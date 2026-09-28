@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Page not found — Stick-It</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg transform='rotate(-6 12 12)'%3E%3Cpath d='M4 3h12l4 4v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z' fill='%23d9634a'/%3E%3Cpath d='M16 3v4h4z' fill='%23a94a35'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Caveat:wght@600;700&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --paper: #faf6e8;
+    --paper-dot: rgba(60,50,20,0.05);
+    --ink: #33301f;
+    --ink-soft: #6b6650;
+    --line: #e4dbb9;
+    --panel: #fffdf5;
+    --accent: #c98a2e;
+    --danger: #d9634a;
+    --shadow: rgba(60, 45, 10, 0.22);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; margin:0; }
+  body{
+    background:var(--paper);
+    background-image: radial-gradient(circle, var(--paper-dot) 1.6px, transparent 1.6px);
+    background-size: 26px 26px;
+    color:var(--ink);
+    font-family:'Sora', system-ui, sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px; padding-block: max(24px, env(safe-area-inset-top,0px)) max(24px, env(safe-area-inset-bottom,0px));
+  }
+  .wrap{ display:flex; flex-direction:column; align-items:center; gap:20px; max-width:420px; width:100%; }
+  .note404{
+    position:relative;
+    background:#fff3a8;
+    background-image: linear-gradient(180deg, rgba(255,255,255,0.35), rgba(255,255,255,0));
+    border-radius:4px;
+    padding:38px 28px 30px;
+    width:100%;
+    box-shadow: 4px 10px 24px var(--shadow), 0 1px 0 rgba(255,255,255,0.4) inset;
+    transform: rotate(-2deg);
+    text-align:center;
+  }
+  .tape{
+    position:absolute; top:-13px; left:50%; transform:translateX(-50%) rotate(-3deg);
+    width:70px; height:26px;
+    background:rgba(255,255,255,0.6);
+    border:1px solid rgba(0,0,0,0.06);
+    box-shadow:0 2px 4px rgba(0,0,0,0.12);
+  }
+  .logo404{ width:56px; height:56px; margin:0 auto 10px; display:block; }
+  h1{
+    font-family:'Caveat', cursive;
+    font-weight:700;
+    font-size:2.6rem;
+    line-height:1.15;
+    margin:0 0 12px;
+  }
+  .code{
+    font-family:'Sora',sans-serif;
+    font-weight:700;
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    color:var(--danger);
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  p.body{
+    font-size:0.95rem;
+    line-height:1.5;
+    color:var(--ink);
+    margin:0;
+  }
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    background:var(--accent); color:#fff; text-decoration:none;
+    font-weight:600; font-size:0.9rem;
+    padding:11px 22px; border-radius:999px;
+    box-shadow:0 6px 16px rgba(201,138,46,0.35);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover{ transform:translateY(-1px); box-shadow:0 8px 20px rgba(201,138,46,0.45); }
+  .btn:active{ transform:translateY(0); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="note404">
+      <div class="tape"></div>
+      <svg class="logo404" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <g transform="rotate(-6 12 12)">
+          <path d="M4 3h12l4 4v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" fill="#d9634a"/>
+          <path d="M16 3v4h4z" fill="#a94a35"/>
+          <line x1="6" y1="11" x2="15" y2="11" stroke="#a94a35" stroke-width="1.3" stroke-linecap="round" opacity="0.55"/>
+          <line x1="6" y1="15" x2="12" y2="15" stroke="#a94a35" stroke-width="1.3" stroke-linecap="round" opacity="0.55"/>
+        </g>
+      </svg>
+      <p class="code">404 — unstuck</p>
+      <h1>Well, this note fell off the board.</h1>
+      <p class="body">Whatever you were looking for isn't here anymore &mdash; or never was. It happens to the best corkboards.</p>
+    </div>
+    <a class="btn" href="/stick-it/">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to safer shores
+    </a>
+  </div>
+</body>
+</html>
