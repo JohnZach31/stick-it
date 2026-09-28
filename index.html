@@ -8,6 +8,7 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     color-scheme: light;
@@ -538,6 +539,9 @@
     box-shadow:0 10px 26px var(--shadow), 0 1px 0 rgba(255,255,255,0.6) inset;
     z-index:9500;
   }
+  @media (max-width: 600px){
+    .minimap{ display:none; }
+  }
   .minimapTrack{ position:relative; height:100%; cursor:pointer; padding:0 4px; }
   .miniNote{
     position:absolute; top:8px; bottom:8px; border-radius:999px;
@@ -625,6 +629,9 @@
     <input type="text" id="searchInput" placeholder="Search notes…" autocomplete="off">
   </div>
   <div class="rightButtons">
+    <button class="gearBtn" id="accountBtn" aria-label="Account" title="Account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+    </button>
     <button class="gearBtn" id="shareBtn" aria-label="Share your board" title="Share your board">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line></svg>
     </button>
@@ -640,6 +647,8 @@
     </button>
   </div>
 </div>
+
+<div class="panel" id="accountPanel" hidden style="width:290px;"></div>
 
 <div class="panel" id="boardPanel" hidden style="width:250px;">
   <h3>Your boards</h3>
@@ -758,6 +767,12 @@
     {name:"Question", hue:266}
   ];
 
+  // Create your own at https://console.cloud.google.com/apis/credentials
+  // (OAuth client ID -> Web application -> add this site's URL under
+  // "Authorized JavaScript origins"). Sign-in shows a friendly notice
+  // until this is filled in.
+  var GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+
   var BOARDS_KEY = "stickyboard.boards.v1";
   var ACTIVE_BOARD_KEY = "stickyboard.activeBoard.v1";
   var LEGACY_NOTES_KEY = "stickyboard.notes.v2";
@@ -773,6 +788,8 @@
   var brandBtn = document.getElementById("brandBtn");
   var boardNameLabel = document.getElementById("boardNameLabel");
   var boardPanel = document.getElementById("boardPanel");
+  var accountBtn = document.getElementById("accountBtn");
+  var accountPanel = document.getElementById("accountPanel");
   var boardList = document.getElementById("boardList");
   var newBoardName = document.getElementById("newBoardName");
   var addBoardBtn = document.getElementById("addBoardBtn");
@@ -830,6 +847,7 @@
   }
 
   function getDisplayName(){
+    if(settings.account && settings.account.name) return settings.account.name;
     if(settings.displayName) return settings.displayName;
     var anon = safeGet("stickyboard.anonId");
     if(!anon){
@@ -878,8 +896,9 @@
     return "hsl(" + cat.hue + "," + sat + "%," + light + "%)";
   }
 
-  var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"" };
+  var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null };
   if(settings.displayName === undefined) settings.displayName = "";
+  if(settings.account === undefined) settings.account = null;
 
   function pickFont(){
     if(settings.lockFont){
@@ -1720,7 +1739,7 @@
 
   // ---------- settings panel ----------
   function closeOtherPanels(except){
-    [panel, sharePanel, boardPanel].forEach(function(p){ if(p !== except) p.hidden = true; });
+    [panel, sharePanel, boardPanel, accountPanel].forEach(function(p){ if(p !== except) p.hidden = true; });
   }
   gearBtn.addEventListener("click", function(){
     var willOpen = panel.hidden;
@@ -1742,7 +1761,131 @@
     if(!sharePanel.hidden && !sharePanel.contains(e.target) && e.target !== shareBtn && !shareBtn.contains(e.target)){
       sharePanel.hidden = true;
     }
+    if(!accountPanel.hidden && !accountPanel.contains(e.target) && e.target !== accountBtn && !accountBtn.contains(e.target)){
+      accountPanel.hidden = true;
+    }
   });
+
+  // ---------- account: Google Sign-In or guest ----------
+  var GOOGLE_ICON =
+    '<svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.5 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.43 3.58v2.98h3.94C22.2 19.1 23.5 15.98 23.5 12.27z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.92l-3.94-2.98c-1.08.72-2.45 1.15-3.99 1.15-3.07 0-5.67-2.07-6.6-4.85H1.34v3.07C3.3 21.3 7.31 24 12 24z"/><path fill="#FBBC05" d="M5.4 14.4c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.75H1.34C.49 8.4 0 10.15 0 12.11s.49 3.71 1.34 5.36L5.4 14.4z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.79l3.5-3.5C17.94 1.19 15.24 0 12 0 7.31 0 3.3 2.7 1.34 6.75l4.06 3.07C6.33 6.94 8.93 4.75 12 4.75z"/></svg>';
+
+  function decodeJwt(token){
+    try{
+      var b64 = token.split(".")[1].replace(/-/g,"+").replace(/_/g,"/");
+      var json = decodeURIComponent(atob(b64).split("").map(function(c){
+        return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(""));
+      return JSON.parse(json);
+    }catch(e){ return null; }
+  }
+
+  function updateAccountIcon(){
+    if(settings.account && settings.account.picture){
+      accountBtn.innerHTML = '<img src="' + settings.account.picture + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
+    } else {
+      accountBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>';
+    }
+  }
+
+  window.handleGoogleCredentialResponse = function(response){
+    var payload = decodeJwt(response.credential);
+    if(!payload) return;
+    settings.account = { name: payload.name, email: payload.email, picture: payload.picture, sub: payload.sub };
+    saveSettings();
+    updateAccountIcon();
+    renderAccountPanel();
+    toast("Signed in as " + payload.name + ".");
+  };
+
+  function signOut(){
+    settings.account = null;
+    saveSettings();
+    updateAccountIcon();
+    renderAccountPanel();
+    try{ if(window.google && window.google.accounts) window.google.accounts.id.disableAutoSelect(); }catch(e){}
+  }
+
+  function renderAccountPanel(){
+    if(settings.account){
+      accountPanel.innerHTML =
+        '<h3>Account</h3>' +
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">' +
+          '<img src="' + settings.account.picture + '" alt="" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;">' +
+          '<div style="overflow:hidden;">' +
+            '<div style="font-weight:700;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(settings.account.name) + '</div>' +
+            '<div class="muted" style="font-size:0.76rem;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(settings.account.email) + '</div>' +
+          '</div>' +
+        '</div>' +
+        '<p class="muted" style="font-size:0.76rem;margin:0 0 12px;">Signed in with Google. Your notes still only live in this browser — signing in just puts your real name &amp; photo on notes and boards you share, instead of an anonymous ID.</p>' +
+        '<button class="btn danger" id="signOutBtn">Sign out</button>';
+      document.getElementById("signOutBtn").addEventListener("click", signOut);
+    } else {
+      accountPanel.innerHTML =
+        '<h3>Account</h3>' +
+        '<p class="muted" style="font-size:0.8rem;margin:0 0 10px;">A quick comparison before you choose:</p>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">' +
+          '<div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:0.74rem;">' +
+            '<strong>Guest (default)</strong>' +
+            '<ul style="margin:6px 0 0;padding-left:15px;">' +
+              '<li>No permissions asked</li>' +
+              '<li>Shared notes show as “Anon-XXXX”</li>' +
+              '<li>Nothing leaves this browser</li>' +
+            '</ul>' +
+          '</div>' +
+          '<div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:0.74rem;">' +
+            '<strong>Signed in with Google</strong>' +
+            '<ul style="margin:6px 0 0;padding-left:15px;">' +
+              '<li>Shares only your name, email &amp; photo</li>' +
+              '<li>Shared notes show your real name &amp; photo</li>' +
+              '<li>Notes still stay local to this browser</li>' +
+            '</ul>' +
+          '</div>' +
+        '</div>' +
+        '<p class="muted" style="font-size:0.7rem;margin:0 0 12px;">We never see your Google password, and never touch your Gmail, Calendar, Drive, or contacts — just your basic profile.</p>' +
+        '<div id="googleBtnHolder"></div>' +
+        '<p class="muted" style="font-size:0.72rem;margin:8px 0 0;text-align:center;">Don’t want to sign in? You’re already a guest — nothing to do. Set a nickname for sharing in Settings.</p>';
+      mountGoogleButton();
+    }
+  }
+
+  function mountGoogleButton(){
+    var holder = document.getElementById("googleBtnHolder");
+    if(!holder) return;
+    var configured = GOOGLE_CLIENT_ID.indexOf("YOUR_GOOGLE_CLIENT_ID") === -1;
+    if(!configured || !window.google || !window.google.accounts){
+      var btn = document.createElement("button");
+      btn.className = "btn primary";
+      btn.style.display = "flex";
+      btn.style.alignItems = "center";
+      btn.style.justifyContent = "center";
+      btn.style.gap = "8px";
+      btn.innerHTML = GOOGLE_ICON + "<span>Continue with Google</span>";
+      btn.addEventListener("click", function(){
+        toast(configured ? "Still loading Google Sign-In — try again in a second." : "Google Sign-In isn’t configured yet on this deployment.");
+      });
+      holder.appendChild(btn);
+      return;
+    }
+    try{
+      window.google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: window.handleGoogleCredentialResponse });
+      window.google.accounts.id.renderButton(holder, { theme: "outline", size: "large", width: 258, text: "continue_with" });
+    }catch(e){
+      var btn2 = document.createElement("button");
+      btn2.className = "btn primary";
+      btn2.textContent = "Continue with Google";
+      btn2.addEventListener("click", function(){ toast("Google Sign-In couldn't load just now."); });
+      holder.appendChild(btn2);
+    }
+  }
+
+  accountBtn.addEventListener("click", function(){
+    var willOpen = accountPanel.hidden;
+    closeOtherPanels(willOpen ? accountPanel : null);
+    accountPanel.hidden = !willOpen;
+    if(willOpen) renderAccountPanel();
+  });
+  updateAccountIcon();
 
   FONTS.forEach(function(f){
     var opt = document.createElement("option");

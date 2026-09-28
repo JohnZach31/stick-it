@@ -26,6 +26,7 @@ Share a board with a link that just *works* — no login, no database, no build 
 | 🎨 **A little chaos, on purpose** | Every note gets a random handwriting font and color (or lock one font in Settings if you'd rather it behave). |
 | ✅ **Tasks & real reminders** | Mark a note as a task, give it a date, and download a genuine `.ics` calendar invite — Google Calendar, Outlook, Apple Calendar, all of it. |
 | 🗂️ **Multiple boards** | Work, Personal, whatever — switch boards from the header, each with its own notes. |
+| 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share — Stick-It only ever sees your name, email, and photo, never your password or your Gmail/Calendar/Drive. Or skip it entirely; guest mode asks for nothing. |
 | 🔗 **Sharing that actually works** | "Share" encodes the note data straight into the link. Anyone who opens it sees it — instantly, no account, no server, no expiry. |
 | 📷 **One-click snapshot** | Grab a JPEG of exactly what's on screen. |
 | 🔍 **Search, minimap, undo** | Type to filter notes, jump around a big board from a minimap, and undo an accidental delete before it's gone for good. |
@@ -59,6 +60,18 @@ It's a single static file — it'll run anywhere.
 3. Live at `https://<you>.github.io/<repo>/` within a minute.
 
 **Vercel / Netlify** — drag the folder into the dashboard, or `vercel` / `netlify deploy`. No build command; it's already static.
+
+### 🔑 Turning on Google Sign-In
+
+Off by default until you plug in your own Client ID (nobody else's app should be able to use it):
+
+1. [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) → **Create Credentials → OAuth client ID → Web application**.
+2. Under **Authorized JavaScript origins**, add every URL you'll open the app from, e.g. `https://johnzach31.github.io` and `http://localhost:8000` for local testing.
+3. Copy the generated Client ID into `index.html`:
+   ```js
+   var GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
+   ```
+4. Reload — the "Continue with Google" button lights up. Until this is set, it shows a friendly heads-up instead of pretending to work.
 
 ---
 
