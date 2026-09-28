@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Stick-It</title>
-<meta name="description" content="A playful sticky-note corkboard — drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
+<meta name="description" content="A playful sticky-note corkboard. Drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
 <link rel="icon" id="faviconLink" href="data:,">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&family=Secular+One&family=Rubik:wght@500;700&family=Heebo:wght@500;700&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Klee+One:wght@600&family=Yomogi&family=Hachi+Maru+Pop&family=Gaegu:wght@700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -22,6 +22,29 @@
     --accent-soft: #f1dfb3;
     --danger: #b5482f;
     --shadow: rgba(60, 45, 10, 0.22);
+  }
+  body.dark{
+    color-scheme: dark;
+    --paper: #14111f;
+    --paper-dot: rgba(255,255,255,0.05);
+    --ink: #ede9f7;
+    --ink-soft: #9c93b8;
+    --line: #322c48;
+    --panel: #1e1a30;
+    --accent: #ffb454;
+    --accent-soft: #3a2f52;
+    --danger: #ff5c72;
+    --shadow: rgba(0,0,0,0.6);
+  }
+  body.dark .note{
+    filter: saturate(1.65) brightness(0.88);
+    box-shadow: 0 0 20px var(--note-bg, transparent), 3px 6px 14px var(--shadow), 0 1px 0 rgba(255,255,255,0.15) inset;
+  }
+  body.dark .note:hover, body.dark .note:focus-within{
+    box-shadow: 0 0 28px var(--note-bg, transparent), 5px 12px 22px var(--shadow), 0 1px 0 rgba(255,255,255,0.15) inset;
+  }
+  body.dark .topbar{
+    background:linear-gradient(to bottom, rgba(30,26,48,0.97), rgba(30,26,48,0.85));
   }
   *{box-sizing:border-box;}
   body{
@@ -296,7 +319,7 @@
   .text h1{ font-size:1.5em; line-height:1.2; margin:0.15em 0; }
   .text h2{ font-size:1.28em; line-height:1.2; margin:0.15em 0; }
   .text h3{ font-size:1.12em; line-height:1.2; margin:0.15em 0; }
-  .text ul{ margin:0.2em 0; padding-left:1.1em; }
+  .text ul, .text ol{ margin:0.2em 0; padding-left:1.1em; }
   .text li{ margin:0.15em 0; }
 
   .toolbar{
@@ -362,6 +385,28 @@
   }
   .floatPop.swatchRow button:hover{ transform:scale(1.15); }
   .floatPop.swatchRow button.active{ border-color:var(--ink); }
+  .floatPop.colorPicker{ padding:14px; width:200px; display:flex; flex-direction:column; align-items:center; gap:10px; }
+  .hueWheel{
+    position:relative; width:150px; height:150px; border-radius:50%;
+    background:conic-gradient(from 0deg,
+      hsl(0,62%,82%), hsl(30,62%,82%), hsl(60,62%,82%), hsl(90,62%,82%),
+      hsl(120,62%,82%), hsl(150,62%,82%), hsl(180,62%,82%), hsl(210,62%,82%),
+      hsl(240,62%,82%), hsl(270,62%,82%), hsl(300,62%,82%), hsl(330,62%,82%), hsl(360,62%,82%));
+    box-shadow:0 0 0 3px #fff, 0 2px 10px rgba(0,0,0,0.15);
+    cursor:crosshair; flex:none;
+  }
+  .hueWheel .hueDot{
+    position:absolute; width:16px; height:16px; margin:-8px 0 0 -8px;
+    border-radius:50%; border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.4);
+    pointer-events:none;
+  }
+  .colorPicker .quickRow{ display:flex; gap:5px; }
+  .colorPicker .quickRow button{
+    all:unset; width:18px; height:18px; border-radius:50%; cursor:pointer;
+    border:2px solid transparent; box-sizing:border-box;
+  }
+  .colorPicker .quickRow button:hover{ transform:scale(1.15); }
+  .colorPicker .quickRow button.active{ border-color:var(--ink); }
   .floatPop.notePop{
     padding:10px; display:flex; flex-direction:column; align-items:stretch; gap:6px; width:230px;
   }
@@ -490,6 +535,17 @@
   .boardRow button svg{ width:11px; height:11px; }
   .boardRow button:hover{ background:rgba(0,0,0,0.1); color:var(--ink); }
   .boardRow input{ flex:1; padding:3px 6px; border-radius:6px; border:1px solid var(--line); font-size:0.85rem; }
+  .addBoardRow{
+    display:flex; align-items:center; gap:6px; margin-top:10px;
+    background:#fff; border:1px solid var(--line); border-radius:999px; padding:4px 4px 4px 14px;
+  }
+  .addBoardRow input{ flex:1; border:none; outline:none; background:transparent; font-size:0.85rem; padding:7px 0; font-family:inherit; color:var(--ink); }
+  .addBoardRow button{
+    all:unset; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+    font-size:1.15rem; font-weight:700; line-height:1; transition:background .15s ease;
+  }
+  .addBoardRow button:hover{ background:#b47a24; }
 
   .hint{
     position:fixed;
@@ -703,13 +759,13 @@
 </div>
 
 
-<div class="panel" id="boardPanel" hidden style="width:250px;">
+<div class="panel" id="boardPanel" hidden style="width:250px; right:auto; left:18px;">
   <h3>Your boards</h3>
   <div id="boardList"></div>
-  <div class="row" style="margin-top:10px;">
-    <input type="text" id="newBoardName" placeholder="New board name" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid var(--line);">
+  <div class="addBoardRow">
+    <input type="text" id="newBoardName" placeholder="New board name" maxlength="40">
+    <button id="addBoardBtn" aria-label="Add board" title="Add board">+</button>
   </div>
-  <button class="btn primary" id="addBoardBtn">+ Add board</button>
 </div>
 
 <div class="panel" id="panel" hidden>
@@ -719,6 +775,11 @@
     <button class="switch" id="lockToggle" role="switch" aria-checked="false"></button>
   </div>
   <select id="fontSelect" disabled></select>
+
+  <div class="row" style="margin-top:12px;">
+    <label for="darkToggle">Dark mode (neon notes)</label>
+    <button class="switch" id="darkToggle" role="switch" aria-checked="false"></button>
+  </div>
 
   <h4>Sharing</h4>
   <div class="row">
@@ -809,7 +870,18 @@
     {name:"Caveat Brush", stack:"'Caveat Brush', cursive"},
     {name:"Sriracha", stack:"'Sriracha', cursive"},
     {name:"Zeyada", stack:"'Zeyada', cursive"},
-    {name:"Rock Salt", stack:"'Rock Salt', cursive"}
+    {name:"Rock Salt", stack:"'Rock Salt', cursive"},
+    {name:"Secular One", stack:"'Secular One', sans-serif"},
+    {name:"Rubik", stack:"'Rubik', sans-serif"},
+    {name:"Heebo", stack:"'Heebo', sans-serif"},
+    {name:"Ma Shan Zheng", stack:"'Ma Shan Zheng', cursive"},
+    {name:"Zhi Mang Xing", stack:"'Zhi Mang Xing', cursive"},
+    {name:"Long Cang", stack:"'Long Cang', cursive"},
+    {name:"Liu Jian Mao Cao", stack:"'Liu Jian Mao Cao', cursive"},
+    {name:"Klee One", stack:"'Klee One', cursive"},
+    {name:"Yomogi", stack:"'Yomogi', cursive"},
+    {name:"Hachi Maru Pop", stack:"'Hachi Maru Pop', cursive"},
+    {name:"Gaegu", stack:"'Gaegu', cursive"}
   ];
 
   var ICONS = {
@@ -821,6 +893,8 @@
     close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>',
     image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9.5" r="1.5"></circle><path d="M21 16l-5.5-5.5L5 21"></path></svg>',
     more: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2.2"></circle><circle cx="12" cy="12" r="2.2"></circle><circle cx="19" cy="12" r="2.2"></circle></svg>',
+    highlighter: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11 6 20l-3 1 1-3 9-9"></path><path d="M9 11l4 4"></path><path d="M13 3l8 8-4 4-8-8z"></path></svg>',
+    wheel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"></circle></svg>',
     pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>'
   };
 
@@ -871,6 +945,7 @@
   var newBoardName = document.getElementById("newBoardName");
   var addBoardBtn = document.getElementById("addBoardBtn");
   var lockToggle = document.getElementById("lockToggle");
+  var darkToggle = document.getElementById("darkToggle");
   var fontSelect = document.getElementById("fontSelect");
   var displayNameInput = document.getElementById("displayNameInput");
   var clearBtn = document.getElementById("clearBtn");
@@ -973,10 +1048,12 @@
     return "hsl(" + cat.hue + "," + sat + "%," + light + "%)";
   }
 
-  var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null, guestConfirmed:false };
+  var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null, guestConfirmed:false, theme:"light" };
   if(settings.displayName === undefined) settings.displayName = "";
   if(settings.account === undefined) settings.account = null;
   if(settings.guestConfirmed === undefined) settings.guestConfirmed = false;
+  if(settings.theme === undefined) settings.theme = "light";
+  document.body.classList.toggle("dark", settings.theme === "dark");
 
   function pickFont(){
     if(settings.lockFont){
@@ -1025,7 +1102,7 @@
     notes = stored || [
       {id:"seed-1", x:60, y:40, html:"Click anywhere on the board to stick a new note here.", bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
       {id:"seed-2", x:320, y:170, html:"Drag the little tab at the top to move me around.", bg:randomColor(), font:pickFont(), rot:rand(-4,6), z:2, categoryIndex:0},
-      {id:"seed-3", x:70, y:280, html:"Hover a note for its toolbar &mdash; headings, a bullet list, and marking it a task.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
+      {id:"seed-3", x:70, y:280, html:"Hover a note for its toolbar: headings, a bullet list, and marking it a task.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
     ];
     notes.forEach(function(n){
       if(n.html === undefined) n.html = escapeHtml(n.text || "");
@@ -1064,6 +1141,8 @@
   function adjustForKeyboard(el){
     if(!window.visualViewport) return;
     var vh = window.visualViewport.height;
+    var keyboardLikelyOpen = (window.innerHeight - vh) > 100;
+    if(!keyboardLikelyOpen) return;
     var rect = el.closest(".note").getBoundingClientRect();
     var overflow = rect.bottom - vh + 16;
     if(overflow > 0){
@@ -1106,7 +1185,7 @@
     pop.className = "floatPop " + className;
     document.body.appendChild(pop);
     var r = triggerBtn.getBoundingClientRect();
-    var POP_WIDTHS = {notePop:230, calPop:250, dateCal:216, kbdPop:270, swatchRow:140, moreMenu:44};
+    var POP_WIDTHS = {notePop:230, calPop:250, dateCal:216, kbdPop:270, swatchRow:140, moreMenu:44, colorPicker:200};
     var popW = POP_WIDTHS[className] || 140;
     var left = Math.min(Math.max(12, r.left + r.width/2 - popW/2), window.innerWidth - popW - 12);
     pop.style.left = left + "px";
@@ -1241,7 +1320,7 @@
       '<div><label>Event title</label><input type="text" id="calTitle"></div>' +
       '<div><label>Attendees (optional, comma-separated emails)</label><input type="text" id="calAttendees" placeholder="jane@example.com, sam@example.com"></div>' +
       '<button class="btn primary" id="calSubmit" style="margin:2px 0 0;">Download calendar invite (.ics)</button>' +
-      '<p class="muted" style="margin:0;font-size:0.72rem;">Opens in Google Calendar, Outlook, or Apple Calendar &mdash; whichever you import it into.</p>';
+      '<p class="muted" style="margin:0;font-size:0.72rem;">Opens in Google Calendar, Outlook, or Apple Calendar, whichever you import it into.</p>';
 
     var titleInput = pop.querySelector("#calTitle");
     var attendeesInput = pop.querySelector("#calAttendees");
@@ -1271,6 +1350,18 @@
   function applyFormat(textEl, cmd, value){
     textEl.focus();
     try{ document.execCommand(cmd, false, value || null); }catch(e){}
+    textEl.dispatchEvent(new Event("input", {bubbles:true}));
+  }
+
+  function cycleList(textEl){
+    textEl.focus();
+    var isUl = false, isOl = false;
+    try{ isUl = document.queryCommandState("insertUnorderedList"); }catch(e){}
+    try{ isOl = document.queryCommandState("insertOrderedList"); }catch(e){}
+    try{
+      if(!isUl && !isOl) document.execCommand("insertUnorderedList");
+      else document.execCommand("insertOrderedList");
+    }catch(e){}
     textEl.dispatchEvent(new Event("input", {bubbles:true}));
   }
 
@@ -1355,8 +1446,20 @@
       ulBtn.innerHTML = ICONS.ul;
       ulBtn.title = "Bullet list";
       ulBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
-      ulBtn.addEventListener("click", function(){ applyFormat(text, "insertUnorderedList"); });
+      ulBtn.title = "Cycle list: bullet → numbered → none";
+      ulBtn.addEventListener("click", function(){ cycleList(text); });
       toolbar.appendChild(ulBtn);
+
+      var hlBtn = document.createElement("button");
+      hlBtn.innerHTML = ICONS.highlighter;
+      hlBtn.title = "Highlight selected text";
+      hlBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      hlBtn.addEventListener("click", function(){
+        text.focus();
+        try{ document.execCommand("hiliteColor", false, "#fff36b"); }catch(e){}
+        text.dispatchEvent(new Event("input", {bubbles:true}));
+      });
+      toolbar.appendChild(hlBtn);
 
       var uploadBtn = document.createElement("button");
       uploadBtn.innerHTML = ICONS.image;
@@ -1398,8 +1501,54 @@
 
       catDot.addEventListener("click", function(e){
         e.stopPropagation();
-        var pop = openFloatingPopover(catDot, "swatchRow");
+        var pop = openFloatingPopover(catDot, "colorPicker");
         if(!pop) return;
+
+        var wheel = document.createElement("div");
+        wheel.className = "hueWheel";
+        var dot = document.createElement("div");
+        dot.className = "hueDot";
+        wheel.appendChild(dot);
+        pop.appendChild(wheel);
+
+        function placeDot(hue){
+          var rad = (hue - 90) * Math.PI / 180;
+          var r = 75;
+          dot.style.left = (75 + r * Math.cos(rad)) + "px";
+          dot.style.top = (75 + r * Math.sin(rad)) + "px";
+          dot.style.background = "hsl(" + hue + ",62%,82%)";
+        }
+        function currentHue(){
+          var m = /hsl\((\d+)/.exec(n.bg);
+          return m ? +m[1] : 40;
+        }
+        placeDot(currentHue());
+
+        function pickAt(clientX, clientY){
+          var r = wheel.getBoundingClientRect();
+          var cx = r.left + r.width/2, cy = r.top + r.height/2;
+          var dx = clientX - cx, dy = clientY - cy;
+          var deg = Math.atan2(dx, -dy) * 180 / Math.PI;
+          if(deg < 0) deg += 360;
+          n.categoryIndex = 0;
+          n.bg = "hsl(" + Math.round(deg) + "," + Math.floor(rand(55,68)) + "%," + Math.floor(rand(79,85)) + "%)";
+          el.style.setProperty("--note-bg", n.bg);
+          catDot.style.background = n.bg;
+          catDot.title = "Custom color";
+          placeDot(Math.round(deg));
+          saveNotes();
+        }
+        wheel.addEventListener("pointerdown", function(ev){
+          ev.stopPropagation();
+          pickAt(ev.clientX, ev.clientY);
+          function move(mv){ pickAt(mv.clientX, mv.clientY); }
+          function up(){ window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); }
+          window.addEventListener("pointermove", move);
+          window.addEventListener("pointerup", up);
+        });
+
+        var quickRow = document.createElement("div");
+        quickRow.className = "quickRow";
         CATEGORIES.forEach(function(c, ci){
           var sw = document.createElement("button");
           sw.style.background = c.hue == null ? c.swatch : ("hsl(" + c.hue + ",65%,55%)");
@@ -1416,8 +1565,9 @@
             saveNotes();
             closeFloatingPopovers();
           });
-          pop.appendChild(sw);
+          quickRow.appendChild(sw);
         });
+        pop.appendChild(quickRow);
       });
       toolbar.appendChild(swatchWrap);
 
@@ -1429,7 +1579,7 @@
       shareNoteBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
       shareNoteBtn.addEventListener("click", function(e){
         e.stopPropagation();
-        openShareNotePopover(n, text, shareNoteBtn);
+        openShareNotePopover(n, text);
       });
       shareWrap.appendChild(shareNoteBtn);
       toolbar.appendChild(shareWrap);
@@ -1693,9 +1843,7 @@
     pendingImageNote = null;
   });
 
-  function openShareNotePopover(n, textEl, triggerBtn){
-    var pop = openFloatingPopover(triggerBtn, "notePop");
-    if(!pop) return;
+  function openShareNotePopover(n, textEl){
     var name = getDisplayName();
     var plain = getPlainText(textEl) || "a sticky note";
     var shortDesc = plain.slice(0, 80);
@@ -1704,35 +1852,50 @@
     var link = encoded ? (location.href.split("#")[0] + "#sn=" + encoded) : "";
     var msg = "Check out this sticky note by " + name + ": \"" + shortDesc + (plain.length > 80 ? "…" : "") + "\"" + (link ? ". Click to view: " + link : "");
 
-    pop.innerHTML = "";
-    var ta = document.createElement("textarea");
-    ta.value = msg;
-    ta.readOnly = true;
-    ta.style.width = "100%";
-    ta.style.minHeight = "72px";
-    ta.style.fontSize = "0.78rem";
-    ta.style.borderRadius = "8px";
-    ta.style.border = "1px solid var(--line)";
-    ta.style.padding = "6px";
-    ta.style.fontFamily = "'Sora',sans-serif";
-    pop.appendChild(ta);
-    var copyBtn = document.createElement("button");
-    copyBtn.className = "btn primary";
-    copyBtn.style.margin = "0";
-    copyBtn.textContent = "Copy message";
-    copyBtn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
-    copyBtn.addEventListener("click", async function(ev){
-      ev.stopPropagation();
-      try{ await navigator.clipboard.writeText(msg); toast("Message copied — paste it into WhatsApp or email."); }
-      catch(err){ ta.select(); toast("Select the text above and copy it manually."); }
+    var backdrop = document.createElement("div");
+    backdrop.className = "acctBackdrop";
+    var card = document.createElement("div");
+    card.className = "acctCard";
+    card.style.width = "380px";
+    backdrop.appendChild(card);
+    document.body.appendChild(backdrop);
+    function close(){ backdrop.remove(); document.removeEventListener("keydown", escHandler); }
+    function escHandler(e){ if(e.key === "Escape") close(); }
+    backdrop.addEventListener("click", function(e){ if(e.target === backdrop) close(); });
+    document.addEventListener("keydown", escHandler);
+
+    card.innerHTML =
+      '<button class="acctClose" id="shareNoteClose" aria-label="Close">' + ICONS.close + '</button>' +
+      '<h3>Share this note</h3>' +
+      '<p class="acctSub">Here’s what they’ll see:</p>' +
+      '<div style="display:flex;justify-content:center;margin-bottom:16px;">' +
+        '<div class="note" style="position:relative;left:auto;top:auto;width:190px;min-height:130px;padding:18px 12px 12px;transform:rotate(' + n.rot + 'deg);background:' + n.bg + ';"></div>' +
+      '</div>' +
+      '<div style="background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:0.82rem;line-height:1.5;color:var(--ink);margin-bottom:14px;max-height:160px;overflow-y:auto;">' + escapeHtml(msg) + '</div>' +
+      '<button class="guestBtn" id="copyMsgBtn" style="background:var(--accent);color:#fff;border-color:var(--accent);">Copy message</button>' +
+      '<button class="acctBack" id="copyLinkOnlyBtn" style="display:block;text-align:center;width:100%;margin:12px 0 0;">Just copy the link</button>' +
+      '<p class="acctSub" style="margin-top:14px;font-size:0.72rem;">A real, fully public link: anyone who opens it can view this note, no account needed.</p>';
+
+    var previewNote = card.querySelector(".note");
+    previewNote.style.background = n.bg;
+    var previewText = document.createElement("div");
+    previewText.className = "text";
+    previewText.style.fontFamily = fontStack(n.font);
+    previewText.style.fontSize = "1rem";
+    previewText.style.minHeight = "auto";
+    previewText.innerHTML = n.html || "";
+    previewNote.appendChild(previewText);
+
+    card.querySelector("#shareNoteClose").addEventListener("click", close);
+    card.querySelector("#copyMsgBtn").addEventListener("click", async function(){
+      try{ await navigator.clipboard.writeText(msg); toast("Message copied. Paste it into WhatsApp or email."); }
+      catch(err){ toast("Couldn't copy automatically. Select the text above."); }
     });
-    pop.appendChild(copyBtn);
-    var footNote = document.createElement("p");
-    footNote.className = "muted";
-    footNote.style.margin = "0";
-    footNote.style.fontSize = "0.7rem";
-    footNote.textContent = "The link is a real, fully public link — anyone who opens it can view this note, no account needed.";
-    pop.appendChild(footNote);
+    card.querySelector("#copyLinkOnlyBtn").addEventListener("click", async function(){
+      if(!link){ toast("No link available."); return; }
+      try{ await navigator.clipboard.writeText(link); toast("Link copied."); }
+      catch(err){ toast("Couldn't copy automatically."); }
+    });
   }
 
   function renderSingleNoteView(encoded){
@@ -1917,23 +2080,31 @@
           '<h3>' + escapeHtml(settings.account.name) + '</h3>' +
           '<p class="acctSub">' + escapeHtml(settings.account.email) + '</p>' +
         '</div>' +
-        '<div class="acctWhy"><p>Your real name &amp; photo show up on anything you share — boards, notes, and any future collaboration features. Your notes themselves still only live in this browser.</p></div>' +
+        '<div class="acctWhy"><p>Your real name &amp; photo show up on anything you share: boards, notes, and any future collaboration features. Your notes themselves still only live in this browser.</p></div>' +
         '<button class="guestBtn" id="signOutBtn" style="margin-top:18px;color:var(--danger);border-color:var(--danger);">Sign out</button>';
       card.querySelector("#signOutBtn").addEventListener("click", signOut);
 
     } else if(state === "guestHome"){
       card.innerHTML = closeBtnHtml +
         '<h3 style="text-align:center;">Browsing as a guest</h3>' +
-        '<p class="acctSub">Shared notes show an anonymous name. Switch any time.</p>' +
+        '<p class="acctSub">Notes you share will show this name:</p>' +
+        '<div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:18px;">' +
+          '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex:none;">' + escapeHtml(getDisplayName().charAt(0).toUpperCase()) + '</div>' +
+          '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-size:0.9rem;font-family:inherit;">' +
+        '</div>' +
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>';
       mountGoogleButton();
+      card.querySelector("#guestNameInput").addEventListener("input", function(e){
+        settings.displayName = e.target.value.trim();
+        saveSettings();
+      });
 
     } else if(state === "guestCompare"){
       card.innerHTML =
         '<button class="acctBack" id="acctBackBtn">← Back</button>' +
         '<h3 style="text-align:center;">Here’s the difference</h3>' +
-        '<p class="acctSub">No judgment either way — just so you know what you’re choosing.</p>' +
+        '<p class="acctSub">No judgment either way, just so you know what you’re choosing.</p>' +
         '<div class="acctCompare">' +
           '<div><strong>Guest</strong><ul>' +
             '<li>No permissions asked</li>' +
@@ -1960,13 +2131,13 @@
     } else {
       card.innerHTML = closeBtnHtml +
         '<h3>Sign in to Stick-It</h3>' +
-        '<p class="acctSub">Optional — pick whichever fits.</p>' +
+        '<p class="acctSub">Optional. Pick whichever fits.</p>' +
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
         '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
         '<div class="acctWhy">' +
           '<p>👤 Your real name &amp; photo on anything you share, instead of “Anon-4821.”</p>' +
-          '<p>🔓 Only your name, email &amp; photo — never your password, Gmail, Calendar, or Drive.</p>' +
+          '<p>🔓 Only your name, email &amp; photo. Never your password, Gmail, Calendar, or Drive.</p>' +
           '<p>🚀 Sets you up for premium features and multi-user boards, coming soon.</p>' +
         '</div>';
       card.querySelector("#chooseGuestBtn").addEventListener("click", function(){ renderAccountModal("guestCompare"); });
@@ -1985,7 +2156,7 @@
     if(!configured || !window.google || !window.google.accounts){
       fallback.innerHTML = GOOGLE_ICON + "<span>Continue with Google</span>";
       fallback.addEventListener("click", function(){
-        toast(configured ? "Still loading Google Sign-In — try again in a second." : "Google Sign-In isn’t configured yet on this deployment.");
+        toast(configured ? "Still loading Google Sign-In. Try again in a second." : "Google Sign-In isn’t configured yet on this deployment.");
       });
       return;
     }
@@ -2019,6 +2190,16 @@
     lockToggle.classList.toggle("on", settings.lockFont);
     lockToggle.setAttribute("aria-checked", String(settings.lockFont));
     fontSelect.disabled = !settings.lockFont;
+    saveSettings();
+  });
+
+  darkToggle.classList.toggle("on", settings.theme === "dark");
+  darkToggle.setAttribute("aria-checked", String(settings.theme === "dark"));
+  darkToggle.addEventListener("click", function(){
+    settings.theme = settings.theme === "dark" ? "light" : "dark";
+    document.body.classList.toggle("dark", settings.theme === "dark");
+    darkToggle.classList.toggle("on", settings.theme === "dark");
+    darkToggle.setAttribute("aria-checked", String(settings.theme === "dark"));
     saveSettings();
   });
   fontSelect.addEventListener("change", function(){
@@ -2108,7 +2289,7 @@
       importArea.value = "";
       toast("Board imported.");
     }catch(e){
-      toast("Import failed — the JSON may be malformed.");
+      toast("Import failed. The JSON may be malformed.");
     }
   });
 
@@ -2152,7 +2333,7 @@
   snapshotBtn.addEventListener("click", async function(){
     shareResult.innerHTML = '<p class="muted">Rendering snapshot…</p>';
     if(typeof html2canvas !== "function"){
-      shareResult.innerHTML = '<p class="muted">Snapshot tool didn\'t load — try again in a moment.</p>';
+      shareResult.innerHTML = '<p class="muted">Snapshot tool didn\'t load. Try again in a moment.</p>';
       return;
     }
     try{
@@ -2193,7 +2374,7 @@
     });
     var encoded = encodeState(payload);
     if(!encoded){
-      shareResult.innerHTML = '<p class="muted">Couldn\'t encode the board for sharing — try the snapshot image instead.</p>';
+      shareResult.innerHTML = '<p class="muted">Couldn\'t encode the board for sharing. Try the snapshot image instead.</p>';
       return;
     }
     var link = location.href.split("#")[0] + "#sb=" + encoded;
@@ -2201,8 +2382,8 @@
     var p = document.createElement("p");
     p.className = "muted";
     p.textContent = link.length > 6000
-      ? "This link is long (your board has a lot of notes) but it's a real, fully public link — anyone can open it, no account needed."
-      : "A real, fully public link — anyone who opens it can view this board, no account needed.";
+      ? "This link is long (your board has a lot of notes) but it's a real, fully public link: anyone can open it, no account needed."
+      : "A real, fully public link: anyone who opens it can view this board, no account needed.";
     shareResult.appendChild(p);
     var row = document.createElement("div");
     row.className = "copyRow";
@@ -2264,14 +2445,14 @@
   var tourRoot = null, tourIndex = 0, tourSteps = [];
   function buildTourSteps(){
     var steps = [
-      {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do — hit Next to begin."},
+      {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do. Hit Next to begin."},
       {sel:"#boardInner", title:"Stick a note", body:"Click any empty spot on the board to pin a new note there, ready to type into right away."},
       {sel:".note", title:"Move, format, delete", body:"Drag a note by its tape tab to move it. Hover a note to reveal its × and its toolbar for headings, bullet lists, color categories and marking it a task."},
-      {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match — handy once the board fills up."},
+      {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match. Handy once the board fills up."},
       {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump straight there."},
-      {sel:"#accountBtn", title:"Sign in (optional)", body:"Sign in with Google so your real name and photo show up on notes you share, or stay a guest — totally up to you."},
+      {sel:"#accountBtn", title:"Sign in (optional)", body:"Sign in with Google so your real name and photo show up on notes you share, or stay a guest. Totally up to you."},
       {sel:"#gearBtn", title:"Settings", body:"Lock new notes to one font, export or import your board as JSON, or clear everything."},
-      {sel:"#shareBtn", title:"Share your board", body:"Get a real, fully public link anyone can open as a read-only board — no account needed — or grab a JPEG snapshot of what's on screen right now."},
+      {sel:"#shareBtn", title:"Share your board", body:"Get a real, fully public link anyone can open as a read-only board (no account needed), or grab a JPEG snapshot of what's on screen right now."},
       {sel:null, title:"That's it!", body:"Click anywhere on the board to get started."}
     ];
     return steps.filter(function(s){
@@ -2511,6 +2692,9 @@
       newBoardName.value = "";
       location.hash = "";
       location.reload();
+    });
+    newBoardName.addEventListener("keydown", function(e){
+      if(e.key === "Enter") addBoardBtn.click();
     });
   }
 
