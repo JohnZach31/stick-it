@@ -1,0 +1,2282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick-It</title>
+<meta name="description" content="A playful sticky-note corkboard — drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    color-scheme: light;
+    --paper: #faf6e8;
+    --paper-dot: rgba(60,50,20,0.05);
+    --ink: #33301f;
+    --ink-soft: #6b6650;
+    --line: #e4dbb9;
+    --panel: #fffdf5;
+    --accent: #c98a2e;
+    --accent-soft: #f1dfb3;
+    --danger: #b5482f;
+    --shadow: rgba(60, 45, 10, 0.22);
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Sora', system-ui, sans-serif;
+    overflow:hidden;
+    height:100%;
+  }
+  html{height:100%;}
+  button, input, textarea, select{ font-family:inherit; }
+  .muted{ color:var(--ink-soft); font-size:0.85rem; }
+
+  .topbar{
+    position:fixed;
+    top:env(safe-area-inset-top,0px);
+    left:0; right:0;
+    min-height:56px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:8px 18px;
+    background:linear-gradient(to bottom, rgba(250,246,232,0.97), rgba(250,246,232,0.85));
+    border-bottom:1px solid var(--line);
+    z-index:10000;
+    backdrop-filter:blur(3px);
+  }
+  .brand{
+    font-family:'Sora', system-ui, sans-serif;
+    font-weight:600;
+    font-size:1.25rem;
+    color:var(--ink);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    letter-spacing:0.2px;
+    flex:none;
+  }
+  .brand .dot{
+    width:10px;height:10px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 0 3px var(--accent-soft);
+  }
+
+  .searchWrap{ position:relative; flex:1 1 160px; max-width:280px; min-width:120px; }
+  .searchWrap input{
+    width:100%;
+    padding:8px 12px 8px 30px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+    font-size:0.88rem;
+    outline:none;
+  }
+  .searchWrap input:focus{ border-color:var(--accent); }
+  .searchWrap svg{ position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--ink-soft); pointer-events:none; }
+
+  .rightButtons{ display:flex; align-items:center; gap:10px; flex:none; }
+  .gearBtn{
+    width:38px;height:38px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--panel);
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    color:var(--ink-soft);
+    font-family:'Sora', sans-serif;
+    font-size:1rem;
+    font-weight:600;
+    transition:transform .35s ease, color .2s ease, border-color .2s ease;
+  }
+  .gearBtn:hover{ color:var(--ink); border-color:var(--accent); }
+  .gearBtn.spin svg{ animation: spin .5s ease; }
+  @keyframes spin{ to{ transform:rotate(90deg); } }
+  .gearBtn svg{ width:20px;height:20px; display:block; }
+
+  /* settings + share panels */
+  .panel{
+    position:fixed;
+    top:64px; right:18px;
+    width:260px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px;
+    box-shadow:0 10px 28px var(--shadow);
+    z-index:10001;
+    font-size:0.92rem;
+    animation: panelIn .18s ease both;
+    max-height:80vh;
+    overflow-y:auto;
+  }
+  @keyframes panelIn{ from{ opacity:0; transform:translateY(-6px) scale(.98);} to{opacity:1; transform:none;} }
+  .panel h3{ margin:0 0 12px; font-family:'Sora',sans-serif; font-size:1rem; font-weight:600; }
+  .panel h4{ margin:14px 0 8px; font-size:0.82rem; text-transform:uppercase; letter-spacing:0.05em; color:var(--ink-soft); }
+  .row{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .row label{ flex:1; color:var(--ink); cursor:pointer; }
+  select, textarea, .linkBox{
+    width:100%;
+    padding:7px 8px;
+    border-radius:7px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    font-size:0.85rem;
+    font-family:inherit;
+  }
+  textarea{ min-height:70px; resize:vertical; }
+  select:disabled{ opacity:0.5; }
+  .switch{
+    position:relative; width:38px; height:22px; flex:none;
+    background:var(--line); border-radius:999px; cursor:pointer; border:none;
+    transition:background .2s ease;
+  }
+  .switch.on{ background:var(--accent); }
+  .switch::after{
+    content:''; position:absolute; top:2px; left:2px;
+    width:18px;height:18px; border-radius:50%; background:#fff;
+    transition:transform .2s ease; box-shadow:0 1px 3px rgba(0,0,0,0.3);
+  }
+  .switch.on::after{ transform:translateX(16px); }
+  .btn{
+    width:100%;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:#fff;
+    color:var(--ink);
+    font-size:0.85rem;
+    cursor:pointer;
+    margin-top:6px;
+    transition:background .15s ease, color .15s ease, border-color .15s ease;
+    text-align:center;
+  }
+  .btn:hover{ border-color:var(--accent); }
+  .btn.danger{ border-color:var(--danger); color:var(--danger); }
+  .btn.danger.confirm{ background:var(--danger); color:#fff; }
+  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .count{ color:var(--ink-soft); font-size:0.8rem; margin-top:10px; text-align:center; }
+  .copyRow{ display:flex; gap:6px; margin-top:8px; }
+  .copyRow input{ flex:1; padding:6px 8px; border-radius:7px; border:1px solid var(--line); font-size:0.78rem; background:#fff; }
+  .copyRow button{ flex:none; }
+  #shareResult img{ width:100%; border-radius:8px; margin-top:8px; display:block; }
+
+  /* board */
+  .board{
+    position:fixed;
+    inset:0;
+    top:56px;
+    overflow-x:auto;
+    overflow-y:hidden;
+    touch-action:pan-x;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:var(--line) transparent;
+  }
+  .board::-webkit-scrollbar{ height:10px; }
+  .board::-webkit-scrollbar-thumb{ background:var(--line); border-radius:6px; }
+  .board::-webkit-scrollbar-track{ background:transparent; }
+
+  .boardInner{
+    position:relative;
+    height:100%;
+    min-width:100%;
+    background-image: radial-gradient(circle, var(--paper-dot) 1.6px, transparent 1.6px);
+    background-size: 26px 26px;
+    background-position: 6px 6px;
+    cursor: crosshair;
+  }
+  body.read-only .boardInner{ cursor:default; }
+
+  @property --wob{ syntax:'<angle>'; inherits:false; initial-value:0deg; }
+  @keyframes wobble{ 0%,100%{ --wob:-3.5deg; } 50%{ --wob:3.5deg; } }
+
+  .note{
+    position:absolute;
+    width:250px;
+    min-height:196px;
+    padding:26px 14px 14px 14px;
+    background: var(--note-bg, #fff3a8);
+    color: var(--note-text, #33301f);
+    border-radius:3px;
+    box-shadow: 3px 6px 14px var(--shadow), 0 1px 0 rgba(255,255,255,0.4) inset;
+    transform: rotate(var(--rot, 0deg));
+    transition: transform .18s ease, box-shadow .18s ease;
+    cursor: text;
+    user-select:text;
+  }
+  .note:hover, .note:focus-within{
+    transform: rotate(var(--rot, 0deg)) translateY(-4px) scale(1.02);
+    box-shadow: 5px 12px 22px var(--shadow), 0 1px 0 rgba(255,255,255,0.4) inset;
+    z-index: 9998 !important;
+  }
+  .note.dragging{
+    transition:none;
+    cursor:grabbing;
+    box-shadow: 8px 18px 30px var(--shadow);
+    z-index:9999 !important;
+    transform: rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important;
+    animation: wobble .5s ease-in-out infinite;
+  }
+  .note.new{ animation: popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+  .note.removing{ animation: popOut .26s ease-in forwards; pointer-events:none; }
+  @keyframes popIn{
+    0%{ transform: rotate(var(--rot,0deg)) scale(.35) translateY(16px); opacity:0; }
+    65%{ transform: rotate(var(--rot,0deg)) scale(1.08) translateY(-4px); opacity:1; }
+    100%{ transform: rotate(var(--rot,0deg)) scale(1) translateY(0); opacity:1; }
+  }
+  @keyframes popOut{
+    to{ transform: rotate(calc(var(--rot,0deg) + 22deg)) scale(.3) translateY(24px); opacity:0; }
+  }
+
+  .tab{
+    position:absolute;
+    top:-11px; left:50%;
+    transform:translateX(-50%) rotate(-2deg);
+    width:56px; height:22px;
+    background:rgba(255,255,255,0.55);
+    border:1px solid rgba(0,0,0,0.06);
+    border-radius:2px;
+    cursor:grab;
+    box-shadow:0 2px 4px rgba(0,0,0,0.12);
+  }
+  .tab:active{ cursor:grabbing; }
+  body.read-only .tab{ display:none; }
+
+  .del{
+    position:absolute;
+    top:6px; right:6px;
+    width:22px;height:22px;
+    border-radius:50%;
+    border:none;
+    background:rgba(0,0,0,0.1);
+    color:inherit;
+    font-size:14px;
+    line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    cursor:pointer;
+    opacity:0;
+    transition:opacity .15s ease, background .15s ease, transform .15s ease;
+  }
+  .note:hover .del{ opacity:0.85; }
+  .del:hover{ background:rgba(0,0,0,0.22); transform:scale(1.1); opacity:1; }
+  body.read-only .del{ display:none; }
+  .del svg{ width:11px; height:11px; }
+
+  .badge{
+    position:absolute; top:6px; left:6px;
+    font-size:0.66rem;
+    padding:2px 8px;
+    border-radius:999px;
+    background:rgba(255,255,255,0.6);
+    max-width:62%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .badge.done{ text-decoration:line-through; opacity:0.6; }
+
+  .text{
+    font-size:1.24rem;
+    line-height:1.42;
+    outline:none;
+    min-height:104px;
+    overflow-wrap:anywhere;
+    white-space:pre-wrap;
+  }
+  .text:empty:before{
+    content: attr(data-placeholder);
+    opacity:0.45;
+  }
+  .text.done{ text-decoration:line-through; opacity:0.55; }
+  .text h1{ font-size:1.5em; line-height:1.2; margin:0.15em 0; }
+  .text h2{ font-size:1.28em; line-height:1.2; margin:0.15em 0; }
+  .text h3{ font-size:1.12em; line-height:1.2; margin:0.15em 0; }
+  .text ul{ margin:0.2em 0; padding-left:1.1em; }
+  .text li{ margin:0.15em 0; }
+
+  .toolbar{
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+  }
+  .floatPop.moreMenu{ padding:6px; }
+  .moreBtn{
+    position:absolute; bottom:6px; right:6px;
+    width:24px; height:24px; border-radius:50%;
+    background:rgba(255,255,255,0.7);
+    -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--ink); cursor:pointer; border:none; padding:0;
+    opacity:0; transition:opacity .15s ease, background .15s ease;
+  }
+  .note:hover .moreBtn, .note:focus-within .moreBtn{ opacity:0.85; }
+  .moreBtn:hover{ opacity:1; background:#fff; }
+  body.read-only .moreBtn{ display:none; }
+  .moreBtn svg{ width:14px; height:14px; }
+  .toolbar button{
+    all:unset; box-sizing:border-box;
+    width:22px; height:22px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:7px;
+    font-size:0.62rem; font-weight:700; letter-spacing:0.2px;
+    cursor:pointer; color:var(--ink); font-family:'Sora',sans-serif;
+    flex:none;
+    transition:background .12s ease, color .12s ease, transform .12s ease;
+  }
+  .toolbar button svg{ width:13px; height:13px; display:block; }
+  .toolbar button:hover{ background:rgba(0,0,0,0.08); }
+  .toolbar button:active{ transform:scale(0.92); }
+  .toolbar button.active{ background:var(--ink); color:#fff; }
+  .toolbar .divider{ width:16px; height:1px; background:rgba(0,0,0,0.14); margin:2px 0; flex:none; }
+
+  /* task detail row: docked flush along the note's bottom edge, separate from the side rail */
+  .taskDock{
+    position:absolute; left:14px; right:34px; bottom:8px;
+    opacity:0; transform:translateY(4px);
+    transition:opacity .15s ease, transform .15s ease;
+  }
+  .note:hover .taskDock, .note:focus-within .taskDock{ opacity:1; transform:translateY(0); }
+  body.read-only .taskDock{ display:none; }
+
+  .swatchTrigger{ position:relative; flex:none; }
+  .colorDot{
+    width:22px; height:22px; border-radius:50%; padding:0;
+    border:2px solid rgba(255,255,255,0.9); box-shadow:0 0 0 1px rgba(0,0,0,0.12);
+  }
+  /* Floating popovers are appended to document.body (fixed position) rather than
+     nested inside .toolbar, which has its own backdrop-filter blur. */
+  .floatPop{
+    position:fixed; z-index:10020;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    box-shadow:0 10px 26px var(--shadow);
+    animation:panelIn .15s ease both;
+    overflow-y:auto;
+  }
+  .floatPop.swatchRow{ display:flex; gap:5px; padding:6px; border-radius:999px; }
+  .floatPop.swatchRow button{
+    all:unset; width:20px; height:20px; border-radius:50%; cursor:pointer;
+    border:2px solid transparent; box-sizing:border-box;
+  }
+  .floatPop.swatchRow button:hover{ transform:scale(1.15); }
+  .floatPop.swatchRow button.active{ border-color:var(--ink); }
+  .floatPop.notePop{
+    padding:10px; display:flex; flex-direction:column; align-items:stretch; gap:6px; width:230px;
+  }
+  .floatPop.kbdPop{ padding:12px 14px; width:270px; max-height:80vh; overflow-y:auto; }
+  .kbdPop h4{ margin:0 0 10px; font-size:0.86rem; font-weight:700; color:var(--ink); }
+  .kbdPop dl{ margin:0; display:flex; flex-direction:column; gap:9px; }
+  .kbdPop dt{
+    font-family:ui-monospace,'SF Mono',Consolas,monospace; font-size:0.72rem;
+    background:var(--accent-soft); color:var(--ink); padding:2px 6px; border-radius:5px;
+    white-space:nowrap; display:inline-block; margin:0 0 3px;
+  }
+  .kbdPop dd{ margin:0; font-size:0.78rem; color:var(--ink-soft); line-height:1.35; }
+  .kbdGroupTitle{
+    font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--accent); margin:0 0 8px;
+  }
+  .kbdSep{ height:1px; background:var(--line); margin:12px 0; }
+  .floatPop.calPop{ padding:12px; width:250px; display:flex; flex-direction:column; gap:8px; }
+  .calPop label{ font-size:0.7rem; color:var(--ink-soft); font-weight:600; display:block; margin-bottom:2px; }
+  .calPop input, .calPop select{
+    width:100%; padding:6px 8px; border-radius:7px; border:1px solid var(--line);
+    font-size:0.8rem; font-family:'Sora',sans-serif; color:var(--ink); background:#fff; box-sizing:border-box;
+  }
+  .floatPop.dateCal{ padding:10px; width:216px; }
+  .dateCalHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; }
+  .dateCalHead button{
+    all:unset; width:22px; height:22px; border-radius:6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; color:var(--ink-soft);
+  }
+  .dateCalHead button:hover{ background:var(--accent-soft); color:var(--ink); }
+  .dateCalHead button svg{ width:14px; height:14px; }
+  .dateCalHead span{ font-size:0.82rem; font-weight:700; color:var(--ink); }
+  .dateCalGrid{ display:grid; grid-template-columns:repeat(7,1fr); gap:2px; text-align:center; }
+  .dateCalGrid .dow{ font-size:0.62rem; color:var(--ink-soft); font-weight:700; padding-bottom:3px; }
+  .dateCalGrid button{
+    all:unset; box-sizing:border-box; width:100%; aspect-ratio:1; border-radius:7px;
+    font-size:0.74rem; color:var(--ink); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .dateCalGrid button:hover{ background:var(--accent-soft); }
+  .dateCalGrid button.today{ box-shadow:inset 0 0 0 1.5px var(--accent); }
+  .dateCalGrid button.selected{ background:var(--ink); color:#fff; }
+  .dateCalGrid button.otherMonth{ color:var(--ink-soft); opacity:0.4; }
+  .dateCalFoot{ display:flex; justify-content:space-between; margin-top:8px; }
+  .dateCalFoot button{
+    all:unset; font-size:0.72rem; color:var(--accent); cursor:pointer; font-weight:600;
+  }
+  .dateCalFoot button:hover{ text-decoration:underline; }
+  .dateTrigger{
+    height:24px; border-radius:7px; border:1px solid rgba(0,0,0,0.12);
+    background:rgba(255,255,255,0.75); padding:0 8px; flex:1; min-width:0; color:var(--ink);
+    font-size:0.72rem; font-family:'Sora',sans-serif; cursor:pointer;
+    display:flex; align-items:center; white-space:nowrap; overflow:hidden;
+  }
+  .dateTrigger:hover{ background:#fff; }
+
+  .taskRow{
+    display:flex; gap:5px; width:100%; align-items:center;
+    background:rgba(255,255,255,0.65);
+    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,0.7);
+    border-radius:10px; padding:4px;
+    box-shadow:0 4px 14px rgba(30,24,10,0.16);
+  }
+  .checkToggle{
+    all:unset; box-sizing:border-box;
+    width:20px; height:20px; border-radius:6px; flex:none;
+    border:1.5px solid rgba(0,0,0,0.3); background:rgba(255,255,255,0.6);
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background .12s ease, border-color .12s ease;
+  }
+  .checkToggle svg{ width:13px; height:13px; opacity:0; transition:opacity .12s ease; }
+  .checkToggle.checked{ background:var(--ink); border-color:var(--ink); }
+  .checkToggle.checked svg{ opacity:1; stroke:#fff; }
+  .calBtn{
+    all:unset; box-sizing:border-box; width:24px; height:24px; border-radius:7px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
+    background:var(--accent-soft);
+  }
+  .calBtn:hover{ background:var(--accent) !important; color:#fff; }
+  .calBtn svg{ width:14px; height:14px; }
+  .taskRow input[type=time]{
+    all:revert;
+    height:24px; font-size:0.68rem; border-radius:7px; border:1px solid rgba(0,0,0,0.12);
+    background:rgba(255,255,255,0.75); padding:0 4px; flex:none; width:76px; color:var(--ink);
+    font-family:'Sora',sans-serif; box-sizing:border-box;
+  }
+  .taskRow input[type=time]:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .note.selected{ outline:2px solid var(--accent); outline-offset:3px; border-radius:5px; }
+  .note.dragOver{ outline:2px dashed var(--accent); outline-offset:3px; border-radius:5px; }
+
+  .noteImgWrap{ position:relative; margin:0 0 8px; }
+  .noteImgWrap img{ width:100%; max-height:140px; object-fit:cover; border-radius:6px; display:block; }
+  .noteImgWrap .rmImg{
+    all:unset; position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%;
+    background:rgba(0,0,0,0.5); color:#fff; cursor:pointer; box-sizing:border-box;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .noteImgWrap .rmImg svg{ width:10px; height:10px; }
+
+  .toastAction{
+    background:var(--accent); color:#fff; border:none; border-radius:999px;
+    padding:4px 12px; font-size:0.78rem; font-weight:600; cursor:pointer; flex:none;
+  }
+
+  .brand{ cursor:pointer; }
+  .brand:hover{ opacity:0.85; }
+  .boardName{
+    font-family:'Sora',sans-serif; font-weight:600; font-size:0.76rem;
+    color:var(--ink-soft); background:var(--accent-soft); padding:3px 10px;
+    border-radius:999px; margin-left:2px;
+  }
+  .brand .chev{ width:14px; height:14px; color:var(--ink-soft); flex:none; }
+  .boardRow{
+    display:flex; align-items:center; gap:6px; padding:7px 8px; border-radius:8px;
+    cursor:pointer; margin-bottom:4px;
+  }
+  .boardRow:hover{ background:var(--accent-soft); }
+  .boardRow.active{ background:var(--accent-soft); font-weight:700; }
+  .boardRow span.name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .boardRow button{
+    all:unset; width:20px; height:20px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; color:var(--ink-soft); flex:none; box-sizing:border-box;
+  }
+  .boardRow button svg{ width:11px; height:11px; }
+  .boardRow button:hover{ background:rgba(0,0,0,0.1); color:var(--ink); }
+  .boardRow input{ flex:1; padding:3px 6px; border-radius:6px; border:1px solid var(--line); font-size:0.85rem; }
+
+  .hint{
+    position:fixed;
+    left:50%; bottom:56px;
+    transform:translateX(-50%);
+    padding:9px 16px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:999px;
+    font-size:0.85rem;
+    color:var(--ink-soft);
+    box-shadow:0 4px 12px var(--shadow);
+    z-index:9000;
+    transition:opacity .5s ease;
+    pointer-events:none;
+    white-space:nowrap;
+    max-width:90vw;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .hint.hidden{ opacity:0; }
+
+  .toast{
+    position:fixed; left:50%; bottom:56px; transform:translateX(-50%);
+    padding:9px 16px; background:var(--ink); color:var(--paper);
+    border-radius:999px; font-size:0.82rem; z-index:10005;
+    opacity:0; transition:opacity .3s ease; pointer-events:none;
+    max-width:88vw; text-align:center;
+    display:flex; align-items:center; justify-content:center; gap:10px;
+  }
+  .toast.show{ opacity:0.96; pointer-events:auto; }
+
+  /* minimap */
+  .minimap{
+    position:fixed; left:50%;
+    bottom:calc(14px + env(safe-area-inset-bottom,0px));
+    transform:translateX(-50%);
+    width:min(680px, calc(100% - 32px));
+    height:30px;
+    background:rgba(255,253,245,0.78);
+    -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px);
+    border:1px solid rgba(228,219,185,0.9);
+    border-radius:999px;
+    box-shadow:0 10px 26px var(--shadow), 0 1px 0 rgba(255,255,255,0.6) inset;
+    z-index:9500;
+  }
+  .minimapTrack{ position:relative; height:100%; cursor:pointer; padding:0 4px; }
+  .miniNote{
+    position:absolute; top:8px; bottom:8px; border-radius:999px;
+    box-shadow:0 0 0 1px rgba(255,255,255,0.7);
+    transition:transform .12s ease;
+  }
+  .miniNote:hover{ transform:scaleY(1.25); }
+  .miniView{
+    position:absolute; top:3px; bottom:3px;
+    border:1.5px solid var(--accent);
+    background:rgba(201,138,46,0.16);
+    pointer-events:none; border-radius:999px;
+  }
+
+  /* shared-view banner */
+  .shareBanner{
+    position:fixed; top:calc(56px + env(safe-area-inset-top,0px)); left:0; right:0;
+    padding:10px 18px; background:var(--accent-soft); border-bottom:1px solid var(--accent);
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    z-index:9600; font-size:0.88rem;
+  }
+  .shareBanner[hidden]{ display:none; }
+  .shareBanner button{ flex:none; }
+
+  /* tour */
+  .spotlight{
+    position:fixed; z-index:10010;
+    border-radius:10px;
+    box-shadow:0 0 0 9999px rgba(30,24,10,0.6);
+    transition:all .35s cubic-bezier(.4,0,.2,1);
+    pointer-events:none;
+  }
+  .tourCard{
+    position:fixed; z-index:10011;
+    width:280px; max-width:88vw;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:16px;
+    box-shadow:0 16px 40px var(--shadow);
+    transition:top .35s cubic-bezier(.4,0,.2,1), left .35s cubic-bezier(.4,0,.2,1);
+  }
+  .tourCard h4{ margin:0 0 8px; font-family:'Sora',sans-serif; font-size:1.02rem; }
+  .tourCard p{ margin:0 0 12px; font-size:0.88rem; line-height:1.45; color:var(--ink); }
+  .tourFoot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .tourDots{ display:flex; gap:5px; }
+  .tourDots span{ width:6px; height:6px; border-radius:50%; background:var(--line); }
+  .tourDots span.active{ background:var(--accent); }
+  .tourBtns{ display:flex; gap:6px; }
+  .tourBtns button{ padding:6px 14px; border-radius:7px; border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer; font-size:0.82rem; font-weight:600; transition:background .15s ease, border-color .15s ease; }
+  .tourBtns button:hover{ background:var(--accent-soft); border-color:var(--accent); }
+  .tourBtns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tourBtns button.primary:hover{ background:#b47a24; }
+  .tourSkip{ background:none; border:none; color:var(--ink-soft); font-size:0.78rem; cursor:pointer; text-decoration:underline; padding:0; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand" id="brandBtn" role="button" tabindex="0" title="Switch board">
+    <span class="dot"></span>Stick-It
+    <span class="boardName" id="boardNameLabel"></span>
+    <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </div>
+  <div class="searchWrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+    <input type="text" id="searchInput" placeholder="Search notes…" autocomplete="off">
+  </div>
+  <div class="rightButtons">
+    <button class="gearBtn" id="shareBtn" aria-label="Share your board" title="Share your board">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line></svg>
+    </button>
+    <button class="gearBtn kbdBtn" id="kbdBtn" aria-label="Keyboard shortcuts" title="Keyboard shortcuts">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><line x1="6" y1="10" x2="6" y2="10"></line><line x1="9" y1="10" x2="9" y2="10"></line><line x1="12" y1="10" x2="12" y2="10"></line><line x1="15" y1="10" x2="15" y2="10"></line><line x1="18" y1="10" x2="18" y2="10"></line><line x1="7" y1="14" x2="17" y2="14"></line></svg>
+    </button>
+    <button class="gearBtn" id="helpBtn" aria-label="How it works" title="How it works">?</button>
+    <button class="gearBtn" id="gearBtn" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<div class="panel" id="boardPanel" hidden style="width:250px;">
+  <h3>Your boards</h3>
+  <div id="boardList"></div>
+  <div class="row" style="margin-top:10px;">
+    <input type="text" id="newBoardName" placeholder="New board name" style="flex:1;padding:7px 8px;border-radius:7px;border:1px solid var(--line);">
+  </div>
+  <button class="btn primary" id="addBoardBtn">+ Add board</button>
+</div>
+
+<div class="panel" id="panel" hidden>
+  <h3>Settings</h3>
+  <div class="row">
+    <label for="lockToggle">Keep new notes in one font</label>
+    <button class="switch" id="lockToggle" role="switch" aria-checked="false"></button>
+  </div>
+  <select id="fontSelect" disabled></select>
+
+  <h4>Sharing</h4>
+  <div class="row">
+    <label for="displayNameInput" style="flex:none;">Your name</label>
+    <input type="text" id="displayNameInput" placeholder="Optional" style="flex:1;padding:6px 8px;border-radius:7px;border:1px solid var(--line);">
+  </div>
+
+  <h4>Board data</h4>
+  <button class="btn" id="exportBtn">Export board (.json)</button>
+  <textarea id="importArea" placeholder="Paste exported board JSON here…"></textarea>
+  <button class="btn" id="importBtn">Import (replaces current board)</button>
+
+  <h4>Danger zone</h4>
+  <button class="btn danger" id="clearBtn">Clear the board</button>
+  <div class="count" id="count"></div>
+</div>
+
+<div class="panel" id="sharePanel" hidden style="width:290px;">
+  <h3>Share your board</h3>
+  <p class="muted" style="margin:0 0 10px;">Two ways to share what's on your corkboard.</p>
+  <button class="btn primary" id="snapshotBtn">📷 Snapshot image (JPEG)</button>
+  <button class="btn" id="publishBtn">🔗 Publish interactive link</button>
+  <div id="shareResult"></div>
+</div>
+
+<div class="shareBanner" id="shareBanner" hidden>
+  <span id="shareBannerText">Viewing a shared Stick-It board.</span>
+  <button class="btn primary" id="copyToMineBtn" style="width:auto; margin:0;">Copy to my board</button>
+</div>
+
+<div class="board" id="board">
+  <div class="boardInner" id="boardInner"></div>
+</div>
+
+<div class="minimap" id="minimap"><div class="minimapTrack" id="minimapTrack"></div></div>
+
+<div class="hint" id="hint">Click anywhere to stick a note &nbsp;·&nbsp; scroll sideways to explore →</div>
+<div class="toast" id="toast"></div>
+<input type="file" id="imageUploadInput" accept="image/*" hidden>
+
+<script>
+(function(){
+  "use strict";
+
+  var FONTS = [
+    {name:"Caveat", stack:"'Caveat', cursive"},
+    {name:"Kalam", stack:"'Kalam', cursive"},
+    {name:"Shadows Into Light", stack:"'Shadows Into Light', cursive"},
+    {name:"Indie Flower", stack:"'Indie Flower', cursive"},
+    {name:"Patrick Hand", stack:"'Patrick Hand', cursive"},
+    {name:"Gochi Hand", stack:"'Gochi Hand', cursive"},
+    {name:"Architects Daughter", stack:"'Architects Daughter', cursive"},
+    {name:"Permanent Marker", stack:"'Permanent Marker', cursive"},
+    {name:"Reenie Beanie", stack:"'Reenie Beanie', cursive"},
+    {name:"Homemade Apple", stack:"'Homemade Apple', cursive"},
+    {name:"Nanum Pen Script", stack:"'Nanum Pen Script', cursive"},
+    {name:"Covered By Your Grace", stack:"'Covered By Your Grace', cursive"},
+    {name:"Schoolbell", stack:"'Schoolbell', cursive"},
+    {name:"Crafty Girls", stack:"'Crafty Girls', cursive"},
+    {name:"Neucha", stack:"'Neucha', cursive"},
+    {name:"Dancing Script", stack:"'Dancing Script', cursive"},
+    {name:"Handlee", stack:"'Handlee', cursive"},
+    {name:"Caveat Brush", stack:"'Caveat Brush', cursive"},
+    {name:"Sriracha", stack:"'Sriracha', cursive"},
+    {name:"Zeyada", stack:"'Zeyada', cursive"},
+    {name:"Rock Salt", stack:"'Rock Salt', cursive"}
+  ];
+
+  var ICONS = {
+    ul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4" cy="6" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="6" x2="20" y2="6"></line><circle cx="4" cy="12" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="12" x2="20" y2="12"></line><circle cx="4" cy="18" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="18" x2="20" y2="18"></line></svg>',
+    task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"></path></svg>',
+    cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"></rect><line x1="16" y1="3" x2="16" y2="7"></line><line x1="8" y1="3" x2="8" y2="7"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="12" y1="14" x2="12" y2="18"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12 9 18 20 6"></polyline></svg>',
+    share: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.6" y1="10.6" x2="15.4" y2="6.4"></line><line x1="8.6" y1="13.4" x2="15.4" y2="17.6"></line></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9.5" r="1.5"></circle><path d="M21 16l-5.5-5.5L5 21"></path></svg>',
+    more: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="5" cy="12" r="2.2"></circle><circle cx="12" cy="12" r="2.2"></circle><circle cx="19" cy="12" r="2.2"></circle></svg>',
+    pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>'
+  };
+
+  var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var DOW_NAMES = ["S","M","T","W","T","F","S"];
+
+  function pad2(x){ return String(x).padStart(2,"0"); }
+  function isoToday(){ var d = new Date(); return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()); }
+  function formatDueLabel(iso){
+    if(!iso) return "Set date";
+    var parts = iso.split("-");
+    var y = +parts[0], m = +parts[1], d = +parts[2];
+    return MONTH_NAMES[m-1].slice(0,3) + " " + d;
+  }
+
+  var CATEGORIES = [
+    {name:"Random", hue:null, swatch:"conic-gradient(red,orange,yellow,green,blue,violet,red)"},
+    {name:"Idea", hue:46},
+    {name:"Task", hue:206},
+    {name:"Urgent", hue:352},
+    {name:"Note", hue:134},
+    {name:"Question", hue:266}
+  ];
+
+  var BOARDS_KEY = "stickyboard.boards.v1";
+  var ACTIVE_BOARD_KEY = "stickyboard.activeBoard.v1";
+  var LEGACY_NOTES_KEY = "stickyboard.notes.v2";
+  var SETTINGS_KEY = "stickyboard.settings.v1";
+  var NOTE_W = 250, NOTE_H = 196;
+
+  var board = document.getElementById("board");
+  var boardInner = document.getElementById("boardInner");
+  var hint = document.getElementById("hint");
+  var toastEl = document.getElementById("toast");
+  var gearBtn = document.getElementById("gearBtn");
+  var panel = document.getElementById("panel");
+  var brandBtn = document.getElementById("brandBtn");
+  var boardNameLabel = document.getElementById("boardNameLabel");
+  var boardPanel = document.getElementById("boardPanel");
+  var boardList = document.getElementById("boardList");
+  var newBoardName = document.getElementById("newBoardName");
+  var addBoardBtn = document.getElementById("addBoardBtn");
+  var lockToggle = document.getElementById("lockToggle");
+  var fontSelect = document.getElementById("fontSelect");
+  var displayNameInput = document.getElementById("displayNameInput");
+  var clearBtn = document.getElementById("clearBtn");
+  var countEl = document.getElementById("count");
+  var exportBtn = document.getElementById("exportBtn");
+  var importBtn = document.getElementById("importBtn");
+  var importArea = document.getElementById("importArea");
+  var helpBtn = document.getElementById("helpBtn");
+  var kbdBtn = document.getElementById("kbdBtn");
+  var searchInput = document.getElementById("searchInput");
+  var shareBtn = document.getElementById("shareBtn");
+  var sharePanel = document.getElementById("sharePanel");
+  var shareResult = document.getElementById("shareResult");
+  var snapshotBtn = document.getElementById("snapshotBtn");
+  var publishBtn = document.getElementById("publishBtn");
+  var shareBanner = document.getElementById("shareBanner");
+  var shareBannerText = document.getElementById("shareBannerText");
+  var copyToMineBtn = document.getElementById("copyToMineBtn");
+  var minimap = document.getElementById("minimap");
+  var minimapTrack = document.getElementById("minimapTrack");
+  var imageUploadInput = document.getElementById("imageUploadInput");
+  var pendingImageNote = null;
+
+  function safeGet(key){
+    try{ var v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
+    catch(e){ return null; }
+  }
+  function safeSet(key, val){
+    try{ localStorage.setItem(key, JSON.stringify(val)); }
+    catch(e){ /* storage unavailable; board still works this session */ }
+  }
+
+  function downloadBlob(filename, blob){
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+
+  function encodeState(obj){
+    try{ return btoa(encodeURIComponent(JSON.stringify(obj))); }
+    catch(e){ return null; }
+  }
+  function decodeState(str){
+    try{ return JSON.parse(decodeURIComponent(atob(str))); }
+    catch(e){ return null; }
+  }
+
+  function getDisplayName(){
+    if(settings.displayName) return settings.displayName;
+    var anon = safeGet("stickyboard.anonId");
+    if(!anon){
+      anon = "Anon-" + Math.floor(1000 + Math.random()*9000);
+      safeSet("stickyboard.anonId", anon);
+    }
+    return anon;
+  }
+
+  var toastTimer;
+  function toast(msg, actionLabel, actionFn){
+    toastEl.innerHTML = "";
+    var span = document.createElement("span");
+    span.textContent = msg;
+    toastEl.appendChild(span);
+    if(actionLabel && actionFn){
+      var abtn = document.createElement("button");
+      abtn.className = "toastAction";
+      abtn.textContent = actionLabel;
+      abtn.addEventListener("click", function(){ actionFn(); toastEl.classList.remove("show"); });
+      toastEl.appendChild(abtn);
+    }
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, actionLabel ? 6000 : 3800);
+  }
+
+  function escapeHtml(s){
+    return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function rand(min, max){ return Math.random()*(max-min)+min; }
+
+  function randomColor(){
+    var hue = Math.floor(rand(0,360));
+    var sat = Math.floor(rand(55,72));
+    var light = Math.floor(rand(78,87));
+    return "hsl(" + hue + "," + sat + "%," + light + "%)";
+  }
+
+  function colorForCategory(idx){
+    var cat = CATEGORIES[idx] || CATEGORIES[0];
+    if(cat.hue == null) return randomColor();
+    var sat = Math.floor(rand(50,70));
+    var light = Math.floor(rand(78,86));
+    return "hsl(" + cat.hue + "," + sat + "%," + light + "%)";
+  }
+
+  var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"" };
+  if(settings.displayName === undefined) settings.displayName = "";
+
+  function pickFont(){
+    if(settings.lockFont){
+      var f = FONTS.filter(function(f){ return f.name === settings.fontName; })[0];
+      return (f || FONTS[0]).name;
+    }
+    return FONTS[Math.floor(rand(0, FONTS.length))].name;
+  }
+  function fontStack(name){
+    var f = FONTS.filter(function(f){ return f.name === name; })[0];
+    return f ? f.stack : FONTS[0].stack;
+  }
+
+  var readOnly = /^#sb=/.test(location.hash);
+  var singleNoteMode = /^#sn=/.test(location.hash);
+  if(readOnly) document.body.classList.add("read-only");
+
+  function notesKeyFor(boardId){ return "stickyboard.notes." + boardId; }
+
+  var boards = [];
+  var activeBoardId = null;
+  if(!singleNoteMode){
+    boards = safeGet(BOARDS_KEY);
+    activeBoardId = safeGet(ACTIVE_BOARD_KEY);
+    if(!boards || !boards.length){
+      var legacy = safeGet(LEGACY_NOTES_KEY);
+      var defaultId = "b" + Date.now().toString(36);
+      boards = [{id:defaultId, name:"My Board"}];
+      activeBoardId = defaultId;
+      safeSet(BOARDS_KEY, boards);
+      safeSet(ACTIVE_BOARD_KEY, activeBoardId);
+      if(legacy) safeSet(notesKeyFor(defaultId), legacy);
+    }
+    if(!activeBoardId || !boards.some(function(b){ return b.id === activeBoardId; })){
+      activeBoardId = boards[0].id;
+      safeSet(ACTIVE_BOARD_KEY, activeBoardId);
+    }
+  }
+  var NOTES_KEY = activeBoardId ? notesKeyFor(activeBoardId) : null;
+
+  var notes = [];
+  var firstRun = false;
+  if(!readOnly && !singleNoteMode){
+    var stored = safeGet(NOTES_KEY);
+    firstRun = !stored;
+    notes = stored || [
+      {id:"seed-1", x:60, y:40, html:"Click anywhere on the board to stick a new note here.", bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
+      {id:"seed-2", x:320, y:170, html:"Drag the little tab at the top to move me around.", bg:randomColor(), font:pickFont(), rot:rand(-4,6), z:2, categoryIndex:0},
+      {id:"seed-3", x:70, y:280, html:"Hover a note for its toolbar &mdash; headings, a bullet list, and marking it a task.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
+    ];
+    notes.forEach(function(n){
+      if(n.html === undefined) n.html = escapeHtml(n.text || "");
+      if(n.categoryIndex === undefined) n.categoryIndex = 0;
+    });
+  }
+
+  var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
+
+  function saveNotes(){ if(!readOnly && !singleNoteMode) safeSet(NOTES_KEY, notes); }
+  function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
+
+  function boardHeight(){ return boardInner.clientHeight || (window.innerHeight - 56); }
+
+  function ensureWidth(){
+    var maxX = notes.reduce(function(m,n){ return Math.max(m, n.x + (n.w||NOTE_W)); }, 0);
+    var needed = Math.max(window.innerWidth * 2.2, maxX + window.innerWidth);
+    boardInner.style.width = needed + "px";
+    return needed;
+  }
+
+  var ZOOM_KEY = activeBoardId ? ("stickyboard.zoom." + activeBoardId) : null;
+  var boardZoom = (ZOOM_KEY && safeGet(ZOOM_KEY)) || 1;
+  function applyZoom(){
+    boardInner.style.transformOrigin = "0 0";
+    boardInner.style.transform = "scale(" + boardZoom + ")";
+    if(ZOOM_KEY) safeSet(ZOOM_KEY, boardZoom);
+    updateMinimap();
+  }
+
+  function updateCount(){
+    countEl.textContent = notes.length + (notes.length === 1 ? " note on the board" : " notes on the board");
+  }
+
+  function getPlainText(el){ return (el.textContent || "").trim(); }
+
+  var openPopover = null, openPopoverTrigger = null;
+  function closeFloatingPopovers(){
+    if(openPopover) openPopover.remove();
+    openPopover = null;
+    openPopoverTrigger = null;
+  }
+  function openFloatingPopover(triggerBtn, className){
+    var wasOpenForThisTrigger = (openPopoverTrigger === triggerBtn);
+    closeFloatingPopovers();
+    if(wasOpenForThisTrigger) return null;
+    var pop = document.createElement("div");
+    pop.className = "floatPop " + className;
+    document.body.appendChild(pop);
+    var r = triggerBtn.getBoundingClientRect();
+    var POP_WIDTHS = {notePop:230, calPop:250, dateCal:216, kbdPop:270, swatchRow:140, moreMenu:44};
+    var popW = POP_WIDTHS[className] || 140;
+    var left = Math.min(Math.max(12, r.left + r.width/2 - popW/2), window.innerWidth - popW - 12);
+    pop.style.left = left + "px";
+    var spaceAbove = r.top;
+    var spaceBelow = window.innerHeight - r.bottom;
+    if(spaceAbove >= 160 || spaceAbove >= spaceBelow){
+      pop.style.bottom = (window.innerHeight - r.top + 8) + "px";
+      pop.style.maxHeight = Math.max(120, spaceAbove - 16) + "px";
+    } else {
+      pop.style.top = (r.bottom + 8) + "px";
+      pop.style.maxHeight = Math.max(120, spaceBelow - 16) + "px";
+    }
+    openPopover = pop;
+    openPopoverTrigger = triggerBtn;
+    return pop;
+  }
+  document.addEventListener("click", function(e){
+    if(openPopover && !openPopover.contains(e.target) && e.target !== openPopoverTrigger && !(openPopoverTrigger && openPopoverTrigger.contains(e.target))){
+      closeFloatingPopovers();
+    }
+  });
+
+  function openDatePicker(triggerBtn, currentIso, onPick){
+    var pop = openFloatingPopover(triggerBtn, "dateCal");
+    if(!pop) return;
+    var base = currentIso ? currentIso.split("-").map(Number) : null;
+    var viewY = base ? base[0] : new Date().getFullYear();
+    var viewM = base ? base[1]-1 : new Date().getMonth();
+
+    function render(){
+      pop.innerHTML = "";
+      var head = document.createElement("div");
+      head.className = "dateCalHead";
+      var prev = document.createElement("button");
+      prev.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>';
+      prev.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      prev.addEventListener("click", function(e){ e.stopPropagation(); viewM--; if(viewM<0){ viewM=11; viewY--; } render(); });
+      var label = document.createElement("span");
+      label.textContent = MONTH_NAMES[viewM] + " " + viewY;
+      var next = document.createElement("button");
+      next.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>';
+      next.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      next.addEventListener("click", function(e){ e.stopPropagation(); viewM++; if(viewM>11){ viewM=0; viewY++; } render(); });
+      head.appendChild(prev); head.appendChild(label); head.appendChild(next);
+      pop.appendChild(head);
+
+      var grid = document.createElement("div");
+      grid.className = "dateCalGrid";
+      DOW_NAMES.forEach(function(d){
+        var el = document.createElement("div");
+        el.className = "dow";
+        el.textContent = d;
+        grid.appendChild(el);
+      });
+      var firstDow = new Date(viewY, viewM, 1).getDay();
+      var daysInMonth = new Date(viewY, viewM+1, 0).getDate();
+      var daysInPrevMonth = new Date(viewY, viewM, 0).getDate();
+      var today = isoToday();
+      var cells = [];
+      for(var i=firstDow-1; i>=0; i--) cells.push({d:daysInPrevMonth-i, other:true});
+      for(var d=1; d<=daysInMonth; d++) cells.push({d:d, other:false});
+      while(cells.length % 7 !== 0) cells.push({d:cells.length - (firstDow+daysInMonth) + 1, other:true});
+      cells.forEach(function(c){
+        var btn = document.createElement("button");
+        btn.textContent = c.d;
+        var iso = viewY + "-" + pad2(viewM+1) + "-" + pad2(c.d);
+        if(c.other) btn.classList.add("otherMonth");
+        if(!c.other && iso === today) btn.classList.add("today");
+        if(!c.other && iso === currentIso) btn.classList.add("selected");
+        btn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        btn.addEventListener("click", function(e){
+          e.stopPropagation();
+          if(c.other) return;
+          onPick(iso);
+          closeFloatingPopovers();
+        });
+        grid.appendChild(btn);
+      });
+      pop.appendChild(grid);
+
+      var foot = document.createElement("div");
+      foot.className = "dateCalFoot";
+      var todayBtn = document.createElement("button");
+      todayBtn.textContent = "Today";
+      todayBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      todayBtn.addEventListener("click", function(e){ e.stopPropagation(); onPick(today); closeFloatingPopovers(); });
+      var clearBtn2 = document.createElement("button");
+      clearBtn2.textContent = "Clear";
+      clearBtn2.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      clearBtn2.addEventListener("click", function(e){ e.stopPropagation(); onPick(""); closeFloatingPopovers(); });
+      foot.appendChild(todayBtn); foot.appendChild(clearBtn2);
+      pop.appendChild(foot);
+    }
+    render();
+  }
+
+  function dismissHint(){
+    if(!hint.classList.contains("hidden")) hint.classList.add("hidden");
+  }
+
+  // ---------- calendar (.ics download, no account needed) ----------
+  function icsEscape(s){
+    return String(s||"").replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g,"\\n");
+  }
+  function icsDate(d){
+    var p = function(x){ return String(x).padStart(2,"0"); };
+    return d.getUTCFullYear() + p(d.getUTCMonth()+1) + p(d.getUTCDate()) + "T" + p(d.getUTCHours()) + p(d.getUTCMinutes()) + p(d.getUTCSeconds()) + "Z";
+  }
+  function buildIcs(summary, startDate, endDate, description, attendees){
+    var lines = [
+      "BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Stick-It//EN", "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",
+      "UID:" + Date.now() + "-" + Math.floor(rand(0,999999)) + "@stick-it",
+      "DTSTAMP:" + icsDate(new Date()),
+      "DTSTART:" + icsDate(startDate),
+      "DTEND:" + icsDate(endDate),
+      "SUMMARY:" + icsEscape(summary),
+      "DESCRIPTION:" + icsEscape(description || "")
+    ];
+    (attendees || []).forEach(function(email){ lines.push("ATTENDEE:mailto:" + email); });
+    lines.push("END:VEVENT", "END:VCALENDAR");
+    return lines.join("\r\n");
+  }
+
+  function openCalendarPopover(n, triggerBtn){
+    var pop = openFloatingPopover(triggerBtn, "calPop");
+    if(!pop) return;
+    var plain = getPlainText(n.el.querySelector(".text")) || "Sticky note reminder";
+    var defaultTitle = plain.split("\n")[0].slice(0,120);
+
+    pop.innerHTML =
+      '<div><label>Event title</label><input type="text" id="calTitle"></div>' +
+      '<div><label>Attendees (optional, comma-separated emails)</label><input type="text" id="calAttendees" placeholder="jane@example.com, sam@example.com"></div>' +
+      '<button class="btn primary" id="calSubmit" style="margin:2px 0 0;">Download calendar invite (.ics)</button>' +
+      '<p class="muted" style="margin:0;font-size:0.72rem;">Opens in Google Calendar, Outlook, or Apple Calendar &mdash; whichever you import it into.</p>';
+
+    var titleInput = pop.querySelector("#calTitle");
+    var attendeesInput = pop.querySelector("#calAttendees");
+    var submitBtn = pop.querySelector("#calSubmit");
+    titleInput.value = defaultTitle;
+    [titleInput, attendeesInput].forEach(function(el2){
+      el2.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+      el2.addEventListener("click", function(e){ e.stopPropagation(); });
+    });
+    submitBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+
+    submitBtn.addEventListener("click", function(e){
+      e.stopPropagation();
+      var timeStr = n.dueTime || "09:00";
+      var startDate = new Date(n.due + "T" + timeStr + ":00");
+      var endDate = new Date(startDate.getTime() + 60*60*1000);
+      var attendees = attendeesInput.value.split(",").map(function(s){ return s.trim(); }).filter(Boolean);
+      var summary = titleInput.value.trim() || defaultTitle;
+      var ics = buildIcs(summary, startDate, endDate, plain, attendees);
+      downloadBlob("stickit-event.ics", new Blob([ics], {type:"text/calendar;charset=utf-8"}));
+      closeFloatingPopovers();
+      toast("Downloaded \u201c" + summary + "\u201d as a calendar invite.");
+    });
+  }
+
+  // ---------- note rendering ----------
+  function applyFormat(textEl, cmd, value){
+    textEl.focus();
+    try{ document.execCommand(cmd, false, value || null); }catch(e){}
+    textEl.dispatchEvent(new Event("input", {bubbles:true}));
+  }
+
+  function renderNote(n, isNew){
+    var el = document.createElement("div");
+    el.className = "note" + (isNew ? " new" : "");
+    el.dataset.id = n.id;
+    el.style.left = n.x + "px";
+    el.style.top = n.y + "px";
+    el.style.width = (n.w || NOTE_W) + "px";
+    el.style.zIndex = n.z;
+    el.style.setProperty("--note-bg", n.bg);
+    el.style.setProperty("--rot", n.rot + "deg");
+    n.el = el;
+
+    var tab = document.createElement("div");
+    tab.className = "tab";
+    el.appendChild(tab);
+
+    var del = document.createElement("button");
+    del.className = "del";
+    del.setAttribute("aria-label","Delete note");
+    del.innerHTML = ICONS.close;
+    el.appendChild(del);
+
+    if(n.isTask){
+      var badge = document.createElement("div");
+      badge.className = "badge" + (n.done ? " done" : "");
+      badge.textContent = n.due ? ("Due " + n.due + (n.dueTime ? ", " + n.dueTime : "")) : "Task";
+      el.appendChild(badge);
+      n.badgeEl = badge;
+    }
+
+    if(n.image){
+      var imgWrap = document.createElement("div");
+      imgWrap.className = "noteImgWrap";
+      var img = document.createElement("img");
+      img.src = n.image;
+      img.alt = "";
+      imgWrap.appendChild(img);
+      if(!readOnly){
+        var rmImg = document.createElement("button");
+        rmImg.className = "rmImg";
+        rmImg.innerHTML = ICONS.close;
+        rmImg.title = "Remove image";
+        rmImg.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+        rmImg.addEventListener("click", function(e){
+          e.stopPropagation();
+          n.image = null;
+          saveNotes();
+          rerenderNote(n);
+        });
+        imgWrap.appendChild(rmImg);
+      }
+      el.appendChild(imgWrap);
+    }
+
+    var text = document.createElement("div");
+    text.className = "text" + (n.done ? " done" : "");
+    text.contentEditable = readOnly ? "false" : "true";
+    text.spellcheck = false;
+    text.setAttribute("data-placeholder","Type something…");
+    text.style.fontFamily = fontStack(n.font);
+    text.innerHTML = n.html || "";
+    el.appendChild(text);
+    n.textEl = text;
+
+    if(!readOnly){
+      var toolbar = document.createElement("div");
+      toolbar.className = "toolbar";
+
+      [["H1","h1"],["H2","h2"],["H3","h3"]].forEach(function(pair){
+        var b = document.createElement("button");
+        b.textContent = pair[0];
+        b.title = "Heading " + pair[0].slice(1);
+        b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        b.addEventListener("click", function(){ applyFormat(text, "formatBlock", "<" + pair[1] + ">"); });
+        toolbar.appendChild(b);
+      });
+
+      var ulBtn = document.createElement("button");
+      ulBtn.innerHTML = ICONS.ul;
+      ulBtn.title = "Bullet list";
+      ulBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      ulBtn.addEventListener("click", function(){ applyFormat(text, "insertUnorderedList"); });
+      toolbar.appendChild(ulBtn);
+
+      var uploadBtn = document.createElement("button");
+      uploadBtn.innerHTML = ICONS.image;
+      uploadBtn.title = "Add an image";
+      uploadBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      uploadBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        pendingImageNote = n;
+        imageUploadInput.value = "";
+        imageUploadInput.click();
+      });
+      toolbar.appendChild(uploadBtn);
+
+      toolbar.appendChild(Object.assign(document.createElement("span"), {className:"divider"}));
+
+      var taskBtn = document.createElement("button");
+      taskBtn.innerHTML = ICONS.task;
+      taskBtn.title = "Mark as task";
+      taskBtn.classList.toggle("active", !!n.isTask);
+      taskBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      taskBtn.addEventListener("click", function(){
+        n.isTask = !n.isTask;
+        saveNotes();
+        rerenderNote(n);
+      });
+      toolbar.appendChild(taskBtn);
+
+      toolbar.appendChild(Object.assign(document.createElement("span"), {className:"divider"}));
+
+      var swatchWrap = document.createElement("div");
+      swatchWrap.className = "swatchTrigger";
+      var catDot = document.createElement("button");
+      catDot.className = "colorDot";
+      var cat = CATEGORIES[n.categoryIndex || 0];
+      catDot.style.background = cat.hue == null ? cat.swatch : ("hsl(" + cat.hue + ",65%,55%)");
+      catDot.title = "Color: " + cat.name;
+      catDot.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      swatchWrap.appendChild(catDot);
+
+      catDot.addEventListener("click", function(e){
+        e.stopPropagation();
+        var pop = openFloatingPopover(catDot, "swatchRow");
+        if(!pop) return;
+        CATEGORIES.forEach(function(c, ci){
+          var sw = document.createElement("button");
+          sw.style.background = c.hue == null ? c.swatch : ("hsl(" + c.hue + ",65%,55%)");
+          sw.title = c.name;
+          sw.classList.toggle("active", ci === (n.categoryIndex||0));
+          sw.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+          sw.addEventListener("click", function(ev){
+            ev.stopPropagation();
+            n.categoryIndex = ci;
+            n.bg = colorForCategory(ci);
+            el.style.setProperty("--note-bg", n.bg);
+            catDot.style.background = c.hue == null ? c.swatch : ("hsl(" + c.hue + ",65%,55%)");
+            catDot.title = "Color: " + c.name;
+            saveNotes();
+            closeFloatingPopovers();
+          });
+          pop.appendChild(sw);
+        });
+      });
+      toolbar.appendChild(swatchWrap);
+
+      var shareWrap = document.createElement("div");
+      shareWrap.className = "swatchTrigger";
+      var shareNoteBtn = document.createElement("button");
+      shareNoteBtn.innerHTML = ICONS.share;
+      shareNoteBtn.title = "Share this note";
+      shareNoteBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      shareNoteBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        openShareNotePopover(n, text, shareNoteBtn);
+      });
+      shareWrap.appendChild(shareNoteBtn);
+      toolbar.appendChild(shareWrap);
+
+      if(n.isTask){
+        var taskRow = document.createElement("div");
+        taskRow.className = "taskRow";
+
+        var doneBtn = document.createElement("button");
+        doneBtn.className = "checkToggle" + (n.done ? " checked" : "");
+        doneBtn.innerHTML = ICONS.check;
+        doneBtn.title = "Mark done";
+        doneBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        doneBtn.addEventListener("click", function(){
+          n.done = !n.done;
+          saveNotes();
+          rerenderNote(n);
+        });
+        taskRow.appendChild(doneBtn);
+
+        var dateBtn = document.createElement("button");
+        dateBtn.className = "dateTrigger";
+        dateBtn.textContent = formatDueLabel(n.due);
+        dateBtn.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+        dateBtn.addEventListener("click", function(e){
+          e.stopPropagation();
+          openDatePicker(dateBtn, n.due, function(iso){
+            n.due = iso;
+            saveNotes();
+            rerenderNote(n);
+          });
+        });
+        taskRow.appendChild(dateBtn);
+
+        var timeInput = document.createElement("input");
+        timeInput.type = "time";
+        timeInput.id = n.id + "-time";
+        timeInput.value = n.dueTime || "09:00";
+        timeInput.addEventListener("mousedown", function(e){ e.stopPropagation(); });
+        timeInput.addEventListener("click", function(e){ e.stopPropagation(); });
+        timeInput.addEventListener("change", function(){
+          n.dueTime = timeInput.value;
+          saveNotes();
+          rerenderNote(n);
+        });
+        taskRow.appendChild(timeInput);
+
+        if(n.due){
+          var calBtn = document.createElement("button");
+          calBtn.className = "calBtn";
+          calBtn.innerHTML = ICONS.cal;
+          calBtn.title = "Add to Google Calendar";
+          calBtn.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+          calBtn.addEventListener("click", function(e){
+            e.stopPropagation();
+            openCalendarPopover(n, calBtn);
+          });
+          taskRow.appendChild(calBtn);
+        }
+
+        var taskDock = document.createElement("div");
+        taskDock.className = "taskDock";
+        taskDock.appendChild(taskRow);
+        el.appendChild(taskDock);
+      }
+
+      var moreBtn = document.createElement("button");
+      moreBtn.className = "moreBtn";
+      moreBtn.innerHTML = ICONS.more;
+      moreBtn.title = "More actions";
+      moreBtn.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+      moreBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        var pop = openFloatingPopover(moreBtn, "moreMenu");
+        if(!pop) return;
+        pop.appendChild(toolbar);
+      });
+      el.appendChild(moreBtn);
+    }
+
+    boardInner.appendChild(el);
+
+    if(!readOnly){
+      el.addEventListener("pointerdown", function(){ bringToFront(n, el); }, {passive:true});
+
+      text.addEventListener("input", function(){
+        n.html = text.innerHTML;
+        clearTimeout(text._t);
+        text._t = setTimeout(saveNotes, 250);
+      });
+      text.addEventListener("keydown", function(e){
+        if(e.key === "Enter" && !e.shiftKey){
+          e.preventDefault();
+          text.blur();
+        }
+      });
+
+      del.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      del.addEventListener("click", function(e){
+        e.stopPropagation();
+        deleteNoteById(n.id);
+      });
+
+      tab.addEventListener("pointerdown", function(e){
+        e.stopPropagation();
+        selectNote(n.id);
+        bringToFront(n, el);
+        startDrag(e, n, el);
+      });
+
+      el.addEventListener("dragover", function(e){ e.preventDefault(); e.stopPropagation(); el.classList.add("dragOver"); }, true);
+      el.addEventListener("dragleave", function(e){ el.classList.remove("dragOver"); }, true);
+      el.addEventListener("drop", function(e){
+        e.preventDefault(); e.stopPropagation();
+        el.classList.remove("dragOver");
+        var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(file && file.type.indexOf("image/") === 0) handleImageDrop(file, n);
+      }, true);
+
+      if(isNew){
+        requestAnimationFrame(function(){ text.focus(); });
+        el.addEventListener("animationend", function(){
+          el.classList.remove("new");
+        }, {once:true});
+      }
+    }
+
+    return el;
+  }
+
+  function rerenderNote(n){
+    var old = n.el;
+    old.remove();
+    renderNote(n, false);
+    updateMinimap();
+  }
+
+  function bringToFront(n, el){
+    zCounter += 1;
+    n.z = zCounter;
+    el.style.zIndex = n.z;
+    saveNotes();
+  }
+
+  function startDrag(e, n, el){
+    el.classList.add("dragging");
+    var startX = e.clientX, startY = e.clientY;
+    var origX = n.x, origY = n.y;
+    var maxY = Math.max(0, boardHeight() - NOTE_H - 10);
+
+    function move(ev){
+      var dx = (ev.clientX - startX) / boardZoom;
+      var dy = (ev.clientY - startY) / boardZoom;
+      n.x = Math.max(0, origX + dx);
+      n.y = Math.min(maxY, Math.max(0, origY + dy));
+      el.style.left = n.x + "px";
+      el.style.top = n.y + "px";
+      updateMinimap();
+    }
+    function up(){
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      el.classList.remove("dragging");
+      ensureWidth();
+      saveNotes();
+      updateMinimap();
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  function addNoteAt(x, y){
+    zCounter += 1;
+    var n = {
+      id: "n" + Date.now() + Math.floor(rand(0,999)),
+      x: Math.max(0, x - NOTE_W/2),
+      y: Math.min(Math.max(0, boardHeight() - NOTE_H - 10), Math.max(0, y - 30)),
+      w: NOTE_W,
+      html: "",
+      bg: randomColor(),
+      font: pickFont(),
+      rot: rand(-6,6),
+      z: zCounter,
+      categoryIndex: 0,
+      isTask:false, done:false, due:"", dueTime:"09:00", image:null
+    };
+    notes.push(n);
+    ensureWidth();
+    renderNote(n, true);
+    saveNotes();
+    updateCount();
+    updateMinimap();
+    dismissHint();
+  }
+
+  var lastDeleted = null, lastDeletedTimer = null;
+  function deleteNoteById(id){
+    var idx = notes.findIndex(function(x){ return x.id === id; });
+    if(idx === -1) return;
+    var n = notes[idx];
+    var hadContent = !!((n.textEl && getPlainText(n.textEl)) || n.image);
+    if(selectedId === id) clearSelection();
+    if(n.el){
+      var elRef = n.el;
+      elRef.classList.add("removing");
+      elRef.addEventListener("animationend", function(){ elRef.remove(); }, {once:true});
+    }
+    notes.splice(idx, 1);
+    saveNotes();
+    updateCount();
+    updateMinimap();
+    if(!hadContent){
+      toast("Note deleted.");
+      return;
+    }
+    lastDeleted = {note:n, index:idx};
+    clearTimeout(lastDeletedTimer);
+    toast("Note deleted.", "Undo", function(){
+      if(!lastDeleted) return;
+      var restored = lastDeleted.note;
+      notes.splice(Math.min(lastDeleted.index, notes.length), 0, restored);
+      zCounter += 1;
+      restored.z = zCounter;
+      renderNote(restored, true);
+      saveNotes();
+      updateCount();
+      updateMinimap();
+      lastDeleted = null;
+    });
+    lastDeletedTimer = setTimeout(function(){ lastDeleted = null; }, 6000);
+  }
+
+  function handleImageDrop(file, n){
+    var reader = new FileReader();
+    reader.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var maxDim = 480;
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var w = Math.max(1, Math.round(img.width * scale));
+        var h = Math.max(1, Math.round(img.height * scale));
+        var canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        n.image = canvas.toDataURL("image/jpeg", 0.82);
+        saveNotes();
+        rerenderNote(n);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  imageUploadInput.addEventListener("change", function(){
+    var file = imageUploadInput.files && imageUploadInput.files[0];
+    if(file && pendingImageNote) handleImageDrop(file, pendingImageNote);
+    pendingImageNote = null;
+  });
+
+  function openShareNotePopover(n, textEl, triggerBtn){
+    var pop = openFloatingPopover(triggerBtn, "notePop");
+    if(!pop) return;
+    var name = getDisplayName();
+    var plain = getPlainText(textEl) || "a sticky note";
+    var shortDesc = plain.slice(0, 80);
+    var payload = {html:n.html, bg:n.bg, font:n.font, rot:n.rot, isTask:!!n.isTask, done:!!n.done, due:n.due||"", dueTime:n.dueTime||"", byName:name};
+    var encoded = encodeState(payload);
+    var link = encoded ? (location.href.split("#")[0] + "#sn=" + encoded) : "";
+    var msg = "Check out this sticky note by " + name + ": \"" + shortDesc + (plain.length > 80 ? "…" : "") + "\"" + (link ? ". Click to view: " + link : "");
+
+    pop.innerHTML = "";
+    var ta = document.createElement("textarea");
+    ta.value = msg;
+    ta.readOnly = true;
+    ta.style.width = "100%";
+    ta.style.minHeight = "72px";
+    ta.style.fontSize = "0.78rem";
+    ta.style.borderRadius = "8px";
+    ta.style.border = "1px solid var(--line)";
+    ta.style.padding = "6px";
+    ta.style.fontFamily = "'Sora',sans-serif";
+    pop.appendChild(ta);
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "btn primary";
+    copyBtn.style.margin = "0";
+    copyBtn.textContent = "Copy message";
+    copyBtn.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    copyBtn.addEventListener("click", async function(ev){
+      ev.stopPropagation();
+      try{ await navigator.clipboard.writeText(msg); toast("Message copied — paste it into WhatsApp or email."); }
+      catch(err){ ta.select(); toast("Select the text above and copy it manually."); }
+    });
+    pop.appendChild(copyBtn);
+    var footNote = document.createElement("p");
+    footNote.className = "muted";
+    footNote.style.margin = "0";
+    footNote.style.fontSize = "0.7rem";
+    footNote.textContent = "The link is a real, fully public link — anyone who opens it can view this note, no account needed.";
+    pop.appendChild(footNote);
+  }
+
+  function renderSingleNoteView(encoded){
+    document.querySelector(".topbar").style.display = "none";
+    board.style.display = "none";
+    minimap.style.display = "none";
+    hint.style.display = "none";
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center;";
+    document.body.appendChild(wrap);
+
+    var item = decodeState(encoded);
+    if(!item){
+      wrap.innerHTML = '<p class="muted">This note link looks broken or incomplete.</p>';
+      return;
+    }
+
+    var byline = document.createElement("p");
+    byline.className = "muted";
+    byline.textContent = "Shared by " + (item.byName || "someone");
+    wrap.appendChild(byline);
+
+    var card = document.createElement("div");
+    card.className = "note";
+    card.style.position = "relative";
+    card.style.left = "auto";
+    card.style.top = "auto";
+    card.style.width = "260px";
+    card.style.setProperty("--note-bg", item.bg || randomColor());
+    card.style.setProperty("--rot", (item.rot || 0) + "deg");
+    if(item.isTask){
+      var b = document.createElement("div");
+      b.className = "badge" + (item.done ? " done" : "");
+      b.textContent = item.due ? ("Due " + item.due + (item.dueTime ? ", " + item.dueTime : "")) : "Task";
+      card.appendChild(b);
+    }
+    var textDiv = document.createElement("div");
+    textDiv.className = "text" + (item.done ? " done" : "");
+    textDiv.style.fontFamily = fontStack(item.font || FONTS[0].name);
+    textDiv.innerHTML = item.html || "";
+    card.appendChild(textDiv);
+    wrap.appendChild(card);
+
+    var openBtn = document.createElement("button");
+    openBtn.className = "btn primary";
+    openBtn.style.width = "auto";
+    openBtn.textContent = "Open Stick-It";
+    openBtn.addEventListener("click", function(){ location.hash = ""; location.reload(); });
+    wrap.appendChild(openBtn);
+  }
+
+  if(!readOnly){
+    boardInner.addEventListener("click", function(e){
+      if(e.target !== boardInner) return;
+      clearSelection();
+      var rect = boardInner.getBoundingClientRect();
+      addNoteAt((e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
+    });
+  }
+
+  board.addEventListener("wheel", function(e){
+    if(Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+    board.scrollLeft += e.deltaY;
+    e.preventDefault();
+    dismissHint();
+  }, {passive:false});
+
+  board.addEventListener("scroll", function(){ dismissHint(); updateMinimapViewport(); closeFloatingPopovers(); }, {passive:true});
+
+  // ---------- search ----------
+  searchInput.addEventListener("input", function(){
+    var q = searchInput.value.trim().toLowerCase();
+    notes.forEach(function(n){
+      if(!n.el) return;
+      if(!q){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
+      var hay = getPlainText(n.textEl).toLowerCase();
+      var match = hay.indexOf(q) !== -1;
+      n.el.style.opacity = match ? "1" : "0.15";
+      n.el.style.pointerEvents = match ? "" : "none";
+    });
+  });
+
+  // ---------- settings panel ----------
+  function closeOtherPanels(except){
+    [panel, sharePanel, boardPanel].forEach(function(p){ if(p !== except) p.hidden = true; });
+  }
+  gearBtn.addEventListener("click", function(){
+    var willOpen = panel.hidden;
+    closeOtherPanels(willOpen ? panel : null);
+    panel.hidden = !willOpen;
+    gearBtn.classList.remove("spin");
+    void gearBtn.offsetWidth;
+    gearBtn.classList.add("spin");
+  });
+  shareBtn.addEventListener("click", function(){
+    var willOpen = sharePanel.hidden;
+    closeOtherPanels(willOpen ? sharePanel : null);
+    sharePanel.hidden = !willOpen;
+  });
+  document.addEventListener("click", function(e){
+    if(!panel.hidden && !panel.contains(e.target) && e.target !== gearBtn && !gearBtn.contains(e.target)){
+      panel.hidden = true;
+    }
+    if(!sharePanel.hidden && !sharePanel.contains(e.target) && e.target !== shareBtn && !shareBtn.contains(e.target)){
+      sharePanel.hidden = true;
+    }
+  });
+
+  FONTS.forEach(function(f){
+    var opt = document.createElement("option");
+    opt.value = f.name;
+    opt.textContent = f.name;
+    fontSelect.appendChild(opt);
+  });
+  fontSelect.value = settings.fontName;
+  fontSelect.disabled = !settings.lockFont;
+  lockToggle.classList.toggle("on", settings.lockFont);
+  lockToggle.setAttribute("aria-checked", String(settings.lockFont));
+
+  lockToggle.addEventListener("click", function(){
+    settings.lockFont = !settings.lockFont;
+    lockToggle.classList.toggle("on", settings.lockFont);
+    lockToggle.setAttribute("aria-checked", String(settings.lockFont));
+    fontSelect.disabled = !settings.lockFont;
+    saveSettings();
+  });
+  fontSelect.addEventListener("change", function(){
+    settings.fontName = fontSelect.value;
+    saveSettings();
+  });
+
+  displayNameInput.value = settings.displayName || "";
+  displayNameInput.addEventListener("input", function(){
+    settings.displayName = displayNameInput.value.trim();
+    saveSettings();
+  });
+
+  var clearArmed = false, clearTimer;
+  clearBtn.addEventListener("click", function(){
+    if(!clearArmed){
+      clearArmed = true;
+      clearBtn.textContent = "Click again to confirm";
+      clearBtn.classList.add("confirm");
+      clearTimer = setTimeout(function(){
+        clearArmed = false;
+        clearBtn.textContent = "Clear the board";
+        clearBtn.classList.remove("confirm");
+      }, 3500);
+      return;
+    }
+    clearTimeout(clearTimer);
+    clearArmed = false;
+    clearBtn.textContent = "Clear the board";
+    clearBtn.classList.remove("confirm");
+    notes = [];
+    boardInner.innerHTML = "";
+    saveNotes();
+    ensureWidth();
+    updateCount();
+    updateMinimap();
+  });
+
+  // ---------- export / import ----------
+  function exportBoard(){
+    var data = JSON.stringify(notes.map(function(n){
+      return {x:n.x,y:n.y,html:n.html,bg:n.bg,font:n.font,rot:n.rot,categoryIndex:n.categoryIndex,isTask:n.isTask,done:n.done,due:n.due};
+    }), null, 2);
+    downloadBlob("stickit-board.json", new Blob([data], {type:"application/json"}));
+    toast("Board exported.");
+  }
+  exportBtn.addEventListener("click", exportBoard);
+
+  var importArmed = false, importTimer;
+  importBtn.addEventListener("click", function(){
+    if(!importArmed){
+      var parsed;
+      try{ parsed = JSON.parse(importArea.value); }
+      catch(e){ toast("That doesn't look like valid board JSON."); return; }
+      if(!Array.isArray(parsed)){ toast("Expected a JSON array of notes."); return; }
+      importArmed = true;
+      importBtn.textContent = "Click again to replace the board";
+      importBtn.classList.add("danger","confirm");
+      importTimer = setTimeout(function(){
+        importArmed = false;
+        importBtn.textContent = "Import (replaces current board)";
+        importBtn.classList.remove("danger","confirm");
+      }, 4000);
+      return;
+    }
+    clearTimeout(importTimer);
+    importArmed = false;
+    importBtn.textContent = "Import (replaces current board)";
+    importBtn.classList.remove("danger","confirm");
+    try{
+      var parsed2 = JSON.parse(importArea.value);
+      boardInner.innerHTML = "";
+      notes = parsed2.map(function(item, i){
+        return {
+          id: "n" + Date.now() + i,
+          x: item.x||0, y: item.y||0, html: item.html || escapeHtml(item.text||""),
+          bg: item.bg || randomColor(), font: item.font || pickFont(), rot: item.rot || 0,
+          z: ++zCounter, categoryIndex: item.categoryIndex||0,
+          isTask: !!item.isTask, done: !!item.done, due: item.due||""
+        };
+      });
+      notes.forEach(function(n){ renderNote(n, false); });
+      ensureWidth();
+      saveNotes();
+      updateCount();
+      updateMinimap();
+      importArea.value = "";
+      toast("Board imported.");
+    }catch(e){
+      toast("Import failed — the JSON may be malformed.");
+    }
+  });
+
+  // ---------- minimap ----------
+  function updateMinimap(){
+    minimapTrack.innerHTML = "";
+    var boardWidth = ensureWidth();
+    var trackWidth = minimapTrack.clientWidth || 1;
+    notes.forEach(function(n){
+      var m = document.createElement("div");
+      m.className = "miniNote";
+      m.style.left = ((n.x/boardWidth)*trackWidth) + "px";
+      m.style.width = Math.max(3, (NOTE_W/boardWidth)*trackWidth) + "px";
+      m.style.background = n.bg;
+      minimapTrack.appendChild(m);
+    });
+    var view = document.createElement("div");
+    view.className = "miniView";
+    view.id = "miniViewIndicator";
+    minimapTrack.appendChild(view);
+    updateMinimapViewport();
+  }
+  function updateMinimapViewport(){
+    var view = document.getElementById("miniViewIndicator");
+    if(!view) return;
+    var boardWidth = boardInner.scrollWidth || 1;
+    var trackWidth = minimapTrack.clientWidth || 1;
+    view.style.left = ((board.scrollLeft/boardWidth)*trackWidth) + "px";
+    view.style.width = Math.max(8, (window.innerWidth/boardWidth)*trackWidth) + "px";
+  }
+  minimapTrack.addEventListener("click", function(e){
+    var rect = minimapTrack.getBoundingClientRect();
+    var ratio = (e.clientX - rect.left) / rect.width;
+    var boardWidth = boardInner.scrollWidth;
+    var target = ratio*boardWidth - window.innerWidth/2;
+    board.scrollTo({left: Math.max(0, target), behavior:"smooth"});
+  });
+  window.addEventListener("resize", function(){ ensureWidth(); updateMinimap(); });
+
+  // ---------- share: snapshot ----------
+  snapshotBtn.addEventListener("click", async function(){
+    shareResult.innerHTML = '<p class="muted">Rendering snapshot…</p>';
+    if(typeof html2canvas !== "function"){
+      shareResult.innerHTML = '<p class="muted">Snapshot tool didn\'t load — try again in a moment.</p>';
+      return;
+    }
+    try{
+      var canvas = await html2canvas(document.body, {
+        backgroundColor: "#faf6e8",
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        scale: Math.min(window.devicePixelRatio || 1, 2)
+      });
+      canvas.toBlob(async function(blob){
+        if(!blob){ shareResult.innerHTML = '<p class="muted">Couldn\'t render a snapshot.</p>'; return; }
+        var url = URL.createObjectURL(blob);
+        shareResult.innerHTML = "";
+        var img = document.createElement("img");
+        img.src = url;
+        shareResult.appendChild(img);
+        var row = document.createElement("div");
+        row.className = "copyRow";
+        var saveBtn = document.createElement("button");
+        saveBtn.className = "btn primary";
+        saveBtn.style.margin = "8px 0 0";
+        saveBtn.textContent = "Save image";
+        saveBtn.addEventListener("click", function(){
+          downloadBlob("stickit-snapshot.jpg", blob);
+          toast("Snapshot saved.");
+        });
+        shareResult.appendChild(saveBtn);
+      }, "image/jpeg", 0.92);
+    }catch(e){
+      shareResult.innerHTML = '<p class="muted">Couldn\'t render a snapshot in this view.</p>';
+    }
+  });
+
+  // ---------- share: interactive link ----------
+  publishBtn.addEventListener("click", function(){
+    var payload = notes.map(function(n){
+      return {x:n.x,y:n.y,html:n.html,bg:n.bg,font:n.font,rot:n.rot,isTask:!!n.isTask,done:!!n.done,due:n.due||""};
+    });
+    var encoded = encodeState(payload);
+    if(!encoded){
+      shareResult.innerHTML = '<p class="muted">Couldn\'t encode the board for sharing — try the snapshot image instead.</p>';
+      return;
+    }
+    var link = location.href.split("#")[0] + "#sb=" + encoded;
+    shareResult.innerHTML = "";
+    var p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = link.length > 6000
+      ? "This link is long (your board has a lot of notes) but it's a real, fully public link — anyone can open it, no account needed."
+      : "A real, fully public link — anyone who opens it can view this board, no account needed.";
+    shareResult.appendChild(p);
+    var row = document.createElement("div");
+    row.className = "copyRow";
+    var input = document.createElement("input");
+    input.readOnly = true;
+    input.value = link;
+    input.id = "shareLinkInput";
+    row.appendChild(input);
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "btn primary";
+    copyBtn.style.margin = "0";
+    copyBtn.style.width = "auto";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", async function(){
+      try{ await navigator.clipboard.writeText(link); toast("Link copied."); }
+      catch(e){ input.select(); toast("Select the link and copy it manually."); }
+    });
+    row.appendChild(copyBtn);
+    shareResult.appendChild(row);
+  });
+
+  // ---------- shared read-only view ----------
+  if(readOnly){
+    shareBanner.hidden = false;
+    var shared = decodeState(location.hash.replace(/^#sb=/, "")) || [];
+    if(!shared.length){
+      shareBannerText.textContent = "This shared board link looks broken or empty.";
+      copyToMineBtn.hidden = true;
+    } else {
+      shared.forEach(function(item, i){
+        var n = {
+          id: "s" + i, x:item.x||0, y:item.y||0, html:item.html||"",
+          bg:item.bg||randomColor(), font:item.font||FONTS[0].name, rot:item.rot||0,
+          z: i+1, categoryIndex:0, isTask:!!item.isTask, done:!!item.done, due:item.due||""
+        };
+        notes.push(n);
+        renderNote(n, false);
+      });
+      ensureWidth();
+      updateMinimap();
+    }
+
+    copyToMineBtn.addEventListener("click", function(){
+      var mine = safeGet(NOTES_KEY) || [];
+      shared.forEach(function(item, i){
+        mine.push({
+          id: "n" + Date.now() + i, x:(item.x||0)+20, y:(item.y||0)+20, html:item.html||"",
+          bg:item.bg||randomColor(), font:item.font||FONTS[0].name, rot:item.rot||0,
+          z: 1, categoryIndex:0, isTask:!!item.isTask, done:!!item.done, due:item.due||""
+        });
+      });
+      safeSet(NOTES_KEY, mine);
+      location.hash = "";
+      location.reload();
+    });
+  }
+
+  // ---------- interactive tour ----------
+  var tourRoot = null, tourIndex = 0, tourSteps = [];
+  function buildTourSteps(){
+    var steps = [
+      {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do — hit Next to begin."},
+      {sel:"#boardInner", title:"Stick a note", body:"Click any empty spot on the board to pin a new note there, ready to type into right away."},
+      {sel:".note", title:"Move, format, delete", body:"Drag a note by its tape tab to move it. Hover a note to reveal its × and its toolbar for headings, bullet lists, color categories and marking it a task."},
+      {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match — handy once the board fills up."},
+      {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump straight there."},
+      {sel:"#gearBtn", title:"Settings", body:"Lock new notes to one font, export or import your board as JSON, or clear everything."},
+      {sel:"#shareBtn", title:"Share your board", body:"Get a real, fully public link anyone can open as a read-only board — no account needed — or grab a JPEG snapshot of what's on screen right now."},
+      {sel:null, title:"That's it!", body:"Click anywhere on the board to get started."}
+    ];
+    return steps.filter(function(s){ return !s.sel || document.querySelector(s.sel); });
+  }
+
+  function startTour(){
+    panel.hidden = true; sharePanel.hidden = true;
+    tourSteps = buildTourSteps();
+    tourIndex = 0;
+    tourRoot = document.createElement("div");
+    var spot = document.createElement("div");
+    spot.className = "spotlight";
+    var card = document.createElement("div");
+    card.className = "tourCard";
+    tourRoot.appendChild(spot);
+    tourRoot.appendChild(card);
+    document.body.appendChild(tourRoot);
+    renderTourStep();
+    window.addEventListener("resize", positionTourStep);
+  }
+  function endTour(){
+    if(!tourRoot) return;
+    window.removeEventListener("resize", positionTourStep);
+    tourRoot.remove();
+    tourRoot = null;
+  }
+  function renderTourStep(){
+    var card = tourRoot.querySelector(".tourCard");
+    var step = tourSteps[tourIndex];
+    var dotsHtml = tourSteps.map(function(s,i){ return '<span class="' + (i===tourIndex?"active":"") + '"></span>'; }).join("");
+    card.innerHTML =
+      "<h4>" + step.title + "</h4>" +
+      "<p>" + step.body + "</p>" +
+      '<div class="tourFoot">' +
+        '<button class="tourSkip" id="tourSkip">Skip</button>' +
+        '<div class="tourDots">' + dotsHtml + "</div>" +
+        '<div class="tourBtns">' +
+          (tourIndex > 0 ? '<button id="tourBack">Previous</button>' : "") +
+          '<button class="primary" id="tourNext">' + (tourIndex === tourSteps.length-1 ? "Done" : "Next") + "</button>" +
+        "</div>" +
+      "</div>";
+    card.querySelector("#tourSkip").addEventListener("click", endTour);
+    var backBtn = card.querySelector("#tourBack");
+    if(backBtn) backBtn.addEventListener("click", function(){ tourIndex--; renderTourStep(); });
+    card.querySelector("#tourNext").addEventListener("click", function(){
+      if(tourIndex === tourSteps.length-1){ endTour(); return; }
+      tourIndex++; renderTourStep();
+    });
+    positionTourStep();
+  }
+  function positionTourStep(){
+    if(!tourRoot) return;
+    var spot = tourRoot.querySelector(".spotlight");
+    var card = tourRoot.querySelector(".tourCard");
+    var step = tourSteps[tourIndex];
+    var target = step.sel ? document.querySelector(step.sel) : null;
+    var pad = 8;
+    var r = target ? target.getBoundingClientRect() : null;
+    if(r){
+      spot.style.left = (r.left - pad) + "px";
+      spot.style.top = (r.top - pad) + "px";
+      spot.style.width = (r.width + pad*2) + "px";
+      spot.style.height = (r.height + pad*2) + "px";
+    } else {
+      var cx = window.innerWidth/2, cy = window.innerHeight/2;
+      spot.style.left = cx + "px";
+      spot.style.top = cy + "px";
+      spot.style.width = "0px";
+      spot.style.height = "0px";
+    }
+    var cardW = 280;
+    var top, left;
+    if(r){
+      top = r.bottom + pad + 14;
+      if(top + 180 > window.innerHeight) top = Math.max(70, r.top - 190);
+      left = Math.min(Math.max(16, r.left), window.innerWidth - cardW - 16);
+    } else {
+      top = window.innerHeight/2 - 90;
+      left = window.innerWidth/2 - cardW/2;
+    }
+    card.style.top = top + "px";
+    card.style.left = left + "px";
+  }
+  helpBtn.addEventListener("click", startTour);
+
+  var SHORTCUT_GROUPS = [
+    { title: "Selecting & moving", items: [
+      ["Click a note's tab", "Select it"],
+      ["Arrow keys", "Nudge the selected note &middot; hold Shift for bigger steps"],
+      ["Delete / Backspace", "Delete the selected note"]
+    ]},
+    { title: "Resizing & zoom", items: [
+      ["Ctrl/Cmd + / -", "Resize the selected note, or zoom the board if nothing's selected"],
+      ["Ctrl/Cmd + 0", "Reset that note's size, or the board zoom"]
+    ]},
+    { title: "Typing in a note", items: [
+      ["Enter", "Finish editing"],
+      ["Shift + Enter", "New line"],
+      ["Esc", "Close a popover, or deselect / stop editing"]
+    ]}
+  ];
+  function showShortcutsPopover(){
+    if(openPopoverTrigger === kbdBtn) return;
+    var pop = openFloatingPopover(kbdBtn, "kbdPop");
+    if(!pop) return;
+    pop.innerHTML = "<h4>Keyboard shortcuts</h4>" + SHORTCUT_GROUPS.map(function(g, gi){
+      return (gi > 0 ? '<div class="kbdSep"></div>' : "") +
+        '<div class="kbdGroupTitle">' + g.title + "</div><dl>" +
+        g.items.map(function(s){ return "<dt>" + s[0] + "</dt><dd>" + s[1] + "</dd>"; }).join("") +
+        "</dl>";
+    }).join("");
+    pop.addEventListener("mouseleave", function(){
+      if(openPopoverTrigger === kbdBtn) closeFloatingPopovers();
+    });
+  }
+  kbdBtn.addEventListener("mouseenter", showShortcutsPopover);
+  kbdBtn.addEventListener("mouseleave", function(){
+    setTimeout(function(){
+      if(openPopoverTrigger === kbdBtn && openPopover && !openPopover.matches(":hover")){
+        closeFloatingPopovers();
+      }
+    }, 150);
+  });
+  kbdBtn.addEventListener("click", function(e){
+    e.stopPropagation();
+    if(openPopoverTrigger === kbdBtn){ closeFloatingPopovers(); return; }
+    showShortcutsPopover();
+  });
+
+  // ---------- board switcher ----------
+  function renderBoardList(){
+    boardList.innerHTML = "";
+    boards.forEach(function(b){
+      var row = document.createElement("div");
+      row.className = "boardRow" + (b.id === activeBoardId ? " active" : "");
+      var nameSpan = document.createElement("span");
+      nameSpan.className = "name";
+      nameSpan.textContent = b.name;
+      row.appendChild(nameSpan);
+      row.addEventListener("click", function(){
+        if(b.id === activeBoardId) return;
+        safeSet(ACTIVE_BOARD_KEY, b.id);
+        location.hash = "";
+        location.reload();
+      });
+
+      var renameBtn = document.createElement("button");
+      renameBtn.innerHTML = ICONS.pencil;
+      renameBtn.title = "Rename";
+      renameBtn.addEventListener("click", function(e){
+        e.stopPropagation();
+        var input = document.createElement("input");
+        input.value = b.name;
+        row.innerHTML = "";
+        row.appendChild(input);
+        input.focus(); input.select();
+        function commit(){
+          var v = input.value.trim();
+          if(v) b.name = v;
+          safeSet(BOARDS_KEY, boards);
+          renderBoardList();
+          updateBoardLabel();
+        }
+        input.addEventListener("keydown", function(ev){
+          if(ev.key === "Enter") commit();
+          if(ev.key === "Escape") renderBoardList();
+        });
+        input.addEventListener("blur", commit);
+      });
+      row.appendChild(renameBtn);
+
+      if(boards.length > 1){
+        var delBtn = document.createElement("button");
+        delBtn.innerHTML = ICONS.close;
+        delBtn.title = "Delete board";
+        delBtn.addEventListener("click", function(e){
+          e.stopPropagation();
+          if(!confirm2(delBtn)) return;
+          boards = boards.filter(function(x){ return x.id !== b.id; });
+          safeSet(BOARDS_KEY, boards);
+          try{ localStorage.removeItem(notesKeyFor(b.id)); }catch(err){}
+          if(b.id === activeBoardId){
+            safeSet(ACTIVE_BOARD_KEY, boards[0].id);
+            location.hash = "";
+            location.reload();
+            return;
+          }
+          renderBoardList();
+        });
+        row.appendChild(delBtn);
+      }
+
+      boardList.appendChild(row);
+    });
+  }
+  function confirm2(btn){
+    if(btn.dataset.armed === "1"){ return true; }
+    btn.dataset.armed = "1";
+    btn.innerHTML = ICONS.check;
+    btn.title = "Click again to confirm delete";
+    setTimeout(function(){ btn.dataset.armed = "0"; btn.innerHTML = ICONS.close; btn.title = "Delete board"; }, 3000);
+    return false;
+  }
+  function updateBoardLabel(){
+    var b = boards.filter(function(x){ return x.id === activeBoardId; })[0];
+    boardNameLabel.textContent = b ? b.name : "";
+  }
+
+  if(!readOnly && !singleNoteMode){
+    updateBoardLabel();
+    brandBtn.addEventListener("click", function(){
+      var willOpen = boardPanel.hidden;
+      closeOtherPanels(willOpen ? boardPanel : null);
+      boardPanel.hidden = !willOpen;
+      if(willOpen) renderBoardList();
+    });
+    document.addEventListener("click", function(e){
+      if(!boardPanel.hidden && !boardPanel.contains(e.target) && !brandBtn.contains(e.target)){
+        boardPanel.hidden = true;
+      }
+    });
+    addBoardBtn.addEventListener("click", function(){
+      var name = newBoardName.value.trim() || "New board";
+      var id = "b" + Date.now().toString(36) + Math.floor(rand(0,99));
+      boards.push({id:id, name:name});
+      safeSet(BOARDS_KEY, boards);
+      safeSet(ACTIVE_BOARD_KEY, id);
+      newBoardName.value = "";
+      location.hash = "";
+      location.reload();
+    });
+  }
+
+  // ---------- selection + keyboard shortcuts ----------
+  var selectedId = null;
+  function selectNote(id){
+    if(selectedId){
+      var prev = notes.find(function(x){ return x.id === selectedId; });
+      if(prev && prev.el) prev.el.classList.remove("selected");
+    }
+    selectedId = id;
+    var n = notes.find(function(x){ return x.id === id; });
+    if(n && n.el) n.el.classList.add("selected");
+  }
+  function clearSelection(){
+    if(!selectedId) return;
+    var prev = notes.find(function(x){ return x.id === selectedId; });
+    if(prev && prev.el) prev.el.classList.remove("selected");
+    selectedId = null;
+  }
+
+  if(!readOnly && !singleNoteMode){
+    document.addEventListener("keydown", function(e){
+      var ae = document.activeElement;
+      var typing = ae && (ae.isContentEditable || ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT");
+      if(e.key === "Escape"){
+        closeFloatingPopovers();
+        if(typing){ ae.blur(); }
+        else if(selectedId){ clearSelection(); }
+        return;
+      }
+
+      var isZoomKey = (e.ctrlKey || e.metaKey) && (e.key === "+" || e.key === "=" || e.key === "-" || e.key === "_" || e.key === "0");
+      if(isZoomKey && !typing){
+        e.preventDefault();
+        var selNote = selectedId ? notes.find(function(x){ return x.id === selectedId; }) : null;
+        if(selNote){
+          if(e.key === "0"){ selNote.w = NOTE_W; }
+          else{
+            var wStep = (e.key === "-" || e.key === "_") ? -20 : 20;
+            selNote.w = Math.min(420, Math.max(160, (selNote.w || NOTE_W) + wStep));
+          }
+          if(selNote.el) selNote.el.style.width = selNote.w + "px";
+          saveNotes();
+          updateMinimap();
+        } else {
+          if(e.key === "0"){ boardZoom = 1; }
+          else{
+            var zStep = (e.key === "-" || e.key === "_") ? -0.1 : 0.1;
+            boardZoom = Math.round(Math.min(1.6, Math.max(0.5, boardZoom + zStep)) * 100) / 100;
+          }
+          applyZoom();
+        }
+        return;
+      }
+
+      if(typing || !selectedId) return;
+      var n = notes.find(function(x){ return x.id === selectedId; });
+      if(!n){ selectedId = null; return; }
+      var step = e.shiftKey ? 20 : 4;
+      var moved = true;
+      if(e.key === "ArrowUp"){ n.y = Math.max(0, n.y - step); }
+      else if(e.key === "ArrowDown"){ n.y = Math.min(Math.max(0, boardHeight() - NOTE_H - 10), n.y + step); }
+      else if(e.key === "ArrowLeft"){ n.x = Math.max(0, n.x - step); }
+      else if(e.key === "ArrowRight"){ n.x = n.x + step; ensureWidth(); }
+      else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteNoteById(n.id); return; }
+      else { moved = false; }
+      if(moved){
+        e.preventDefault();
+        if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; }
+        saveNotes();
+        updateMinimap();
+      }
+    });
+  }
+
+  // ---------- boot ----------
+  if(singleNoteMode){
+    renderSingleNoteView(location.hash.replace(/^#sn=/, ""));
+  } else {
+    ensureWidth();
+    notes.forEach(function(n){ renderNote(n, false); });
+    updateCount();
+    applyZoom();
+    updateMinimap();
+
+    if(!firstRun || readOnly) hint.classList.add("hidden");
+    else setTimeout(dismissHint, 7000);
+  }
+})();
+</script>
+</body>
+</html>
