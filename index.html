@@ -192,6 +192,7 @@
     background-size: 26px 26px;
     background-position: 6px 6px;
     cursor: crosshair;
+    transition: transform .25s ease;
   }
   body.read-only .boardInner{ cursor:default; }
 
@@ -562,6 +563,10 @@
   .shareBanner button{ flex:none; }
 
   /* tour */
+  .tourBlock{
+    position:fixed; inset:0; z-index:10009;
+    cursor:default;
+  }
   .spotlight{
     position:fixed; z-index:10010;
     border-radius:10px;
@@ -589,6 +594,22 @@
   .tourBtns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .tourBtns button.primary:hover{ background:#b47a24; }
   .tourSkip{ background:none; border:none; color:var(--ink-soft); font-size:0.78rem; cursor:pointer; text-decoration:underline; padding:0; }
+
+  /* touch devices: bigger, thumb-friendly targets */
+  @media (pointer: coarse){
+    .moreBtn{ width:34px; height:34px; }
+    .moreBtn svg{ width:17px; height:17px; }
+    .del{ width:30px; height:30px; }
+    .del svg{ width:14px; height:14px; }
+    .toolbar button{ width:32px; height:32px; }
+    .toolbar button svg{ width:16px; height:16px; }
+    .colorDot{ width:28px; height:28px; }
+    .checkToggle{ width:26px; height:26px; }
+    .checkToggle svg{ width:15px; height:15px; }
+    .calBtn{ width:30px; height:30px; }
+    .gearBtn{ width:42px; height:42px; }
+    .tab{ width:64px; height:26px; }
+  }
 </style>
 </head>
 <body>
@@ -931,11 +952,41 @@
 
   var ZOOM_KEY = activeBoardId ? ("stickyboard.zoom." + activeBoardId) : null;
   var boardZoom = (ZOOM_KEY && safeGet(ZOOM_KEY)) || 1;
-  function applyZoom(){
+  var kbShift = 0;
+  function updateBoardTransform(){
     boardInner.style.transformOrigin = "0 0";
-    boardInner.style.transform = "scale(" + boardZoom + ")";
+    boardInner.style.transform = "translateY(" + (-kbShift) + "px) scale(" + boardZoom + ")";
+  }
+  function applyZoom(){
+    updateBoardTransform();
     if(ZOOM_KEY) safeSet(ZOOM_KEY, boardZoom);
     updateMinimap();
+  }
+
+  // ---------- mobile: keep the focused note above the on-screen keyboard ----------
+  function adjustForKeyboard(el){
+    if(!window.visualViewport) return;
+    var vh = window.visualViewport.height;
+    var rect = el.closest(".note").getBoundingClientRect();
+    var overflow = rect.bottom - vh + 16;
+    if(overflow > 0){
+      var maxShift = Math.max(0, boardHeight()*boardZoom - vh + 56);
+      kbShift = Math.min(kbShift + overflow, maxShift);
+      updateBoardTransform();
+    }
+  }
+  function resetKeyboardShift(){
+    if(kbShift !== 0){ kbShift = 0; updateBoardTransform(); }
+  }
+  if(window.visualViewport && !readOnly && !singleNoteMode){
+    window.visualViewport.addEventListener("resize", function(){
+      var focused = document.activeElement;
+      if(focused && focused.classList && focused.classList.contains("text") && focused.isContentEditable){
+        requestAnimationFrame(function(){ adjustForKeyboard(focused); });
+      } else {
+        resetKeyboardShift();
+      }
+    });
   }
 
   function updateCount(){
@@ -1378,6 +1429,10 @@
           text.blur();
         }
       });
+      text.addEventListener("focus", function(){
+        setTimeout(function(){ adjustForKeyboard(text); }, 250);
+      });
+      text.addEventListener("blur", resetKeyboardShift);
 
       del.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
       del.addEventListener("click", function(e){
@@ -1967,10 +2022,13 @@
     tourSteps = buildTourSteps();
     tourIndex = 0;
     tourRoot = document.createElement("div");
+    var block = document.createElement("div");
+    block.className = "tourBlock";
     var spot = document.createElement("div");
     spot.className = "spotlight";
     var card = document.createElement("div");
     card.className = "tourCard";
+    tourRoot.appendChild(block);
     tourRoot.appendChild(spot);
     tourRoot.appendChild(card);
     document.body.appendChild(tourRoot);
