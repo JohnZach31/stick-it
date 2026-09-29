@@ -268,7 +268,9 @@
     transition:transform .18s ease;
   }
   .photoObj:hover{ transform:rotate(var(--rot, 0deg)) translateY(-3px); z-index:9998 !important; }
-  .photoObj.dragging{ cursor:grabbing; transition:none; z-index:9999 !important; transform:rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important; animation:wobble .5s ease-in-out infinite; }
+  /* a photo print is stiffer than a paper note: it barely sways while carried */
+  @keyframes wobbleSoft{ 0%,100%{ --wob:-1deg; } 50%{ --wob:1deg; } }
+  .photoObj.dragging{ cursor:grabbing; transition:none; z-index:9999 !important; transform:rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important; animation:wobbleSoft .8s ease-in-out infinite; }
   .photoObj.new{ animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
   .photoObj.removing{ animation:popOut .26s ease-in forwards; pointer-events:none; }
   .photoObj.selected{ outline:1.5px solid var(--sel-ring); outline-offset:6px; }
@@ -366,6 +368,7 @@
   }
   .focusClose:hover{ background:rgba(0,0,0,0.2); }
   .focusClose svg{ width:12px; height:12px; }
+  .note.dragging{
     transition:none;
     cursor:grabbing;
     box-shadow: 8px 18px 30px var(--shadow);
