@@ -19,14 +19,15 @@ Share a board with a link that just *works*.
 | | |
 |---|---|
 | 🖱️ **Infinite corkboard** | Click anywhere to stick a note. Scroll or swipe sideways for more room, or zoom the whole board. |
-| ✍️ **Rich text notes** | Headings, bullet lists, and drag-and-drop images, all tucked behind one tidy menu per note so the board stays clean. |
-| 🎨 **A little chaos, on purpose** | Every note gets a random handwriting font and color, or lock one font in if you'd rather it behave. |
-| ✅ **Tasks & real reminders** | Mark a note as a task, give it a date, and download a genuine calendar invite: Google Calendar, Outlook, Apple Calendar, all of it. |
+| ✍️ **Rich text notes** | Headings, bold, italic, a marker-style highlighter, lists, hand-drawn checklists, links and drag-and-drop images, all tucked behind one tidy menu per note so the board stays clean. |
+| 🎨 **A little chaos, on purpose** | Every note gets its own handwriting, colour, tape or pin, and a crease or two. Tap **Aa** to try another hand. Hebrew, Chinese, Japanese and Korean get fonts that actually have those letters. |
+| ✅ **Tasks & real reminders** | Write "Dentist Tuesday 17:30" and Stick-It spots the date; one click adds it to Google Calendar or downloads a reminder for Apple Calendar / Outlook. Tasks with due dates still work too. |
 | 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with its own notes. |
 | 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share. Stick-It only ever sees your name, email, and photo, never your password or your Gmail/Calendar/Drive. Or skip it entirely; guest mode asks for nothing. |
-| 🔗 **Sharing that actually works** | Share a board or a single note with a link that opens instantly for whoever you send it to, no login or setup on their end. |
+| 🔗 **Sharing that actually works** | Share a board, a single note, or just a few selected notes with a link that opens instantly for whoever you send it to, no login or setup on their end. |
 | 📷 **One-click snapshot** | Grab an image of exactly what's on screen. |
-| 🔍 **Search, minimap, undo** | Type to filter notes, jump around a big board, and undo an accidental delete before it's gone for good. |
+| 🔍 **Search, minimap, undo** | Type to filter notes, jump around a big board, and undo almost anything: moves, deletes, colours, fonts, imports. |
+| 🧲 **Handle a few at once** | Ctrl/Cmd+click or drag a box to select notes, then move, duplicate, copy/paste, share or send them to another board together. |
 | ⌨️ **Real keyboard shortcuts** | Select, nudge, resize, zoom, all documented in-app, one hover away. |
 | 📱 **Built for touch too** | Bigger tap targets on mobile, and the on-screen keyboard won't swallow the note you're typing into. |
 
