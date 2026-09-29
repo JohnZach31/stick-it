@@ -248,7 +248,124 @@
     box-shadow: 5px 12px 22px var(--shadow), 0 1px 0 rgba(255,255,255,0.4) inset;
     z-index: 9998 !important;
   }
-  .note.dragging{
+  /* A note never grows past the board's height: the paper stops, the writing scrolls. */
+  .note{ display:flex; flex-direction:column; max-height:var(--note-max-h, none); }
+  .note > .text{
+    flex:1 1 auto; min-height:40px; overflow:hidden; padding-bottom:2px; overscroll-behavior:contain;
+    scrollbar-width:thin; scrollbar-color:rgba(0,0,0,0.2) transparent;
+  }
+  .note > .text::-webkit-scrollbar{ width:6px; }
+  .note > .text::-webkit-scrollbar-thumb{ background:rgba(0,0,0,0.18); border-radius:6px; }
+  .note > .text::-webkit-scrollbar-track{ background:transparent; }
+  .note > .text.moreBelow{ -webkit-mask-image:linear-gradient(to bottom, #000 calc(100% - 26px), transparent); mask-image:linear-gradient(to bottom, #000 calc(100% - 26px), transparent); }
+  .note > .noteImgWrap{ flex:none; }
+  .note.capped > .text{ overflow-y:auto; }
+
+  /* ---------- standalone photos: printed, cut out, or mounted on card ---------- */
+  .photoObj{
+    position:absolute; transform:rotate(var(--rot, 0deg)); transform-origin:50% 50%;
+    cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;
+    transition:transform .18s ease;
+  }
+  .photoObj:hover{ transform:rotate(var(--rot, 0deg)) translateY(-3px); z-index:9998 !important; }
+  .photoObj.dragging{ cursor:grabbing; transition:none; z-index:9999 !important; transform:rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important; animation:wobble .5s ease-in-out infinite; }
+  .photoObj.new{ animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+  .photoObj.removing{ animation:popOut .26s ease-in forwards; pointer-events:none; }
+  .photoObj.selected{ outline:1.5px solid var(--sel-ring); outline-offset:6px; }
+  .photoObj .pBody{ position:relative; }
+  .photoObj .pFrame{ position:relative; }
+  .photoObj img{ display:block; width:var(--pw, 220px); height:auto; pointer-events:none; -webkit-user-drag:none; }
+  .photoObj .pCaption{ color:#3a3528; overflow-wrap:anywhere; outline:none; cursor:default; }
+  .photoObj .pCaption.editing{ cursor:text; background:rgba(255,255,255,0.35); user-select:text; -webkit-user-select:text; touch-action:auto; }
+  .photoObj .pCaption.empty:not(.editing){ color:transparent; }
+  /* polaroid: off-white instant print with the deep bottom margin */
+  .ps-polaroid .pFrame{
+    background:linear-gradient(172deg, #fcfaf5, #f1ede3);
+    padding:calc(var(--pw, 220px) * 0.055) calc(var(--pw, 220px) * 0.055) calc(var(--pw, 220px) * 0.26);
+    border-radius:1.5px;
+    box-shadow:0 1px 1.5px rgba(0,0,0,0.16), 3px 8px 16px var(--shadow);
+  }
+  .ps-polaroid img{ outline:1px solid rgba(0,0,0,0.06); }
+  .ps-polaroid .pCaption{
+    position:absolute; left:calc(var(--pw, 220px) * 0.055); right:calc(var(--pw, 220px) * 0.055); bottom:0;
+    height:calc(var(--pw, 220px) * 0.26); display:flex; align-items:center; justify-content:center; text-align:center;
+    font-size:clamp(11px, calc(var(--pw, 220px) * 0.078), 28px); line-height:1.1; overflow:hidden; padding:0 4px;
+  }
+  /* cut-out: a white, slightly irregular scissor border (clip-path from the photo's seed) */
+  .ps-cutout .pBody, .ps-mounted .pBody{ filter:drop-shadow(1px 2px 1.5px rgba(0,0,0,0.24)) drop-shadow(2px 6px 7px rgba(40,30,10,0.22)); }
+  .ps-cutout .pFrame, .ps-mounted .pFrame{ background:#fdfcf8; padding:calc(var(--pw, 220px) * 0.03 + 2px); }
+  .ps-cutout .pFrame.isolated, .ps-mounted .pFrame.isolated{ background:none; padding:0; clip-path:none !important; }
+  .ps-cutout .pFrame.isolated img, .ps-mounted .pFrame.isolated img{
+    filter:drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff);
+  }
+  /* mounted: the cut-out glued onto a scrap of light card */
+  .ps-mounted{ padding:calc(var(--pw, 220px) * 0.085); }
+  .ps-mounted .pBack{
+    position:absolute; inset:0; z-index:0;
+    transform:translate(var(--bx, 3px), var(--by, 4px)) rotate(var(--br, 1deg));
+    background-color:#d8c29a;
+    background-image:
+      repeating-linear-gradient(97deg, rgba(110,80,30,0.05) 0 1px, transparent 1px 4px),
+      linear-gradient(160deg, rgba(255,255,255,0.18), rgba(0,0,0,0.07));
+    border-radius:3px 7px 2px 6px / 6px 2px 7px 3px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.2), 3px 7px 14px var(--shadow);
+  }
+  .ps-mounted .pBody, .ps-mounted .pCaption{ position:relative; z-index:1; }
+  /* caption as a small paper label under cut-outs */
+  .ps-cutout .pCaption, .ps-mounted .pCaption{
+    display:table; margin:8px auto 0; max-width:var(--pw, 220px);
+    background:#fbf8ef; padding:2px 10px 3px; transform:rotate(var(--lr, -2deg));
+    font-size:clamp(11px, calc(var(--pw, 220px) * 0.066), 24px); line-height:1.15; text-align:center;
+    box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  }
+  .ps-cutout .pCaption.empty:not(.editing), .ps-mounted .pCaption.empty:not(.editing){ display:none; }
+  .ps-cutout .pCaption.editing, .ps-mounted .pCaption.editing{ display:block; width:fit-content; min-width:5em; min-height:1.3em; }
+  .ps-polaroid .pCaption.editing{ min-height:1.3em; }
+  body.dark .ps-polaroid .pFrame{ background:linear-gradient(172deg, #efebe1, #e4dfd3); }
+  body.dark .ps-mounted .pBack{ filter:brightness(0.88); }
+  body.dark .ps-cutout .pBody, body.dark .ps-mounted .pBody{ filter:drop-shadow(1px 2px 1.5px rgba(0,0,0,0.5)) drop-shadow(2px 6px 8px rgba(0,0,0,0.45)); }
+  /* controls on a selected photo */
+  .pCtl{
+    position:absolute; z-index:3; display:none; align-items:center; justify-content:center;
+    width:26px; height:26px; border-radius:50%; padding:0; cursor:pointer;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink); box-shadow:0 3px 10px var(--shadow);
+  }
+  .pCtl svg{ width:13px; height:13px; }
+  .photoObj.selected .pCtl{ display:flex; }
+  body.multi-sel .pCtl, body.read-only .pCtl, .photoObj.static .pCtl{ display:none !important; }
+  .pCtl.pMore{ top:-13px; right:-13px; }
+  .pCtl.pStyle{ bottom:-13px; left:-13px; }
+  .pCtl.pHandle{ bottom:-9px; right:-9px; width:18px; height:18px; cursor:nwse-resize; border:1.5px solid var(--accent); touch-action:none; }
+  @media (pointer: coarse){ .pCtl{ width:34px; height:34px; } .pCtl.pHandle{ width:26px; height:26px; } }
+  .photoObj.static{ cursor:default; }
+  .photoObj.static:hover{ transform:rotate(var(--rot, 0deg)); }
+  #snapStage .pFrame, #snapStage .pBack{ box-shadow:none !important; }
+  #snapStage .ps-polaroid .pFrame{ border:1px solid rgba(0,0,0,0.08); }
+  #snapStage .pBack{ transform:translate(var(--bx, 3px), var(--by, 4px)); }
+  #snapStage .pCaption{ box-shadow:none !important; }
+
+  /* focus mode: the note is picked up and brought close; the board dims behind it */
+  .focusScrim{ position:fixed; inset:0; z-index:10003; background:rgba(40,32,12,0.32); animation:acctFade .18s ease both; }
+  body.dark .focusScrim{ background:rgba(3,2,10,0.55); }
+  .note.focused, .note.focused:hover, .note.focused:focus-within{
+    position:fixed !important; left:50% !important; top:50% !important;
+    width:min(560px, calc(100vw - 32px)) !important;
+    min-height:min(420px, 70vh); max-height:min(84vh, 900px);
+    transform:translate(-50%, -50%) rotate(calc(var(--rot, 0deg) * 0.35)) !important;
+    z-index:10004 !important; cursor:text;
+    box-shadow:6px 18px 40px rgba(20,15,5,0.35), 0 1px 0 rgba(255,255,255,0.4) inset;
+    animation:focusIn .22s cubic-bezier(.3,1.3,.6,1) both;
+  }
+  @keyframes focusIn{ from{ opacity:0.4; } to{ opacity:1; } }
+  .note.focused > .text{ font-size:1.36rem; padding-bottom:18px; }
+  .note.focused .tab{ cursor:default; }
+  .note.focused .del, .note.focused .fontCycle, .note.focused .listHint{ display:none !important; }
+  .focusClose{
+    position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; border:none;
+    background:rgba(0,0,0,0.1); color:inherit; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;
+  }
+  .focusClose:hover{ background:rgba(0,0,0,0.2); }
+  .focusClose svg{ width:12px; height:12px; }
     transition:none;
     cursor:grabbing;
     box-shadow: 8px 18px 30px var(--shadow);
@@ -624,6 +741,12 @@
   }
   .boardRow .info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
   .boardRow .info .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .boardRow .info .sub{ font-size:0.72rem; color:var(--ink); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .coverPreview{ width:100%; aspect-ratio:16 / 10; border-radius:10px; border:1px solid var(--line); background:var(--paper); display:block; object-fit:cover; margin-bottom:12px; }
+  .coverModes{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; margin-bottom:6px; }
+  .coverModes .pillBtn{ padding:8px 6px; white-space:normal; line-height:1.2; }
+  .coverModes .pillBtn.on{ border-color:var(--accent); background:var(--accent-soft); }
+  .coverHint{ font-size:0.72rem; color:var(--ink-soft); min-height:1.2em; margin:0 0 12px; }
   .boardRow .info .meta{ font-size:0.68rem; color:var(--ink-soft); font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .boardRow:hover{ background:var(--accent-soft); }
   .boardRow.active{ background:var(--accent-soft); font-weight:700; }
@@ -728,7 +851,7 @@
   }
   .tourCard{
     position:fixed; z-index:10011;
-    width:280px; max-width:88vw;
+    width:min(300px, calc(100vw - 24px)); max-width:none;
     background:var(--panel); border:1px solid var(--line);
     border-radius:12px; padding:16px;
     box-shadow:0 16px 40px var(--shadow);
@@ -736,11 +859,16 @@
   }
   .tourCard h4{ margin:0 0 8px; font-family:'Sora',sans-serif; font-size:1.02rem; }
   .tourCard p{ margin:0 0 12px; font-size:0.88rem; line-height:1.45; color:var(--ink); }
-  .tourFoot{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
-  .tourDots{ display:flex; gap:5px; }
+  .tourFoot{ display:grid; grid-template-columns:auto minmax(0, 1fr) auto; align-items:center; gap:8px; }
+  .tourFoot.tight{ grid-template-columns:minmax(0, 1fr) auto; }
+  .tourFoot.tight .tourSkip{ grid-column:1 / -1; justify-self:start; }
+  .tourDots{ display:flex; gap:5px; justify-content:center; min-width:0; overflow:hidden; }
+  .tourDots span{ flex:none; }
+  .tourCount{ font-size:0.74rem; color:var(--ink-soft); text-align:center; white-space:nowrap; font-variant-numeric:tabular-nums; }
   .tourDots span{ width:6px; height:6px; border-radius:50%; background:var(--line); }
   .tourDots span.active{ background:var(--accent); }
-  .tourBtns{ display:flex; gap:6px; }
+  .tourBtns{ display:flex; gap:6px; flex:none; }
+  .tourBtns button{ white-space:nowrap; }
   .tourBtns button{ padding:6px 14px; border-radius:7px; border:1px solid var(--field-line); background:var(--field); color:var(--ink); cursor:pointer; font-size:0.82rem; font-weight:600; transition:background .15s ease, border-color .15s ease; }
   .tourBtns button:hover{ background:var(--accent-soft); border-color:var(--accent); }
   .tourBtns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
@@ -956,6 +1084,7 @@
     transform:rotate(calc(-1 * var(--rot, 0deg)));
     transform-origin:left top;
   }
+  .listHint.above{ top:auto; bottom:calc(100% + 16px); transform-origin:left bottom; }
   .note.selected .listHint, .note:focus-within .listHint{ display:flex; }
   body.multi-sel .listHint, body.read-only .listHint{ display:none !important; }
   .listHint button{
@@ -1584,8 +1713,22 @@
       hole: p.hole && typeof p.hole === "object" ? {x: clampNum(p.hole.x, 8, 40, 18), r: !!p.hole.r} : null
     };
   }
+  // photos: a seed for the scissor edge, where the card backing sits, the label's tilt
+  function makePhotoPhys(rng){
+    rng = rng || Math.random;
+    function r(a, b){ return a + rng()*(b-a); }
+    return {cut: Math.floor(rng()*1e6), bx: Math.round(r(-6, 6)), by: Math.round(r(2, 7)), br: +r(-3, 3).toFixed(1), lr: +r(-4, 3).toFixed(1)};
+  }
+  function sanitizePhotoPhys(p){
+    if(!p || typeof p !== "object") return null;
+    return {cut: Math.round(clampNum(p.cut, 0, 1e6, 1)), bx: clampNum(p.bx, -12, 12, 3), by: clampNum(p.by, -12, 12, 4), br: clampNum(p.br, -8, 8, 1), lr: clampNum(p.lr, -8, 8, -2)};
+  }
   // Notes from before this existed get stable values derived from their id.
   function ensurePhys(n){
+    if(isPhoto(n)){
+      if(!n.phys || typeof n.phys !== "object" || n.phys.cut == null) n.phys = makePhotoPhys(seededRng(hashStr(String(n.id || n.image.length))));
+      return n.phys;
+    }
     if(!n.phys || typeof n.phys !== "object") n.phys = makePhys(seededRng(hashStr(String(n.id || (n.bg + ":" + n.rot)))));
     return n.phys;
   }
@@ -1687,8 +1830,29 @@
   var idSeq = 0;
   function newId(){ idSeq += 1; return "n" + Date.now().toString(36) + idSeq + Math.floor(rand(0, 999)); }
   // Normalise a note that came from a link, a file, or the clipboard.
+  var PHOTO_STYLES = ["polaroid", "cutout", "mounted"];
+  var PHOTO_STYLE_NAMES = {polaroid:"Polaroid", cutout:"Cut-out", mounted:"Mounted cut-out"};
+  var PHOTO_MIN_W = 80, PHOTO_MAX_W = 900;
+  function isPhoto(n){ return !!n && n.type === "photo"; }
   function normalizeIncoming(item){
     item = item || {};
+    if(item.type === "photo"){
+      var src = safeImage(item.image);
+      if(!src) return null;
+      return {
+        id: newId(), type: "photo",
+        x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0),
+        w: Math.round(clampNum(item.w, PHOTO_MIN_W, PHOTO_MAX_W, 220)),
+        imgRatio: clampNum(item.imgRatio, 0.05, 20, 0.75),
+        rot: clampNum(item.rot, -12, 12, 0), z: 1,
+        image: src, cutout: safeImage(item.cutout),
+        photoStyle: PHOTO_STYLES.indexOf(item.photoStyle) !== -1 ? item.photoStyle : "polaroid",
+        caption: String(item.caption || "").replace(/\s+/g, " ").trim().slice(0, 120),
+        font: FONT_BY_NAME[item.font] ? item.font : pickFont(),
+        createdAt: clampNum(item.createdAt, 0, 1e14, Date.now()),
+        phys: sanitizePhotoPhys(item.phys)
+      };
+    }
     return {
       id: newId(),
       x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0), w: clampNum(item.w, 160, 420, NOTE_W),
@@ -1707,7 +1871,10 @@
       phys: sanitizePhys(item.phys)
     };
   }
-  var SERIAL_FIELDS = ["id","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","phys"];
+  // Board items are sticky notes unless `type` says otherwise (old boards have no type).
+  // For a photo, `w` is the printed photo's width and `image` its source; the
+  // original is never modified (`cutout` is reserved for an isolated-subject version).
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1758,6 +1925,10 @@
   var PublicShare = {
     PREFIX: {note:"sn", group:"sg", board:"sb"},
     toPublicNote: function(n){
+      if(isPhoto(n)) return {
+        type:"photo", x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, image:n.image,
+        photoStyle:n.photoStyle, caption:n.caption || "", font:n.font, phys:ensurePhys(n)
+      };
       return {
         x:n.x, y:n.y, w:n.w || NOTE_W, html:n.html || "", bg:n.bg, font:n.font, rot:n.rot,
         isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "",
@@ -1767,7 +1938,7 @@
     // Photos travel inside the link, so shrink them (same ratio, fewer pixels) first.
     prepare: async function(items){
       await Promise.all(items.map(async function(it){
-        if(it.image) it.image = await shrinkDataUrl(it.image, 360, 0.72);
+        if(it.image) it.image = await shrinkDataUrl(it.image, it.type === "photo" ? 640 : 360, it.type === "photo" ? 0.78 : 0.72);
       }));
       return items;
     },
@@ -1838,6 +2009,34 @@
   function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
 
   function boardHeight(){ return boardInner.clientHeight || (window.innerHeight - 56); }
+  // Vertical space is bounded on purpose: everything must stay reachable.
+  function itemHeight(n){ return (n.el && n.el.offsetHeight) || NOTE_H; }
+  function itemMaxY(n){ return Math.max(0, boardHeight() - itemHeight(n) - 8); }
+  function syncNoteMaxHeight(){
+    if(!boardInner.clientHeight) return; // hidden/collapsed: keep the last real measurement
+    document.documentElement.style.setProperty("--note-max-h", Math.max(240, boardInner.clientHeight - 16) + "px");
+    if(typeof notes !== "undefined") notes.forEach(function(n){ if(n.textEl) updateScrollCue(n.textEl); });
+  }
+  // pull anything that ended up below the usable area back into view (no undo step: it's a repair)
+  function recoverVertical(list){
+    if(!boardInner.clientHeight) return; // never "recover" against a collapsed board
+    var changed = false;
+    (list || notes).forEach(function(n){
+      if(!n.el) return;
+      var my = itemMaxY(n);
+      if(n.y > my){ n.y = my; n.el.style.top = n.y + "px"; changed = true; }
+    });
+    if(changed){ saveNotes(); updateMinimap(); }
+  }
+  // scrolling only switches on when the writing really overflows (not for sub-pixel rounding)
+  function updateScrollCue(t){
+    if(!t) return;
+    var over = t.scrollHeight - t.clientHeight > 2;
+    var note = t.closest(".note");
+    if(note) note.classList.toggle("capped", over);
+    if(!over) t.scrollTop = 0;
+    t.classList.toggle("moreBelow", over && t.scrollHeight - t.clientHeight - t.scrollTop > 4);
+  }
 
   function ensureWidth(){
     var maxX = notes.reduce(function(m,n){ return Math.max(m, n.x + (n.w||NOTE_W)); }, 0);
@@ -1855,6 +2054,9 @@
   }
   function applyZoom(){
     updateBoardTransform();
+    // zoomed in, the scaled board is taller than the window: let it scroll so nothing is out of reach
+    board.style.overflowY = boardZoom > 1 ? "auto" : "hidden";
+    if(boardZoom <= 1) board.scrollTop = 0;
     if(ZOOM_KEY) safeSet(ZOOM_KEY, boardZoom);
     updateMinimap();
   }
@@ -2372,7 +2574,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2509,8 +2711,18 @@
   function clearSelection(){ if(selected.size) setSelection([]); }
 
   // ---------- note content helpers ----------
+  // the words someone can see on an item (a note's writing, a photo's caption)
+  function itemText(n){
+    if(isPhoto(n)) return n.caption || "";
+    return n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "").trim();
+  }
+  function itemWord(list){
+    var photos = list.filter(isPhoto).length;
+    if(list.length === 1) return photos ? "photo" : "note";
+    return photos === list.length ? "photos" : (photos ? "items" : "notes");
+  }
   function noteHasContent(n){
-    if(n.image) return true;
+    if(isPhoto(n) || n.image) return true;
     if(n.isTask && n.due) return true;
     var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
     if(/<ul[^>]*checklist/i.test(html)) return true;
@@ -3020,18 +3232,41 @@
   function isShortItem(t, maxLen, maxWords){
     return t.length <= maxLen && t.split(/\s+/).length <= maxWords && !/[.!?]\s/.test(t) && !/[!?]$/.test(t);
   }
+  // Short, item-like lines: few words, mostly no sentence punctuation, small average length.
+  function looksLikeItems(list){
+    if(list.length < 3) return false;
+    var lens = list.map(function(l){ return l.length; });
+    var words = list.map(function(l){ return l.split(/\s+/).length; });
+    var avg = lens.reduce(function(a, b){ return a + b; }, 0) / list.length;
+    if(Math.max.apply(null, lens) > 50 || avg > 28 || Math.max.apply(null, words) > 7) return false;
+    var sentences = list.filter(function(l){ return /[.!?]$/.test(l) || /[.!?]\s/.test(l); }).length;
+    if(sentences > list.length * 0.2) return false;
+    var prose = list.filter(function(l){ return PROSE_START.test(l) && l.split(/\s+/).length > 2; }).length;
+    return prose <= list.length * 0.25;
+  }
   function listCandidate(n){
-    if(!n.textEl || readOnly) return null;
+    if(!n.textEl || readOnly || n.type === "photo") return null;
     if(n.textEl.querySelector("ul.checklist")) return null;
-    var lines = textIndex(n.textEl).text.split("\n").map(function(l){ return l.trim(); }).filter(Boolean);
+    var raw = textIndex(n.textEl).text.split("\n").map(function(l){ return l.trim(); });
+    while(raw.length && !raw[0]) raw.shift();
+    while(raw.length && !raw[raw.length - 1]) raw.pop();
+    var lines = raw.filter(Boolean);
     if(!lines.length) return null;
     var title = null, items = null;
+    function strip(l){ return l.replace(/^([-*\u2022]|\d+[.)])\s*/, ""); }
+    function tidy(l){ return l.replace(/[.;,]$/, ""); }
     if(lines.length >= 3){
-      var body = lines;
-      if(/:$/.test(body[0]) && body[0].length <= 40){ title = body[0]; body = body.slice(1); }
-      var clean = body.map(function(l){ return l.replace(/^[-*\u2022]\s*/, "").replace(/\.$/, ""); });
-      if(clean.length >= 3 && clean.every(function(l){ return l && isShortItem(l, 40, 5); }) &&
-         !clean.some(function(l){ return PROSE_START.test(l) && l.split(/\s+/).length > 2; })) items = clean;
+      var first = lines[0], rest = lines.slice(1).map(strip);
+      var titleLike = first.length <= 60 && !/[.!?]$/.test(first) && (
+        /:$/.test(first) ||                                  // "Groceries:"
+        (raw.length > 1 && raw[1] === "") ||                 // title, blank line, items
+        first.split(/\s+/).length > Math.max.apply(null, rest.map(function(l){ return l.split(/\s+/).length; })) // longer than every item
+      );
+      if(titleLike && rest.length >= 3 && looksLikeItems(rest)){ title = first; items = rest.map(tidy); }
+      else {
+        var all = lines.map(strip);
+        if(looksLikeItems(all)) items = all.map(tidy);
+      }
     } else {
       var line = lines[lines.length - 1];
       if(lines.length === 2){
@@ -3074,6 +3309,8 @@
       hintEl.remove();
     });
     n.el.appendChild(hintEl);
+    // near the bottom of the board the suggestion sits above the note so it stays visible
+    if(n.y + itemHeight(n) + 60 > boardHeight()) hintEl.classList.add("above");
   }
   function setNoteHtml(id, html){
     var n = findNote(id);
@@ -3097,6 +3334,363 @@
     toast("Made a checklist.", "Undo", function(){ undoIfTop(action); });
   }
 
+  // ---------- standalone photos ----------
+  function defaultPhotoW(n){ return (n.imgRatio || 0.75) > 1.05 ? 190 : 240; }
+  // A hand-cut edge: points walk around the rectangle, nudged inward a little.
+  function cutPolygon(seed, jitter){
+    var rng = seededRng(seed), pts = [];
+    function j(){ return (rng() * jitter).toFixed(2); }
+    var steps = 7;
+    for(var i = 0; i < steps; i++) pts.push((i / steps * 100).toFixed(2) + "% " + j() + "%");
+    for(i = 0; i < steps; i++) pts.push((100 - j()) + "% " + (i / steps * 100).toFixed(2) + "%");
+    for(i = 0; i < steps; i++) pts.push((100 - i / steps * 100).toFixed(2) + "% " + (100 - j()) + "%");
+    for(i = 0; i < steps; i++) pts.push(j() + "% " + (100 - i / steps * 100).toFixed(2) + "%");
+    return "polygon(" + pts.join(", ") + ")";
+  }
+  // Subject isolation hook. Reliable segmentation for arbitrary photos needs a model
+  // far too heavy for this page (tens of MB, plus licensing), so it's deferred to the
+  // image-processing pass. When that exists it resolves {ok:true, cutout:"data:image/png..."}
+  // and the photo keeps both the original and the cut-out version.
+  var PhotoCutout = {
+    available: false,
+    segment: function(photo){ return Promise.resolve({ok:false, reason:"Automatic subject cut-out needs the upcoming image-processing step."}); }
+  };
+  function buildPhotoEl(item){
+    var style = PHOTO_STYLES.indexOf(item.photoStyle) !== -1 ? item.photoStyle : "polaroid";
+    var p = ensurePhys(item);
+    var el = makeDiv("photoObj ps-" + style);
+    el.style.setProperty("--pw", (item.w || defaultPhotoW(item)) + "px");
+    el.style.setProperty("--rot", (item.rot || 0) + "deg");
+    el.style.setProperty("--bx", p.bx + "px");
+    el.style.setProperty("--by", p.by + "px");
+    el.style.setProperty("--br", p.br + "deg");
+    el.style.setProperty("--lr", p.lr + "deg");
+    if(style === "mounted") el.appendChild(makeDiv("pBack"));
+    var body = makeDiv("pBody"), frame = makeDiv("pFrame");
+    var isolated = style !== "polaroid" && !!item.cutout;
+    if(isolated) frame.classList.add("isolated");
+    else if(style !== "polaroid") frame.style.clipPath = cutPolygon(p.cut, 1.2);
+    var img = document.createElement("img");
+    img.alt = item.caption || "";
+    img.draggable = false;
+    img.style.aspectRatio = "1 / " + (item.imgRatio || 0.75);
+    img.src = isolated ? item.cutout : item.image;
+    frame.appendChild(img);
+    var cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
+    cap.dir = "auto";
+    cap.textContent = item.caption || "";
+    cap.style.fontFamily = fontStack(item.font);
+    if(style === "polaroid") frame.appendChild(cap);
+    body.appendChild(frame);
+    el.appendChild(body);
+    if(style !== "polaroid") el.appendChild(cap);
+    return {el:el, img:img, cap:cap};
+  }
+  function buildStaticPhoto(item){
+    var b = buildPhotoEl(item);
+    b.el.classList.add("static");
+    return b.el;
+  }
+  function photoFrameSize(n){
+    if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
+    var w = n.w || 220, ih = w * (n.imgRatio || 0.75);
+    if(n.photoStyle === "polaroid" || !n.photoStyle) return {w:w * 1.11, h:ih + w * 0.315};
+    var pad = w * 0.06 + 4, extra = n.photoStyle === "mounted" ? w * 0.17 : 0;
+    return {w:w + pad + extra, h:ih + pad + extra + (n.caption ? 30 : 0)};
+  }
+  function renderPhoto(n, isNew, opts){
+    opts = opts || {};
+    var b = buildPhotoEl(n);
+    var el = b.el;
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id;
+    el.style.left = n.x + "px";
+    el.style.top = n.y + "px";
+    el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el;
+    n.textEl = null;
+    n.captionEl = b.cap;
+    if(!readOnly){
+      function ctl(cls, html, title, onDown){
+        var c = document.createElement("button");
+        c.className = "pCtl " + cls; c.innerHTML = html; c.title = title; c.setAttribute("aria-label", title);
+        c.addEventListener("pointerdown", function(e){ e.stopPropagation(); if(onDown) onDown(e, c); });
+        c.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        el.appendChild(c);
+        return c;
+      }
+      var more = ctl("pMore", ICONS.more, "Photo options");
+      more.addEventListener("click", function(e){ e.stopPropagation(); openPhotoMenu(n, more); });
+      var sty = ctl("pStyle", ICONS.image, "Change style (" + PHOTO_STYLE_NAMES[n.photoStyle || "polaroid"] + ")");
+      sty.addEventListener("click", function(e){ e.stopPropagation(); cyclePhotoStyle(n); });
+      ctl("pHandle", "", "Drag to resize", function(e){ startPhotoResize(e, n); });
+
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(b.cap.isContentEditable && b.cap.contains(e.target)) return; // editing the caption
+        e.preventDefault();
+        endEditing();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);
+      });
+      // double-click selects/raises a photo (focus mode is for notes); on the caption it edits it
+      el.addEventListener("dblclick", function(e){
+        e.preventDefault(); e.stopPropagation();
+        if(b.cap.contains(e.target) || (n.photoStyle === "polaroid" && e.target.closest(".pFrame"))) editCaption(n);
+      });
+      el.addEventListener("dragover", function(e){ e.preventDefault(); e.stopPropagation(); }, true);
+      el.addEventListener("drop", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var f = firstImageFile(e.dataTransfer);
+        if(f) dropPhotoFiles([f], n.x + 40, n.y + 40);
+      }, true);
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once:true});
+    }
+    boardInner.appendChild(el);
+    return el;
+  }
+  // finishes the caption being edited when the pointer goes anywhere else
+  var finishCaption = null;
+  document.addEventListener("pointerdown", function(e){
+    if(!finishCaption) return;
+    var ed = document.querySelector(".pCaption.editing");
+    if(ed && ed.contains(e.target)) return;
+    finishCaption();
+  }, true);
+  function editCaption(n){
+    var cap = n.captionEl;
+    if(!cap || readOnly) return;
+    setSelection([n.id]);
+    var before = captureState([n.id]);
+    var finished = false;
+    function key(e){
+      if(e.key === "Enter"){ e.preventDefault(); done(); cap.blur(); }
+      if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); cap.textContent = n.caption || ""; done(); cap.blur(); }
+    }
+    function paste(e){
+      e.preventDefault();
+      var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || "";
+      document.execCommand("insertText", false, t.replace(/\s+/g, " "));
+    }
+    function done(){
+      if(finished) return;
+      finished = true;
+      if(finishCaption === done) finishCaption = null;
+      cap.removeEventListener("keydown", key);
+      cap.removeEventListener("blur", done);
+      cap.removeEventListener("paste", paste);
+      cap.contentEditable = "false";
+      cap.classList.remove("editing");
+      var v = cap.textContent.replace(/\s+/g, " ").trim().slice(0, 120);
+      cap.textContent = v;
+      cap.classList.toggle("empty", !v);
+      if(v === (n.caption || "")) return;
+      n.caption = v;
+      if(n.el) n.el.querySelector("img").alt = v;
+      saveNotes();
+      recordChange(v ? (before[n.id].caption ? "Edit caption" : "Add caption") : "Remove caption", before);
+    }
+    cap.addEventListener("keydown", key);
+    cap.addEventListener("blur", done);
+    cap.addEventListener("paste", paste);
+    if(finishCaption) finishCaption();
+    finishCaption = done;
+    cap.contentEditable = "true";
+    cap.classList.add("editing");
+    cap.classList.remove("empty");
+    focusNoScroll(cap);
+    var r = document.createRange(); r.selectNodeContents(cap); r.collapse(false);
+    var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r);
+  }
+  var cutoutNoticeShown = false;
+  function setPhotoStyle(n, style){
+    if(style === n.photoStyle) return;
+    var before = captureState([n.id]);
+    n.photoStyle = style;
+    saveNotes();
+    rerenderNote(n);
+    recordChange("Change photo style", before);
+    if(style !== "polaroid" && !n.cutout){
+      PhotoCutout.segment(n).then(function(res){
+        if(res && res.ok && res.cutout){ n.cutout = res.cutout; saveNotes(); rerenderNote(n); return; }
+        if(!cutoutNoticeShown){
+          cutoutNoticeShown = true;
+          toast("Shown as a hand-cut print for now: " + (res && res.reason || "automatic cut-out isn't available yet.") + " Your original photo is untouched.");
+        }
+      });
+    }
+  }
+  function cyclePhotoStyle(n){
+    var i = PHOTO_STYLES.indexOf(n.photoStyle || "polaroid");
+    setPhotoStyle(n, PHOTO_STYLES[(i + 1) % PHOTO_STYLES.length]);
+  }
+  function startPhotoResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el;
+    var before = captureState([n.id]);
+    var startX = e.clientX, startY = e.clientY, startW = n.w;
+    var frameScale = el.offsetWidth / Math.max(1, n.w);
+    var frameRatio = el.offsetHeight / Math.max(1, el.offsetWidth);
+    var w = startW;
+    document.body.style.cursor = "nwse-resize";
+    function move(ev){
+      var dx = (ev.clientX - startX) / boardZoom, dy = (ev.clientY - startY) / boardZoom;
+      var delta = Math.abs(dx) >= Math.abs(dy / frameRatio) ? dx : dy / frameRatio;
+      w = Math.round(Math.min(PHOTO_MAX_W, Math.max(PHOTO_MIN_W, startW + delta / frameScale)));
+      el.style.setProperty("--pw", w + "px");
+    }
+    function up(){
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = "";
+      if(w === startW) return;
+      n.w = w;
+      recoverVertical([n]);
+      ensureWidth(); saveNotes(); updateMinimap();
+      recordChange("Resize photo", before);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+  function openPhotoMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu");
+    if(!pop) return;
+    var head = makeDiv("menuHint");
+    head.textContent = "Style";
+    pop.appendChild(head);
+    PHOTO_STYLES.forEach(function(st){
+      pop.appendChild(menuItem(st === (n.photoStyle || "polaroid") ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', PHOTO_STYLE_NAMES[st], function(){
+        closeFloatingPopovers(); setPhotoStyle(n, st);
+      }));
+    });
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Edit caption" : "Add caption", function(){ closeFloatingPopovers(); editCaption(n); }));
+    if(n.caption) pop.appendChild(menuItem(ICONS.close, "Remove caption", function(){
+      closeFloatingPopovers();
+      var before = captureState([n.id]);
+      n.caption = "";
+      saveNotes(); rerenderNote(n);
+      recordChange("Remove caption", before);
+    }));
+    if(n.w !== defaultPhotoW(n)) pop.appendChild(menuItem(ICONS.image, "Reset size", function(){
+      closeFloatingPopovers();
+      var before = captureState([n.id]);
+      n.w = defaultPhotoW(n);
+      saveNotes(); rerenderNote(n);
+      recordChange("Reset photo size", before);
+    }));
+    pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
+    var moveItem = menuItem(ICONS.move, "Move to board", function(){
+      var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
+      if(open){ moveItem.nextSibling.remove(); return; }
+      moveItem.parentNode.insertBefore(boardPicker(document.createDocumentFragment(), [n.id]), moveItem.nextSibling);
+    }, {kbd:"\u203A"});
+    pop.appendChild(moveItem);
+    pop.appendChild(menuItem(ICONS.share, "Share photo…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
+  }
+  function firstImageFile(dt){
+    return dt && dt.files ? Array.prototype.filter.call(dt.files, function(f){ return f.type.indexOf("image/") === 0; })[0] || null : null;
+  }
+  // Reads an image into a board-friendly JPEG (kept sharp enough for large prints).
+  function loadPhotoFile(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = function(){
+        var img = new Image();
+        img.onerror = reject;
+        img.onload = function(){
+          var sc = Math.min(1, 1000 / Math.max(img.width, img.height));
+          var w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+          var c = document.createElement("canvas");
+          c.width = w; c.height = h;
+          var g = c.getContext("2d");
+          g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); // transparent PNGs print on white
+          g.drawImage(img, 0, 0, w, h);
+          resolve({src:c.toDataURL("image/jpeg", 0.85), ratio:+(h / w).toFixed(4)});
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  // x, y: where the photo's centre should land (board coordinates)
+  function dropPhotoFiles(files, x, y){
+    Promise.all(files.map(loadPhotoFile)).then(function(loaded){
+      var made = loaded.map(function(l, i){
+        var n = {id:newId(), type:"photo", x:0, y:0, w:0, imgRatio:l.ratio, rot:rand(-5, 5), image:l.src, cutout:null,
+                 photoStyle:"polaroid", caption:"", font:pickFont(), createdAt:Date.now(), phys:makePhotoPhys()};
+        n.w = defaultPhotoW(n);
+        var size = photoFrameSize(n);
+        n.x = Math.max(0, x - size.w/2 + i * 26);
+        n.y = Math.max(0, Math.min(boardHeight() - size.h - 8, y - size.h/2 + i * 26));
+        return n;
+      });
+      var act = insertNotes(made, made.length > 1 ? "Add " + made.length + " photos" : "Add photo");
+      recoverVertical(made);
+      dismissHint();
+    }).catch(function(){ toast("That image couldn't be read."); });
+  }
+
+  // ---------- focus mode: pick a note up to write on it comfortably ----------
+  // The element is lifted out of the (zoomed) board while focused; its saved
+  // position and size never change, only the words do.
+  var focusState = null;
+  function enterFocus(n){
+    if(!n || n.type === "photo" || readOnly || focusState || !n.el || !n.textEl) return;
+    closeFloatingPopovers(); hideLinkCard();
+    setSelection([n.id]);
+    var el = n.el;
+    var scrim = makeDiv("focusScrim");
+    scrim.addEventListener("mousedown", function(e){ e.preventDefault(); exitFocus(); });
+    document.body.appendChild(scrim);
+    var placeholder = document.createComment("focused note");
+    el.parentNode.insertBefore(placeholder, el);
+    document.body.appendChild(el);
+    el.classList.add("focused");
+    var closeBtn = document.createElement("button");
+    closeBtn.className = "focusClose";
+    closeBtn.innerHTML = ICONS.close;
+    closeBtn.title = "Done (Esc)";
+    closeBtn.setAttribute("aria-label", "Put the note back");
+    closeBtn.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    closeBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    closeBtn.addEventListener("click", function(e){ e.stopPropagation(); exitFocus(); });
+    el.appendChild(closeBtn);
+    focusState = {n:n, el:el, scrim:scrim, placeholder:placeholder, closeBtn:closeBtn};
+    document.body.classList.add("focusing");
+    ensureCaret(n.textEl);
+    updateScrollCue(n.textEl);
+  }
+  function exitFocus(){
+    if(!focusState) return;
+    var f = focusState;
+    focusState = null;
+    f.closeBtn.remove();
+    f.el.classList.remove("focused");
+    if(f.placeholder.parentNode){ f.placeholder.parentNode.insertBefore(f.el, f.placeholder); f.placeholder.remove(); }
+    else boardInner.appendChild(f.el);
+    f.scrim.remove();
+    document.body.classList.remove("focusing");
+    if(f.n.textEl){
+      f.n.html = f.n.textEl.innerHTML;
+      f.n.textEl.scrollTop = 0;
+      updateScrollCue(f.n.textEl);
+      refreshDates(f.n);
+      updateListHint(f.n);
+    }
+    saveNotes();
+    recoverVertical([f.n]);
+  }
+
   // ---------- note rendering ----------
   function makeBadge(n){
     var badge = document.createElement("div");
@@ -3108,6 +3702,7 @@
 
   // Read-only note for share previews and public pages: same paper, tape, font and formatting.
   function buildStaticNote(item){
+    if(isPhoto(item)) return buildStaticPhoto(item);
     var el = makeDiv("note staticNote");
     el.style.width = (item.w || NOTE_W) + "px";
     applyNoteLook(el, item);
@@ -3128,6 +3723,7 @@
   }
 
   function renderNote(n, isNew, opts){
+    if(isPhoto(n)) return renderPhoto(n, isNew, opts);
     opts = opts || {};
     var el = document.createElement("div");
     el.className = "note" + (isNew ? " new" : "");
@@ -3319,8 +3915,10 @@
         bringToFront(n, el);
       });
 
+      text.addEventListener("scroll", function(){ updateScrollCue(text); }, {passive:true});
       text.addEventListener("input", function(){
         stripInlineStyles(text);
+        updateScrollCue(text);
         n.html = text.innerHTML;
         clearTimeout(text._t);
         text._t = setTimeout(saveNotes, 250);
@@ -3330,12 +3928,14 @@
           if(searchInput.value.trim()) runSearch();
           maybeAutoFont(n);
           updateListHint(n);
+          if(!focusState || focusState.n !== n) recoverVertical([n]);
         }, 450);
       });
       text.addEventListener("keydown", function(e){
         if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "u"){ e.preventDefault(); return; } // no underline
         if(e.key === "Enter" && !e.shiftKey){
           if(handleListEnter(text, e)) return;
+          if(focusState && focusState.n === n) return;
           e.preventDefault();
           text.blur();
         }
@@ -3384,6 +3984,7 @@
           saveNotes();
           refreshDates(n);
         }
+        updateListHint(n);
         scheduleCleanup(n);
       });
 
@@ -3393,9 +3994,17 @@
         deleteNotes([n.id]);
       });
 
+      el.addEventListener("dblclick", function(e){
+        if(focusState || !e.target.closest) return;
+        if(e.target.closest(".del, .moreBtn, .fontCycle, .imgHandle, .rmImg, .listHint, .taskDock, .focusClose")) return;
+        e.preventDefault();
+        e.stopPropagation();
+        enterFocus(n);
+      });
       tab.addEventListener("pointerdown", function(e){
         e.stopPropagation();
         e.preventDefault();
+        if(focusState) return;
         endEditing();
         if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
@@ -3424,6 +4033,7 @@
 
     refreshDates(n);
     if(!readOnly) updateListHint(n);
+    setTimeout(function(){ updateScrollCue(text); }, 0);
     return el;
   }
 
@@ -3458,8 +4068,8 @@
     var before = captureState(group.map(function(g){ return g.id; }));
     var minX0 = Math.min.apply(null, orig.map(function(o){ return o.x; }));
     var minY0 = Math.min.apply(null, orig.map(function(o){ return o.y; }));
-    var maxY0 = Math.max.apply(null, orig.map(function(o){ return o.y; }));
-    var maxY = Math.max(0, boardHeight() - NOTE_H - 10);
+    // how far the group may move down before its lowest-reaching member hits the bottom
+    var dyMax = Math.min.apply(null, orig.map(function(o){ return itemMaxY(o.n) - o.y; }));
     var moved = false;
     draggingIds = new Set(group.map(function(g){ return g.id; }));
     group.forEach(function(g){ if(g.el) g.el.classList.add("dragging"); });
@@ -3471,7 +4081,7 @@
       moved = true;
       // clamp the group as one piece so relative spacing survives the board edges
       dx = Math.max(-minX0, dx);
-      dy = Math.max(-minY0, Math.min(maxY - maxY0, dy));
+      dy = Math.max(-minY0, Math.min(Math.max(-minY0, dyMax), dy));
       orig.forEach(function(o){
         o.n.x = o.x + dx; o.n.y = o.y + dy;
         if(o.n.el){ o.n.el.style.left = o.n.x + "px"; o.n.el.style.top = o.n.y + "px"; }
@@ -3498,16 +4108,17 @@
     window.addEventListener("pointercancel", up);
   }
 
-  function clampY(y){ return Math.min(Math.max(0, boardHeight() - NOTE_H - 10), Math.max(0, y)); }
+  function clampY(y, n){ return Math.min(n && n.el ? itemMaxY(n) : Math.max(0, boardHeight() - NOTE_H - 10), Math.max(0, y)); }
 
-  function addNoteAt(x, y){
+  function addNoteAt(x, y, opts){
+    opts = opts || {};
     zCounter += 1;
     var n = {
       id: newId(),
       x: Math.max(0, x - NOTE_W/2),
       y: clampY(y - 30),
       w: NOTE_W,
-      html: "",
+      html: opts.html || "",
       bg: randomColor(),
       font: pickFont(),
       rot: rand(-6,6),
@@ -3518,13 +4129,14 @@
     };
     notes.push(n);
     ensureWidth();
-    renderNote(n, true);
+    renderNote(n, true, {focus:opts.focus});
     setSelection([n.id]);
+    if(opts.html) recoverVertical([n]);
     saveNotes();
     updateCount();
     updateMinimap();
     dismissHint();
-    recordChange("Create note", {}, {newIds:[n.id]});
+    recordChange(opts.html ? "Paste as note" : "Create note", {}, {newIds:[n.id]});
   }
 
   // opts.silent: tidy-up removal, no toast and no undo step
@@ -3554,8 +4166,9 @@
       });
       return;
     }
-    var action = recordChange(list.length > 1 ? "Delete " + list.length + " notes" : "Delete note", before);
-    var label = list.length > 1 ? list.length + " notes deleted." : "Note deleted.";
+    var action = recordChange(list.length > 1 ? "Delete " + list.length + " " + itemWord(list) : "Delete " + itemWord(list), before);
+    var word = itemWord(list);
+    var label = list.length > 1 ? list.length + " " + word + " deleted." : word.charAt(0).toUpperCase() + word.slice(1) + " deleted.";
     if(hadContent) toast(label, "Undo", function(){ undoIfTop(action); });
     else toast(label);
   }
@@ -3565,7 +4178,7 @@
     if(!list.length) return;
     if(!list.some(noteHasContent)){ deleteNotes(ids); return; }
     confirmDialog({
-      title: list.length > 1 ? "Delete " + list.length + " notes?" : "Delete this note?",
+      title: list.length > 1 ? "Delete " + list.length + " " + itemWord(list) + "?" : "Delete this " + itemWord(list) + "?",
       body: "You can bring " + (list.length > 1 ? "them" : "it") + " back with " + MOD + "+Z.",
       confirm: "Delete", danger: true
     }).then(function(ok){ if(ok) deleteNotes(ids); });
@@ -3619,6 +4232,7 @@
 
   // ---------- fonts on a note ----------
   function cycleFont(n){
+    if(isPhoto(n)) return;
     var script = detectScript(n.textEl ? n.textEl.textContent : "");
     var pool = fontPool(script);
     if(!pool.length) return;
@@ -3636,7 +4250,7 @@
   // really has those letters, keeping the note's feel (mood). Undo puts it back and
   // stops it happening again for that note.
   function maybeAutoFont(n){
-    if(n.fontManual || settings.lockFont || !n.textEl) return;
+    if(isPhoto(n) || n.fontManual || settings.lockFont || !n.textEl) return;
     var script = detectScript(n.textEl.textContent);
     if(script === "latin" || fontCovers(n.font, script)) return;
     var before = captureState([n.id]);
@@ -3666,7 +4280,7 @@
   function centerGroup(list, cx, cy){
     var b = groupBox(list);
     var dx = cx - (b.x1 + b.x2)/2, dy = cy - (b.y1 + b.y2)/2;
-    var maxY = Math.max(0, boardHeight() - NOTE_H - 10);
+    var maxY = Math.max(0, boardHeight() - Math.max.apply(null, list.map(itemHeight)) - 8);
     var topMost = Math.min.apply(null, list.map(function(n){ return n.y; }));
     var lowMost = Math.max.apply(null, list.map(function(n){ return n.y; }));
     dx = Math.max(20 - b.x1, dx);
@@ -3676,8 +4290,9 @@
   // a fresh piece of paper with the same content: new id, new rotation and tape
   function paperCopy(src){
     var c = normalizeIncoming(src);
-    c.phys = makePhys();
-    c.rot = rand(-6, 6);
+    if(!c) return null;
+    c.phys = isPhoto(c) ? makePhotoPhys() : makePhys();
+    c.rot = isPhoto(c) ? rand(-5, 5) : rand(-6, 6);
     c.fontManual = !!src.fontManual;
     return c;
   }
@@ -3695,7 +4310,7 @@
   function duplicateNotes(ids){
     var src = ids.map(findNote).filter(Boolean);
     if(!src.length) return;
-    var copies = src.map(function(s){ var c = paperCopy(serializeNote(s)); c.x = s.x + 26; c.y = s.y + 26; return c; });
+    var copies = src.map(function(s){ var c = paperCopy(serializeNote(s)); if(c){ c.x = s.x + 26; c.y = s.y + 26; } return c; }).filter(Boolean);
     insertNotes(copies, copies.length > 1 ? "Duplicate " + copies.length + " notes" : "Duplicate note");
   }
 
@@ -3708,7 +4323,7 @@
     var list = selectedNotes();
     if(!list.length) return false;
     var data = {v:1, board:activeBoardId, ts:Date.now(), notes:list.map(serializeNote)};
-    var plain = list.map(function(n){ return getPlainText(n.textEl); }).filter(Boolean).join("\n\n");
+    var plain = list.map(itemText).filter(Boolean).join("\n\n");
     data.text = plain;
     if(!e) { safeSet(CLIP_KEY, data); lastNoteCopy = Date.now(); }
     if(e && e.clipboardData){
@@ -3726,7 +4341,8 @@
     if(data.ts !== lastPasteTs){ lastPasteTs = data.ts; pasteSeq = 0; }
     pasteSeq += 1;
     var sameBoard = data.board === activeBoardId && data.notes.some(function(s){ return findNote(s.id); });
-    var copies = data.notes.map(function(s){ return paperCopy(s); });
+    var copies = data.notes.map(function(s){ return paperCopy(s); }).filter(Boolean);
+    if(!copies.length) return;
     if(sameBoard){
       copies.forEach(function(c){ c.x += 26 * pasteSeq; c.y += 26 * pasteSeq; });
     } else {
@@ -3735,16 +4351,22 @@
     }
     insertNotes(copies, copies.length > 1 ? "Paste " + copies.length + " notes" : "Paste note");
   }
-  // Pasting outside a note turns clipboard text or an image into a new note.
-  function pasteAsNewNote(text, file){
-    var vc = viewCenter();
-    addNoteAt(vc.x, vc.y - 60);
-    var n = notes[notes.length - 1];
-    if(text){
-      n.textEl.innerHTML = linkifyText(text);
-      notifyInput(n.textEl);
+  // Pasting on the board (not while typing) captures whatever is on the clipboard.
+  // The note is only created once we know what goes in it.
+  function pasteAsNewNote(text, html){
+    var one = (text || "").trim(), content;
+    if(one && !/\s/.test(one) && /^(https?:\/\/|www\.)/i.test(one) && normalizeUrl(one)){
+      content = '<a href="' + escapeAttr(normalizeUrl(one)) + '">' + escapeHtml(one) + "</a>";
+    } else if(html){
+      content = sanitizeHtml(html.replace(/<!--[\s\S]*?-->/g, ""));
+      if(!htmlToText(content).trim()) content = linkifyText(text || "");
+    } else {
+      content = linkifyText(text || "");
     }
-    if(file) handleImageDrop(file, n);
+    if(!htmlToText(content).trim()) return false;
+    var vc = viewCenter();
+    addNoteAt(vc.x, vc.y - 60, {html:content, focus:false});
+    return true;
   }
 
   function canEditBoard(b){ return !!b && !b.readOnly && (!b.access || b.access === "owner" || b.access === "edit"); }
@@ -4087,9 +4709,9 @@
     if(isGroup){
       msg = "Check out these " + shareable.length + " sticky notes by " + name + ". Click to view: " + link;
     } else {
-      var plain = getPlainText(shareable[0].textEl);
+      var plain = itemText(shareable[0]);
       var short = plain.replace(/\s+/g, " ").slice(0, 80);
-      msg = "Check out this sticky note by " + name + (short ? ": \"" + short + (plain.length > 80 ? "…" : "") + "\"" : "") + ". Click to view: " + link;
+      msg = "Check out this " + (isPhoto(shareable[0]) ? "photo" : "sticky note") + " by " + name + (short ? ": \"" + short + (plain.length > 80 ? "…" : "") + "\"" : "") + ". Click to view: " + link;
     }
     var skipped = list.length - shareable.length;
 
@@ -4155,9 +4777,10 @@
     var items = data ? (isGroup ? (Array.isArray(data.notes) ? data.notes : []) : [data]) : [];
     items = items.slice(0, 60).map(function(it){
       var n = normalizeIncoming(it);
-      n.phys = n.phys || makePhys(seededRng(hashStr(JSON.stringify([it.bg, it.rot, it.html]).slice(0, 200))));
+      if(!n) return null;
+      if(!n.phys) n.phys = isPhoto(n) ? makePhotoPhys(seededRng(hashStr(String(it.image || "").slice(-200)))) : makePhys(seededRng(hashStr(JSON.stringify([it.bg, it.rot, it.html]).slice(0, 200))));
       return n;
-    });
+    }).filter(Boolean);
     if(!items.length){
       wrap.innerHTML = '<p class="muted">This note link looks broken or incomplete.</p>';
       return;
@@ -4198,6 +4821,16 @@
       clearSelection();
       endEditing();
       if(touchLike) noteAtEvent(e);
+    });
+    boardInner.addEventListener("dragover", function(e){
+      if(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") !== -1){ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }
+    });
+    boardInner.addEventListener("drop", function(e){
+      var files = e.dataTransfer ? Array.prototype.filter.call(e.dataTransfer.files || [], function(f){ return f.type.indexOf("image/") === 0; }) : [];
+      if(!files.length) return;
+      e.preventDefault();
+      var rect = boardInner.getBoundingClientRect();
+      dropPhotoFiles(files.slice(0, 12), (e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
     });
     boardInner.addEventListener("dblclick", function(e){
       if(e.target !== boardInner || suppressBoardClick) return;
@@ -4249,6 +4882,11 @@
 
   board.addEventListener("wheel", function(e){
     if(Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+    var t = e.target.closest && e.target.closest(".note > .text");
+    if(t && t.parentNode.classList.contains("capped")){
+      var atTop = t.scrollTop <= 0, atBottom = t.scrollTop + t.clientHeight >= t.scrollHeight - 1;
+      if((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) return; // native scroll inside the note
+    }
     board.scrollLeft += e.deltaY;
     e.preventDefault();
     dismissHint();
@@ -4260,7 +4898,7 @@
     clearTimeout(viewSaveT);
     viewSaveT = setTimeout(function(){ safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x}); }, 300);
   }
-  board.addEventListener("scroll", function(){ dismissHint(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); }, {passive:true});
+  board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); }, {passive:true});
 
   // ---------- search ----------
   function runSearch(){
@@ -4269,7 +4907,9 @@
     notes.forEach(function(n){
       if(!n.el) return;
       if(!q){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
-      var idx = textIndex(n.textEl);
+      var searchable = n.textEl || n.captionEl;
+      if(!searchable){ n.el.style.opacity = "0.15"; n.el.style.pointerEvents = "none"; return; }
+      var idx = textIndex(searchable);
       var hay = idx.text.toLowerCase();
       var match = hay.indexOf(q) !== -1;
       n.el.style.opacity = match ? "1" : "0.15";
@@ -4707,7 +5347,8 @@
         {label:"Cancel"},
         {label:"Replace board", kind:"dangerFill", id:"importGo", onClick:function(){
           if(!result || result.error){ area.focus(); return false; }
-          var incoming = result.notes.map(function(item){ var n = normalizeIncoming(item); zCounter += 1; n.z = zCounter; return n; });
+          var incoming = result.notes.map(normalizeIncoming).filter(Boolean);
+          incoming.forEach(function(n){ zCounter += 1; n.z = zCounter; });
           var action = replaceAllNotes(incoming, "Import board");
           updateCount();
           toast("Board imported.", "Undo", function(){ undoIfTop(action); });
@@ -4736,7 +5377,7 @@
       m.className = "miniNote";
       m.style.left = ((n.x/boardWidth)*trackWidth) + "px";
       m.style.width = Math.max(3, (NOTE_W/boardWidth)*trackWidth) + "px";
-      m.style.background = n.bg;
+      m.style.background = isPhoto(n) ? "#cfc6b0" : n.bg;
       minimapTrack.appendChild(m);
     });
     var view = document.createElement("div");
@@ -4760,7 +5401,18 @@
     var target = ratio*boardWidth - window.innerWidth/2;
     board.scrollTo({left: Math.max(0, target), behavior:"smooth"});
   });
-  window.addEventListener("resize", function(){ ensureWidth(); updateMinimap(); });
+  var recoverT = null;
+  // the board can change size without a window resize (panes, split views, the header wrapping)
+  if(window.ResizeObserver) new ResizeObserver(function(){
+    syncNoteMaxHeight();
+    clearTimeout(recoverT);
+    recoverT = setTimeout(function(){ if(!readOnly && !singleNoteMode && boardInner.clientHeight) recoverVertical(); }, 250);
+  }).observe(board);
+  window.addEventListener("resize", function(){
+    ensureWidth(); updateMinimap(); syncNoteMaxHeight();
+    clearTimeout(recoverT);
+    recoverT = setTimeout(function(){ if(!readOnly && !singleNoteMode && boardInner.clientHeight) recoverVertical(); }, 250);
+  });
   // the header wraps onto extra rows on narrow screens; keep the board (and banner) below it
   (function syncTopbarHeight(){
     var bar = document.querySelector(".topbar");
@@ -4768,10 +5420,12 @@
       var h = Math.max(56, Math.round(bar.getBoundingClientRect().bottom));
       board.style.top = h + "px";
       shareBanner.style.top = h + "px";
+      syncNoteMaxHeight();
     }
     sync();
     if(window.ResizeObserver) new ResizeObserver(sync).observe(bar);
-    else window.addEventListener("resize", sync);
+    window.addEventListener("resize", sync);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(sync); // the header grows once its fonts arrive
   })();
 
   // ---------- share: snapshot ----------
@@ -4793,11 +5447,12 @@
     stage.appendChild(dots);
     notes.slice().sort(function(a, b){ return (a.z || 0) - (b.z || 0); }).forEach(function(n){
       var h = (n.el && n.el.offsetHeight) || NOTE_H;
-      if(n.x + (n.w || NOTE_W) < region.x - 40 || n.x > region.x + region.w + 40) return;
+      var wReach = isPhoto(n) ? photoFrameSize(n).w : (n.w || NOTE_W);
+      if(n.x + wReach < region.x - 40 || n.x > region.x + region.w + 40) return;
       var el = buildStaticNote(n);
       el.style.left = (n.x - region.x) + "px";
       el.style.top = (n.y - region.y) + "px";
-      el.style.minHeight = h + "px";
+      if(!isPhoto(n)) el.style.minHeight = h + "px";
       stage.appendChild(el);
     });
     document.body.appendChild(stage);
@@ -4929,9 +5584,10 @@
       }
       shared.forEach(function(item, i){
         var n = normalizeIncoming(item);
+        if(!n) return;
         n.id = "s" + i;
         n.z = i + 1;
-        n.phys = n.phys || makePhys(seededRng(hashStr(n.id + n.bg)));
+        if(!n.phys) ensurePhys(n);
         notes.push(n);
         renderNote(n, false);
       });
@@ -4943,6 +5599,7 @@
       var mine = safeGet(NOTES_KEY) || [];
       shared.forEach(function(item){
         var n = normalizeIncoming(item);
+        if(!n) return;
         n.x += 20; n.y += 20;
         mine.push(n);
       });
@@ -4959,6 +5616,7 @@
       {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do. Hit Next to begin."},
       {sel:"#boardInner", title:"Stick a note", body:(COARSE ? "Tap" : "Double-click") + " any empty spot on the board to pin a new note there, ready to type into right away."},
       {sel:".note", title:"Move, format, delete", body:"Drag a note by its tape to move it. Tap \u2022\u2022\u2022 for headings, checklists, the highlighter, links, colours, duplicate and move. A selected note has a little Aa button that tries another handwriting."},
+      {sel:null, title:"Photos & focus", body:"Drop or paste a photo onto the board to pin it as a print, then use its little style button for a Polaroid or a cut-out. Double-click any note to pick it up and write comfortably; Esc puts it back."},
       {sel:null, title:"Handle a few at once", body:"Ctrl/Cmd+click notes, or drag a box on empty board, to select several. Then move, duplicate, share or delete them together. Ctrl/Cmd+Z undoes almost anything on the board."},
       {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match. Click a match to jump back to the full board with it selected."},
       {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump straight there."},
@@ -5011,7 +5669,7 @@
       "<p>" + step.body + "</p>" +
       '<div class="tourFoot">' +
         '<button class="tourSkip" id="tourSkip">Skip</button>' +
-        '<div class="tourDots">' + dotsHtml + "</div>" +
+        '<div class="tourDots" aria-label="Step ' + (tourIndex + 1) + ' of ' + tourSteps.length + '">' + dotsHtml + "</div>" +
         '<div class="tourBtns">' +
           (tourIndex > 0 ? '<button id="tourBack">Previous</button>' : "") +
           '<button class="primary" id="tourNext">' + (tourIndex === tourSteps.length-1 ? "Done" : "Next") + "</button>" +
@@ -5024,6 +5682,12 @@
       if(tourIndex === tourSteps.length-1){ endTour(); return; }
       tourIndex++; renderTourStep();
     });
+    // when the dots don't fit, show "4 / 11" instead; if even that is tight, Skip gets its own row
+    var foot = card.querySelector(".tourFoot"), dots = card.querySelector(".tourDots");
+    if(dots.scrollWidth > dots.clientWidth + 1){
+      dots.outerHTML = '<div class="tourCount">' + (tourIndex + 1) + " / " + tourSteps.length + "</div>";
+    }
+    if(foot.scrollWidth > foot.clientWidth + 1) foot.classList.add("tight");
     positionTourStep();
   }
   function positionTourStep(){
@@ -5046,16 +5710,18 @@
       spot.style.width = "0px";
       spot.style.height = "0px";
     }
-    var cardW = 280;
+    var cardW = card.offsetWidth || 280, cardH = card.offsetHeight || 180;
     var top, left;
     if(r){
       top = r.bottom + pad + 14;
-      if(top + 180 > window.innerHeight) top = Math.max(70, r.top - 190);
-      left = Math.min(Math.max(16, r.left), window.innerWidth - cardW - 16);
+      if(top + cardH > window.innerHeight - 8) top = r.top - cardH - pad - 14;
+      left = Math.min(Math.max(12, r.left), window.innerWidth - cardW - 12);
     } else {
-      top = window.innerHeight/2 - 90;
+      top = window.innerHeight/2 - cardH/2;
       left = window.innerWidth/2 - cardW/2;
     }
+    top = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - cardH - 8));
+    left = Math.max(8, left);
     card.style.top = top + "px";
     card.style.left = left + "px";
   }
@@ -5129,6 +5795,7 @@
     return im;
   }
   function estimateNoteH(n){
+    if(isPhoto(n)) return photoFrameSize(n).h;
     if(n.el && n.el.offsetHeight) return n.el.offsetHeight;
     var inner = (n.w || NOTE_W) - 28, h = 40;
     if(n.image){ var iw = Math.min(inner, n.imgW || defaultImgW(n) || inner); h += iw * (n.imgRatio || 0.75) + 8; }
@@ -5146,7 +5813,7 @@
     g.fillStyle = cs.getPropertyValue("--paper").trim() || "#faf6e8";
     g.fillRect(0, 0, THUMB_W, THUMB_H);
     var pending = false;
-    var items = list.map(function(n){ return {n:n, w:n.w || NOTE_W, h:estimateNoteH(n)}; });
+    var items = list.map(function(n){ return {n:n, w:isPhoto(n) ? photoFrameSize(n).w : (n.w || NOTE_W), h:estimateNoteH(n)}; });
     var x1 = 0, y1 = 0, x2 = 900, y2 = 560;
     if(items.length){
       x1 = Math.min.apply(null, items.map(function(i){ return i.n.x; })) - 40;
@@ -5168,6 +5835,7 @@
     }
     items.sort(function(a, b){ return (a.n.z || 0) - (b.n.z || 0); }).forEach(function(it){
       var n = it.n, w = it.w * sc, h = it.h * sc, p = ensurePhys(n);
+      if(isPhoto(n)){ if(drawThumbPhoto(g, n, it, sc, ox, oy, dark)) pending = true; return; }
       g.save();
       g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
       g.rotate((n.rot || 0) * Math.PI / 180);
@@ -5212,6 +5880,42 @@
     });
     return {url:c.toDataURL("image/jpeg", 0.82), pending:pending};
   }
+  function drawThumbPhoto(g, n, it, sc, ox, oy, dark){
+    var style = n.photoStyle || "polaroid", pw = (n.w || 220) * sc, ph = pw * (n.imgRatio || 0.75), pending = false;
+    var im = (n.el && n.el.querySelector(".pFrame img")) || thumbImage(n.image);
+    g.save();
+    g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
+    g.rotate((n.rot || 0) * Math.PI / 180);
+    g.shadowColor = dark ? "rgba(0,0,0,0.6)" : "rgba(60,45,10,0.3)";
+    g.shadowBlur = 3; g.shadowOffsetY = 1.2;
+    var fw, fh, ix, iy;
+    if(style === "polaroid"){
+      var m = pw * 0.055; fw = pw + 2 * m; fh = ph + m + pw * 0.26;
+      g.fillStyle = dark ? "#e9e4d8" : "#f6f2e9"; g.fillRect(-fw/2, -fh/2, fw, fh);
+      ix = -fw/2 + m; iy = -fh/2 + m;
+    } else {
+      var pad = pw * 0.03 + 2 * sc; fw = pw + 2 * pad; fh = ph + 2 * pad;
+      if(style === "mounted"){
+        var bp = pw * 0.085;
+        g.fillStyle = "#d8c29a";
+        g.fillRect(-fw/2 - bp + n.phys.bx * sc, -fh/2 - bp + n.phys.by * sc, fw + 2 * bp, fh + 2 * bp);
+      }
+      g.fillStyle = "#fdfcf8"; g.fillRect(-fw/2, -fh/2, fw, fh);
+      ix = -fw/2 + pad; iy = -fh/2 + pad;
+    }
+    g.shadowColor = "transparent";
+    if(im.complete && im.naturalWidth) g.drawImage(im, ix, iy, pw, ph);
+    else { pending = true; g.fillStyle = "rgba(0,0,0,0.12)"; g.fillRect(ix, iy, pw, ph); }
+    if(n.caption){
+      var fs = Math.max(2.4, Math.min(28, (n.w || 220) * 0.075) * sc);
+      g.font = fs + "px " + fontStack(n.font);
+      g.fillStyle = "rgba(51,48,31,0.85)";
+      g.textAlign = "center";
+      g.fillText(n.caption.slice(0, 40), 0, style === "polaroid" ? fh/2 - pw * 0.11 : fh/2 + fs * 1.4, fw);
+    }
+    g.restore();
+    return pending;
+  }
   function storeThumb(boardId, list, ts){
     var d = drawThumb(list);
     var rec = {url:d.url, theme:settings.theme, ts:ts || Date.now(), count:list.length};
@@ -5244,6 +5948,121 @@
     }
     return out.rec;
   }
+  // Custom covers live apart from the automatic thumbnail, so automatic redraws never overwrite them.
+  // {mode:"view"|"upload", url, ts}; no record means Automatic.
+  function coverKey(id){ return "stickyboard.cover." + id; }
+  var COVER_W = 352, COVER_H = 220;
+  // centre-crop any image/canvas to the 16:10 card without stretching it
+  function coverFrom(src, sw, sh){
+    var c = document.createElement("canvas");
+    c.width = COVER_W; c.height = COVER_H;
+    var g = c.getContext("2d");
+    var sc = Math.max(COVER_W / sw, COVER_H / sh);
+    var dw = sw * sc, dh = sh * sc;
+    g.fillStyle = getComputedStyle(document.body).getPropertyValue("--paper").trim() || "#faf6e8";
+    g.fillRect(0, 0, COVER_W, COVER_H);
+    g.drawImage(src, (COVER_W - dw) / 2, (COVER_H - dh) / 2, dw, dh);
+    return c.toDataURL("image/jpeg", 0.84);
+  }
+  function applyCover(boardId, rec){
+    if(rec) safeSet(coverKey(boardId), rec);
+    else { try{ localStorage.removeItem(coverKey(boardId)); }catch(e){} }
+  }
+  function openCoverEditor(b){
+    var oldCover = safeGet(coverKey(b.id));
+    var oldSub = b.subtitle || "";
+    var draft = oldCover ? Object.assign({}, oldCover) : null; // null = Automatic
+    var isActive = b.id === activeBoardId;
+    var content = document.createElement("div");
+    var preview = document.createElement("img");
+    preview.className = "coverPreview"; preview.alt = "";
+    var modes = makeDiv("coverModes");
+    var hintEl = makeDiv("coverHint");
+    function autoUrl(){ return thumbFor(b, function(rec){ if(!draft) preview.src = rec.url; }).url; }
+    function mode(label, key, fn){
+      var btn = document.createElement("button");
+      btn.className = "pillBtn"; btn.textContent = label; btn.dataset.mode = key;
+      btn.addEventListener("click", fn);
+      modes.appendChild(btn);
+      return btn;
+    }
+    function sync(){
+      preview.src = draft ? draft.url : autoUrl();
+      Array.prototype.forEach.call(modes.children, function(x){ x.classList.toggle("on", (draft ? draft.mode : "auto") === x.dataset.mode); });
+      hintEl.textContent = !draft ? "Updates by itself as the board changes." :
+        draft.mode === "view" ? "A still of the board as it looks right now. It won't change until you pick Automatic." :
+        "Your picture, cropped to fit. It won't change until you pick Automatic.";
+    }
+    mode("Automatic", "auto", function(){ draft = null; sync(); });
+    var viewBtn = mode("Use current view", "view", async function(){
+      if(!isActive || typeof html2canvas !== "function") return;
+      viewBtn.setAttribute("aria-disabled", "true");
+      hintEl.textContent = "Taking the picture\u2026";
+      try{
+        var canvas = await renderBoardSnapshot();
+        draft = {mode:"view", url:coverFrom(canvas, canvas.width, canvas.height), ts:Date.now()};
+      }catch(e){ toast("Couldn't capture this view."); }
+      viewBtn.removeAttribute("aria-disabled");
+      sync();
+    });
+    if(!isActive){ viewBtn.setAttribute("aria-disabled", "true"); viewBtn.title = "Open this board to use its view"; }
+    var fileInput = document.createElement("input");
+    fileInput.type = "file"; fileInput.accept = "image/*"; fileInput.hidden = true;
+    mode("Upload image\u2026", "upload", function(){ fileInput.value = ""; fileInput.click(); });
+    fileInput.addEventListener("change", function(){
+      var f = fileInput.files && fileInput.files[0];
+      if(!f) return;
+      var reader = new FileReader();
+      reader.onload = function(){
+        var im = new Image();
+        im.onload = function(){ draft = {mode:"upload", url:coverFrom(im, im.naturalWidth, im.naturalHeight), ts:Date.now()}; sync(); };
+        im.onerror = function(){ toast("That image couldn't be read."); };
+        im.src = reader.result;
+      };
+      reader.readAsDataURL(f);
+    });
+    var subLabel = document.createElement("label");
+    subLabel.className = "setLabel"; subLabel.textContent = "Subtitle (optional)";
+    var sub = document.createElement("input");
+    sub.className = "setInput"; sub.maxLength = 60; sub.value = oldSub;
+    sub.placeholder = "e.g. October 20\u201328";
+    subLabel.htmlFor = sub.id = "boardSubInput";
+    content.appendChild(preview); content.appendChild(modes); content.appendChild(hintEl);
+    content.appendChild(fileInput); content.appendChild(subLabel); content.appendChild(sub);
+    sync();
+    var m = openModal({
+      title: "\u201c" + b.name + "\u201d cover",
+      sub: "How this board looks in your board list.",
+      content: content,
+      actions: [
+        {label:"Cancel"},
+        {label:"Save", kind:"primary", onClick:function(){
+          var newSub = sub.value.replace(/\s+/g, " ").trim().slice(0, 60);
+          var newCover = draft;
+          var coverChanged = JSON.stringify(newCover) !== JSON.stringify(oldCover);
+          if(!coverChanged && newSub === oldSub) return;
+          function put(cover, subtitle){
+            var bb = boards.filter(function(x){ return x.id === b.id; })[0];
+            if(!bb) return false;
+            applyCover(b.id, cover);
+            if(subtitle) bb.subtitle = subtitle; else delete bb.subtitle;
+            safeSet(BOARDS_KEY, boards);
+            if(!cover && bb.id === activeBoardId) saveThumbNow();
+            if(!boardPanel.hidden) renderBoardList();
+            updateBoardLabel();
+            return true;
+          }
+          put(newCover, newSub);
+          var label = coverChanged ? (newCover ? (newCover.mode === "upload" ? "Set cover image" : "Use view as cover") : "Back to automatic cover") : "Change subtitle";
+          pushHistory({label:label, custom:true, t:Date.now(),
+            undo:function(){ return put(oldCover, oldSub); },
+            redo:function(){ return put(newCover, newSub); }});
+          toast("Board cover saved.");
+        }}
+      ]
+    });
+    sub.addEventListener("keydown", function(e){ if(e.key === "Enter") m.card.querySelector(".modalActions .primary").click(); });
+  }
   function timeAgo(ts){
     if(!ts) return "";
     var m = Math.round((Date.now() - ts) / 60000);
@@ -5271,9 +6090,17 @@
       nameSpan.textContent = b.name;
       var meta = document.createElement("span");
       meta.className = "meta";
-      info.appendChild(nameSpan); info.appendChild(meta);
+      info.appendChild(nameSpan);
+      if(b.subtitle){
+        var subSpan = document.createElement("span");
+        subSpan.className = "sub";
+        subSpan.textContent = b.subtitle;
+        info.appendChild(subSpan);
+      }
+      info.appendChild(meta);
       function fill(rec){
-        thumb.src = rec.url;
+        var cover = safeGet(coverKey(b.id));
+        thumb.src = cover && cover.url ? cover.url : rec.url;
         meta.textContent = rec.count + (rec.count === 1 ? " note" : " notes") + (rec.count ? " \u00b7 " + timeAgo(rec.ts) : "");
       }
       fill(thumbFor(b, fill));
@@ -5313,6 +6140,13 @@
       });
       row.appendChild(renameBtn);
 
+      var coverBtn = document.createElement("button");
+      coverBtn.innerHTML = ICONS.image;
+      coverBtn.title = "Cover & subtitle";
+      coverBtn.setAttribute("aria-label", "Board cover and subtitle");
+      coverBtn.addEventListener("click", function(e){ e.stopPropagation(); openCoverEditor(b); });
+      row.appendChild(coverBtn);
+
       if(boards.length > 1){
         var delBtn = document.createElement("button");
         delBtn.innerHTML = ICONS.close;
@@ -5322,7 +6156,7 @@
           if(!confirm2(delBtn)) return;
           boards = boards.filter(function(x){ return x.id !== b.id; });
           safeSet(BOARDS_KEY, boards);
-          try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); localStorage.removeItem(thumbKey(b.id)); }catch(err){}
+          try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); localStorage.removeItem(thumbKey(b.id)); localStorage.removeItem(coverKey(b.id)); }catch(err){}
           if(b.id === activeBoardId){
             safeSet(ACTIVE_BOARD_KEY, boards[0].id);
             location.hash = "";
@@ -5346,6 +6180,8 @@
     return false;
   }
   function updateBoardLabel(){
+    var cur = boards.filter(function(x){ return x.id === activeBoardId; })[0];
+    brandBtn.title = cur && cur.subtitle ? cur.name + " \u00b7 " + cur.subtitle : "Switch board";
     var b = boards.filter(function(x){ return x.id === activeBoardId; })[0];
     boardNameLabel.textContent = b ? b.name : "";
   }
@@ -5383,7 +6219,7 @@
     var ae = document.activeElement;
     return !!(ae && (ae.isContentEditable || ae.tagName === "INPUT" || ae.tagName === "TEXTAREA" || ae.tagName === "SELECT"));
   }
-  function modalOpen(){ return !!document.querySelector(".acctBackdrop:not([hidden])") || !!tourRoot; }
+  function modalOpen(){ return !!document.querySelector(".acctBackdrop:not([hidden])") || !!tourRoot || !!focusState; }
 
   if(!readOnly && !singleNoteMode){
     document.addEventListener("keydown", function(e){
@@ -5392,6 +6228,7 @@
       var key = e.key;
       if(key === "Escape"){
         if(openPopover){ closeFloatingPopovers(); return; }
+        if(focusState){ e.preventDefault(); exitFocus(); return; }
         if(modalOpen()) return;
         if(typing){ document.activeElement.blur(); }
         else if(selected.size){ clearSelection(); }
@@ -5426,6 +6263,11 @@
         if(sel.length){
           var before = captureState(sel.map(function(n){ return n.id; }));
           sel.forEach(function(selNote){
+            if(isPhoto(selNote)){
+              selNote.w = key === "0" ? defaultPhotoW(selNote) : Math.round(Math.min(PHOTO_MAX_W, Math.max(PHOTO_MIN_W, selNote.w * ((key === "-" || key === "_") ? 0.9 : 1.1))));
+              if(selNote.el) selNote.el.style.setProperty("--pw", selNote.w + "px");
+              return;
+            }
             if(key === "0"){ selNote.w = NOTE_W; }
             else{
               var wStep = (key === "-" || key === "_") ? -20 : 20;
@@ -5470,12 +6312,11 @@
       e.preventDefault();
       var list = selectedNotes();
       var before2 = captureState(list.map(function(n){ return n.id; }));
-      var maxY = Math.max(0, boardHeight() - NOTE_H - 10);
       var minX = Math.min.apply(null, list.map(function(n){ return n.x; }));
       var minY = Math.min.apply(null, list.map(function(n){ return n.y; }));
-      var maxYNow = Math.max.apply(null, list.map(function(n){ return n.y; }));
+      var roomDown = Math.min.apply(null, list.map(function(n){ return itemMaxY(n) - n.y; }));
       dx = Math.max(-minX, dx);
-      dy = Math.max(-minY, Math.min(maxY - maxYNow, dy));
+      dy = Math.max(-minY, Math.min(Math.max(0, roomDown), dy));
       list.forEach(function(n){
         n.x += dx; n.y += dy;
         if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; }
@@ -5535,10 +6376,18 @@
       var plain = cd ? cd.getData("text/plain") : "";
       if(!data && stored && (plain === (stored.text || " ") || (!plain && !(cd && cd.files && cd.files.length)))) data = stored;
       if(data && data.notes){ e.preventDefault(); pasteNotes(data); return; }
-      var file = cd ? Array.prototype.filter.call(cd.files || [], function(f){ return f.type.indexOf("image/") === 0; })[0] : null;
-      if(file || (plain && plain.trim())){
+      var file = cd ? firstImageFile(cd) : null;
+      if(file){
         e.preventDefault();
-        pasteAsNewNote(plain && plain.trim() ? plain : "", file);
+        var sel = selectedNotes();
+        if(sel.length === 1 && !isPhoto(sel[0])){ handleImageDrop(file, sel[0]); toast("Added the image to the selected note."); }
+        else { var vc = viewCenter(); dropPhotoFiles([file], vc.x, vc.y); }
+        return;
+      }
+      var html = cd ? cd.getData("text/html") : "";
+      if((plain && plain.trim()) || html){
+        e.preventDefault();
+        pasteAsNewNote(plain, html);
       }
     });
   }
@@ -5551,10 +6400,12 @@
       notes = notes.filter(function(n){ return noteHasContent(n) || /^seed-/.test(n.id); });
       saveNotes();
     }
+    syncNoteMaxHeight();
     ensureWidth();
     notes.forEach(function(n){ renderNote(n, false); });
     updateCount();
     applyZoom();
+    if(!readOnly) setTimeout(function(){ if(boardInner.clientHeight) recoverVertical(); }, 300);
     updateMinimap();
     syncHighlight("date");
 

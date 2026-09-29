@@ -22,10 +22,12 @@ Share a board with a link that just *works*.
 | ✍️ **Rich text notes** | Headings, bold, italic, a marker-style highlighter, lists, hand-drawn checklists (it'll offer when your note looks like a list), links and resizable photos, all tucked behind one tidy menu per note so the board stays clean. |
 | 🎨 **A little chaos, on purpose** | Every note gets its own handwriting, colour, tape or pin, and a crease or two. Tap **Aa** to try another hand. Hebrew, Chinese, Japanese and Korean get fonts that actually have those letters. |
 | ✅ **Tasks & real reminders** | Write "Dentist Tuesday 17:30" and Stick-It spots the date; one click adds it to Google Calendar or downloads a reminder for Apple Calendar / Outlook. Tasks with due dates still work too. |
-| 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with a live little thumbnail of its own notes. |
+| 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with a live little thumbnail of its own notes, or a cover and subtitle you choose. |
 | 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share. Stick-It only ever sees your name, email, and photo, never your password or your Gmail/Calendar/Drive. Or skip it entirely; guest mode asks for nothing. |
 | 🔗 **Sharing that actually works** | Share a board, a single note, or just a few selected notes with a link that opens instantly for whoever you send it to, no login or setup on their end. |
-| 📷 **One-click snapshot** | Grab an image of exactly what's on screen. |
+| 🖼️ **Photos that feel printed** | Drop or paste a photo onto the board and it becomes a Polaroid, a hand-cut print or a cut-out mounted on card, with an optional handwritten caption. |
+| 🔎 **Focus mode** | Double-click a note to pick it up and write comfortably; Esc puts it back exactly where it was. |
+| 📷 **One-click snapshot** | Grab an image of the board content on screen (never the menus or dialogs). |
 | 🔍 **Search, minimap, undo** | Type to filter notes, jump around a big board, and undo almost anything: moves, deletes, colours, fonts, imports. |
 | 🧲 **Handle a few at once** | Ctrl/Cmd+click or drag a box to select notes, then move, duplicate, copy/paste, share or send them to another board together. |
 | ⌨️ **Real keyboard shortcuts** | Select, nudge, resize, zoom, all documented in-app, one hover away. |
