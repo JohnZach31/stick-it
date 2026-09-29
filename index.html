@@ -581,8 +581,19 @@
   .note.selected{ outline:1.5px solid var(--sel-ring); outline-offset:4px; }
   .note.dragOver{ outline:2px dashed var(--accent); outline-offset:3px; border-radius:5px; }
 
-  .noteImgWrap{ position:relative; margin:0 0 8px; }
-  .noteImgWrap img{ width:100%; max-height:140px; object-fit:cover; border-radius:6px; display:block; }
+  /* Images keep their natural ratio: a width (saved per note) + height:auto, never both */
+  .noteImgWrap{ position:relative; margin:0 0 8px; width:fit-content; max-width:100%; }
+  .noteImgWrap img{ display:block; max-width:100%; height:auto; border-radius:6px; -webkit-user-drag:none; user-select:none; }
+  .noteImgWrap.rtl{ margin-left:auto; }
+  .noteImgWrap.imgSel img{ outline:1.5px solid var(--sel-ring); outline-offset:2px; }
+  .imgHandle{
+    position:absolute; right:-7px; bottom:-7px; width:16px; height:16px; border-radius:50%;
+    background:var(--panel); border:1.5px solid var(--accent); box-shadow:0 1px 4px rgba(0,0,0,0.25);
+    cursor:nwse-resize; display:none; touch-action:none; z-index:2;
+  }
+  .noteImgWrap.imgSel .imgHandle{ display:block; }
+  body.read-only .imgHandle{ display:none !important; }
+  @media (pointer: coarse){ .imgHandle{ width:24px; height:24px; right:-11px; bottom:-11px; } }
   .noteImgWrap .rmImg{
     all:unset; position:absolute; top:4px; right:4px; width:20px; height:20px; border-radius:50%;
     background:rgba(0,0,0,0.5); color:#fff; cursor:pointer; box-sizing:border-box;
@@ -604,9 +615,16 @@
   }
   .brand .chev{ width:14px; height:14px; color:var(--ink-soft); flex:none; }
   .boardRow{
-    display:flex; align-items:center; gap:6px; padding:7px 8px; border-radius:8px;
+    display:flex; align-items:center; gap:8px; padding:6px 8px; border-radius:10px;
     cursor:pointer; margin-bottom:4px;
   }
+  .boardRow .thumb{
+    width:64px; height:40px; flex:none; border-radius:6px; display:block;
+    border:1px solid var(--line); background:var(--paper); object-fit:cover;
+  }
+  .boardRow .info{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .boardRow .info .name{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .boardRow .info .meta{ font-size:0.68rem; color:var(--ink-soft); font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .boardRow:hover{ background:var(--accent-soft); }
   .boardRow.active{ background:var(--accent-soft); font-weight:700; }
   .boardRow span.name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -928,6 +946,25 @@
   .datePop .pillBtn{ width:100%; display:flex; align-items:center; gap:8px; text-align:left; }
   .datePop .pillBtn svg{ width:14px; height:14px; flex:none; }
 
+  /* "looks like a list" suggestion, tucked under the selected note */
+  .listHint{
+    position:absolute; left:0; top:calc(100% + 10px); z-index:4;
+    display:none; align-items:center; gap:6px; white-space:nowrap;
+    padding:5px 5px 5px 12px; border-radius:999px;
+    background:var(--panel); border:1px solid var(--line); box-shadow:0 6px 18px var(--shadow);
+    font:500 0.74rem 'Sora', sans-serif; color:var(--ink);
+    transform:rotate(calc(-1 * var(--rot, 0deg)));
+    transform-origin:left top;
+  }
+  .note.selected .listHint, .note:focus-within .listHint{ display:flex; }
+  body.multi-sel .listHint, body.read-only .listHint{ display:none !important; }
+  .listHint button{
+    all:unset; cursor:pointer; padding:4px 10px; border-radius:999px; font-weight:600;
+  }
+  .listHint .go{ background:var(--accent); color:#fff; }
+  .listHint .no{ color:var(--ink-soft); padding:4px 7px; }
+  .listHint .no:hover{ background:var(--accent-soft); color:var(--ink); }
+
   /* ---------- selection ---------- */
   .marquee{
     position:absolute; z-index:9997; pointer-events:none;
@@ -1006,6 +1043,26 @@
   @keyframes copyFill{ to{ transform:scaleX(1); } }
   @keyframes tickDraw{ to{ stroke-dashoffset:0; } }
 
+  /* snapshot stage: board content only, rendered offscreen from note data.
+     html2canvas can't do CSS masks, color-mix() or calc() gradient stops, so
+     this scope swaps in plain equivalents that look the same. */
+  #snapStage{ position:fixed; left:0; top:0; z-index:-5; opacity:0; pointer-events:none; overflow:hidden; background:var(--paper); }
+  #snapStage .note{ box-shadow:none !important; filter:none; border-bottom:1px solid rgba(0,0,0,0.07); }
+  #snapStage .note.wr-2 .paperFx{
+    background:
+      linear-gradient(calc(var(--wr-a, 120deg) + 40deg), transparent 78%, rgba(255,255,255,0.14) 80%, rgba(0,0,0,0.03) 80.6%, transparent 82%),
+      linear-gradient(172deg, rgba(255,255,255,0.2), rgba(255,255,255,0) 38%, rgba(0,0,0,0.018) 100%);
+  }
+  body.dark #snapStage .note.att-pin .tab::before{
+    background:var(--pin, #cf3f36);
+    box-shadow:inset -2px -3px 3px rgba(0,0,0,0.3), inset 2px 2px 2px rgba(255,255,255,0.35);
+  }
+  body.dark #snapStage .note.att-pin .tab::after{ display:none; }
+  #snapStage .note.has-hole .paperFx::after{ background:rgba(40,30,10,0.35); width:3px; height:3px; margin:2px; }
+  #snapStage .text mark.hl{ background-image:none; background-color:var(--hl, rgba(255,222,40,0.5)); }
+  #snapStage .text ul.checklist > li::before, #snapStage .text ul.checklist > li::after{ display:none; }
+  #snapStage .snapMark{ position:absolute; pointer-events:none; }
+
   /* static notes (share previews, public views) */
   .staticNote{ position:absolute; cursor:default; text-align:start; }
   .staticNote:hover{ transform:rotate(var(--rot, 0deg)); }
@@ -1067,7 +1124,7 @@
 </div>
 
 
-<div class="panel" id="boardPanel" hidden style="width:250px; right:auto; left:18px;">
+<div class="panel" id="boardPanel" hidden style="width:290px; right:auto; left:18px;">
   <h3>Your boards</h3>
   <div id="boardList"></div>
   <div class="addBoardRow">
@@ -1120,6 +1177,11 @@
         <button class="pillBtn danger" id="clearBtn">Clear board</button>
       </div>
     </section>
+
+    <div class="modalActions" style="margin-top:6px;">
+      <button class="pillBtn" id="settingsCancel">Cancel</button>
+      <button class="pillBtn primary" id="settingsSave">Save</button>
+    </div>
   </div>
 </div>
 
@@ -1640,10 +1702,12 @@
       due: /^\d{4}-\d{2}-\d{2}$/.test(item.due || "") ? item.due : "",
       dueTime: /^\d{2}:\d{2}$/.test(item.dueTime || "") ? item.dueTime : "09:00",
       image: safeImage(item.image),
+      imgW: item.imgW == null ? null : Math.round(clampNum(item.imgW, 40, 420, 200)),
+      imgRatio: item.imgRatio == null ? null : clampNum(item.imgRatio, 0.05, 20, 1),
       phys: sanitizePhys(item.phys)
     };
   }
-  var SERIAL_FIELDS = ["id","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","phys"];
+  var SERIAL_FIELDS = ["id","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1697,8 +1761,15 @@
       return {
         x:n.x, y:n.y, w:n.w || NOTE_W, html:n.html || "", bg:n.bg, font:n.font, rot:n.rot,
         isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "",
-        image:n.image || null, phys:ensurePhys(n)
+        image:n.image || null, imgW:n.imgW || null, imgRatio:n.imgRatio || null, phys:ensurePhys(n)
       };
+    },
+    // Photos travel inside the link, so shrink them (same ratio, fewer pixels) first.
+    prepare: async function(items){
+      await Promise.all(items.map(async function(it){
+        if(it.image) it.image = await shrinkDataUrl(it.image, 360, 0.72);
+      }));
+      return items;
     },
     review: function(kind, payload){ return {ok:true, payload:payload}; },
     createLink: async function(kind, payload){
@@ -1710,7 +1781,11 @@
     }
   };
 
-  var readOnly = /^#sb=/.test(location.hash);  var readOnly = /^#sb=/.test(location.hash);
+  var readOnly = /^#sb=/.test(location.hash);
+  // Desktop: double-click makes a note (single clicks stay free for selecting).
+  // Touch screens keep one-tap notes until mobile capture gets its own design.
+  var COARSE = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
+  var CREATE_HINT = COARSE ? "Tap anywhere to stick a note" : "Double-click anywhere to stick a note";
   var singleNoteMode = /^#s[ng]=/.test(location.hash); // a public note or group of notes
   if(readOnly) document.body.classList.add("read-only");
 
@@ -1743,7 +1818,7 @@
     var stored = safeGet(NOTES_KEY);
     firstRun = !stored;
     notes = stored || [
-      {id:"seed-1", x:60, y:40, html:"Click anywhere on the board to stick a new note here.", bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
+      {id:"seed-1", x:60, y:40, html:(COARSE ? "Tap" : "Double-click") + " anywhere on the board to stick a new note here.", bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
       {id:"seed-2", x:320, y:170, html:"Drag the little tab at the top to move me around.", bg:randomColor(), font:pickFont(), rot:rand(-4,6), z:2, categoryIndex:0},
       {id:"seed-3", x:70, y:280, html:"Tap \u2022\u2022\u2022 on a note for headings, checklists, a highlighter, colours and more.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
     ];
@@ -1755,7 +1830,11 @@
 
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
 
-  function saveNotes(){ if(!readOnly && !singleNoteMode) safeSet(NOTES_KEY, notes.map(serializeNote)); }
+  function saveNotes(){
+    if(readOnly || singleNoteMode) return;
+    safeSet(NOTES_KEY, notes.map(serializeNote));
+    if(typeof scheduleThumb === "function") scheduleThumb();
+  }
   function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
 
   function boardHeight(){ return boardInner.clientHeight || (window.innerHeight - 56); }
@@ -2293,7 +2372,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2816,6 +2895,208 @@
   window.addEventListener("keyup", function(e){ if(e.key === "Control" || e.key === "Meta") document.body.classList.remove("mod-held"); });
   window.addEventListener("blur", function(){ document.body.classList.remove("mod-held"); });
 
+  // ---------- images inside notes ----------
+  // Width is what the user chose (imgW) or a default that keeps the photo about
+  // 150px tall; height is always derived from the natural ratio.
+  var IMG_DEFAULT_H = 150, IMG_MIN_W = 48;
+  function defaultImgW(n){ return n.imgRatio ? Math.round(IMG_DEFAULT_H / n.imgRatio) : null; }
+  function sizeImage(img, n){
+    var w = n.imgW || defaultImgW(n);
+    img.style.width = w ? w + "px" : "100%";
+    img.style.height = "auto";
+  }
+  function buildImageWrap(n, onRatio){
+    var wrap = makeDiv("noteImgWrap");
+    var img = document.createElement("img");
+    img.alt = "";
+    img.draggable = false;
+    img.addEventListener("load", function(){
+      if(!img.naturalWidth) return;
+      var r = +(img.naturalHeight / img.naturalWidth).toFixed(4);
+      if(!n.imgRatio || Math.abs(n.imgRatio - r) > 0.01){
+        n.imgRatio = r; // older notes learn their ratio the first time the photo loads
+        sizeImage(img, n);
+        if(onRatio) onRatio();
+      }
+    });
+    sizeImage(img, n);
+    img.src = n.image;
+    wrap.appendChild(img);
+    // photos sit on the same side the writing starts from
+    if(detectScript(htmlToText(n.html || "")) === "hebrew") wrap.classList.add("rtl");
+    return {wrap:wrap, img:img};
+  }
+  function shrinkDataUrl(src, maxDim, quality){
+    return new Promise(function(resolve){
+      var im = new Image();
+      im.onload = function(){
+        var sc = Math.min(1, maxDim / Math.max(im.naturalWidth, im.naturalHeight));
+        if(sc >= 1 && src.length < 60000){ resolve(src); return; }
+        var c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(im.naturalWidth * sc));
+        c.height = Math.max(1, Math.round(im.naturalHeight * sc));
+        c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", quality));
+      };
+      im.onerror = function(){ resolve(src); };
+      im.src = src;
+    });
+  }
+  var selectedImageNote = null;
+  function selectImage(n){
+    if(selectedImageNote && selectedImageNote !== n && selectedImageNote.el){
+      var old = selectedImageNote.el.querySelector(".noteImgWrap");
+      if(old) old.classList.remove("imgSel");
+    }
+    selectedImageNote = n;
+    var w = n && n.el && n.el.querySelector(".noteImgWrap");
+    if(w) w.classList.add("imgSel");
+  }
+  function clearImageSelection(){
+    if(selectedImageNote && selectedImageNote.el){
+      var w = selectedImageNote.el.querySelector(".noteImgWrap");
+      if(w) w.classList.remove("imgSel");
+    }
+    selectedImageNote = null;
+  }
+  document.addEventListener("pointerdown", function(e){
+    if(!selectedImageNote) return;
+    var w = selectedImageNote.el && selectedImageNote.el.querySelector(".noteImgWrap");
+    if(w && w.contains(e.target)) return;
+    if(e.target.closest && e.target.closest(".floatPop")) return;
+    clearImageSelection();
+  }, true);
+  function removeImage(n){
+    var before = captureState([n.id]);
+    n.image = null; n.imgW = null; n.imgRatio = null;
+    if(selectedImageNote === n) selectedImageNote = null;
+    saveNotes();
+    rerenderNote(n);
+    return recordChange("Remove image", before);
+  }
+  function resetImageSize(n){
+    if(!n.imgW) return;
+    var before = captureState([n.id]);
+    n.imgW = null;
+    saveNotes();
+    rerenderNote(n);
+    recordChange("Reset image size", before);
+  }
+  // drag the corner handle: width follows the pointer, height follows the ratio
+  function startImageResize(e, n, img){
+    e.preventDefault(); e.stopPropagation();
+    var before = captureState([n.id]);
+    var startX = e.clientX, startY = e.clientY;
+    var startW = img.offsetWidth;
+    var ratio = n.imgRatio || (img.offsetHeight / Math.max(1, img.offsetWidth)) || 1;
+    var maxW = Math.max(IMG_MIN_W, n.el.clientWidth - 28);
+    var w = startW;
+    document.body.style.cursor = "nwse-resize";
+    function move(ev){
+      var dx = (ev.clientX - startX) / boardZoom, dy = (ev.clientY - startY) / boardZoom;
+      var delta = Math.abs(dx) >= Math.abs(dy / ratio) ? dx : dy / ratio;
+      w = Math.round(Math.min(maxW, Math.max(IMG_MIN_W, startW + delta)));
+      img.style.width = w + "px";
+    }
+    function up(){
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = "";
+      if(w === startW) return;
+      n.imgW = w;
+      saveNotes();
+      updateMinimap();
+      recordChange("Resize image", before);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  // ---------- "looks like a list" -> checklist suggestion ----------
+  // Local heuristic only. Suggests, never converts on its own.
+  var PROSE_START = /^(i|we|you|he|she|they|it|my|our|this|that|there|then|so|but)\b/i;
+  function isShortItem(t, maxLen, maxWords){
+    return t.length <= maxLen && t.split(/\s+/).length <= maxWords && !/[.!?]\s/.test(t) && !/[!?]$/.test(t);
+  }
+  function listCandidate(n){
+    if(!n.textEl || readOnly) return null;
+    if(n.textEl.querySelector("ul.checklist")) return null;
+    var lines = textIndex(n.textEl).text.split("\n").map(function(l){ return l.trim(); }).filter(Boolean);
+    if(!lines.length) return null;
+    var title = null, items = null;
+    if(lines.length >= 3){
+      var body = lines;
+      if(/:$/.test(body[0]) && body[0].length <= 40){ title = body[0]; body = body.slice(1); }
+      var clean = body.map(function(l){ return l.replace(/^[-*\u2022]\s*/, "").replace(/\.$/, ""); });
+      if(clean.length >= 3 && clean.every(function(l){ return l && isShortItem(l, 40, 5); }) &&
+         !clean.some(function(l){ return PROSE_START.test(l) && l.split(/\s+/).length > 2; })) items = clean;
+    } else {
+      var line = lines[lines.length - 1];
+      if(lines.length === 2){
+        if(lines[0].length > 40) return null;
+        title = lines[0];
+      }
+      var m = /^([^:,;]{1,30}):\s*(.+)$/.exec(line);
+      if(m && !title){ title = m[1] + ":"; line = m[2]; }
+      if(line.length <= 220){
+        var sep = line.indexOf(";") !== -1 ? ";" : ",";
+        var parts = line.replace(/\.$/, "").split(sep).map(function(x){ return x.trim().replace(/^(and|or|&)\s+/i, ""); }).filter(Boolean);
+        if(parts.length >= 3 && parts.every(function(x){ return isShortItem(x, 30, 4) && !/[.!?]/.test(x); }) &&
+           !parts.some(function(x){ return PROSE_START.test(x); })) items = parts;
+      }
+    }
+    if(!items) return null;
+    return {title:title, items:items};
+  }
+  function updateListHint(n){
+    if(!n.el) return;
+    var old = n.el.querySelector(".listHint");
+    var cand = listCandidate(n);
+    var show = cand && (!n.listHintOff || cand.items.length >= n.listHintOff + 2);
+    if(!show){ if(old) old.remove(); return; }
+    if(old) return;
+    var hintEl = makeDiv("listHint");
+    hintEl.innerHTML = '<span>Looks like a list. Make it a checklist?</span><button class="go">Make checklist</button><button class="no" aria-label="Dismiss">\u2715</button>';
+    hintEl.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    hintEl.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    hintEl.querySelector(".go").addEventListener("click", function(e){
+      e.stopPropagation();
+      var c = listCandidate(n);
+      if(c) convertToChecklist(n, c);
+    });
+    hintEl.querySelector(".no").addEventListener("click", function(e){
+      e.stopPropagation();
+      var c = listCandidate(n);
+      n.listHintOff = c ? c.items.length : 1; // stay quiet unless the list grows noticeably
+      saveNotes();
+      hintEl.remove();
+    });
+    n.el.appendChild(hintEl);
+  }
+  function setNoteHtml(id, html){
+    var n = findNote(id);
+    if(!n) return false;
+    n.html = html;
+    if(n.textEl){ n.textEl.innerHTML = html; refreshDates(n); updateListHint(n); }
+    saveNotes();
+    return true;
+  }
+  function convertToChecklist(n, cand){
+    var beforeHtml = n.textEl ? n.textEl.innerHTML : n.html;
+    var afterHtml = (cand.title ? "<div>" + linkifyText(cand.title) + "</div>" : "") +
+      '<ul class="checklist">' + cand.items.map(function(it){ return '<li data-checked="false">' + linkifyText(it) + "</li>"; }).join("") + "</ul>";
+    endEditing();
+    setNoteHtml(n.id, afterHtml);
+    var id = n.id;
+    var action = pushHistory({label:"Make checklist", custom:true, t:Date.now(),
+      undo:function(){ return setNoteHtml(id, beforeHtml); },
+      redo:function(){ return setNoteHtml(id, afterHtml); }});
+    setSelection([n.id]);
+    toast("Made a checklist.", "Undo", function(){ undoIfTop(action); });
+  }
+
   // ---------- note rendering ----------
   function makeBadge(n){
     var badge = document.createElement("div");
@@ -2833,11 +3114,7 @@
     el.appendChild(makeDiv("tab"));
     el.appendChild(makeDiv("paperFx"));
     if(item.isTask) el.appendChild(makeBadge(item));
-    if(item.image){
-      var wrap = makeDiv("noteImgWrap");
-      var img = document.createElement("img"); img.src = item.image; img.alt = "";
-      wrap.appendChild(img); el.appendChild(wrap);
-    }
+    if(item.image) el.appendChild(buildImageWrap(item).wrap);
     var t = makeDiv("text" + (item.done ? " done" : ""));
     t.dir = "auto";
     t.style.fontFamily = fontStack(item.font);
@@ -2877,28 +3154,34 @@
     if(n.isTask){ n.badgeEl = makeBadge(n); el.appendChild(n.badgeEl); }
 
     if(n.image){
-      var imgWrap = makeDiv("noteImgWrap");
-      var img = document.createElement("img");
-      img.src = n.image;
-      img.alt = "";
-      imgWrap.appendChild(img);
+      var built = buildImageWrap(n, function(){ if(!readOnly) saveNotes(); });
+      var imgWrap = built.wrap, img = built.img;
       if(!readOnly){
         var rmImg = document.createElement("button");
         rmImg.className = "rmImg";
         rmImg.innerHTML = ICONS.close;
         rmImg.title = "Remove image";
+        rmImg.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
         rmImg.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
         rmImg.addEventListener("click", function(e){
           e.stopPropagation();
-          var before = captureState([n.id]);
-          n.image = null;
-          saveNotes();
-          rerenderNote(n);
-          recordChange("Remove image", before);
+          removeImage(n);
         });
         imgWrap.appendChild(rmImg);
+        var handle = makeDiv("imgHandle");
+        handle.title = "Drag to resize";
+        handle.addEventListener("pointerdown", function(e){ startImageResize(e, n, img); });
+        imgWrap.appendChild(handle);
+        // clicking the photo selects it (and its note) without starting to type
+        img.addEventListener("mousedown", function(e){ if(!(e.ctrlKey || e.metaKey)) e.preventDefault(); });
+        img.addEventListener("pointerdown", function(e){
+          if(e.ctrlKey || e.metaKey) return;
+          endEditing();
+          selectImage(n);
+        });
       }
       el.appendChild(imgWrap);
+      if(selectedImageNote && selectedImageNote.id === n.id){ imgWrap.classList.add("imgSel"); selectedImageNote = n; }
     }
 
     n.html = sanitizeHtml(n.html || "");
@@ -3046,6 +3329,7 @@
           refreshDates(n);
           if(searchInput.value.trim()) runSearch();
           maybeAutoFont(n);
+          updateListHint(n);
         }, 450);
       });
       text.addEventListener("keydown", function(e){
@@ -3139,6 +3423,7 @@
     }
 
     refreshDates(n);
+    if(!readOnly) updateListHint(n);
     return el;
   }
 
@@ -3315,6 +3600,8 @@
         canvas.getContext("2d").drawImage(img, 0, 0, w, h);
         var before = captureState([n.id]);
         n.image = canvas.toDataURL("image/jpeg", 0.82);
+        n.imgRatio = +(h / w).toFixed(4);
+        n.imgW = null;
         saveNotes();
         rerenderNote(n);
         recordChange(before[n.id] && before[n.id].image ? "Replace image" : "Add image", before);
@@ -3482,6 +3769,7 @@
       var dn = safeGet(notesKeyFor(destId)) || [];
       var ok = safeSet(notesKeyFor(destId), dn.concat(moved.map(function(m){ return Object.assign({}, m); })));
       if(!ok){ toast("Couldn't move: browser storage is full."); return false; }
+      try{ localStorage.removeItem(thumbKey(destId)); }catch(err){}
       moved.forEach(function(m){
         var n = findNote(m.id);
         if(!n) return;
@@ -3496,6 +3784,7 @@
       var ids2 = new Set(moved.map(function(m){ return m.id; }));
       var dn = safeGet(notesKeyFor(destId)) || [];
       safeSet(notesKeyFor(destId), dn.filter(function(x){ return !ids2.has(x.id); }));
+      try{ localStorage.removeItem(thumbKey(destId)); }catch(err){}
       origSnaps.forEach(function(s){
         if(findNote(s.id)) return;
         var copy = Object.assign({}, s);
@@ -3599,6 +3888,9 @@
       imageUploadInput.value = "";
       imageUploadInput.click();
     }));
+    if(n.image && n.imgW){
+      pop.appendChild(menuItem(ICONS.image, "Reset image size", function(){ closeFloatingPopovers(); resetImageSize(n); }));
+    }
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -3786,7 +4078,7 @@
     }
     var name = getDisplayName();
     var isGroup = shareable.length > 1;
-    var items = shareable.map(PublicShare.toPublicNote);
+    var items = await PublicShare.prepare(shareable.map(PublicShare.toPublicNote));
     var payload = isGroup ? {v:2, byName:name, notes:items} : Object.assign({v:2, byName:name}, items[0]);
     var link;
     try{ link = await PublicShare.createLink(isGroup ? "group" : "note", payload); }
@@ -3891,14 +4183,27 @@
   // ---------- board: click to stick, drag a box to select ----------
   var suppressBoardClick = false;
   if(!readOnly){
+    var lastBoardPointer = "mouse";
+    boardInner.addEventListener("pointerdown", function(e){ if(e.target === boardInner) lastBoardPointer = e.pointerType || "mouse"; }, true);
+    function noteAtEvent(e){
+      var rect = boardInner.getBoundingClientRect();
+      addNoteAt((e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
+    }
     boardInner.addEventListener("click", function(e){
       if(e.target !== boardInner) return;
       if(suppressBoardClick){ suppressBoardClick = false; return; }
       if(e.ctrlKey || e.metaKey || e.shiftKey) return;
+      var touchLike = lastBoardPointer === "touch" || lastBoardPointer === "pen";
       if(selected.size > 1){ clearSelection(); return; }
       clearSelection();
-      var rect = boardInner.getBoundingClientRect();
-      addNoteAt((e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
+      endEditing();
+      if(touchLike) noteAtEvent(e);
+    });
+    boardInner.addEventListener("dblclick", function(e){
+      if(e.target !== boardInner || suppressBoardClick) return;
+      if(e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if(lastBoardPointer === "touch" || lastBoardPointer === "pen") return;
+      noteAtEvent(e);
     });
     boardInner.addEventListener("pointerdown", function(e){
       if(e.target !== boardInner || e.button !== 0 || e.pointerType !== "mouse") return;
@@ -3991,16 +4296,50 @@
 
   // ---------- settings & share panels ----------
   function closeOtherPanels(except){
-    [panel, sharePanel, boardPanel].forEach(function(p){ if(p !== except) p.hidden = true; });
+    if(except !== panel && !panel.hidden) cancelSettings();
+    [sharePanel, boardPanel].forEach(function(p){ if(p !== except) p.hidden = true; });
     closeAccountModal();
+  }
+  // Preferences changed in Settings are previewed live but only kept on Save;
+  // Cancel (or closing the dialog) puts back what was there when it opened.
+  // Clear board and Import are separate, immediate actions with their own confirmation.
+  var STAGED_KEYS = ["lockFont","fontName","theme","cleanupEmpty","displayName"];
+  var settingsSnapshot = null;
+  function applySettingsUI(){
+    document.body.classList.toggle("dark", settings.theme === "dark");
+    syncSwitch(darkToggle, settings.theme === "dark");
+    syncSwitch(lockToggle, !!settings.lockFont);
+    syncSwitch(cleanupToggle, !!settings.cleanupEmpty);
+    document.getElementById("fontPickRow").hidden = !settings.lockFont;
+    fontSelect.value = settings.fontName;
+    displayNameInput.value = settings.displayName || "";
   }
   function openSettings(){
     closeOtherPanels(panel);
     closeFloatingPopovers();
     updateCount();
+    settingsSnapshot = {};
+    STAGED_KEYS.forEach(function(k){ settingsSnapshot[k] = settings[k]; });
+    applySettingsUI();
     panel.hidden = false;
   }
-  function closeSettings(){ panel.hidden = true; }
+  function saveSettingsAndClose(){
+    saveSettings();
+    settingsSnapshot = null;
+    panel.hidden = true;
+    toast("Settings saved.");
+  }
+  function cancelSettings(){
+    if(settingsSnapshot){
+      STAGED_KEYS.forEach(function(k){ settings[k] = settingsSnapshot[k]; });
+      settingsSnapshot = null;
+      applySettingsUI();
+    }
+    panel.hidden = true;
+  }
+  function closeSettings(){ cancelSettings(); }
+  document.getElementById("settingsSave").addEventListener("click", saveSettingsAndClose);
+  document.getElementById("settingsCancel").addEventListener("click", cancelSettings);
   gearBtn.addEventListener("click", function(){
     if(panel.hidden) openSettings(); else closeSettings();
     gearBtn.classList.remove("spin");
@@ -4219,11 +4558,9 @@
     settings.lockFont = !settings.lockFont;
     syncSwitch(lockToggle, settings.lockFont);
     fontPickRow.hidden = !settings.lockFont;
-    saveSettings();
   });
   fontSelect.addEventListener("change", function(){
     settings.fontName = fontSelect.value;
-    saveSettings();
   });
 
   syncSwitch(darkToggle, settings.theme === "dark");
@@ -4231,14 +4568,12 @@
     settings.theme = settings.theme === "dark" ? "light" : "dark";
     document.body.classList.toggle("dark", settings.theme === "dark");
     syncSwitch(darkToggle, settings.theme === "dark");
-    saveSettings();
   });
 
   syncSwitch(cleanupToggle, settings.cleanupEmpty);
   cleanupToggle.addEventListener("click", function(){
     settings.cleanupEmpty = !settings.cleanupEmpty;
     syncSwitch(cleanupToggle, settings.cleanupEmpty);
-    saveSettings();
   });
   // clicking a row's label flips its switch
   Array.prototype.forEach.call(panel.querySelectorAll(".setRow > label.lbl"), function(lbl){
@@ -4251,8 +4586,8 @@
   displayNameInput.value = settings.displayName || "";
   displayNameInput.addEventListener("input", function(){
     settings.displayName = displayNameInput.value.trim();
-    saveSettings();
   });
+  displayNameInput.addEventListener("keydown", function(e){ if(e.key === "Enter") saveSettingsAndClose(); });
 
   function currentBoardName(){
     var b = boards.filter(function(x){ return x.id === activeBoardId; })[0];
@@ -4297,7 +4632,6 @@
     return {app:"stick-it", version:2, board:currentBoardName(), exportedAt:new Date().toISOString(), notes:notes.map(serializeNote)};
   }
   exportBtn.addEventListener("click", function(){
-    closeSettings();
     var data = JSON.stringify(exportPayload(), null, 2);
     var withImg = notes.filter(function(n){ return n.image; }).length;
     var content = document.createElement("div");
@@ -4332,7 +4666,6 @@
     return {notes:list.filter(function(x){ return x && typeof x === "object"; })};
   }
   importBtn.addEventListener("click", function(){
-    closeSettings();
     var content = document.createElement("div");
     var warn = makeDiv("noteBox warn");
     warn.textContent = "Importing replaces the " + notes.length + (notes.length === 1 ? " note" : " notes") +
@@ -4442,6 +4775,81 @@
   })();
 
   // ---------- share: snapshot ----------
+  // Rebuilds what's in view from note data on an offscreen stage and renders only
+  // that, so dialogs, menus, selection and other chrome can never appear in it.
+  function visibleRegion(){
+    var br = board.getBoundingClientRect(), ir = boardInner.getBoundingClientRect();
+    return {x:(br.left - ir.left) / boardZoom, y:0, w:board.clientWidth / boardZoom, h:boardHeight()};
+  }
+  function buildSnapshotStage(region){
+    var old = document.getElementById("snapStage");
+    if(old) old.remove();
+    var stage = document.createElement("div");
+    stage.id = "snapStage";
+    stage.style.width = Math.ceil(region.w) + "px";
+    stage.style.height = Math.ceil(region.h) + "px";
+    var dots = makeDiv("");
+    dots.style.cssText = "position:absolute;inset:0;background-image:radial-gradient(circle, var(--paper-dot) 1.6px, transparent 1.6px);background-size:26px 26px;background-position:" + (6 - region.x % 26) + "px 6px;";
+    stage.appendChild(dots);
+    notes.slice().sort(function(a, b){ return (a.z || 0) - (b.z || 0); }).forEach(function(n){
+      var h = (n.el && n.el.offsetHeight) || NOTE_H;
+      if(n.x + (n.w || NOTE_W) < region.x - 40 || n.x > region.x + region.w + 40) return;
+      var el = buildStaticNote(n);
+      el.style.left = (n.x - region.x) + "px";
+      el.style.top = (n.y - region.y) + "px";
+      el.style.minHeight = h + "px";
+      stage.appendChild(el);
+    });
+    document.body.appendChild(stage);
+    var BOX = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/></svg>');
+    var TICK = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 28 28" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="1.6" d="M5.2 7.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/><path stroke-width="2.6" d="M8.4 14.6c1.4 1.2 2.6 2.7 3.6 4.4 2.9-5.6 6.6-10.4 11.6-14.6"/></svg>');
+    var STRIKE = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9" fill="none" stroke="#33301f" stroke-opacity="0.85" stroke-width="1.7" stroke-linecap="round"/></svg>');
+    Array.prototype.forEach.call(stage.querySelectorAll("ul.checklist > li"), function(li){
+      var fs = parseFloat(getComputedStyle(li).fontSize) || 18;
+      var rtl = getComputedStyle(li).direction === "rtl";
+      var done = li.getAttribute("data-checked") === "true";
+      var box = document.createElement("img");
+      box.className = "snapMark";
+      box.src = done ? TICK : BOX;
+      var sz = fs * (done ? 1.2 : 1);
+      box.style.width = sz + "px"; box.style.height = sz + "px";
+      box.style.top = (fs * (done ? 0.08 : 0.22)) + "px";
+      box.style[rtl ? "right" : "left"] = "0px";
+      li.appendChild(box);
+      if(done){
+        var lh = fs * 1.42, lines = Math.max(1, Math.round(li.offsetHeight / lh));
+        for(var i = 0; i < lines; i++){
+          var st = document.createElement("img");
+          st.className = "snapMark";
+          st.src = STRIKE;
+          st.style.top = (i * lh) + "px";
+          st.style.height = lh + "px";
+          st.style[rtl ? "right" : "left"] = (fs * 1.3) + "px";
+          st.style.width = Math.max(10, li.offsetWidth - fs * 1.3) + "px";
+          li.appendChild(st);
+        }
+      }
+    });
+    return stage;
+  }
+  async function renderBoardSnapshot(){
+    var region = visibleRegion();
+    var stage = buildSnapshotStage(region);
+    try{
+      await Promise.all(Array.prototype.map.call(stage.querySelectorAll("img"), function(im){
+        return im.complete ? null : new Promise(function(r){ im.onload = im.onerror = r; });
+      }));
+      if(document.fonts && document.fonts.ready) await document.fonts.ready;
+      return await html2canvas(stage, {
+        backgroundColor: getComputedStyle(document.body).backgroundColor || "#faf6e8",
+        scale: boardZoom * Math.min(window.devicePixelRatio || 1, 2),
+        logging: false,
+        onclone: function(doc){ var st = doc.getElementById("snapStage"); if(st) st.style.opacity = "1"; }
+      });
+    } finally {
+      stage.remove();
+    }
+  }
   snapshotBtn.addEventListener("click", async function(){
     shareResult.innerHTML = '<p class="muted">Rendering snapshot…</p>';
     if(typeof html2canvas !== "function"){
@@ -4449,21 +4857,14 @@
       return;
     }
     try{
-      var canvas = await html2canvas(document.body, {
-        backgroundColor: getComputedStyle(document.body).backgroundColor || "#faf6e8",
-        windowWidth: window.innerWidth,
-        windowHeight: window.innerHeight,
-        scale: Math.min(window.devicePixelRatio || 1, 2)
-      });
-      canvas.toBlob(async function(blob){
+      var canvas = await renderBoardSnapshot();
+      canvas.toBlob(function(blob){
         if(!blob){ shareResult.innerHTML = '<p class="muted">Couldn\'t render a snapshot.</p>'; return; }
         var url = URL.createObjectURL(blob);
         shareResult.innerHTML = "";
         var img = document.createElement("img");
         img.src = url;
         shareResult.appendChild(img);
-        var row = document.createElement("div");
-        row.className = "copyRow";
         var saveBtn = document.createElement("button");
         saveBtn.className = "btn primary";
         saveBtn.style.margin = "8px 0 0";
@@ -4481,11 +4882,8 @@
 
   // ---------- share: interactive link ----------
   publishBtn.addEventListener("click", async function(){
-    var payload = notes.map(function(n){
-      var o = PublicShare.toPublicNote(n);
-      delete o.image; // keeps board links a sensible length; single notes and groups keep their photos
-      return o;
-    });
+    shareResult.innerHTML = '<p class="muted">Preparing link\u2026</p>';
+    var payload = await PublicShare.prepare(notes.map(PublicShare.toPublicNote));
     var link = null;
     try{ link = await PublicShare.createLink("board", payload); }catch(e){}
     if(!link){
@@ -4495,9 +4893,8 @@
     shareResult.innerHTML = "";
     var p = document.createElement("p");
     p.className = "muted";
-    p.textContent = link.length > 6000
-      ? "This link is long (your board has a lot of notes). Anyone who opens it can view the whole board, no account needed, and it doesn't expire."
-      : "Anyone who opens it can view the whole board, no account needed. Links don't expire, so share it like you'd hand over the real corkboard.";
+    p.textContent = "Anyone who opens it can view the whole board, no account needed. Links don't expire, so share it like you'd hand over the real corkboard." +
+      (link.length > 30000 ? " Photos make this link long; some chat apps may cut it short, so the snapshot image can be safer for big boards." : "");
     shareResult.appendChild(p);
     var row = document.createElement("div");
     row.className = "copyRow";
@@ -4560,7 +4957,7 @@
   function buildTourSteps(){
     var steps = [
       {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do. Hit Next to begin."},
-      {sel:"#boardInner", title:"Stick a note", body:"Click any empty spot on the board to pin a new note there, ready to type into right away."},
+      {sel:"#boardInner", title:"Stick a note", body:(COARSE ? "Tap" : "Double-click") + " any empty spot on the board to pin a new note there, ready to type into right away."},
       {sel:".note", title:"Move, format, delete", body:"Drag a note by its tape to move it. Tap \u2022\u2022\u2022 for headings, checklists, the highlighter, links, colours, duplicate and move. A selected note has a little Aa button that tries another handwriting."},
       {sel:null, title:"Handle a few at once", body:"Ctrl/Cmd+click notes, or drag a box on empty board, to select several. Then move, duplicate, share or delete them together. Ctrl/Cmd+Z undoes almost anything on the board."},
       {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match. Click a match to jump back to the full board with it selected."},
@@ -4580,7 +4977,8 @@
   }
 
   function startTour(){
-    panel.hidden = true; sharePanel.hidden = true;
+    if(!panel.hidden) cancelSettings();
+    sharePanel.hidden = true;
     closeFloatingPopovers();
     tourSteps = buildTourSteps();
     tourIndex = 0;
@@ -4716,19 +5114,175 @@
     showShortcutsPopover();
   });
 
+  // ---------- board thumbnails ----------
+  // Drawn straight from note data onto a small canvas (no DOM capture), so menus,
+  // selection and dialogs can't appear, and other boards can be drawn without loading them.
+  var THUMB_W = 176, THUMB_H = 110;
+  function thumbKey(id){ return "stickyboard.thumb." + id; }
+  var thumbImgs = new Map();
+  function thumbImage(src){
+    var im = thumbImgs.get(src);
+    if(!im){
+      im = new Image(); im.src = src; thumbImgs.set(src, im);
+      if(thumbImgs.size > 80) thumbImgs.delete(thumbImgs.keys().next().value);
+    }
+    return im;
+  }
+  function estimateNoteH(n){
+    if(n.el && n.el.offsetHeight) return n.el.offsetHeight;
+    var inner = (n.w || NOTE_W) - 28, h = 40;
+    if(n.image){ var iw = Math.min(inner, n.imgW || defaultImgW(n) || inner); h += iw * (n.imgRatio || 0.75) + 8; }
+    var chars = htmlToText(n.html || "").length;
+    h += Math.ceil(Math.max(1, chars) / 22) * 25;
+    return Math.max(NOTE_H, h);
+  }
+  function drawThumb(list){
+    var k = 2, c = document.createElement("canvas");
+    c.width = THUMB_W * k; c.height = THUMB_H * k;
+    var g = c.getContext("2d");
+    g.scale(k, k);
+    var cs = getComputedStyle(document.body);
+    var dark = document.body.classList.contains("dark");
+    g.fillStyle = cs.getPropertyValue("--paper").trim() || "#faf6e8";
+    g.fillRect(0, 0, THUMB_W, THUMB_H);
+    var pending = false;
+    var items = list.map(function(n){ return {n:n, w:n.w || NOTE_W, h:estimateNoteH(n)}; });
+    var x1 = 0, y1 = 0, x2 = 900, y2 = 560;
+    if(items.length){
+      x1 = Math.min.apply(null, items.map(function(i){ return i.n.x; })) - 40;
+      y1 = Math.min.apply(null, items.map(function(i){ return i.n.y; })) - 40;
+      x2 = Math.max.apply(null, items.map(function(i){ return i.n.x + i.w; })) + 40;
+      y2 = Math.max.apply(null, items.map(function(i){ return i.n.y + i.h; })) + 40;
+      // never zoom in so far that one note fills the card
+      var minW = 900, minH = minW * THUMB_H / THUMB_W;
+      if(x2 - x1 < minW){ var cx = (x1 + x2) / 2; x1 = cx - minW/2; x2 = cx + minW/2; }
+      if(y2 - y1 < minH){ var cy = (y1 + y2) / 2; y1 = cy - minH/2; y2 = cy + minH/2; }
+    }
+    var sc = Math.min(THUMB_W / (x2 - x1), THUMB_H / (y2 - y1));
+    var ox = (THUMB_W - (x2 - x1) * sc) / 2 - x1 * sc, oy = (THUMB_H - (y2 - y1) * sc) / 2 - y1 * sc;
+    var step = 26 * sc;
+    if(step >= 3){
+      g.fillStyle = cs.getPropertyValue("--paper-dot").trim() || "rgba(60,50,20,0.05)";
+      for(var gx = (ox % step + step) % step; gx < THUMB_W; gx += step)
+        for(var gy = (oy % step + step) % step; gy < THUMB_H; gy += step){ g.beginPath(); g.arc(gx, gy, Math.max(0.35, 1.6 * sc), 0, 7); g.fill(); }
+    }
+    items.sort(function(a, b){ return (a.n.z || 0) - (b.n.z || 0); }).forEach(function(it){
+      var n = it.n, w = it.w * sc, h = it.h * sc, p = ensurePhys(n);
+      g.save();
+      g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
+      g.rotate((n.rot || 0) * Math.PI / 180);
+      g.shadowColor = dark ? "rgba(0,0,0,0.6)" : "rgba(60,45,10,0.28)";
+      g.shadowBlur = 3; g.shadowOffsetY = 1.2;
+      g.fillStyle = n.bg || "#fff3a8";
+      g.fillRect(-w/2, -h/2, w, h);
+      g.shadowColor = "transparent";
+      if(dark && p.pin){
+        g.fillStyle = PIN_COLORS[p.pc] || PIN_COLORS[0];
+        g.beginPath(); g.arc(p.tx * sc, -h/2 + 2.5 * sc + 1, Math.max(1.2, 7 * sc), 0, 7); g.fill();
+      } else {
+        g.fillStyle = "rgba(255,255,255," + (p.to || 0.55) + ")";
+        var tw = (p.tw || 56) * sc;
+        g.fillRect(p.tx * sc - tw/2, -h/2 - 11 * sc, tw, 22 * sc);
+      }
+      var left = -w/2 + 14 * sc, y = -h/2 + 26 * sc, inner = w - 28 * sc;
+      if(n.image){
+        var im = (n.el && n.el.querySelector(".noteImgWrap img")) || thumbImage(n.image);
+        var ratio = n.imgRatio || (im.naturalWidth ? im.naturalHeight / im.naturalWidth : 0.75);
+        var iw = Math.min(inner, (n.imgW || defaultImgW(n) || (it.w - 28)) * sc), ih = iw * ratio;
+        if(im.complete && im.naturalWidth) g.drawImage(im, left, y, iw, ih);
+        else { pending = true; g.fillStyle = "rgba(0,0,0,0.12)"; g.fillRect(left, y, iw, ih); }
+        y += ih + 8 * sc;
+      }
+      var text = (n.textEl ? n.textEl.textContent : htmlToText(n.html || "")).replace(/\s+/g, " ").trim();
+      if(text){
+        var fs = Math.max(2.4, 17 * sc);
+        g.font = fs + "px " + fontStack(n.font);
+        g.fillStyle = "rgba(51,48,31,0.85)";
+        var rtl = detectScript(text) === "hebrew";
+        g.textAlign = rtl ? "right" : "left";
+        var words = text.split(" "), line = "", lh = fs * 1.35;
+        for(var i = 0; i < words.length && y < h/2 - 8 * sc; i++){
+          var test = line ? line + " " + words[i] : words[i];
+          if(g.measureText(test).width > inner && line){ g.fillText(line, rtl ? left + inner : left, y + fs); y += lh; line = words[i]; }
+          else line = test;
+        }
+        if(line && y < h/2 - 8 * sc) g.fillText(line, rtl ? left + inner : left, y + fs);
+      }
+      g.restore();
+    });
+    return {url:c.toDataURL("image/jpeg", 0.82), pending:pending};
+  }
+  function storeThumb(boardId, list, ts){
+    var d = drawThumb(list);
+    var rec = {url:d.url, theme:settings.theme, ts:ts || Date.now(), count:list.length};
+    safeSet(thumbKey(boardId), rec);
+    return {rec:rec, pending:d.pending};
+  }
+  var thumbT = null;
+  function scheduleThumb(){
+    if(readOnly || singleNoteMode || !activeBoardId) return;
+    clearTimeout(thumbT);
+    thumbT = setTimeout(saveThumbNow, 2500);
+  }
+  function saveThumbNow(){
+    clearTimeout(thumbT);
+    if(readOnly || singleNoteMode || !activeBoardId) return;
+    try{ storeThumb(activeBoardId, notes); }catch(e){}
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "hidden") saveThumbNow(); });
+  // For the board list: use the stored card, or redraw it if it's missing or from the other theme.
+  function thumbFor(b, onUpdate){
+    var rec = safeGet(thumbKey(b.id));
+    if(rec && rec.theme === settings.theme && rec.url) return rec;
+    var list = b.id === activeBoardId ? notes : (safeGet(notesKeyFor(b.id)) || []);
+    var out = storeThumb(b.id, list, rec && rec.ts);
+    if(out.pending){
+      Promise.all(list.filter(function(n){ return n.image; }).map(function(n){
+        var im = thumbImage(n.image);
+        return im.complete ? null : new Promise(function(r){ im.onload = im.onerror = r; });
+      })).then(function(){ onUpdate(storeThumb(b.id, list, out.rec.ts).rec); });
+    }
+    return out.rec;
+  }
+  function timeAgo(ts){
+    if(!ts) return "";
+    var m = Math.round((Date.now() - ts) / 60000);
+    if(m < 1) return "just now";
+    if(m < 60) return m + " min ago";
+    var h = Math.round(m / 60);
+    if(h < 24) return h + " h ago";
+    var d = Math.round(h / 24);
+    return d === 1 ? "yesterday" : d + " days ago";
+  }
+
   // ---------- board switcher ----------
   function renderBoardList(){
     boardList.innerHTML = "";
+    if(activeBoardId) saveThumbNow();
     boards.forEach(function(b){
       var row = document.createElement("div");
       row.className = "boardRow" + (b.id === activeBoardId ? " active" : "");
+      var thumb = document.createElement("img");
+      thumb.className = "thumb";
+      thumb.alt = "";
+      var info = makeDiv("info");
       var nameSpan = document.createElement("span");
       nameSpan.className = "name";
       nameSpan.textContent = b.name;
-      row.appendChild(nameSpan);
+      var meta = document.createElement("span");
+      meta.className = "meta";
+      info.appendChild(nameSpan); info.appendChild(meta);
+      function fill(rec){
+        thumb.src = rec.url;
+        meta.textContent = rec.count + (rec.count === 1 ? " note" : " notes") + (rec.count ? " \u00b7 " + timeAgo(rec.ts) : "");
+      }
+      fill(thumbFor(b, fill));
+      row.appendChild(thumb);
+      row.appendChild(info);
       row.addEventListener("click", function(){
         if(b.id === activeBoardId) return;
         safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x});
+        saveThumbNow();
         safeSet(ACTIVE_BOARD_KEY, b.id);
         location.hash = "";
         location.reload();
@@ -4768,7 +5322,7 @@
           if(!confirm2(delBtn)) return;
           boards = boards.filter(function(x){ return x.id !== b.id; });
           safeSet(BOARDS_KEY, boards);
-          try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); }catch(err){}
+          try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); localStorage.removeItem(thumbKey(b.id)); }catch(err){}
           if(b.id === activeBoardId){
             safeSet(ACTIVE_BOARD_KEY, boards[0].id);
             location.hash = "";
@@ -4893,6 +5447,12 @@
         return;
       }
 
+      if(!typing && selectedImageNote && (key === "Delete" || key === "Backspace") && findNote(selectedImageNote.id)){
+        e.preventDefault();
+        var act = removeImage(selectedImageNote);
+        toast("Image removed.", "Undo", function(){ undoIfTop(act); });
+        return;
+      }
       if(typing || !selected.size) return;
       if(key === "Delete" || key === "Backspace"){
         // only when not editing text: Backspace inside a note always edits text
@@ -5000,6 +5560,7 @@
 
     // a quiet cue while the board is nearly empty
     if(!readOnly && notes.length < 5){
+      hint.textContent = CREATE_HINT;
       hint.classList.remove("hidden");
       setTimeout(dismissHint, 7000);
     }

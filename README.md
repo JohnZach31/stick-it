@@ -18,11 +18,11 @@ Share a board with a link that just *works*.
 
 | | |
 |---|---|
-| 🖱️ **Infinite corkboard** | Click anywhere to stick a note. Scroll or swipe sideways for more room, or zoom the whole board. |
-| ✍️ **Rich text notes** | Headings, bold, italic, a marker-style highlighter, lists, hand-drawn checklists, links and drag-and-drop images, all tucked behind one tidy menu per note so the board stays clean. |
+| 🖱️ **Infinite corkboard** | Double-click anywhere to stick a note (tap on touch screens). Scroll or swipe sideways for more room, or zoom the whole board. |
+| ✍️ **Rich text notes** | Headings, bold, italic, a marker-style highlighter, lists, hand-drawn checklists (it'll offer when your note looks like a list), links and resizable photos, all tucked behind one tidy menu per note so the board stays clean. |
 | 🎨 **A little chaos, on purpose** | Every note gets its own handwriting, colour, tape or pin, and a crease or two. Tap **Aa** to try another hand. Hebrew, Chinese, Japanese and Korean get fonts that actually have those letters. |
 | ✅ **Tasks & real reminders** | Write "Dentist Tuesday 17:30" and Stick-It spots the date; one click adds it to Google Calendar or downloads a reminder for Apple Calendar / Outlook. Tasks with due dates still work too. |
-| 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with its own notes. |
+| 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with a live little thumbnail of its own notes. |
 | 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share. Stick-It only ever sees your name, email, and photo, never your password or your Gmail/Calendar/Drive. Or skip it entirely; guest mode asks for nothing. |
 | 🔗 **Sharing that actually works** | Share a board, a single note, or just a few selected notes with a link that opens instantly for whoever you send it to, no login or setup on their end. |
 | 📷 **One-click snapshot** | Grab an image of exactly what's on screen. |
