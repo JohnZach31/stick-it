@@ -1129,6 +1129,14 @@
   }
   .linkPop input:focus{ border-color:var(--accent); }
   .linkPop .rowBtns{ display:flex; gap:6px; justify-content:flex-end; }
+  .migList{ display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto; }
+  .migRow{ display:flex; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--line, rgba(0,0,0,0.12)); border-radius:10px; cursor:pointer; }
+  .migRow .t{ display:flex; flex-direction:column; min-width:0; font-size:0.86rem; }
+  .migRow .t small{ opacity:0.65; font-size:0.72rem; }
+  .migProgress{ height:8px; border-radius:6px; background:rgba(128,128,128,0.22); overflow:hidden; margin:6px 0 12px; }
+  .migProgress i{ display:block; height:100%; width:6%; background:var(--accent); transition:width .25s; }
+  .shareLinks{ margin-top:12px; border-top:1px solid rgba(128,128,128,0.25); padding-top:10px; }
+  .shareLinks .row{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 0; font-size:0.82rem; }
   .pillBtn{
     all:unset; box-sizing:border-box; padding:6px 12px; border-radius:8px; cursor:pointer;
     font-size:0.78rem; font-weight:600; border:1px solid var(--field-line); background:var(--field); color:var(--ink);
@@ -1287,6 +1295,39 @@
   body.dark .minimap{ background:rgba(30,26,48,0.8); border-color:rgba(61,53,88,0.9); box-shadow:0 10px 26px var(--shadow); }
   body.dark ::highlight(stickit-date){ text-decoration:underline dotted rgba(40,30,20,0.75); }
 
+  /* ---------- cloud: sync status, overlay, media states ---------- */
+  .syncPill{
+    display:inline-flex; align-items:center; gap:6px; margin-left:4px; padding:2px 9px 2px 8px; border-radius:999px;
+    font:500 0.68rem 'Sora',sans-serif; color:var(--ink-soft); background:transparent; border:1px solid transparent;
+    cursor:default; white-space:nowrap; transition:color .2s ease, border-color .2s ease, opacity .3s ease;
+  }
+  .syncPill[hidden]{ display:none; }
+  .syncPill::before{ content:''; width:6px; height:6px; border-radius:50%; background:#5f9e5f; flex:none; }
+  .syncPill.saving::before{ background:var(--accent); animation:recPulse 1.1s ease-in-out infinite; }
+  .syncPill.offline::before{ background:#9a8f7a; }
+  .syncPill.problem{ color:var(--danger); border-color:var(--danger); cursor:pointer; }
+  .syncPill.problem::before{ background:var(--danger); }
+  .syncPill.offline, .syncPill.problem{ cursor:pointer; }
+  .syncPill.saved{ opacity:0.7; }
+  @media (max-width:600px){ .syncPill{ margin-left:0; } }
+  .cloudOverlay{
+    position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:var(--paper); color:var(--ink); font:500 0.95rem 'Sora',sans-serif; text-align:center; padding:24px;
+  }
+  .cloudOverlay .spin{ width:26px; height:26px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--accent); animation:cloudSpin .8s linear infinite; }
+  @keyframes cloudSpin{ to{ transform:rotate(360deg); } }
+  .pFrame.pending img, .noteImgWrap img.pending{ background:linear-gradient(135deg, rgba(0,0,0,0.05), rgba(0,0,0,0.11)); min-height:60px; }
+  .planBadge{ display:inline-block; font:600 0.66rem 'Sora',sans-serif; letter-spacing:0.05em; text-transform:uppercase; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--ink); margin-top:4px; }
+  .migList{ display:flex; flex-direction:column; gap:6px; margin:10px 0 4px; }
+  .migRow{ display:flex; align-items:center; gap:10px; padding:9px 10px; border:1px solid var(--field-line); border-radius:10px; background:var(--field); cursor:pointer; }
+  .migRow input{ flex:none; width:16px; height:16px; }
+  .migRow .t{ min-width:0; flex:1; font-size:0.86rem; }
+  .migRow .t small{ display:block; color:var(--ink-soft); font-size:0.72rem; margin-top:1px; }
+  .migProgress{ height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
+  .migProgress > i{ display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease; }
+  .shareLinks{ margin-top:12px; border-top:1px solid var(--line); padding-top:10px; }
+  .shareLinks .row{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:0.78rem; margin-bottom:6px; }
+
   /* touch devices: bigger, thumb-friendly targets */
   @media (pointer: coarse){
     .moreBtn{ width:34px; height:34px; }
@@ -1313,6 +1354,7 @@
   <div class="brand" id="brandBtn" role="button" tabindex="0" title="Switch board">
     <span class="logoMark" id="logoMark"></span>Stick-It
     <span class="boardName" id="boardNameLabel"></span>
+    <span class="syncPill saved" id="syncPill" hidden role="status" aria-live="polite"></span>
     <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
   </div>
   <div class="searchWrap">
@@ -1427,6 +1469,14 @@
 <div class="toast" id="toast"></div>
 <input type="file" id="imageUploadInput" accept="image/*" hidden>
 
+<!-- Public configuration and the (optional) cloud layer. With no SUPABASE_URL in js/config.js the app is guest-only, exactly as before. -->
+<script src="js/config.js"></script>
+<script src="js/cloud-client.js"></script>
+<script src="js/repo.js"></script>
+<script src="js/assets.js"></script>
+<script src="js/sync.js"></script>
+<script src="js/sharing.js"></script>
+<script src="js/migrate.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1584,8 +1634,14 @@
   // until this is filled in.
   var GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
 
-  var BOARDS_KEY = "stickyboard.boards.v1";
-  var ACTIVE_BOARD_KEY = "stickyboard.activeBoard.v1";
+  // Signed-in users get their own key namespace, so a guest board and an account's cached boards never mix.
+  // Guests keep the original keys untouched. (Stick.mode is decided synchronously from the stored session.)
+  var CLOUD = !!(window.Stick && window.Stick.mode && window.Stick.mode.cloud);
+  var NS = CLOUD ? window.Stick.mode.ns : "";
+  var CLOUD_OK = !!(window.Stick && window.Stick.cloud && window.Stick.cloud.configured);   // a backend is configured
+  var cloudSync = null;              // set once the cloud layer starts
+  var BOARDS_KEY = "stickyboard." + NS + "boards.v1";
+  var ACTIVE_BOARD_KEY = "stickyboard." + NS + "activeBoard.v1";
   var LEGACY_NOTES_KEY = "stickyboard.notes.v2";
   var SETTINGS_KEY = "stickyboard.settings.v1";
   var NOTE_W = 250, NOTE_H = 196;
@@ -1709,6 +1765,8 @@
   if(settings.guestConfirmed === undefined) settings.guestConfirmed = false;
   if(settings.theme === undefined) settings.theme = "light";
   if(settings.cleanupEmpty === undefined) settings.cleanupEmpty = true;
+  // With a real backend, the old browser-only "signed in" display state means nothing: only a real session counts.
+  if(CLOUD_OK && !CLOUD && settings.account) settings.account = null;
   document.body.classList.toggle("dark", settings.theme === "dark");
 
   // ---------- fonts: script-aware picking and harmonious fallback stacks ----------
@@ -1922,7 +1980,19 @@
     return /^(hsl\(\s*\d+(\.\d+)?\s*,\s*\d+(\.\d+)?%\s*,\s*\d+(\.\d+)?%\s*\)|#[0-9a-f]{3,8}|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\))$/i.test(c) ? c : null;
   }
   var idSeq = 0;
-  function newId(){ idSeq += 1; return "n" + Date.now().toString(36) + idSeq + Math.floor(rand(0, 999)); }
+  function uuid4(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    var b = new Uint8Array(16); crypto.getRandomValues(b); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    var h = Array.prototype.map.call(b, function(x){ return ("0" + x.toString(16)).slice(-2); }).join("");
+    return h.slice(0,8) + "-" + h.slice(8,12) + "-" + h.slice(12,16) + "-" + h.slice(16,20) + "-" + h.slice(20);
+  }
+  // Signed-in boards need UUIDs (they are database keys); guest boards keep the short local ids.
+  function newId(){
+    if(CLOUD) return uuid4();
+    idSeq += 1; return "n" + Date.now().toString(36) + idSeq + Math.floor(rand(0, 999));
+  }
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function uuidOrNull(v){ return typeof v === "string" && UUID_RE.test(v) ? v.toLowerCase() : null; }
   // Normalise a note that came from a link, a file, or the clipboard.
   var PHOTO_STYLES = ["polaroid", "cutout", "mounted"];
   var PHOTO_STYLE_NAMES = {polaroid:"Polaroid", cutout:"Cut-out", mounted:"Mounted cut-out"};
@@ -1932,28 +2002,39 @@
   // the media file itself lives in this device's IndexedDB under `mediaId`.
   function isAV(n){ return !!n && (n.type === "audio" || n.type === "video"); }
   function isObj(n){ return isPhoto(n) || isAV(n); }
-  function normalizeIncoming(item){
+  // opts.allowAssets: the item comes from this account's own board (duplicate / paste), so its asset ids may be kept.
+  // Anything from a file or a link is untrusted and never gets to reference stored media.
+  function normalizeIncoming(item, opts){
     item = item || {};
+    opts = opts || {};
+    function cloudRefs(o){
+      if(!opts.allowAssets) return o;
+      var a = uuidOrNull(item.assetId), b = uuidOrNull(item.attachedAssetId);
+      if(a) o.assetId = a;
+      if(b) o.attachedAssetId = b;
+      if(a || b) o.mediaState = item.mediaState === "failed" || item.mediaState === "uploading" ? item.mediaState : "ready";
+      return o;
+    }
     if(item.type === "audio" || item.type === "video"){
       var mid = /^[\w-]{1,64}$/.test(String(item.mediaId || "")) ? String(item.mediaId) : null;
-      if(!mid) return null;
-      return {
+      if(!mid && !(opts.allowAssets && uuidOrNull(item.assetId))) return null;
+      return cloudRefs({
         id: newId(), type: item.type,
         x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0),
         w: Math.round(clampNum(item.w, 120, 480, 200)),
         imgRatio: clampNum(item.imgRatio, 0.2, 5, 0.5625),
         rot: clampNum(item.rot, -12, 12, 0), z: 1,
-        mediaId: mid, duration: clampNum(item.duration, 0, 86400, 0),
+        mediaId: mid || undefined, duration: clampNum(item.duration, 0, 86400, 0),
         mime: String(item.mime || "").slice(0, 60), poster: safeImage(item.poster),
         caption: String(item.caption || "").replace(/\s+/g, " ").trim().slice(0, 120),
         font: FONT_BY_NAME[item.font] ? item.font : pickFont(),
         createdAt: clampNum(item.createdAt, 0, 1e14, Date.now()), phys: {}
-      };
+      });
     }
     if(item.type === "photo"){
       var src = safeImage(item.image);
-      if(!src) return null;
-      return {
+      if(!src && !(opts.allowAssets && uuidOrNull(item.assetId))) return null;
+      return cloudRefs({
         id: newId(), type: "photo",
         x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0),
         w: Math.round(clampNum(item.w, PHOTO_MIN_W, PHOTO_MAX_W, 220)),
@@ -1965,9 +2046,9 @@
         font: FONT_BY_NAME[item.font] ? item.font : pickFont(),
         createdAt: clampNum(item.createdAt, 0, 1e14, Date.now()),
         phys: sanitizePhotoPhys(item.phys)
-      };
+      });
     }
-    return {
+    return cloudRefs({
       id: newId(),
       x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0), w: clampNum(item.w, 160, 420, NOTE_W),
       html: sanitizeHtml(item.html != null ? item.html : escapeHtml(item.text || "")),
@@ -1983,16 +2064,53 @@
       imgW: item.imgW == null ? null : Math.round(clampNum(item.imgW, 40, 420, 200)),
       imgRatio: item.imgRatio == null ? null : clampNum(item.imgRatio, 0.05, 20, 1),
       phys: sanitizePhys(item.phys)
-    };
+    });
   }
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","mediaId","duration","mime","poster","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
     return o;
+  }
+  // What goes into storage / the sync layer. Runtime-only URLs (blob:, https: signed URLs) are never persisted,
+  // and once a picture lives in the cloud (assetId) the device does not keep a second copy in localStorage.
+  function persistForm(n){
+    var o = serializeNote(n);
+    if(o.image && !/^data:/.test(o.image)) delete o.image;
+    if(o.cutout && !/^data:/.test(o.cutout)) delete o.cutout;
+    if(CLOUD && (o.assetId || o.attachedAssetId) && o.image) delete o.image;
+    return o;
+  }
+  // Objects that arrive from the server (or the cache filled from it) came from other devices and other people:
+  // sanitise the risky fields, but change nothing else, so an object that was already fine keeps the exact same
+  // content (and therefore the same sync hash) and is not re-sent.
+  function cloudSanitize(o){
+    if(!o || typeof o !== "object") return null;
+    var c = Object.assign({}, o);
+    c.id = String(c.id);
+    if(!/^[\w-]{1,64}$/.test(c.id)) return null;
+    c.x = clampNum(c.x, 0, 1e6, 0); c.y = clampNum(c.y, 0, 5000, 0);
+    if(c.w != null) c.w = clampNum(c.w, 40, 1000, NOTE_W);
+    c.rot = clampNum(c.rot, -12, 12, 0);
+    c.z = Math.round(clampNum(c.z, 0, 1e9, 1));
+    if(c.font !== undefined && !FONT_BY_NAME[c.font]) c.font = pickFont();
+    if(c.bg !== undefined && !safeColor(c.bg)) c.bg = randomColor();
+    if(c.type === "audio" || c.type === "video" || c.type === "photo"){
+      if(c.caption !== undefined) c.caption = String(c.caption).replace(/\s+/g, " ").trim().slice(0, 120);
+      if(c.mediaId !== undefined && !/^[\w-]{1,64}$/.test(String(c.mediaId))) delete c.mediaId;
+      if(c.poster !== undefined && !safeImage(c.poster)) delete c.poster;
+      if(c.photoStyle !== undefined && PHOTO_STYLES.indexOf(c.photoStyle) === -1) c.photoStyle = "polaroid";
+    } else {
+      var clean = sanitizeHtml(c.html || "");
+      if(clean !== (c.html || "")) c.html = clean;
+    }
+    ["assetId", "attachedAssetId"].forEach(function(k){ if(c[k] !== undefined && !uuidOrNull(c[k])) delete c[k]; });
+    if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
+    delete c.image; delete c.cutout;                     // media only ever arrives through assets
+    return c;
   }
 
   // ---------- compact link encoding (deflate + base64url), with the old format still readable ----------
@@ -2043,6 +2161,10 @@
         type:"photo", x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, image:n.image,
         photoStyle:n.photoStyle, caption:n.caption || "", font:n.font, phys:ensurePhys(n)
       };
+      if(isAV(n)) return {   // (previews only: legacy links never carry recordings or videos)
+        type:n.type, x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, caption:n.caption || "", font:n.font,
+        duration:n.duration, poster:n.poster, mediaId:n.mediaId, assetId:n.assetId, phys:{}
+      };
       return {
         x:n.x, y:n.y, w:n.w || NOTE_W, html:n.html || "", bg:n.bg, font:n.font, rot:n.rot,
         isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "",
@@ -2066,7 +2188,9 @@
     }
   };
 
-  var readOnly = /^#sb=/.test(location.hash);
+  var readOnly = /^#(sb|s)=/.test(location.hash);   // legacy board link (#sb=) or a new server link (#s=<token>)
+  var viewerMode = false;                            // signed in, but only allowed to look at this board
+  var needsCloudBootstrap = false, needsBoardFill = false;
   // Desktop: double-click makes a note (single clicks stay free for selecting).
   // Touch screens keep one-tap notes until mobile capture gets its own design.
   var COARSE = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
@@ -2074,14 +2198,17 @@
   var singleNoteMode = /^#s[ng]=/.test(location.hash); // a public note or group of notes
   if(readOnly) document.body.classList.add("read-only");
 
-  function notesKeyFor(boardId){ return "stickyboard.notes." + boardId; }
+  function notesKeyFor(boardId){ return "stickyboard." + NS + "notes." + boardId; }
 
   var boards = [];
   var activeBoardId = null;
   if(!singleNoteMode){
     boards = safeGet(BOARDS_KEY);
     activeBoardId = safeGet(ACTIVE_BOARD_KEY);
-    if(!boards || !boards.length){
+    if((!boards || !boards.length) && CLOUD){
+      // first time this account is opened on this device: the cloud layer fills the cache, then reloads
+      boards = []; activeBoardId = null; needsCloudBootstrap = true;
+    } else if(!boards || !boards.length){
       var legacy = safeGet(LEGACY_NOTES_KEY);
       var defaultId = "b" + Date.now().toString(36);
       boards = [{id:defaultId, name:"My Board"}];
@@ -2090,34 +2217,52 @@
       safeSet(ACTIVE_BOARD_KEY, activeBoardId);
       if(legacy) safeSet(notesKeyFor(defaultId), legacy);
     }
-    if(!activeBoardId || !boards.some(function(b){ return b.id === activeBoardId; })){
+    if(!needsCloudBootstrap && (!activeBoardId || !boards.some(function(b){ return b.id === activeBoardId; }))){
       activeBoardId = boards[0].id;
       safeSet(ACTIVE_BOARD_KEY, activeBoardId);
+    }
+    if(CLOUD && activeBoardId){
+      var activeMeta = boards.filter(function(b){ return b.id === activeBoardId; })[0];
+      if(activeMeta && (activeMeta.access === "viewer" || activeMeta.locked)){
+        viewerMode = true; readOnly = true;
+        document.body.classList.add("read-only");
+      }
     }
   }
   var NOTES_KEY = activeBoardId ? notesKeyFor(activeBoardId) : null;
 
   var notes = [];
   var firstRun = false;
-  if(!readOnly && !singleNoteMode){
-    var stored = safeGet(NOTES_KEY);
+  if((!readOnly || viewerMode) && !singleNoteMode){
+    var stored = NOTES_KEY ? safeGet(NOTES_KEY) : null;
     firstRun = !stored;
-    notes = stored || [
+    if(CLOUD && !stored && !needsCloudBootstrap) needsBoardFill = true;
+    notes = stored || (CLOUD ? [] : [
       {id:"seed-1", x:60, y:40, html:(COARSE ? "Tap anywhere on the board to add a note, a photo, a voice memo or a video." : "Double-click anywhere on the board to stick a new note here."), bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
       {id:"seed-2", x:320, y:170, html:"Drag the little tab at the top to move me around.", bg:randomColor(), font:pickFont(), rot:rand(-4,6), z:2, categoryIndex:0},
       {id:"seed-3", x:70, y:280, html:"Tap \u2022\u2022\u2022 on a note for headings, checklists, a highlighter, colours and more.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
-    ];
-    notes.forEach(function(n){
-      if(n.html === undefined) n.html = escapeHtml(n.text || "");
-      if(n.categoryIndex === undefined) n.categoryIndex = 0;
-    });
+    ]);
+    if(CLOUD){
+      notes = notes.map(cloudSanitize).filter(Boolean);        // cached from the server: never trust it blindly
+    } else {
+      notes.forEach(function(n){
+        if(n.html === undefined) n.html = escapeHtml(n.text || "");
+        if(n.categoryIndex === undefined) n.categoryIndex = 0;
+      });
+    }
   }
 
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
 
   function saveNotes(){
-    if(readOnly || singleNoteMode) return;
-    safeSet(NOTES_KEY, notes.map(serializeNote));
+    if(readOnly || singleNoteMode || !NOTES_KEY) return;
+    safeSet(NOTES_KEY, notes.map(persistForm));
+    if(typeof scheduleThumb === "function") scheduleThumb();
+    if(cloudSync) cloudSync.notesChanged();
+  }
+  // write the cache without telling the sync layer (used when the change came from the server)
+  function saveNotesCache(){
+    if(NOTES_KEY) safeSet(NOTES_KEY, notes.map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
   }
   function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
@@ -2159,7 +2304,7 @@
     return needed;
   }
 
-  var ZOOM_KEY = activeBoardId ? ("stickyboard.zoom." + activeBoardId) : null;
+  var ZOOM_KEY = activeBoardId ? ("stickyboard." + NS + "zoom." + activeBoardId) : null;
   var boardZoom = (ZOOM_KEY && safeGet(ZOOM_KEY)) || 1;
   var kbShift = 0;
   function updateBoardTransform(){
@@ -3247,7 +3392,7 @@
       }
     });
     sizeImage(img, n);
-    img.src = n.image;
+    if(n.image) img.src = n.image; else img.classList.add("pending");
     wrap.appendChild(img);
     // photos sit on the same side the writing starts from
     if(detectScript(htmlToText(n.html || "")) === "hebrew") wrap.classList.add("rtl");
@@ -3489,7 +3634,7 @@
     img.alt = item.caption || "";
     img.draggable = false;
     img.style.aspectRatio = "1 / " + (item.imgRatio || 0.75);
-    img.src = isolated ? item.cutout : item.image;
+    if(isolated ? item.cutout : item.image) img.src = isolated ? item.cutout : item.image; else frame.classList.add("pending");
     frame.appendChild(img);
     var cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
     cap.dir = "auto";
@@ -3784,6 +3929,7 @@
     return {
       put: function(id, blob){ return run("readwrite", function(st){ return st.put(blob, id); }); },
       remember: function(id, blob){ var u = URL.createObjectURL(blob); urls.set(id, u); return u; },
+      blob: function(id){ return run("readonly", function(st){ return st.get(id); }).then(function(b){ return b || null; }); },
       url: function(id){
         if(urls.has(id)) return Promise.resolve(urls.get(id));
         return run("readonly", function(st){ return st.get(id); }).then(function(b){
@@ -3854,18 +4000,40 @@
   function stopMediaFor(n){
     if(playing && playing.n.id === n.id){ playing.audio.pause(); playing = null; }
   }
+  // Where can this recording/video be played from? This device's cache first, then a shared link's signed URL,
+  // then (signed in) the copy in the account, which is what makes it playable on another device.
+  function mediaUrlFor(n){
+    return MediaStore.url(n.mediaId || "").then(function(u){
+      if(u) return u;
+      if(n.mediaUrl) return n.mediaUrl;
+      if(n.assetId && CLOUD && window.Stick) return Stick.assets.signedUrl(n.assetId);
+      return null;
+    });
+  }
+  function mediaAvailable(n){
+    if(n.mediaUrl || (n.assetId && CLOUD)) return Promise.resolve(true);
+    return MediaStore.url(n.mediaId || "").then(function(u){ return !!u; });
+  }
   function markMissing(n){
     if(!n.el) return;
     n.el.classList.add("missing");
-    if(n.el.querySelector(".mNote")) return;
-    var note = makeDiv("mNote");
-    note.textContent = "Not on this device";
-    var host = n.el.querySelector(".mBody") || n.el;
-    host.appendChild(note);
+    var note = n.el.querySelector(".mNote");
+    if(!note){ note = makeDiv("mNote"); (n.el.querySelector(".mBody") || n.el).appendChild(note); }
+    note.textContent = n.mediaState === "uploading" ? "Still uploading\u2026"
+      : n.mediaState === "failed" ? "Upload failed. Tap play to retry."
+      : n.assetId ? "Couldn't load"
+      : n.mediaState === "missing" ? "Wasn't available when this was moved"
+      : "Not on this device";
   }
   function playAV(n, btn){
-    MediaStore.url(n.mediaId).then(function(u){
-      if(!u){ markMissing(n); toast("This " + (n.type === "audio" ? "recording" : "video") + " isn't stored on this device."); return; }
+    mediaUrlFor(n).then(function(u){
+      if(!u){
+        markMissing(n);
+        toast(n.mediaState === "uploading" ? "This is still uploading from another device."
+          : "This " + (n.type === "audio" ? "recording" : "video") + " isn't available here.");
+        if(n.mediaState === "failed" && cloudSync) cloudSync.retryAll();
+        return;
+      }
       if(n.type === "video"){ openVideoModal(n, u); return; }
       if(playing && playing.n.id === n.id){
         if(playing.audio.paused){ playing.audio.play(); btn.innerHTML = ICONS.pause; }
@@ -3922,7 +4090,7 @@
       if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once:true});
     }
     boardInner.appendChild(el);
-    MediaStore.url(n.mediaId).then(function(u){ if(!u) markMissing(n); });
+    mediaAvailable(n).then(function(ok){ if(!ok) markMissing(n); else if(n.mediaState === "uploading" && !n.assetId && !readOnly){ /* ours, still on its way up */ } });
     return el;
   }
   function openAVMenu(n, anchor){
@@ -4120,6 +4288,10 @@
     });
   }
   function createVideoObject(file, bx, by){
+    if(CLOUD && window.Stick && file.size > Stick.config.MEDIA_LIMITS.video.maxBytes){
+      toast("Videos over " + Math.round(Stick.config.MEDIA_LIMITS.video.maxBytes / 1048576) + " MB can't be saved to your account. Try a shorter clip.");
+      return;
+    }
     var url = URL.createObjectURL(file);
     videoInfo(url).then(function(info){
       URL.revokeObjectURL(url);
@@ -4195,7 +4367,12 @@
   // Read-only note for share previews and public pages: same paper, tape, font and formatting.
   function buildStaticNote(item){
     if(isPhoto(item)) return buildStaticPhoto(item);
-    if(isAV(item)){ var sb = buildAVEl(item); sb.el.classList.add("static"); return sb.el; }
+    if(isAV(item)){
+      var sb = buildAVEl(item); sb.el.classList.add("static");
+      item.el = sb.el;
+      sb.play.addEventListener("click", function(e){ e.stopPropagation(); playAV(item, sb.play); });
+      return sb.el;
+    }
     var el = makeDiv("note staticNote");
     el.style.width = (item.w || NOTE_W) + "px";
     applyNoteLook(el, item);
@@ -4784,7 +4961,7 @@
   }
   // a fresh piece of paper with the same content: new id, new rotation and tape
   function paperCopy(src){
-    var c = normalizeIncoming(src);
+    var c = normalizeIncoming(src, {allowAssets:true});
     if(!c) return null;
     c.phys = isPhoto(c) ? makePhotoPhys() : isAV(c) ? {} : makePhys();
     c.rot = isPhoto(c) ? rand(-5, 5) : rand(-6, 6);
@@ -4792,6 +4969,7 @@
     return c;
   }
   function insertNotes(list, label){
+    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); }, 0);
     list.forEach(function(n){
       zCounter += 1; n.z = zCounter;
       n.y = clampY(n.y);
@@ -4868,7 +5046,7 @@
   function moveTargets(){
     return boards.filter(function(b){ return b.id !== activeBoardId && canEditBoard(b); });
   }
-  function boardViewKey(id){ return "stickyboard.view." + id; }
+  function boardViewKey(id){ return "stickyboard." + NS + "view." + id; }
   // Moves notes into another board's storage, arranged around where that board was last viewed.
   function moveNotesToBoard(ids, destId){
     var dest = boards.filter(function(b){ return b.id === destId; })[0];
@@ -4881,14 +5059,17 @@
     moved.forEach(function(m, i){ m.el = list[i].el; });
     centerGroup(moved, view.cx, boardHeight()/2);
     var destZ = destNotes.reduce(function(mx, x){ return Math.max(mx, x.z || 0); }, 10);
-    moved = moved.map(function(m){ var o = serializeNote(m); destZ += 1; o.z = destZ; return o; });
+    var srcIds = list.map(function(n){ return n.id; });
+    // in an account the destination gets NEW ids: the originals are deleted on this board, and a database
+    // row can't be in two places at once (Undo restores the originals on this board)
+    moved = moved.map(function(m){ var o = persistForm(m); if(CLOUD) o.id = newId(); destZ += 1; o.z = destZ; return o; });
     function doMove(){
       var dn = safeGet(notesKeyFor(destId)) || [];
       var ok = safeSet(notesKeyFor(destId), dn.concat(moved.map(function(m){ return Object.assign({}, m); })));
       if(!ok){ toast("Couldn't move: browser storage is full."); return false; }
       try{ localStorage.removeItem(thumbKey(destId)); }catch(err){}
-      moved.forEach(function(m){
-        var n = findNote(m.id);
+      srcIds.forEach(function(sid){
+        var n = findNote(sid);
         if(!n) return;
         selected.delete(n.id);
         removeNoteEl(n, true);
@@ -5188,27 +5369,44 @@
     return {el:outer, fit:fit};
   }
   async function openShareModal(list){
+    // Signed in (on a board you can edit): a short server link to a frozen copy. Guests: the link carries the content.
+    var cloudShare = !!(CLOUD && cloudSync && !viewerMode && window.Stick && Stick.share);
     var avLeft = list.filter(isAV).length;
-    var shareable = list.filter(function(n){ return noteHasContent(n) && !isAV(n); });
-    if(!shareable.length && avLeft){ toast("Voice memos and videos stay on this device for now, so they can't be shared by link yet."); return; }
+    var shareable = list.filter(function(n){ return noteHasContent(n) && (cloudShare || !isAV(n)); });
+    if(!shareable.length && avLeft && !cloudShare){ toast("Voice memos and videos stay on this device for now, so they can't be shared by link yet. Sign in to share them."); return; }
     if(!shareable.length){
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
       return;
     }
     var name = getDisplayName();
     var isGroup = shareable.length > 1;
-    var items = await PublicShare.prepare(shareable.map(PublicShare.toPublicNote));
-    var payload = isGroup ? {v:2, byName:name, notes:items} : Object.assign({v:2, byName:name}, items[0]);
-    var link;
-    try{ link = await PublicShare.createLink(isGroup ? "group" : "note", payload); }
-    catch(e){ toast("Couldn't create a share link for that."); return; }
+    var items, link, shareInfo = null;
+    if(cloudShare){
+      cloudOverlay("Getting ready to share\u2026");
+      var ready = await cloudSync.settle(60000);     // the link can only point at things that have reached the server
+      hideCloudOverlay();
+      if(!ready){ toast("Couldn't finish saving to your account yet. Check your connection and try again."); return; }
+      var kept = shareable.filter(function(n){ return !isAV(n) || n.assetId; });
+      avLeft = shareable.length - kept.length;
+      shareable = kept;
+      if(!shareable.length){ toast("That recording is still uploading. Try again in a moment."); return; }
+      isGroup = shareable.length > 1;
+      items = shareable.map(PublicShare.toPublicNote);     // preview only: pictures are already loaded on this device
+      try{ shareInfo = await Stick.share.createSnapshot(activeBoardId, shareable.map(function(n){ return n.id; }), name); link = shareInfo.url; }
+      catch(e){ var se = Stick.errors.parse(e); toast(se.code === "FORBIDDEN" ? "You don't have permission to share from this board." : "Couldn't create a share link for that."); return; }
+    } else {
+      items = await PublicShare.prepare(shareable.map(PublicShare.toPublicNote));
+      var payload = isGroup ? {v:2, byName:name, notes:items} : Object.assign({v:2, byName:name}, items[0]);
+      try{ link = await PublicShare.createLink(isGroup ? "group" : "note", payload); }
+      catch(e){ toast("Couldn't create a share link for that."); return; }
+    }
     var msg;
     if(isGroup){
-      msg = "Check out these " + shareable.length + " sticky notes by " + name + ". Click to view: " + link;
+      msg = "Check out these " + shareable.length + " items by " + name + ". Click to view: " + link;
     } else {
       var plain = itemText(shareable[0]);
       var short = plain.replace(/\s+/g, " ").slice(0, 80);
-      msg = "Check out this " + (isPhoto(shareable[0]) ? "photo" : "sticky note") + " by " + name + (short ? ": \"" + short + (plain.length > 80 ? "…" : "") + "\"" : "") + ". Click to view: " + link;
+      msg = "Check out this " + (isPhoto(shareable[0]) ? "photo" : isAV(shareable[0]) ? itemWord(shareable) : "sticky note") + " by " + name + (short ? ": \"" + short + (plain.length > 80 ? "…" : "") + "\"" : "") + ". Click to view: " + link;
     }
     var skipped = list.length - shareable.length;
 
@@ -5232,13 +5430,25 @@
     content.appendChild(copyLink);
     var fine = document.createElement("p");
     fine.className = "shareFine";
-    fine.textContent = "Anyone with the link can view " + (isGroup ? "these notes" : "this note") +
+    fine.textContent = "Anyone with the link can view " + (isGroup ? "these items" : "this") +
       ", no account needed. Shared links don't expire, so think of it like handing over a paper note: once it's sent, they can keep it." +
-      (isGroup ? " Only the selected notes are included, never the rest of your board." : "") +
+      (cloudShare ? " It's a frozen copy: changing the original later won't change what they see." : "") +
+      (isGroup ? " Only the selected items are included, never the rest of your board." : "") +
       (skipped - avLeft > 0 ? " (" + (skipped - avLeft) + " empty note" + (skipped - avLeft > 1 ? "s were" : " was") + " left out.)" : "") +
-      (avLeft ? " Voice memos and videos stay on this device for now, so they aren't included." : "") +
-      (link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "");
+      (avLeft ? (cloudShare ? " (" + avLeft + " recording" + (avLeft > 1 ? "s" : "") + " still uploading " + (avLeft > 1 ? "were" : "was") + " left out.)" : " Voice memos and videos stay on this device for now, so they aren't included.") : "") +
+      (!cloudShare && link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "");
     content.appendChild(fine);
+    if(shareInfo){
+      var off = document.createElement("button");
+      off.className = "acctBack";
+      off.style.cssText = "display:block;text-align:center;width:100%;margin:10px 0 0;color:var(--danger);";
+      off.textContent = "Turn this link off";
+      off.addEventListener("click", function(){
+        Stick.share.disable(shareInfo.id).then(function(){ off.textContent = "\u2713 Link turned off"; off.disabled = true; toast("That link no longer works."); })
+          .catch(function(){ toast("Couldn't turn it off. Try again."); });
+      });
+      content.appendChild(off);
+    }
 
     openModal({
       title: isGroup ? "Share " + shareable.length + " notes" : "Share this note",
@@ -5261,15 +5471,46 @@
   }
 
   // Public page for a shared note or group: minimal, just the paper.
-  async function renderPublicView(hash){
+  function publicShell(){
     document.querySelector(".topbar").style.display = "none";
     board.style.display = "none";
     minimap.style.display = "none";
     hint.style.display = "none";
+    shareBanner.hidden = true;
     var wrap = document.createElement("div");
     wrap.style.cssText = "min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 20px;text-align:center;";
     document.body.appendChild(wrap);
-
+    return wrap;
+  }
+  function publicOpenButton(wrap){
+    var openBtn = document.createElement("button");
+    openBtn.className = "btn primary";
+    openBtn.style.width = "auto";
+    openBtn.textContent = "Open Stick-It";
+    openBtn.addEventListener("click", function(){ location.hash = ""; location.reload(); });
+    wrap.appendChild(openBtn);
+  }
+  function renderPublicViewItems(items, byName, token){
+    var wrap = publicShell();
+    if(!items.length){ wrap.innerHTML = '<p class="muted">This link looks broken or incomplete.</p>'; return; }
+    var byline = document.createElement("p");
+    byline.className = "muted";
+    byline.textContent = "Shared by " + (byName ? String(byName).slice(0, 60) : "someone");
+    wrap.appendChild(byline);
+    var arr = buildArrangement(items, Math.min(window.innerWidth - 40, 1100), Math.max(260, window.innerHeight - 200));
+    wrap.appendChild(arr.el);
+    setTimeout(arr.fit, 0);
+    if(document.fonts && document.fonts.ready) document.fonts.ready.then(arr.fit);
+    window.addEventListener("resize", arr.fit);
+    publicOpenButton(wrap);
+    if(token && window.Stick){
+      var rep = document.createElement("button");
+      rep.className = "acctBack"; rep.style.margin = "0"; rep.textContent = "Report this content";
+      rep.addEventListener("click", function(){ Stick.share.report(token).then(function(){ rep.textContent = "Report sent"; rep.disabled = true; }); });
+      wrap.appendChild(rep);
+    }
+  }
+  async function renderPublicView(hash){
     var isGroup = /^#sg=/.test(hash);
     var data = await decodeStateAny(hash.replace(/^#s[ng]=/, ""));
     var items = data ? (isGroup ? (Array.isArray(data.notes) ? data.notes : []) : [data]) : [];
@@ -5279,26 +5520,66 @@
       if(!n.phys) n.phys = isPhoto(n) ? makePhotoPhys(seededRng(hashStr(String(it.image || "").slice(-200)))) : makePhys(seededRng(hashStr(JSON.stringify([it.bg, it.rot, it.html]).slice(0, 200))));
       return n;
     }).filter(Boolean);
-    if(!items.length){
-      wrap.innerHTML = '<p class="muted">This note link looks broken or incomplete.</p>';
-      return;
-    }
-    var byline = document.createElement("p");
-    byline.className = "muted";
-    byline.textContent = "Shared by " + (data.byName ? String(data.byName).slice(0, 60) : "someone");
-    wrap.appendChild(byline);
-    var arr = buildArrangement(items, Math.min(window.innerWidth - 40, 1100), Math.max(260, window.innerHeight - 200));
-    wrap.appendChild(arr.el);
-    setTimeout(arr.fit, 0);
-    if(document.fonts && document.fonts.ready) document.fonts.ready.then(arr.fit);
-    window.addEventListener("resize", arr.fit);
+    renderPublicViewItems(items, data && data.byName, null);
+  }
 
-    var openBtn = document.createElement("button");
-    openBtn.className = "btn primary";
-    openBtn.style.width = "auto";
-    openBtn.textContent = "Open Stick-It";
-    openBtn.addEventListener("click", function(){ location.hash = ""; location.reload(); });
-    wrap.appendChild(openBtn);
+  // ---- new short links (#s=<token>): resolved by the server, no account needed ----
+  function cloudShareObject(o){
+    var img = o.image, mu = o.mediaUrl;
+    var c = cloudSanitize(o);
+    if(!c) return null;
+    if(typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;       // signed URLs from the resolver only
+    if(typeof mu === "string" && /^https?:\/\//.test(mu)) c.mediaUrl = mu;
+    delete c.mediaId;                                                              // a device-local key means nothing here
+    return c;
+  }
+  function shareUnavailable(text){
+    var wrap = publicShell();
+    wrap.innerHTML = "";
+    var p = document.createElement("p"); p.className = "muted"; p.textContent = text; wrap.appendChild(p);
+    publicOpenButton(wrap);
+  }
+  function cloudShareBoot(){
+    var token = window.Stick && Stick.share.tokenFromHash(location.hash);
+    shareBanner.hidden = false; copyToMineBtn.hidden = true;
+    shareBannerText.textContent = "Opening shared board\u2026";
+    if(!token || !CLOUD_OK){ shareUnavailable("This link looks broken or incomplete."); return; }
+    var last = "";
+    function paintLive(res){
+      var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
+      var sig = JSON.stringify(res.objects) + Object.keys(res.assets || {}).join();
+      if(sig === last) return;
+      last = sig;
+      notes.forEach(function(n){ if(n.el) n.el.remove(); });
+      notes = [];
+      objs.forEach(function(n, i){ n.id = "s" + i; if(!n.z) n.z = i + 1; if(!n.phys) ensurePhys(n); notes.push(n); renderNote(n, false); });
+      ensureWidth(); updateMinimap();
+    }
+    Stick.share.resolve(token).then(function(res){
+      if(!res.ok){
+        shareUnavailable(res.reason === "disabled" || res.reason === "expired" ? "The person who shared this has turned the link off."
+          : res.reason === "rate_limited" ? "Too many tries. Please wait a minute and reload."
+          : res.reason === "unavailable" ? "Couldn't reach the server. Check your connection and try again."
+          : "This link isn't available.");
+        return;
+      }
+      if(res.type !== "board_live"){
+        var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
+        objs.forEach(function(n){ if(!n.phys) n.phys = isPhoto(n) ? makePhotoPhys() : isAV(n) ? {} : makePhys(); });
+        renderPublicViewItems(objs, res.by_name, token);
+        return;
+      }
+      shareBannerText.textContent = (res.board && res.board.name ? "\u201c" + res.board.name + "\u201d" : "A shared board") + " \u00b7 shared by " + (res.by_name || "someone") + " \u00b7 view only";
+      var rep = document.createElement("button");
+      rep.className = "pillBtn"; rep.textContent = "Report";
+      rep.addEventListener("click", function(){ Stick.share.report(token).then(function(){ rep.textContent = "Report sent"; rep.disabled = true; }); });
+      shareBanner.appendChild(rep);
+      paintLive(res);
+      setInterval(function(){                                          // it's a live link: pick up the owner's changes
+        if(document.visibilityState === "hidden") return;
+        Stick.share.resolve(token).then(function(r2){ if(r2.ok && r2.type === "board_live") paintLive(r2); else if(!r2.ok && (r2.reason === "disabled" || r2.reason === "not_found")) location.reload(); });
+      }, 30000);
+    });
   }
 
   // ---------- board: click to stick, drag a box to select ----------
@@ -5477,7 +5758,7 @@
     syncSwitch(cleanupToggle, !!settings.cleanupEmpty);
     document.getElementById("fontPickRow").hidden = !settings.lockFont;
     fontSelect.value = settings.fontName;
-    displayNameInput.value = settings.displayName || "";
+    displayNameInput.value = (CLOUD && settings.account) ? (settings.account.name || "") : (settings.displayName || "");
   }
   function openSettings(){
     closeOtherPanels(panel);
@@ -5489,6 +5770,14 @@
     panel.hidden = false;
   }
   function saveSettingsAndClose(){
+    if(CLOUD && settings.account && window.Stick){
+      var nm = displayNameInput.value.replace(/\s+/g, " ").trim().slice(0, 60);
+      if(nm && nm !== settings.account.name){
+        // the display name is part of the account, so it follows you to your other devices
+        Stick.auth.updateDisplayName(nm).then(function(prof){ if(prof){ settings.account.name = prof.display_name; saveSettings(); } })
+          .catch(function(e){ toast("Couldn't update your name: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+      }
+    }
     saveSettings();
     settingsSnapshot = null;
     panel.hidden = true;
@@ -5597,15 +5886,25 @@
     var closeBtnHtml = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>';
 
     if(state === "signedIn" && settings.account){
+      var acc = settings.account;
+      var localCount = (CLOUD && window.Stick) ? Stick.migrate.inspectLocal(localStorage).length : 0;
+      var avatar = acc.picture
+        ? '<img src="' + escapeAttr(acc.picture) + '" alt="" referrerpolicy="no-referrer" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:12px;">'
+        : '<div style="width:64px;height:64px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.5rem;color:var(--accent);margin-bottom:12px;">' + escapeHtml((acc.name || "?").charAt(0).toUpperCase()) + '</div>';
       card.innerHTML = closeBtnHtml +
-        '<div style="display:flex;flex-direction:column;align-items:center;">' +
-          '<img src="' + settings.account.picture + '" alt="" style="width:64px;height:64px;border-radius:50%;object-fit:cover;margin-bottom:12px;">' +
-          '<h3>' + escapeHtml(settings.account.name) + '</h3>' +
-          '<p class="acctSub">' + escapeHtml(settings.account.email) + '</p>' +
+        '<div style="display:flex;flex-direction:column;align-items:center;">' + avatar +
+          '<h3>' + escapeHtml(acc.name) + '</h3>' +
+          '<p class="acctSub" style="margin-bottom:4px;">' + escapeHtml(acc.email) + '</p>' +
+          (CLOUD ? '<span class="planBadge">' + escapeHtml(acc.plan || "free") + ' plan</span>' : '') +
         '</div>' +
-        '<div class="acctWhy"><p>Your real name &amp; photo show up on anything you share: boards, notes, and any future collaboration features. Your notes themselves still only live in this browser.</p></div>' +
-        '<button class="guestBtn" id="signOutBtn" style="margin-top:18px;color:var(--danger);border-color:var(--danger);">Sign out</button>';
-      card.querySelector("#signOutBtn").addEventListener("click", signOut);
+        '<div class="acctWhy" style="margin-top:14px;"><p>' + (CLOUD
+          ? 'Your boards, photos and recordings are saved to your account and follow you to your other devices. Your name shows on anything you share.'
+          : 'Your real name &amp; photo show up on anything you share: boards, notes, and any future collaboration features. Your notes themselves still only live in this browser.') + '</p></div>' +
+        (localCount ? '<button class="guestBtn" id="importLocalBtn" style="margin-top:14px;">Import a board saved on this device (' + localCount + ')\u2026</button>' : '') +
+        '<button class="guestBtn" id="signOutBtn" style="margin-top:14px;color:var(--danger);border-color:var(--danger);">Sign out</button>';
+      card.querySelector("#signOutBtn").addEventListener("click", CLOUD ? cloudSignOut : signOut);
+      var imp = card.querySelector("#importLocalBtn");
+      if(imp) imp.addEventListener("click", function(){ closeAccountModal(); startManualImport(); });
 
     } else if(state === "guestHome"){
       card.innerHTML = closeBtnHtml +
@@ -5632,13 +5931,13 @@
           '<div><strong>Guest</strong><ul>' +
             '<li>No permissions asked</li>' +
             '<li>Shared notes show “Anon-XXXX”</li>' +
-            '<li>Nothing leaves this browser</li>' +
-            '<li>Premium features (coming soon) won’t be available</li>' +
+            '<li>' + (CLOUD_OK ? 'Boards stay on this device only' : 'Nothing leaves this browser') + '</li>' +
+            '<li>' + (CLOUD_OK ? 'Links to photos and recordings need an account' : 'Premium features (coming soon) won’t be available') + '</li>' +
           '</ul></div>' +
           '<div><strong>Google</strong><ul>' +
             '<li>Shares only name, email &amp; photo</li>' +
             '<li>Shared notes show your real name</li>' +
-            '<li>Ready for premium &amp; multi-user features</li>' +
+            '<li>' + (CLOUD_OK ? 'Boards, photos and recordings sync across your devices' : 'Ready for premium &amp; multi-user features') + '</li>' +
             '<li>Never your password, Gmail, Calendar, or Drive</li>' +
           '</ul></div>' +
         '</div>' +
@@ -5661,7 +5960,7 @@
         '<div class="acctWhy">' +
           '<p>👤 Your real name &amp; photo on anything you share, instead of “Anon-4821.”</p>' +
           '<p>🔓 Only your name, email &amp; photo. Never your password, Gmail, Calendar, or Drive.</p>' +
-          '<p>🚀 Sets you up for premium features and multi-user boards, coming soon.</p>' +
+          '<p>' + (CLOUD_OK ? '☁️ Your boards, photos and recordings follow you to every device.' : '🚀 Sets you up for premium features and multi-user boards, coming soon.') + '</p>' +
         '</div>';
       card.querySelector("#chooseGuestBtn").addEventListener("click", function(){ renderAccountModal("guestCompare"); });
       mountGoogleButton();
@@ -5675,6 +5974,11 @@
     var fallback = document.getElementById("googleBtnFallback");
     var holder = document.getElementById("googleBtnHolder");
     if(!fallback || !holder) return;
+    if(CLOUD_OK){                              // Supabase Auth: a full redirect to Google and back
+      fallback.innerHTML = GOOGLE_ICON + "<span>Continue with Google</span>";
+      fallback.addEventListener("click", beginGoogleSignIn);
+      return;
+    }
     var configured = GOOGLE_CLIENT_ID.indexOf("YOUR_GOOGLE_CLIENT_ID") === -1;
     if(!configured || !window.google || !window.google.accounts){
       fallback.innerHTML = GOOGLE_ICON + "<span>Continue with Google</span>";
@@ -5750,7 +6054,7 @@
 
   displayNameInput.value = settings.displayName || "";
   displayNameInput.addEventListener("input", function(){
-    settings.displayName = displayNameInput.value.trim();
+    if(!CLOUD) settings.displayName = displayNameInput.value.trim();     // signed in: saved to the account on Save
   });
   displayNameInput.addEventListener("keydown", function(e){ if(e.key === "Enter") saveSettingsAndClose(); });
 
@@ -5796,13 +6100,35 @@
   function exportPayload(){
     return {app:"stick-it", version:2, board:currentBoardName(), exportedAt:new Date().toISOString(), notes:notes.map(serializeNote)};
   }
-  exportBtn.addEventListener("click", function(){
-    var data = JSON.stringify(exportPayload(), null, 2);
-    var withImg = notes.filter(function(n){ return n.image; }).length;
+  // Pictures that live in the account are downloaded into the file so it stays portable. Recordings and videos are
+  // not included (their files stay in the account / on the device); the dialog says so.
+  async function exportPayloadCloud(){
+    var out = [];
+    for(var i = 0; i < notes.length; i++){
+      var o = serializeNote(notes[i]);
+      var aid = o.assetId || o.attachedAssetId;
+      if(!isAV(o) && aid && (!o.image || !/^data:/.test(o.image))){
+        try{
+          var blob = o.image ? await (await fetch(o.image)).blob() : await Stick.assets.blob(aid);
+          if(blob) o.image = await Stick.assets.blobToDataUrl(blob); else delete o.image;
+        }catch(e){ delete o.image; }
+      }
+      delete o.assetId; delete o.attachedAssetId; delete o.mediaState;
+      if(isAV(o)) delete o.image;
+      out.push(o);
+    }
+    return {app:"stick-it", version:2, board:currentBoardName(), exportedAt:new Date().toISOString(), notes:out};
+  }
+  exportBtn.addEventListener("click", async function(){
+    var payload = CLOUD ? await exportPayloadCloud() : exportPayload();
+    var data = JSON.stringify(payload, null, 2);
+    var withImg = notes.filter(function(n){ return n.image || n.assetId || n.attachedAssetId; }).filter(function(n){ return !isAV(n); }).length;
+    var avCount = notes.filter(isAV).length;
     var content = document.createElement("div");
     var box = makeDiv("noteBox");
     box.textContent = "“" + currentBoardName() + "” · " + notes.length + (notes.length === 1 ? " note" : " notes") +
-      (withImg ? " (" + withImg + " with images)" : "") + ". The file keeps everything: text, formatting, colours, fonts, images and positions.";
+      (withImg ? " (" + withImg + " with images)" : "") + ". The file keeps text, formatting, colours, fonts, images and positions." +
+      (avCount ? " Voice memos and videos aren\u2019t included in the file (" + avCount + " on this board)." : "");
     content.appendChild(box);
     var m = openModal({
       title:"Export board",
@@ -6061,7 +6387,63 @@
   });
 
   // ---------- share: interactive link ----------
+  // Signed in: a LIVE link. Whoever has it always sees the board as it currently is, read-only.
+  async function publishLiveBoard(){
+    shareResult.innerHTML = '<p class="muted">Getting your board ready\u2026</p>';
+    var ready = await cloudSync.settle(60000);
+    if(!ready){ shareResult.innerHTML = '<p class="muted">Couldn\'t finish saving to your account yet. Check your connection and try again.</p>'; return; }
+    var info;
+    try{ info = await Stick.share.createLive(activeBoardId, getDisplayName()); }
+    catch(e){
+      var er = Stick.errors.parse(e);
+      shareResult.innerHTML = '<p class="muted">' + escapeHtml(er.code === "FORBIDDEN" ? "Only the board's owner can publish a live link. You can still share selected items." : Stick.errors.friendly(er)) + '</p>';
+      return;
+    }
+    shareResult.innerHTML = "";
+    var p = document.createElement("p");
+    p.className = "muted";
+    p.textContent = "A live, read-only link: anyone who opens it always sees this board as it is now (no account needed). It doesn't expire, and you can turn it off at any time.";
+    shareResult.appendChild(p);
+    var row = document.createElement("div");
+    row.className = "copyRow";
+    var input = document.createElement("input");
+    input.readOnly = true; input.value = info.url; input.id = "shareLinkInput";
+    row.appendChild(input);
+    var copyBtn = document.createElement("button");
+    copyBtn.className = "btn primary copyBtn";
+    copyBtn.style.cssText = "margin:0;width:auto;";
+    copyBtn.textContent = "Copy";
+    copyBtn.addEventListener("click", async function(){
+      if(await copyText(info.url)) flashCopied(copyBtn, "Copied!");
+      else { input.select(); toast("Select the link and copy it manually."); }
+    });
+    row.appendChild(copyBtn);
+    shareResult.appendChild(row);
+    renderMyLinks();
+  }
+  // the links this account has made for this board, with an off switch (tokens can't be shown again)
+  async function renderMyLinks(){
+    try{
+      var all = await Stick.share.list();
+      var mine = all.filter(function(x){ return x.board_id === activeBoardId && x.is_active && x.share_type === "board_live"; });
+      var old = shareResult.querySelector(".shareLinks"); if(old) old.remove();
+      if(!mine.length) return;
+      var box = makeDiv("shareLinks");
+      var head = document.createElement("div"); head.className = "muted"; head.style.marginBottom = "6px";
+      head.textContent = "Live links for this board (" + mine.length + ")";
+      box.appendChild(head);
+      mine.forEach(function(x){
+        var r = makeDiv("row");
+        var t = document.createElement("span"); t.textContent = "Made " + timeAgo(Date.parse(x.created_at));
+        var b = document.createElement("button"); b.className = "pillBtn danger"; b.textContent = "Turn off";
+        b.addEventListener("click", function(){ Stick.share.disable(x.id).then(function(){ r.remove(); toast("That link no longer works."); }, function(){ toast("Couldn't turn it off. Try again."); }); });
+        r.appendChild(t); r.appendChild(b); box.appendChild(r);
+      });
+      shareResult.appendChild(box);
+    }catch(e){}
+  }
   publishBtn.addEventListener("click", async function(){
+    if(CLOUD && cloudSync && !viewerMode){ return publishLiveBoard(); }
     shareResult.innerHTML = '<p class="muted">Preparing link\u2026</p>';
     var payload = await PublicShare.prepare(notes.filter(function(n){ return !isAV(n); }).map(PublicShare.toPublicNote));
     var link = null;
@@ -6097,7 +6479,8 @@
   });
 
   // ---------- shared read-only view ----------
-  if(readOnly){
+  if(readOnly && !viewerMode && /^#s=/.test(location.hash)) cloudShareBoot();
+  else if(readOnly && !viewerMode){
     shareBanner.hidden = false;
     var shared = [];
     decodeStateAny(location.hash.replace(/^#sb=/, "")).then(function(data){
@@ -6314,7 +6697,7 @@
   // Drawn straight from note data onto a small canvas (no DOM capture), so menus,
   // selection and dialogs can't appear, and other boards can be drawn without loading them.
   var THUMB_W = 176, THUMB_H = 110;
-  function thumbKey(id){ return "stickyboard.thumb." + id; }
+  function thumbKey(id){ return "stickyboard." + NS + "thumb." + id; }
   var thumbImgs = new Map();
   function thumbImage(src){
     var im = thumbImgs.get(src);
@@ -6481,7 +6864,7 @@
   }
   // Custom covers live apart from the automatic thumbnail, so automatic redraws never overwrite them.
   // {mode:"view"|"upload", url, ts}; no record means Automatic.
-  function coverKey(id){ return "stickyboard.cover." + id; }
+  function coverKey(id){ return "stickyboard." + NS + "cover." + id; }
   var COVER_W = 352, COVER_H = 220;
   // centre-crop any image/canvas to the 16:10 card without stretching it
   function coverFrom(src, sw, sh){
@@ -6581,6 +6964,7 @@
             if(!cover && bb.id === activeBoardId) saveThumbNow();
             if(!boardPanel.hidden) renderBoardList();
             updateBoardLabel();
+            if(CLOUD && cloudSync) cloudSync.boardMetaChanged(b.id, {subtitle: subtitle || null, cover: cover ? {mode:cover.mode, url:cover.url} : null});
             return true;
           }
           put(newCover, newSub);
@@ -6637,10 +7021,17 @@
       fill(thumbFor(b, fill));
       row.appendChild(thumb);
       row.appendChild(info);
-      row.addEventListener("click", function(){
+      row.addEventListener("click", async function(){
         if(b.id === activeBoardId) return;
         safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x});
         saveThumbNow();
+        if(CLOUD && cloudSync){
+          // make sure nothing is left behind, and that the board is on this device before we switch to it
+          try{
+            if(cloudSync.hasPending()) await cloudSync.flush();
+            if(!safeGet(notesKeyFor(b.id))){ cloudOverlay("Opening \u201c" + b.name + "\u201d\u2026"); await cloudSync.fillBoardCache(b.id); }
+          }catch(e){ hideCloudOverlay(); toast(Stick.errors.friendly(Stick.errors.parse(e))); return; }
+        }
         safeSet(ACTIVE_BOARD_KEY, b.id);
         location.hash = "";
         location.reload();
@@ -6658,7 +7049,7 @@
         input.focus(); input.select();
         function commit(){
           var v = input.value.trim();
-          if(v) b.name = v;
+          if(v){ b.name = v; if(CLOUD && cloudSync) cloudSync.boardMetaChanged(b.id, {name:v}); }
           safeSet(BOARDS_KEY, boards);
           renderBoardList();
           updateBoardLabel();
@@ -6669,38 +7060,56 @@
         });
         input.addEventListener("blur", commit);
       });
-      row.appendChild(renameBtn);
+      var canManage = !CLOUD || !b.access || b.access === "owner";
+      if(canManage) row.appendChild(renameBtn);
 
       var coverBtn = document.createElement("button");
       coverBtn.innerHTML = ICONS.image;
       coverBtn.title = "Cover & subtitle";
       coverBtn.setAttribute("aria-label", "Board cover and subtitle");
       coverBtn.addEventListener("click", function(e){ e.stopPropagation(); openCoverEditor(b); });
-      row.appendChild(coverBtn);
+      if(canManage) row.appendChild(coverBtn);
 
       if(boards.length > 1){
         var delBtn = document.createElement("button");
         delBtn.innerHTML = ICONS.close;
-        delBtn.title = "Delete board";
+        delBtn.title = (CLOUD && b.access && b.access !== "owner") ? "Leave board" : "Delete board";
         delBtn.addEventListener("click", function(e){
           e.stopPropagation();
           if(!confirm2(delBtn)) return;
-          boards = boards.filter(function(x){ return x.id !== b.id; });
-          safeSet(BOARDS_KEY, boards);
-          try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); localStorage.removeItem(thumbKey(b.id)); localStorage.removeItem(coverKey(b.id)); }catch(err){}
-          if(b.id === activeBoardId){
-            safeSet(ACTIVE_BOARD_KEY, boards[0].id);
-            location.hash = "";
-            location.reload();
-            return;
-          }
-          renderBoardList();
+          if(CLOUD) cloudRemoveBoard(b); else finishLocalBoardRemoval(b);
         });
         row.appendChild(delBtn);
       }
 
       boardList.appendChild(row);
     });
+  }
+  function finishLocalBoardRemoval(b){
+    boards = boards.filter(function(x){ return x.id !== b.id; });
+    safeSet(BOARDS_KEY, boards);
+    try{ localStorage.removeItem(notesKeyFor(b.id)); localStorage.removeItem(boardViewKey(b.id)); localStorage.removeItem(thumbKey(b.id)); localStorage.removeItem(coverKey(b.id)); localStorage.removeItem("stickyboard." + NS + "sync." + b.id); }catch(err){}
+    if(b.id === activeBoardId){
+      safeSet(ACTIVE_BOARD_KEY, boards[0].id);
+      location.hash = "";
+      location.reload();
+      return;
+    }
+    renderBoardList();
+  }
+  // in an account the server decides first: only when it agrees do we forget the board locally
+  async function cloudRemoveBoard(b){
+    try{
+      if(b.access && b.access !== "owner") await Stick.repo.leaveBoard(b.id); else await Stick.repo.deleteBoard(b.id);
+    }catch(e){ toast(Stick.errors.friendly(Stick.errors.parse(e))); return; }
+    finishLocalBoardRemoval(b);
+  }
+  function boardLimitMessage(err){
+    var plan = (settings.account && settings.account.plan) || "free";
+    var lim = ((Stick.config.PLAN_LIMITS || {})[plan] || {}).boards;
+    return err && err.code === "BOARD_LIMIT_REACHED"
+      ? "Your " + plan + " plan includes " + (lim || "a limited number of") + " boards. Delete one to make room."
+      : Stick.errors.friendly(err);
   }
   function confirm2(btn){
     if(btn.dataset.armed === "1"){ return true; }
@@ -6717,7 +7126,7 @@
     boardNameLabel.textContent = b ? b.name : "";
   }
 
-  if(!readOnly && !singleNoteMode){
+  if((!readOnly || viewerMode) && !singleNoteMode){
     updateBoardLabel();
     brandBtn.addEventListener("click", function(){
       var willOpen = boardPanel.hidden;
@@ -6730,8 +7139,22 @@
         boardPanel.hidden = true;
       }
     });
-    addBoardBtn.addEventListener("click", function(){
+    addBoardBtn.addEventListener("click", async function(){
       var name = newBoardName.value.trim() || "New board";
+      if(CLOUD){
+        if(!cloudSync || addBoardBtn.disabled) return;
+        addBoardBtn.disabled = true;
+        try{
+          var created = await Stick.repo.createBoard(name);          // the server enforces the plan's board limit
+          await cloudSync.refreshBoards();
+          await cloudSync.fillBoardCache(created.id);
+          safeSet(ACTIVE_BOARD_KEY, created.id);
+        }catch(e){ addBoardBtn.disabled = false; toast(boardLimitMessage(Stick.errors.parse(e))); return; }
+        newBoardName.value = "";
+        location.hash = "";
+        location.reload();
+        return;
+      }
       var id = "b" + Date.now().toString(36) + Math.floor(rand(0,99));
       boards.push({id:id, name:name});
       safeSet(BOARDS_KEY, boards);
@@ -6926,6 +7349,357 @@
     });
   }
 
+  // ================================================================
+  // Cloud (Supabase) integration. Everything here is inert unless a
+  // backend is configured AND the visitor is signed in.
+  // ================================================================
+  var syncPill = document.getElementById("syncPill");
+  var authLost = false, cloudSigningOut = false, migratedCloudId = null;
+
+  function cloudOverlay(text){
+    var o = document.getElementById("cloudOverlay");
+    if(!o){ o = makeDiv("cloudOverlay"); o.id = "cloudOverlay"; o.innerHTML = '<div class="spin"></div><div class="msg"></div>'; document.body.appendChild(o); }
+    o.querySelector(".msg").textContent = text;
+    return o;
+  }
+  function hideCloudOverlay(){ var o = document.getElementById("cloudOverlay"); if(o) o.remove(); }
+
+  // one quiet word in the header; nothing on individual notes
+  function updateSyncPill(state, note){
+    if(!CLOUD){ syncPill.hidden = true; return; }
+    syncPill.hidden = false;
+    if(viewerMode){ syncPill.className = "syncPill saved"; syncPill.textContent = "View only"; syncPill.title = "You can look at this board but not change it."; return; }
+    var labels = {saved:"Saved", saving:"Saving\u2026", offline:"Offline", problem: authLost ? "Sign in again" : "Sync problem"};
+    syncPill.className = "syncPill " + state;
+    syncPill.textContent = labels[state] || "Saved";
+    syncPill.title = state === "problem" ? ((note || "Some changes couldn't be saved.") + " Click to try again.")
+      : state === "offline" ? "You're offline. Changes are kept on this device and will sync when you're back." : "";
+  }
+  syncPill.addEventListener("click", function(){
+    if(!cloudSync) return;
+    if(authLost){ beginGoogleSignIn(); return; }
+    var st = cloudSync.status().state;
+    if(st === "problem" || st === "offline") cloudSync.retryAll();
+  });
+
+  // what the sync layer needs from the app
+  var cloudHost = {
+    snapshot: function(){ return notes.map(persistForm); },
+    getObject: function(id){ var n = findNote(id); return n ? persistForm(n) : null; },
+    // changes that came from the server: applied without an undo step
+    applyRemote: function(d){
+      (d.removes || []).forEach(function(id){
+        var n = findNote(id); if(!n) return;
+        selected.delete(id);
+        if(n.el) n.el.remove();
+        notes.splice(notes.indexOf(n), 1);
+        clearDecorations(id);
+      });
+      (d.upserts || []).forEach(function(raw){
+        var o = cloudSanitize(raw); if(!o) return;
+        var ex = findNote(o.id);
+        if(ex){
+          var keepImg = ex.image, was = ex.assetId || ex.attachedAssetId;
+          Object.keys(ex).forEach(function(k){ if(["el","textEl","captionEl","badgeEl"].indexOf(k) === -1) delete ex[k]; });
+          Object.assign(ex, o);
+          if(keepImg && (ex.assetId || ex.attachedAssetId) === was) ex.image = keepImg;   // same picture: keep what is already loaded
+          rerenderNote(ex);
+        } else {
+          zCounter = Math.max(zCounter, o.z || 0);
+          notes.push(o);
+          renderNote(o, false, {focus:false});
+        }
+      });
+      ensureWidth(); updateCount(); updateMinimap(); applySelection();
+      if(searchInput.value.trim()) runSearch();
+      saveNotesCache();
+    },
+    patch: function(id, fields){ var n = findNote(id); if(!n) return; Object.assign(n, fields); if(fields.mediaState && n.el && isAV(n)) rerenderNote(n); saveNotes(); },
+    setRuntime: function(id, fields){ var n = findNote(id); if(!n) return; Object.assign(n, fields); if(n.el) rerenderNote(n); },
+    // both people edited the same note: the server copy stays, this device's words are kept as a copy beside it
+    addConflictCopy: function(o){
+      var c = normalizeIncoming(o, {allowAssets:true}); if(!c) return;
+      c.x = o.x + 30; c.y = clampY(o.y + 30); zCounter += 1; c.z = zCounter;
+      notes.push(c); renderNote(c, true, {focus:false}); saveNotes();
+      toast("Someone else changed a note at the same time. Your version is kept as a copy next to it.");
+    },
+    mediaBlob: function(mediaId){ return MediaStore.blob(mediaId).catch(function(){ return null; }); },
+    toast: function(m){ toast(m); },
+    onAuthLost: function(){ authLost = true; updateSyncPill("problem", "Please sign in again."); }
+  };
+  function setupCloudSync(){
+    cloudSync = Stick.createSync({
+      host: cloudHost, storage: localStorage,
+      keys: {
+        sync: function(id){ return "stickyboard." + NS + "sync." + id; },
+        meta: function(){ return "stickyboard." + NS + "sync.meta"; },
+        notes: notesKeyFor, boards: function(){ return BOARDS_KEY; }, cover: coverKey
+      }
+    });
+    cloudSync.onStatus(updateSyncPill);
+    return cloudSync;
+  }
+
+  function rememberAccount(user, profile){
+    var meta = (user && user.user_metadata) || {};
+    settings.account = {
+      name: (profile && profile.display_name) || meta.full_name || meta.name || String(user.email || "").split("@")[0],
+      email: user.email, picture: meta.avatar_url || meta.picture || "", sub: user.id,
+      plan: (profile && profile.plan) || "free", cloud: true
+    };
+    settings.guestConfirmed = false;
+    saveSettings();
+    updateAccountIcon();
+  }
+
+  function beginGoogleSignIn(){
+    toast("Opening Google\u2026");
+    Stick.auth.signInWithGoogle().catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+  }
+  function wipeCloudCache(uid){
+    var prefix = "stickyboard.cloud." + uid + ".";
+    Object.keys(localStorage).forEach(function(k){ if(k.indexOf(prefix) === 0) localStorage.removeItem(k); });
+  }
+  async function cloudSignOut(){
+    if(cloudSync && cloudSync.hasPending()){
+      var go = await confirmDialog({title:"Sign out with unsynced changes?", body:"Some recent changes haven't reached your account yet. Signing out on this device will lose them.", confirm:"Sign out anyway", danger:true});
+      if(!go) return;
+    } else if(cloudSync){ try{ await cloudSync.flush(); }catch(e){} }
+    cloudSigningOut = true;
+    var uid = Stick.mode.uid;
+    try{ await Stick.auth.signOut(); }catch(e){}
+    if(uid) wipeCloudCache(uid);                  // a shared computer keeps nothing of your account afterwards
+    try{ await Stick.assets.cacheClear(); }catch(e){}
+    settings.account = null; saveSettings();
+    location.hash = ""; location.reload();
+  }
+
+  // ---- guest -> account: "Bring your current board with you?" ---------------------
+  function planRoom(profile, existing){
+    var plan = (profile && profile.plan) || (settings.account && settings.account.plan) || "free";
+    var lim = ((Stick.config.PLAN_LIMITS || {})[plan] || {}).boards || 0;
+    var me = (Stick.auth.user() || {}).id;
+    var owned = existing.filter(function(b){ return b.owner_id === me || b.role === "owner"; }).length;
+    return {plan: plan, limit: lim, room: Math.max(0, lim - owned)};
+  }
+  // Resolves true when the person chose to import (whatever the outcome), false when they declined.
+  // Nothing on this device is ever deleted unless they explicitly ask for that after everything arrived.
+  function offerMigration(local, existing, profile){
+    return new Promise(function(resolve){
+      var cap = planRoom(profile, existing);
+      var content = document.createElement("div");
+      var lead = document.createElement("p");
+      lead.className = "acctSub"; lead.style.margin = "0 0 6px";
+      lead.textContent = existing.length
+        ? "This account already has " + existing.length + (existing.length === 1 ? " board" : " boards") + ". Importing adds your local board as another one; nothing is merged or replaced."
+        : "You made this board before signing in. Bring it into your account and it will follow you to your other devices.";
+      content.appendChild(lead);
+      var listEl = makeDiv("migList");
+      var boxes = [];
+      local.forEach(function(lb, i){
+        var row = document.createElement("label"); row.className = "migRow";
+        var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = i < cap.room; cb.value = lb.id;
+        var t = makeDiv("t");
+        var bits = [lb.objects + (lb.objects === 1 ? " item" : " items")];
+        if(lb.images) bits.push(lb.images + (lb.images === 1 ? " photo" : " photos"));
+        if(lb.media) bits.push(lb.media + " recording/video" + (lb.media === 1 ? "" : "s"));
+        t.innerHTML = "<span></span><small></small>";
+        t.firstChild.textContent = lb.name + (lb.subtitle ? " \u00b7 " + lb.subtitle : "");
+        t.lastChild.textContent = bits.join(" \u00b7 ");
+        row.appendChild(cb); row.appendChild(t); listEl.appendChild(row); boxes.push(cb);
+      });
+      content.appendChild(listEl);
+      var note = makeDiv("noteBox"); note.style.marginTop = "10px";
+      content.appendChild(note);
+      function chosen(){ return boxes.filter(function(b){ return b.checked; }).map(function(b){ return b.value; }); }
+      function refresh(){
+        var n = chosen().length;
+        note.textContent = cap.room === 0
+          ? "Your " + cap.plan + " plan has no room for another board (" + cap.limit + " allowed). Your local board stays on this device, untouched."
+          : n > cap.room ? "Your " + cap.plan + " plan has room for " + cap.room + " more board" + (cap.room === 1 ? "" : "s") + ". Pick fewer, or the extra ones stay on this device."
+          : "Your " + cap.plan + " plan has room for " + cap.room + " more board" + (cap.room === 1 ? "" : "s") + ". Whatever you don't import stays on this device.";
+        var go = m && m.card.querySelector("#migGo");
+        if(go) go.setAttribute("aria-disabled", String(n === 0 || n > cap.room));
+      }
+      boxes.forEach(function(b){ b.addEventListener("change", refresh); });
+      var settled = false;
+      function finish(v){ if(!settled){ settled = true; resolve(v); } }
+      var m = openModal({
+        title: existing.length ? "Import your local board into this account?" : "Bring your current board with you?",
+        content: content, width: 440,
+        actions: cap.room === 0
+          ? [{label:"OK", kind:"primary", value:false}]
+          : [{label:"Not now", value:false}, {label:"Bring it with me", kind:"primary", id:"migGo", onClick:function(close){
+              var ids = chosen();
+              if(!ids.length || ids.length > cap.room) return false;
+              runMigrationInModal(m, ids, close, finish);
+              return false;
+            }}],
+        onClose: function(v){ finish(v === true); }
+      });
+      refresh();
+    });
+  }
+  async function runMigrationInModal(m, ids, close, finish){
+    var card = m.card;
+    var actions = card.querySelector(".modalActions"); if(actions) actions.remove();
+    var closeX = card.querySelector(".acctClose"); if(closeX) closeX.style.display = "none";
+    var body = card.lastElementChild;
+    var title = card.querySelector("h3");
+    title.textContent = "Bringing your board over\u2026";
+    body.innerHTML = '<div class="migProgress"><i></i></div><p class="acctSub" id="migLabel" style="margin:0">Starting\u2026</p><p class="acctSub" style="margin:8px 0 0;font-size:0.72rem">Keep this page open. Nothing on this device is changed.</p>';
+    var bar = body.querySelector(".migProgress i"), label = body.querySelector("#migLabel");
+    var res = await Stick.migrate.run({
+      store: localStorage, boardIds: ids,
+      mediaBlob: function(id){ return MediaStore.blob(id).catch(function(){ return null; }); },
+      onProgress: function(p){
+        var pct = p.total ? Math.round(100 * (p.done || 0) / p.total) : 8;
+        bar.style.width = Math.max(6, Math.min(100, pct)) + "%";
+        label.textContent = (p.board ? "\u201c" + p.board + "\u201d: " : "") + (p.label || (p.phase === "verify" ? "Checking everything arrived\u2026" : "Working\u2026"));
+      }
+    });
+    bar.style.width = "100%";
+    var good = res.boards.filter(function(b){ return b.verified; });
+    if(good.length && !migratedCloudId) migratedCloudId = good[0].cloudId;
+    var missingMedia = res.boards.reduce(function(a, b){ return a + b.mediaMissing; }, 0);
+    var failed = res.boards.filter(function(b){ return !b.verified; });
+    var limitHit = failed.some(function(b){ return b.error && b.error.code === "BOARD_LIMIT_REACHED"; });
+    title.textContent = failed.length ? "Almost there" : "Your board is in your account";
+    var lines = [];
+    good.forEach(function(b){ lines.push("\u2713 \u201c" + b.name + "\u201d: " + b.migrated + " new" + (b.existing ? ", " + b.existing + " already there" : "") + " item" + ((b.migrated + b.existing) === 1 ? "" : "s")); });
+    failed.forEach(function(b){
+      var msg = b.error && b.error.code ? (b.error.code === "BOARD_LIMIT_REACHED" ? "your plan has no room for it" : Stick.errors.friendly(b.error)) : (b.error || "it didn't finish");
+      lines.push("\u2717 \u201c" + b.name + "\u201d: " + msg);
+    });
+    body.innerHTML = "";
+    var ul = document.createElement("p"); ul.className = "acctSub"; ul.style.cssText = "margin:0;text-align:left;line-height:1.7;white-space:pre-line";
+    ul.textContent = lines.join("\n"); body.appendChild(ul);
+    if(missingMedia){
+      var mm = makeDiv("noteBox"); mm.style.marginTop = "10px";
+      mm.textContent = "Some media wasn\u2019t available on this device (" + missingMedia + "), so those items came across without their recording or video.";
+      body.appendChild(mm);
+    }
+    var row = makeDiv("modalActions");
+    body.appendChild(row);
+    function btn(label, kind, fn){ var b = document.createElement("button"); b.className = "pillBtn" + (kind ? " " + kind : ""); b.textContent = label; b.addEventListener("click", fn); row.appendChild(b); return b; }
+    if(failed.length && !limitHit) btn("Try again", null, function(){ close(true); finish(true); setTimeout(function(){ startManualImport(); }, 50); });
+    if(good.length){
+      var note2 = makeDiv("noteBox"); note2.style.marginTop = "10px";
+      note2.textContent = "Everything above was checked on the server. Keep a copy on this device, or remove it now that it's safe in your account?";
+      body.insertBefore(note2, row);
+      btn("Keep a copy here", null, function(){ close(true); finish(true); });
+      btn("Remove from this device", "danger", function(){ Stick.migrate.removeLocal(localStorage, good.map(function(b){ return b.localId; })); toast("Removed from this device. It's in your account."); close(true); finish(true); });
+    } else {
+      btn("Continue", "primary", function(){ close(true); finish(true); });
+    }
+  }
+  // from the account menu, any time later
+  async function startManualImport(){
+    try{
+      var local = Stick.migrate.inspectLocal(localStorage);
+      if(!local.length){ toast("There's nothing saved on this device to import."); return; }
+      var existing = await Stick.repo.listBoards();
+      var profile = await Stick.auth.profile();
+      var ran = await offerMigration(local, existing, profile);
+      if(ran && migratedCloudId){
+        cloudOverlay("Opening your board\u2026");
+        await cloudSync.refreshBoards();
+        await cloudSync.fillBoardCache(migratedCloudId);
+        safeSet(ACTIVE_BOARD_KEY, migratedCloudId);
+        location.hash = ""; location.reload();
+      }
+    }catch(e){ hideCloudOverlay(); toast(Stick.errors.friendly(Stick.errors.parse(e))); }
+  }
+
+  // ---- first time this account is opened on this device -------------------
+  async function firstCloudLoad(user, profile){
+    cloudOverlay("Setting up your account\u2026");
+    var existing = await Stick.repo.listBoards();
+    var local = Stick.migrate.inspectLocal(localStorage);
+    var declinedKey = "stickit.migration.declined." + user.id;
+    if(local.length && !safeGet(declinedKey)){
+      hideCloudOverlay();
+      var ran = await offerMigration(local, existing, profile);
+      cloudOverlay("Setting up your account\u2026");
+      if(!ran) safeSet(declinedKey, true);
+      existing = await Stick.repo.listBoards();
+    }
+    if(!existing.length) await Stick.repo.createBoard("My Board");     // a brand-new account starts with one empty board
+    var list = await cloudSync.refreshBoards();
+    var owned = list.filter(function(b){ return b.access === "owner"; });
+    var pick = (migratedCloudId && list.some(function(b){ return b.id === migratedCloudId; })) ? migratedCloudId : (owned[0] || list[0]).id;
+    await cloudSync.fillBoardCache(pick);
+    safeSet(ACTIVE_BOARD_KEY, pick);
+    location.hash = ""; location.reload();
+  }
+  async function fillBoardAndReload(id){
+    cloudOverlay("Loading your board\u2026");
+    await cloudSync.fillBoardCache(id);
+    location.reload();
+  }
+  // keep the list of boards (names, covers, who shared what) current; a change of access needs a fresh page
+  async function refreshBoardsQuietly(){
+    try{
+      var list = await cloudSync.refreshBoards();
+      var cur = list.filter(function(b){ return b.id === activeBoardId; })[0];
+      var mine = boards.filter(function(b){ return b.id === activeBoardId; })[0];
+      if(!cur){
+        toast("That board isn't available to you any more.");
+        var alt = list[0];
+        if(alt){ if(!safeGet(notesKeyFor(alt.id))) await cloudSync.fillBoardCache(alt.id); safeSet(ACTIVE_BOARD_KEY, alt.id); }
+        location.reload(); return;
+      }
+      if(mine && (cur.access !== mine.access || !!cur.locked !== !!mine.locked)){ location.reload(); return; }
+      boards = list; updateBoardLabel();
+      if(!boardPanel.hidden) renderBoardList();
+    }catch(e){ /* offline: the cached list stays */ }
+  }
+
+  async function startCloud(){
+    setupCloudSync();
+    if(viewerMode) cloudSync.setReadOnly(true);
+    var session = null;
+    try{ session = await Stick.auth.init(); }catch(e){ session = null; }
+    Stick.auth.onChange(function(ev){
+      if(ev === "SIGNED_OUT" && !cloudSigningOut){ authLost = true; updateSyncPill("problem", "Please sign in again."); }
+      if(ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED"){ if(authLost && cloudSync){ authLost = false; updateSyncPill("saving"); cloudSync.retryAll(); } }
+    });
+    if(!session){
+      // can't prove who we are right now (offline, or the login expired): work from the cache; edits stay queued
+      authLost = !navigator.onLine ? false : true;
+      if(activeBoardId && !needsCloudBootstrap && !needsBoardFill) cloudSync.attach(activeBoardId);
+      updateSyncPill(authLost ? "problem" : "offline", authLost ? "Please sign in again." : "");
+      if(needsCloudBootstrap){ cloudOverlay("Please sign in again to load your boards."); }
+      return;
+    }
+    var profile = null;
+    try{ profile = await Stick.auth.profile(); }catch(e){}
+    rememberAccount(session.user, profile);
+    try{
+      if(needsCloudBootstrap){ await firstCloudLoad(session.user, profile); return; }
+      if(needsBoardFill){ await fillBoardAndReload(activeBoardId); return; }
+    }catch(e){
+      hideCloudOverlay();
+      var er = Stick.errors.parse(e);
+      toast(er.offline ? "You're offline. Connect to load your boards." : Stick.errors.friendly(er));
+      return;
+    }
+    cloudSync.attach(activeBoardId);
+    updateSyncPill("saved");
+    await cloudSync.start();
+    refreshBoardsQuietly();
+  }
+
+  // ---- coming back from Google -------------------------------------------
+  function finishSignIn(){
+    cloudOverlay("Signing you in\u2026");
+    Stick.auth.init().then(function(session){
+      try{ history.replaceState(null, "", location.pathname); }catch(e){}
+      if(!session){ hideCloudOverlay(); toast("Sign-in didn't complete. You're still browsing as a guest."); return; }
+      location.reload();                       // boots again as this account
+    }, function(){ hideCloudOverlay(); toast("Couldn't finish signing in."); });
+  }
+
   // ---------- boot ----------
   if(singleNoteMode){
     renderPublicView(location.hash);
@@ -6951,6 +7725,11 @@
     }
   }
   setTimeout(function(){ setLogo("ready"); }, 450);
+
+  if(CLOUD_OK && !singleNoteMode){
+    if(window.Stick.auth.callbackPending) finishSignIn();
+    else if(CLOUD) startCloud();
+  }
 })();
 </script>
 </body>

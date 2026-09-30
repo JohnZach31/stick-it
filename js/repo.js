@@ -116,6 +116,12 @@
       return db().then(function (c) { return guard(c.from("boards").update(patch).eq("id", id).select(BOARD_COLS)); })
         .then(function (rows) { if (!rows || !rows.length) throw { code: "FORBIDDEN", message: "FORBIDDEN", offline: false, retryable: false }; return rows[0]; });
     },
+    // a member (not the owner) leaving a board they were invited to
+    leaveBoard: function (id) {
+      var uid = Stick.auth.user() && Stick.auth.user().id;
+      return db().then(function (c) { return guard(c.from("board_members").delete().eq("board_id", id).eq("user_id", uid).select("board_id")); })
+        .then(function (rows) { return !!(rows && rows.length); });
+    },
     deleteBoard: function (id) {
       return db().then(function (c) { return guard(c.from("boards").delete().eq("id", id).select("id")); })
         .then(function (rows) { return !!(rows && rows.length); });

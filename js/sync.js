@@ -56,6 +56,7 @@
     var retryTimer = null, retryN = 0;
     var jobs = {};               // media job key -> "running" | "failed"
     var pollTimer = null, started = false;
+    var readOnlyMode = false;    // viewers: pull only, never write
 
     // ------------------------------------------------------------ status
     function setStatus(s, note) {
@@ -115,7 +116,7 @@
       return { snap: snap, ups: ups, dels: dels };
     }
     S.hasPending = function () {
-      if (!boardId) return false;
+      if (!boardId || readOnlyMode) return false;
       var d = computeDiff();
       return d.ups.length > 0 || d.dels.length > 0 || Object.keys(jobs).some(function (k) { return jobs[k] === "running"; });
     };
@@ -174,7 +175,7 @@
     }
 
     S.flush = function () {
-      if (!boardId) return Promise.resolve();
+      if (!boardId || readOnlyMode) return Promise.resolve();
       clearTimeout(flushTimer); flushTimer = null; firstDirty = 0;
       if (inflight) { again = true; return inflight; }
       if (!online()) { setStatus("offline"); return Promise.resolve(); }
@@ -208,12 +209,26 @@
 
     // called by the app after any change to its objects
     S.notesChanged = function () {
-      if (!boardId) return;
+      if (!boardId || readOnlyMode) return;
       if (!firstDirty) firstDirty = Date.now();
       clearTimeout(flushTimer);
       var wait = Math.min(cfg.debounceMs || 700, Math.max(0, (cfg.maxWaitMs || 3000) - (Date.now() - firstDirty)));
       flushTimer = setTimeout(function () { S.flush(); }, wait);
       if (statusVal === "saved") setStatus("saving");
+    };
+    S.setReadOnly = function (on) { readOnlyMode = !!on; };
+    // Resolves true once everything (including background uploads) is on the server, false on timeout/failure.
+    // Used before creating a share link, so the link can't point at objects that aren't there yet.
+    S.settle = async function (timeoutMs) {
+      var end = Date.now() + (timeoutMs || 60000);
+      while (Date.now() < end) {
+        await S.flush();
+        var running = Object.keys(jobs).some(function (k) { return jobs[k] === "running"; });
+        if (!running && !S.hasPending() && statusVal !== "offline" && statusVal !== "problem") return true;
+        if (statusVal === "offline" || statusVal === "problem") return false;
+        await new Promise(function (r) { setTimeout(r, 150); });
+      }
+      return false;
     };
     S.retryAll = function () {
       blocked = {}; retryN = 0;
