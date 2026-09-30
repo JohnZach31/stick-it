@@ -3,6 +3,20 @@
   "private": true,
   "type": "module",
   "description": "SQL/RLS tests for the Stick-It Supabase schema, run on PGlite (Postgres compiled to WASM).",
-  "scripts": { "test": "node run-tests.mjs" },
-  "devDependencies": { "@electric-sql/pglite": "^0.3.0" }
+  "scripts": {
+    "test": "node run-tests.mjs",
+    "test:mutations": "node mutation-check.mjs",
+    "test:functions": "node --experimental-strip-types functions.test.mjs",
+    "test:protocol": "node --experimental-strip-types fake-supabase.test.mjs",
+    "test:client": "node --experimental-strip-types client.test.mjs",
+    "test:all": "node run-tests.mjs && node mutation-check.mjs && node --experimental-strip-types functions.test.mjs && node --experimental-strip-types fake-supabase.test.mjs && node --experimental-strip-types client.test.mjs",
+    "fake-supabase": "node --experimental-strip-types fake-supabase/server.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@supabase/supabase-js": "^2.117.2"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.2"
+  }
 }
