@@ -17,17 +17,19 @@
     tokenFromHash: function (hash) { var m = /^#s=([a-f0-9]{64})$/i.exec(hash || ""); return m ? m[1].toLowerCase() : null; },
 
     // frozen copy of the chosen objects (they must already exist on the server: sync first)
-    createSnapshot: function (boardId, objectIds, byName) {
+    createSnapshot: function (boardId, objectIds, byName, ident) {
       return db().then(function (c) {
-        return c.rpc("create_share", { p_type: objectIds.length === 1 ? "object_snapshot" : "group_snapshot", p_board: boardId, p_object_ids: objectIds, p_by_name: byName || null });
+        return c.rpc("create_share", { p_type: objectIds.length === 1 ? "object_snapshot" : "group_snapshot", p_board: boardId, p_object_ids: objectIds, p_by_name: byName || null,
+          p_show_avatar: !!(ident && ident.avatar), p_show_bio: !!(ident && ident.bio) });
       }).then(function (r) {
         if (r.error) throw Stick.errors.parse(r.error);
         return { id: r.data.id, token: r.data.token, url: Stick.share.linkFor(r.data.token) };
       });
     },
     // the board as it is now, and as it changes
-    createLive: function (boardId, byName) {
-      return db().then(function (c) { return c.rpc("create_share", { p_type: "board_live", p_board: boardId, p_by_name: byName || null }); })
+    createLive: function (boardId, byName, ident) {
+      return db().then(function (c) { return c.rpc("create_share", { p_type: "board_live", p_board: boardId, p_by_name: byName || null,
+        p_show_avatar: !!(ident && ident.avatar), p_show_bio: !!(ident && ident.bio) }); })
         .then(function (r) {
           if (r.error) throw Stick.errors.parse(r.error);
           return { id: r.data.id, token: r.data.token, url: Stick.share.linkFor(r.data.token) };

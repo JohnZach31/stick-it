@@ -63,3 +63,23 @@ Everything was verified against a local stand-in that runs the real migrations o
 ## Optional
 - Enable Realtime on `board_objects` is already in migration 5; the client polls today (see 07-security-csp-status).
 - Pricing/plans: `profiles.plan` is set by you (SQL) until billing exists; nothing in the client can change it.
+
+## Account settings update (migration 6 + delete-account + GitHub)
+
+After pulling this update:
+```bash
+npx supabase db push                                   # applies 20260930130000_account_settings.sql
+npx supabase functions deploy delete-account --no-verify-jwt
+npx supabase functions deploy resolve-share --no-verify-jwt   # now also returns the sharer's frozen bio/avatar
+```
+`delete-account` needs no new secret (the platform provides the service role to the function). Deploy it only when you want people to be able to delete their account; until then the button reports an error.
+
+### GitHub sign-in (optional)
+1. GitHub -> Settings -> Developer settings -> OAuth Apps -> **New OAuth App**.
+2. Homepage URL: `https://johnzach31.github.io/stick-it/`. **Authorization callback URL:** `https://<ref>.supabase.co/auth/v1/callback`.
+3. Create it, then **Generate a new client secret**. Client ID = PUBLIC-ish; **Client secret = SECRET** (paste only into Supabase).
+4. Supabase -> Authentication -> Sign In / Providers -> **GitHub** -> enable, paste ID and secret, Save.
+Nothing else changes: the same redirect allow-list is used. Until GitHub is enabled, the GitHub button starts sign-in and Supabase answers with a "provider is not enabled" error.
+
+### Linking a second sign-in to one account (optional)
+Authentication -> Sign In / Providers -> turn on **Allow manual linking**. Accounts with the same verified e-mail are already merged automatically by Supabase when they sign in with the second provider.

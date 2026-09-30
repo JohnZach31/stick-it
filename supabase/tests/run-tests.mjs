@@ -462,6 +462,116 @@ group('H. comments, reminders, anonymous access, account deletion');
   ok((await run('su', 'select count(*)::int c from public.storage_tombstones')).rows[0].c === before + 1, 'their storage files are queued for removal');
 }
 
+// ================================================================ I. account settings
+group('I. account settings, avatars, frozen share identity, account deletion');
+{
+  const meta2 = (size, mime) => JSON.stringify({ size, mimetype: mime });
+  const up = (u, path, size, mime) => run(u, "insert into storage.objects (bucket_id,name,owner,metadata) values ('media',$1,$2,$3::jsonb)", [path, u.id, meta2(size, mime)]);
+  const u1 = mk('iris'), u2 = mk('jack'), u3 = mk('kate');
+  for (const u of [u1, u2, u3]) await run('su', 'insert into auth.users (id,email,raw_user_meta_data) values ($1,$2,$3::jsonb)', [u.id, u.email, JSON.stringify({ full_name: u.name, avatar_url: 'https://img.example/' + u.name })]);
+
+  // --- profile columns
+  ok(!(await run(u1, "update public.profiles set avatar_style='emoji', avatar_emoji='🎸', avatar_color='#4a7c59' where id=$1", [u1.id])).error, 'owner edits fallback avatar style');
+  ok(!!(await run(u1, "update public.profiles set avatar_color='red' where id=$1", [u1.id])).error, 'bad colour is rejected');
+  ok(denied(await run(u1, "update public.profiles set avatar_url='https://evil.example/pixel.gif' where id=$1", [u1.id])), 'a browser cannot point avatar_url anywhere');
+  ok(denied(await run(u1, "update public.profiles set avatar_asset_id=$2 where id=$1", [u1.id, uuid()])), 'avatar_asset_id can only change through set_avatar_asset');
+  ok(denied(await run(u1, "update public.profiles set plan='premium' where id=$1", [u1.id])), 'plan still not writable');
+
+  // --- private settings
+  ok(!(await run(u1, "insert into public.profile_settings (user_id, bio, handle) values ($1,'Musician, designer','iris_j')", [u1.id])).error, 'owner creates settings');
+  ok(denied(await run(u2, "insert into public.profile_settings (user_id, handle) values ($1,'x_user')", [u1.id])), 'cannot create settings for someone else');
+  ok((await run(u2, 'select * from public.profile_settings')).rows.length === 0, 'settings are invisible to other users');
+  ok(denied(await run('anon', 'select 1 from public.profile_settings')), 'anon has no access to settings');
+  ok(!(await run(u2, "insert into public.profile_settings (user_id, handle) values ($1,'jack_z')", [u2.id])).error, 'second user creates settings');
+  ok(errIs(await run(u2, "update public.profile_settings set handle='iris_j' where user_id=$1", [u2.id]), /duplicate key|unique/i), 'handles are unique on the server');
+  ok(!!(await run(u2, "update public.profile_settings set handle='Has Space' where user_id=$1", [u2.id])).error, 'handle format enforced');
+  ok(!!(await run(u2, "update public.profile_settings set bio=repeat('x',121) where user_id=$1", [u2.id])).error, 'bio capped at 120');
+  ok(!!(await run(u2, "update public.profile_settings set share_default_identity='everyone' where user_id=$1", [u2.id])).error, 'enum values enforced');
+  ok(!!(await run(u2, 'update public.profile_settings set user_id=$1 where user_id=$2', [u1.id, u2.id])).error, 'settings cannot be re-assigned to another user');
+  ok(!(await run(u1, "update public.profile_settings set bio='שלום 你好 مرحبا' where user_id=$1", [u1.id])).error, 'bio accepts RTL and CJK text');
+
+  // --- avatar upload: owner only, no board, size/mime checked, readable by collaborators
+  const asA = (await run(u1, "select * from public.create_asset(null,'avatar','image/jpeg',90000)")).rows[0];
+  ok(asA && asA.board_id === null && asA.kind === 'avatar', 'avatar asset created without a board');
+  ok(errIs(await run(u1, "select * from public.create_asset(null,'image','image/jpeg',900)"), /FORBIDDEN/), 'other kinds still need a board');
+  const B1 = await board(u1, 'Iris board');
+  ok(errIs(await run(u1, "select * from public.create_asset($1,'avatar','image/jpeg',900)", [B1.id]), /FORBIDDEN/), 'an avatar cannot be attached to a board');
+  ok(errIs(await run(u1, "select * from public.create_asset(null,'avatar','image/svg+xml',900)"), /MIME_NOT_ALLOWED/), 'SVG avatars are refused');
+  ok(errIs(await run(u1, "select * from public.create_asset(null,'avatar','image/jpeg',3000000)"), /FILE_TOO_LARGE/), 'avatars over 2 MB are refused');
+  ok(denied(await up(u2, asA.storage_path, 90000, 'image/jpeg')), 'another user cannot upload to my avatar path');
+  ok(!(await up(u1, asA.storage_path, 90000, 'image/jpeg')).error, 'owner uploads the avatar file');
+  ok(errIs(await run(u2, 'select * from public.set_avatar_asset($1)', [asA.id]), /FORBIDDEN/), "cannot adopt someone else's avatar asset");
+  ok(errIs(await run(u1, 'select * from public.set_avatar_asset($1)', [asA.id]), /FORBIDDEN/), 'a pending (unverified) upload cannot be adopted');
+  ok((await run(u1, 'select public.finalize_asset($1) as r', [asA.id])).rows[0].r.ok === true, 'avatar finalised');
+  const setp = await run(u1, 'select * from public.set_avatar_asset($1)', [asA.id]);
+  ok(setp.rows[0] && setp.rows[0].avatar_source === 'custom' && setp.rows[0].avatar_asset_id === asA.id, 'set_avatar_asset switches to the custom photo');
+  ok((await run(u3, 'select name from storage.objects where name=$1', [asA.storage_path])).rows.length === 0, 'strangers cannot read my avatar file');
+  const inv = (await run(u1, 'select public.create_invite($1,$2,$3) as r', [B1.id, u3.email, 'viewer'])).rows[0].r;
+  ok(!(await run(u3, 'select public.accept_invite($1)', [inv.token])).error, 'kate joins the board');
+  ok((await run(u3, 'select name from storage.objects where name=$1', [asA.storage_path])).rows.length === 1, 'a collaborator can read my profile photo');
+  ok(errIs(await run(u3, 'select * from public.set_avatar_asset($1)', [asA.id]), /FORBIDDEN/), 'a collaborator cannot take my photo as theirs');
+  const cl = await run(u1, "select * from public.clear_avatar('provider')");
+  ok(cl.rows[0].avatar_source === 'provider' && cl.rows[0].avatar_asset_id === null, 'revert to the provider photo');
+  ok(!!(await run(u1, "select * from public.clear_avatar('custom')")).error, 'clear_avatar only accepts provider/none');
+  ok((await run(u3, 'select name from storage.objects where name=$1', [asA.storage_path])).rows.length === 0, 'after removal the collaborator loses access');
+  await run(u1, 'select * from public.set_avatar_asset($1)', [asA.id]);
+
+  // --- frozen identity on shares
+  const so = obj({ data: { html: 'shared' } });
+  await sync(u1, B1.id, [so]);
+  const sh = (await run(u1, 'select public.create_share($1,$2,$3::uuid[],$4,$5,$6) as r', ['object_snapshot', B1.id, [so.id], 'Iris', true, true])).rows[0].r;
+  let rs = (await run('service', 'select public.resolve_share($1) as r', [sh.token])).rows[0].r;
+  ok(rs.by_name === 'Iris' && rs.by_bio === 'שלום 你好 مرحبا' && rs.by_avatar === asA.id, 'share carries the name, bio and avatar the creator switched on');
+  ok(!!rs.assets[asA.id], 'and the avatar file is signable through the share');
+  ok(!JSON.stringify(rs).includes('example.com') && !JSON.stringify(rs).includes(u1.id) && !JSON.stringify(rs).includes('iris_j'), 'no e-mail, user id or handle leaks');
+  const sh2 = (await run(u1, 'select public.create_share($1,$2,$3::uuid[],$4) as r', ['object_snapshot', B1.id, [so.id], null])).rows[0].r;
+  rs = (await run('service', 'select public.resolve_share($1) as r', [sh2.token])).rows[0].r;
+  ok(rs.by_avatar === null && rs.by_bio === null && rs.by_name === null, 'default shares stay anonymous');
+  await run(u1, "update public.profile_settings set bio='changed later' where user_id=$1", [u1.id]);
+  rs = (await run('service', 'select public.resolve_share($1) as r', [sh.token])).rows[0].r;
+  ok(rs.by_bio === 'שלום 你好 مرحبا', 'the identity on an existing link is frozen');
+  const shLive = (await run(u1, 'select public.create_share($1,$2,null,$3,$4,$5) as r', ['board_live', B1.id, 'Iris', true, false])).rows[0].r;
+  rs = (await run('service', 'select public.resolve_share($1) as r', [shLive.token])).rows[0].r;
+  ok(rs.by_avatar === asA.id && !!rs.assets[asA.id] && rs.by_bio === null, 'live board link shows the avatar but not the bio when only the avatar is on');
+  ok(denied(await run('anon', "select public.create_share('board_live',$1,null,'x',true,true)", [B1.id])), 'anon cannot create shares');
+  ok(denied(await run(u1, 'select public.resolve_share($1)', [sh.token])), 'users still cannot call the resolver');
+  ok(denied(await run(u1, 'select public.purge_user_data($1)', [u1.id])), 'users cannot call purge_user_data');
+  ok(denied(await run('anon', 'select public.my_usage()')), 'anon cannot read usage');
+
+  // --- avatars survive garbage collection while used, and are collected after they are replaced
+  await run('su', "update public.assets set created_at = now() - interval '60 days'");
+  let claimed = (await run('service', 'select * from public.gc_claim_orphan_assets()')).rows.map(r => r.id);
+  ok(!claimed.includes(asA.id), 'GC never claims a profile photo that is in use');
+  const asB = (await run(u1, "select * from public.create_asset(null,'avatar','image/png',5000)")).rows[0];
+  await up(u1, asB.storage_path, 5000, 'image/png');
+  await run(u1, 'select public.finalize_asset($1)', [asB.id]);
+  await run(u1, 'select * from public.set_avatar_asset($1)', [asB.id]);
+  await run('su', "update public.assets set created_at = now() - interval '60 days'");
+  claimed = (await run('service', 'select * from public.gc_claim_orphan_assets()')).rows.map(r => r.id);
+  ok(!claimed.includes(asA.id), 'the old avatar is kept while a share still uses it');
+  await run('su', 'delete from public.shares where id = $1 or id = $2 or id = $3', [sh.id, sh2.id, shLive.id]);
+  claimed = (await run('service', 'select * from public.gc_claim_orphan_assets()')).rows.map(r => r.id);
+  ok(claimed.includes(asA.id) && !claimed.includes(asB.id), 'a replaced avatar is collected once nothing uses it; the current one stays');
+
+  // --- usage
+  const use = (await run(u1, 'select public.my_usage() as r')).rows[0].r;
+  ok(use.plan === 'free' && use.boards === 1 && use.boards_limit === 2 && use.objects === 1 && use.storage_used > 0 && use.storage_quota > 0, 'my_usage reports plan, boards, objects and storage');
+  ok(!('email' in use), 'usage exposes no e-mail');
+
+  // --- account deletion
+  const shD = (await run(u1, 'select public.create_share($1,$2,$3::uuid[],$4,$5,$6) as r', ['object_snapshot', B1.id, [so.id], 'Iris', true, false])).rows[0].r;
+  const before = (await run('su', 'select count(*)::int c from public.storage_tombstones')).rows[0].c;
+  const pd = await run('service', 'select public.purge_user_data($1)', [u1.id]);
+  ok(!pd.error, 'purge_user_data runs for a user with boards, shares and a profile photo: ' + (pd.error || ''));
+  ok((await run('su', 'select 1 from public.boards where owner_id=$1', [u1.id])).rows.length === 0, 'boards deleted');
+  ok((await run('su', 'select 1 from public.shares where creator_id=$1', [u1.id])).rows.length === 0, 'their public links are deleted with them');
+  ok((await run('service', 'select public.resolve_share($1) as r', [shD.token])).rows[0].r.reason === 'not_found', 'and stop resolving');
+  ok((await run('su', 'select 1 from public.profile_settings where user_id=$1', [u1.id])).rows.length === 0, 'private settings deleted');
+  ok((await run('su', 'select count(*)::int c from public.storage_tombstones')).rows[0].c > before, 'their files are queued for removal');
+  ok((await run('su', 'select 1 from public.board_members where user_id=$1', [u1.id])).rows.length === 0, 'membership gone');
+  ok((await run(u3, 'select 1 from public.boards where id=$1', [B1.id])).rows.length === 0, 'collaborators lose the deleted board');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

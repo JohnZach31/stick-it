@@ -126,6 +126,8 @@
     transition:transform .35s ease, color .2s ease, border-color .2s ease;
   }
   .gearBtn:hover{ color:var(--ink); border-color:var(--accent); }
+  #accountBtn{ padding:0; overflow:hidden; flex:none; }
+  #accountBtn img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
   .gearBtn.spin svg{ animation: spin .5s ease; }
   @keyframes spin{ to{ transform:rotate(90deg); } }
   .gearBtn svg{ width:20px;height:20px; display:block; }
@@ -1129,14 +1131,6 @@
   }
   .linkPop input:focus{ border-color:var(--accent); }
   .linkPop .rowBtns{ display:flex; gap:6px; justify-content:flex-end; }
-  .migList{ display:flex; flex-direction:column; gap:6px; max-height:240px; overflow:auto; }
-  .migRow{ display:flex; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--line, rgba(0,0,0,0.12)); border-radius:10px; cursor:pointer; }
-  .migRow .t{ display:flex; flex-direction:column; min-width:0; font-size:0.86rem; }
-  .migRow .t small{ opacity:0.65; font-size:0.72rem; }
-  .migProgress{ height:8px; border-radius:6px; background:rgba(128,128,128,0.22); overflow:hidden; margin:6px 0 12px; }
-  .migProgress i{ display:block; height:100%; width:6%; background:var(--accent); transition:width .25s; }
-  .shareLinks{ margin-top:12px; border-top:1px solid rgba(128,128,128,0.25); padding-top:10px; }
-  .shareLinks .row{ display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 0; font-size:0.82rem; }
   .pillBtn{
     all:unset; box-sizing:border-box; padding:6px 12px; border-radius:8px; cursor:pointer;
     font-size:0.78rem; font-weight:600; border:1px solid var(--field-line); background:var(--field); color:var(--ink);
@@ -1325,6 +1319,57 @@
   .migRow .t small{ display:block; color:var(--ink-soft); font-size:0.72rem; margin-top:1px; }
   .migProgress{ height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
   .migProgress > i{ display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease; }
+  /* account settings */
+  .acctCard.acctWide{ width:min(560px, 94vw); max-height:88vh; padding:0; display:flex; flex-direction:column; overflow:hidden; }
+  .acctScroll{ overflow-y:auto; padding:24px 26px 8px; flex:1; min-height:0; }
+  .acctScroll h3{ text-align:left; margin:0 0 2px; }
+  .acctFoot{ display:flex; gap:8px; align-items:center; padding:12px 20px; border-top:1px solid var(--line); background:var(--panel); }
+  .acctFoot .spacer{ flex:1; }
+  .asSec{ margin:18px 0 0; padding-top:14px; border-top:1px solid var(--line); }
+  .asSec:first-of-type{ border-top:0; padding-top:0; margin-top:8px; }
+  .asSec h4{ margin:0 0 10px; font:700 0.68rem 'Sora',sans-serif; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink-soft); }
+  .asRow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 0; font-size:0.86rem; }
+  .asRow small{ display:block; font-size:0.72rem; color:var(--ink-soft); line-height:1.35; margin-top:1px; }
+  .asField{ display:block; margin:0 0 10px; }
+  .asField > span{ display:block; font-size:0.74rem; font-weight:600; color:var(--ink-soft); margin-bottom:4px; }
+  .asField input[type=text], .asField textarea, .asField select{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:inherit; font-size:0.9rem; }
+  .asField textarea{ resize:vertical; min-height:56px; }
+  .asField.err input, .asField.err textarea{ border-color:var(--danger); }
+  .asField .cnt{ float:right; font-weight:400; }
+  .asHandle{ display:flex; align-items:center; gap:6px; }
+  .asHandle b{ color:var(--ink-soft); font-weight:600; }
+  .asErr{ margin:8px 0 0; font-size:0.8rem; color:var(--danger); min-height:1em; }
+  .acctAv{ display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; flex:none; font-weight:700; color:#fff; user-select:none; width:100%; height:100%; line-height:1; }
+  .acctAv img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .acctAv.emoji{ font-size:1.5em; }
+  .asAvatar{ display:flex; gap:16px; align-items:center; margin-bottom:12px; }
+  .asAvatar .pic{ width:76px; height:76px; font-size:1.6rem; flex:none; }
+  .asBtns{ display:flex; flex-wrap:wrap; gap:6px; }
+  .asBtns .pillBtn{ padding:6px 12px; font-size:0.78rem; }
+  .asSeg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .asSeg button{ all:unset; cursor:pointer; padding:6px 13px; font-size:0.8rem; color:var(--ink-soft); }
+  .asSeg button.on{ background:var(--accent-soft); color:var(--ink); font-weight:600; }
+  .asSwatches{ display:flex; flex-wrap:wrap; gap:7px; margin:6px 0 10px; }
+  .asSwatches button{ all:unset; cursor:pointer; width:24px; height:24px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); }
+  .asSwatches button.on{ outline:2px solid var(--accent); outline-offset:2px; }
+  .asSwatches button.auto{ display:flex; align-items:center; justify-content:center; width:auto; padding:0 9px; border-radius:999px; font-size:0.7rem; color:var(--ink-soft); }
+  .asEmojis{ display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
+  .asEmojis button{ all:unset; cursor:pointer; font-size:1.15rem; padding:2px 5px; border-radius:6px; }
+  .asEmojis button:hover{ background:var(--accent-soft); }
+  .asCheck{ display:flex; align-items:flex-start; gap:10px; padding:5px 0; font-size:0.86rem; cursor:pointer; }
+  .asCheck input{ margin-top:3px; accent-color:var(--accent); }
+  .asCheck small{ display:block; font-size:0.72rem; color:var(--ink-soft); line-height:1.35; }
+  .asPlan{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:12px; background:var(--accent-soft); margin:6px 0 10px; font-size:0.86rem; }
+  .asStats{ display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; font-size:0.82rem; }
+  .asStats div span{ display:block; font-size:0.7rem; color:var(--ink-soft); }
+  .asBar{ height:6px; border-radius:6px; background:rgba(128,128,128,0.22); overflow:hidden; margin-top:3px; }
+  .asBar i{ display:block; height:100%; background:var(--accent); }
+  .asDanger{ border:1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius:12px; padding:12px 14px; margin-top:18px; }
+  .asDanger h4{ color:var(--danger); }
+  .asDanger p{ margin:0 0 10px; font-size:0.78rem; color:var(--ink-soft); line-height:1.45; }
+  .pillBtn.dangerFill[disabled]{ opacity:0.4; }
+  .acctScroll input[dir=auto], .acctScroll textarea{ unicode-bidi:plaintext; }
+  @media (max-width:520px){ .acctScroll{ padding:20px 16px 6px; } .asStats{ grid-template-columns:1fr; } .acctFoot{ padding:10px 14px; } }
   .shareLinks{ margin-top:12px; border-top:1px solid var(--line); padding-top:10px; }
   .shareLinks .row{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:0.78rem; margin-bottom:6px; }
 
@@ -1413,8 +1458,9 @@
       </div>
     </section>
 
-    <section class="setSec">
+    <section class="setSec" id="sharingSec">
       <h4>Sharing</h4>
+      <p class="setHelp" id="acctNameNote" hidden>Your name, photo and how you appear when you share now live in <a href="#" id="openAcctFromSettings">Account settings</a>.</p>
       <label class="setLabel" for="displayNameInput">Display name</label>
       <input type="text" class="setInput" id="displayNameInput" placeholder="Shown on notes you share" maxlength="40" autocomplete="nickname">
       <p class="setHelp">If you sign in with Google, your Google name is used instead.</p>
@@ -1477,6 +1523,7 @@
 <script src="js/sync.js"></script>
 <script src="js/sharing.js"></script>
 <script src="js/migrate.js"></script>
+<script src="js/account.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1714,15 +1761,33 @@
     catch(e){ return null; }
   }
 
-  function getDisplayName(){
-    if(settings.account && settings.account.name) return settings.account.name;
-    if(settings.displayName) return settings.displayName;
+  function getAnonName(){
     var anon = safeGet("stickyboard.anonId");
     if(!anon){
       anon = "Anon-" + Math.floor(1000 + Math.random()*9000);
       safeSet("stickyboard.anonId", anon);
     }
     return anon;
+  }
+  function getDisplayName(){
+    if(settings.account && settings.account.name) return settings.account.name;
+    if(settings.displayName) return settings.displayName;
+    return getAnonName();
+  }
+  // paper colour for a brand-new note: the account's favourite if set, otherwise a surprise as before
+  function newNoteBg(){
+    var want = CLOUD && settings.accountPrefs && settings.accountPrefs.defaultNoteColor;
+    if(want){
+      for(var i = 0; i < PAPER_COLORS.length; i++) if(PAPER_COLORS[i].name === want) return PAPER_COLORS[i].bg;
+    }
+    return randomColor();
+  }
+  // How this person appears on a link they create: the account's sharing defaults (guests: as before).
+  function shareIdentity(){
+    var pr = CLOUD && settings.account && settings.accountPrefs;
+    if(!pr) return {name:getDisplayName(), avatar:false, bio:false};
+    var named = pr.shareDefaultIdentity !== "anonymous";
+    return {name: named ? getDisplayName() : getAnonName(), avatar: named && !!pr.shareShowAvatar, bio: named && !!pr.shareShowBio};
   }
 
   var toastTimer;
@@ -1812,6 +1877,8 @@
   function pickFont(script, mood){
     script = script || preferredScript();
     if(settings.lockFont && FONT_BY_NAME[settings.fontName] && fontCovers(settings.fontName, script)) return settings.fontName;
+    var pf = CLOUD && settings.accountPrefs && settings.accountPrefs.preferredFont;      // a preference, never an override: text it can't draw falls back
+    if(pf && FONT_BY_NAME[pf] && fontCovers(pf, script)) return pf;
     var pool = fontPool(script);
     if(mood){
       var same = pool.filter(function(f){ return f.mood === mood; });
@@ -4791,7 +4858,7 @@
       y: clampY(y - 30),
       w: NOTE_W,
       html: opts.html || "",
-      bg: randomColor(),
+      bg: newNoteBg(),
       font: pickFont(),
       rot: rand(-6,6),
       z: zCounter,
@@ -5378,7 +5445,8 @@
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
       return;
     }
-    var name = getDisplayName();
+    var ident = cloudShare ? shareIdentity() : {name:getDisplayName(), avatar:false, bio:false};
+    var name = ident.name;
     var isGroup = shareable.length > 1;
     var items, link, shareInfo = null;
     if(cloudShare){
@@ -5392,7 +5460,7 @@
       if(!shareable.length){ toast("That recording is still uploading. Try again in a moment."); return; }
       isGroup = shareable.length > 1;
       items = shareable.map(PublicShare.toPublicNote);     // preview only: pictures are already loaded on this device
-      try{ shareInfo = await Stick.share.createSnapshot(activeBoardId, shareable.map(function(n){ return n.id; }), name); link = shareInfo.url; }
+      try{ shareInfo = await Stick.share.createSnapshot(activeBoardId, shareable.map(function(n){ return n.id; }), name, ident); link = shareInfo.url; }
       catch(e){ var se = Stick.errors.parse(e); toast(se.code === "FORBIDDEN" ? "You don't have permission to share from this board." : "Couldn't create a share link for that."); return; }
     } else {
       items = await PublicShare.prepare(shareable.map(PublicShare.toPublicNote));
@@ -5490,13 +5558,35 @@
     openBtn.addEventListener("click", function(){ location.hash = ""; location.reload(); });
     wrap.appendChild(openBtn);
   }
-  function renderPublicViewItems(items, byName, token){
+  // who shared it: name, and (only if the sharer chose to) their photo and bio
+  function buildByline(byName, who){
+    var box = makeDiv("");
+    box.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:6px;";
+    var line = makeDiv("");
+    line.style.cssText = "display:flex;align-items:center;gap:8px;";
+    if(who && who.avatarUrl){
+      var av = makeDiv("acctAv");
+      av.style.cssText = "width:30px;height:30px;";
+      paintAvatar(av, {name: byName, source: "none", url: who.avatarUrl});
+      line.appendChild(av);
+    }
+    var t = document.createElement("span");
+    t.className = "muted";
+    t.textContent = "Shared by " + (byName ? String(byName).slice(0, 60) : "someone");
+    line.appendChild(t);
+    box.appendChild(line);
+    if(who && who.bio){
+      var b = document.createElement("span");
+      b.className = "muted"; b.style.cssText = "font-size:0.8rem;max-width:420px;"; b.dir = "auto";
+      b.textContent = String(who.bio).slice(0, 120);
+      box.appendChild(b);
+    }
+    return box;
+  }
+  function renderPublicViewItems(items, byName, token, who){
     var wrap = publicShell();
     if(!items.length){ wrap.innerHTML = '<p class="muted">This link looks broken or incomplete.</p>'; return; }
-    var byline = document.createElement("p");
-    byline.className = "muted";
-    byline.textContent = "Shared by " + (byName ? String(byName).slice(0, 60) : "someone");
-    wrap.appendChild(byline);
+    wrap.appendChild(buildByline(byName, who));
     var arr = buildArrangement(items, Math.min(window.innerWidth - 40, 1100), Math.max(260, window.innerHeight - 200));
     wrap.appendChild(arr.el);
     setTimeout(arr.fit, 0);
@@ -5539,6 +5629,10 @@
     var p = document.createElement("p"); p.className = "muted"; p.textContent = text; wrap.appendChild(p);
     publicOpenButton(wrap);
   }
+  function sharerOf(res){
+    var av = res.by_avatar && res.assets && res.assets[res.by_avatar];
+    return {bio: res.by_bio || "", avatarUrl: av && av.url ? av.url : ""};
+  }
   function cloudShareBoot(){
     var token = window.Stick && Stick.share.tokenFromHash(location.hash);
     shareBanner.hidden = false; copyToMineBtn.hidden = true;
@@ -5566,10 +5660,16 @@
       if(res.type !== "board_live"){
         var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
         objs.forEach(function(n){ if(!n.phys) n.phys = isPhoto(n) ? makePhotoPhys() : isAV(n) ? {} : makePhys(); });
-        renderPublicViewItems(objs, res.by_name, token);
+        renderPublicViewItems(objs, res.by_name, token, sharerOf(res));
         return;
       }
-      shareBannerText.textContent = (res.board && res.board.name ? "\u201c" + res.board.name + "\u201d" : "A shared board") + " \u00b7 shared by " + (res.by_name || "someone") + " \u00b7 view only";
+      shareBannerText.textContent = (res.board && res.board.name ? "\u201c" + res.board.name + "\u201d" : "A shared board") + " \u00b7 shared by " + (res.by_name || "someone") + " \u00b7 view only" + (res.by_bio ? " \u00b7 " + String(res.by_bio).slice(0, 120) : "");
+      var sh = sharerOf(res);
+      if(sh.avatarUrl){
+        var bav = makeDiv("acctAv"); bav.style.cssText = "width:24px;height:24px;margin-right:8px;";
+        paintAvatar(bav, {name: res.by_name, source: "none", url: sh.avatarUrl});
+        shareBanner.insertBefore(bav, shareBanner.firstChild);
+      }
       var rep = document.createElement("button");
       rep.className = "pillBtn"; rep.textContent = "Report";
       rep.addEventListener("click", function(){ Stick.share.report(token).then(function(){ rep.textContent = "Report sent"; rep.disabled = true; }); });
@@ -5759,6 +5859,11 @@
     document.getElementById("fontPickRow").hidden = !settings.lockFont;
     fontSelect.value = settings.fontName;
     displayNameInput.value = (CLOUD && settings.account) ? (settings.account.name || "") : (settings.displayName || "");
+    var moved = !!(CLOUD && settings.account);      // identity belongs to Account settings, this dialog is about this device
+    document.getElementById("acctNameNote").hidden = !moved;
+    document.querySelector('label[for="displayNameInput"]').hidden = moved;
+    displayNameInput.hidden = moved;
+    displayNameInput.nextElementSibling.hidden = moved;
   }
   function openSettings(){
     closeOtherPanels(panel);
@@ -5770,14 +5875,6 @@
     panel.hidden = false;
   }
   function saveSettingsAndClose(){
-    if(CLOUD && settings.account && window.Stick){
-      var nm = displayNameInput.value.replace(/\s+/g, " ").trim().slice(0, 60);
-      if(nm && nm !== settings.account.name){
-        // the display name is part of the account, so it follows you to your other devices
-        Stick.auth.updateDisplayName(nm).then(function(prof){ if(prof){ settings.account.name = prof.display_name; saveSettings(); } })
-          .catch(function(e){ toast("Couldn't update your name: " + Stick.errors.friendly(Stick.errors.parse(e))); });
-      }
-    }
     saveSettings();
     settingsSnapshot = null;
     panel.hidden = true;
@@ -5831,8 +5928,55 @@
     }catch(e){ return null; }
   }
 
+  // ---- avatars: photo (custom or from the sign-in provider), else initials or an emoji on a colour ----
+  function avatarInitials(name){
+    var parts = String(name || "?").trim().split(/\s+/).filter(Boolean);
+    if(!parts.length) return "?";
+    var first = Array.from(parts[0])[0] || "?";
+    var last = parts.length > 1 ? (Array.from(parts[parts.length - 1])[0] || "") : "";
+    return (first + last).toUpperCase();
+  }
+  function avatarColorFor(name, color){
+    if(color) return color;
+    var pal = Stick.account.AVATAR_COLORS;
+    return pal[hashStr(String(name || "")) % pal.length];
+  }
+  // av: {name, source: custom|provider|none, assetId, providerUrl, style, color, emoji, url}
+  function paintAvatar(el, av){
+    var token = (el._avTok = (el._avTok || 0) + 1);
+    function fallback(){
+      if(el._avTok !== token) return;
+      el.innerHTML = "";
+      var useEmoji = av.style === "emoji" && av.emoji;
+      el.textContent = useEmoji ? av.emoji : avatarInitials(av.name);
+      el.style.background = avatarColorFor(av.name, av.color);
+      el.classList.toggle("emoji", !!useEmoji);
+    }
+    function img(u){
+      if(el._avTok !== token) return;
+      var im = new Image();
+      im.alt = ""; im.referrerPolicy = "no-referrer";
+      im.onerror = fallback;
+      im.onload = function(){ if(el._avTok === token){ el.innerHTML = ""; el.style.background = "transparent"; el.classList.remove("emoji"); el.appendChild(im); } };
+      im.src = u;
+    }
+    fallback();
+    if(av.url) img(av.url);
+    else if(av.source === "custom" && av.assetId && CLOUD && window.Stick) Stick.assets.blobUrl(av.assetId).then(function(u){ if(u) img(u); });
+    else if(av.source === "provider" && av.providerUrl) img(av.providerUrl);
+  }
+  function accountAvatarSpec(){
+    var acc = settings.account || {}, pf = acc.prof || {};
+    return {name: acc.name, source: pf.avatarSource || "provider", assetId: pf.avatarAssetId, providerUrl: acc.providerUrl || acc.picture,
+            style: pf.avatarStyle, color: pf.avatarColor, emoji: pf.avatarEmoji};
+  }
   function updateAccountIcon(){
-    if(settings.account && settings.account.picture){
+    if(settings.account && CLOUD){
+      accountBtn.innerHTML = "";
+      var holder = makeDiv("acctAv");
+      accountBtn.appendChild(holder);
+      paintAvatar(holder, accountAvatarSpec());
+    } else if(settings.account && settings.account.picture){
       accountBtn.innerHTML = '<img src="' + settings.account.picture + '" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">';
     } else {
       accountBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>';
@@ -5883,8 +6027,13 @@
   function renderAccountModal(state){
     if(!acctBackdrop) return;
     var card = acctBackdrop.querySelector(".acctCard");
+    card.className = "acctCard";
     var closeBtnHtml = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>';
 
+    if(state === "signedIn" && settings.account && CLOUD && window.Stick && Stick.account){
+      renderAccountSettings(card);
+      return;
+    }
     if(state === "signedIn" && settings.account){
       var acc = settings.account;
       var localCount = (CLOUD && window.Stick) ? Stick.migrate.inspectLocal(localStorage).length : 0;
@@ -5915,6 +6064,7 @@
           '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-size:0.9rem;font-family:inherit;">' +
         '</div>' +
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
+        '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>';
       mountGoogleButton();
       card.querySelector("#guestNameInput").addEventListener("input", function(e){
@@ -5935,7 +6085,7 @@
             '<li>' + (CLOUD_OK ? 'Links to photos and recordings need an account' : 'Premium features (coming soon) won’t be available') + '</li>' +
           '</ul></div>' +
           '<div><strong>Google</strong><ul>' +
-            '<li>Shares only name, email &amp; photo</li>' +
+            '<li>Shares only name, email &amp; photo (Google or GitHub)</li>' +
             '<li>Shared notes show your real name</li>' +
             '<li>' + (CLOUD_OK ? 'Boards, photos and recordings sync across your devices' : 'Ready for premium &amp; multi-user features') + '</li>' +
             '<li>Never your password, Gmail, Calendar, or Drive</li>' +
@@ -5955,6 +6105,7 @@
         '<h3>Sign in to Stick-It</h3>' +
         '<p class="acctSub">Optional. Pick whichever fits.</p>' +
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
+        '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
         '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
         '<div class="acctWhy">' +
@@ -5970,7 +6121,442 @@
     if(closeBtn) closeBtn.addEventListener("click", closeAccountModal);
   }
 
+  // ---------- Account settings (signed in): who I am, how I appear when I share, what belongs to my account ----------
+  // Normal Settings answers "how does Stick-It look and behave on THIS device?". This answers "who am I here?".
+  var AV_EMOJIS = ["\uD83D\uDE42", "\uD83C\uDFB8", "\uD83C\uDF3F", "\uD83D\uDCCC", "\uD83E\uDD8A", "\uD83C\uDFA8", "\uD83D\uDC19", "\u2615"];
+  function providerName(p){ return p === "github" ? "GitHub" : p === "google" ? "Google" : "your sign-in provider"; }
+  function fmtBytes(b){
+    b = Number(b) || 0;
+    if(b >= 1073741824) return (b / 1073741824).toFixed(1) + " GB";
+    var mb = b / 1048576;
+    return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + " MB";
+  }
+  function monthYear(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {month:"long", year:"numeric"}); }catch(e){ return ""; } }
+  function downloadText(filename, text, type){
+    var blob = new Blob([text], {type: type || "application/json"});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+
+  // pick + reposition + zoom a photo, returns a small square Blob (or null when cancelled)
+  function openAvatarCropper(file){
+    return new Promise(function(resolve){
+      if(!/^image\/(jpeg|png|webp|gif)$/.test(file.type)){ toast("Please choose a JPG, PNG, WebP or GIF picture."); return resolve(null); }
+      if(file.size > 15 * 1048576){ toast("That picture is too large (15 MB max)."); return resolve(null); }
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onerror = function(){ URL.revokeObjectURL(url); toast("Couldn't read that picture."); resolve(null); };
+      img.onload = function(){
+        var view = {zoom: 1, dx: 0, dy: 0}, SZ = 220;
+        var content = document.createElement("div");
+        content.style.textAlign = "center";
+        var cv = document.createElement("canvas");
+        cv.style.cssText = "width:" + SZ + "px;height:" + SZ + "px;border-radius:50%;background:#ddd;cursor:grab;touch-action:none;box-shadow:0 0 0 3px var(--accent-soft);";
+        function draw(){ Stick.account.drawCrop(cv, img, view, SZ); }
+        var down = null;
+        cv.addEventListener("pointerdown", function(e){ down = {x: e.clientX, y: e.clientY}; cv.setPointerCapture(e.pointerId); cv.style.cursor = "grabbing"; });
+        cv.addEventListener("pointermove", function(e){
+          if(!down) return;
+          view.dx -= (e.clientX - down.x) / SZ; view.dy -= (e.clientY - down.y) / SZ;   // drag the picture under the circle
+          down = {x: e.clientX, y: e.clientY}; draw();
+        });
+        function up(){ down = null; cv.style.cursor = "grab"; }
+        cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+        content.appendChild(cv);
+        var zl = document.createElement("label");
+        zl.style.cssText = "display:block;margin-top:14px;font-size:0.78rem;color:var(--ink-soft);";
+        zl.textContent = "Zoom ";
+        var zr = document.createElement("input");
+        zr.type = "range"; zr.min = "1"; zr.max = "3"; zr.step = "0.01"; zr.value = "1"; zr.style.cssText = "vertical-align:middle;width:60%;";
+        zr.addEventListener("input", function(){ view.zoom = parseFloat(zr.value) || 1; draw(); });
+        zl.appendChild(zr); content.appendChild(zl);
+        var hint = document.createElement("p");
+        hint.className = "acctSub"; hint.style.cssText = "text-align:center;margin:8px 0 0;font-size:0.74rem;";
+        hint.textContent = "Drag to reposition. Your photo is cropped to a square and shrunk before it is saved.";
+        content.appendChild(hint);
+        openModal({
+          title: "Adjust your photo", content: content, width: 340,
+          actions: [{label: "Cancel", value: null}, {label: "Use photo", kind: "primary", onClick: function(close){
+            Stick.account.cropToBlob(img, view, 256).then(function(b){ close(b); });
+            return false;
+          }}],
+          onClose: function(v){ URL.revokeObjectURL(url); resolve(v instanceof Blob ? v : null); }
+        });
+        draw();
+      };
+      img.src = url;
+    });
+  }
+
+  // everything on the account as one file. Pictures are embedded; voice memos and videos are not.
+  async function exportAllCloud(btn){
+    var label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Preparing\u2026";
+    try{
+      if(cloudSync){ try{ await cloudSync.flush(); }catch(e){} }
+      var boards = await Stick.repo.listBoards();
+      var out = [], avSkipped = 0, imgMissing = 0, total = 0;
+      for(var i = 0; i < boards.length; i++){
+        var rows = await Stick.repo.fetchObjects(boards[i].id);
+        var objs = [];
+        for(var j = 0; j < rows.length; j++){
+          var o = Stick.repo.fromRow(rows[j]);
+          var av = o.type === "audio" || o.type === "video";
+          var aid = o.assetId || o.attachedAssetId;
+          if(av){ avSkipped++; }
+          else if(aid){
+            try{ var blob = await Stick.assets.blob(aid); if(blob) o.image = await Stick.assets.blobToDataUrl(blob); else imgMissing++; }
+            catch(e){ imgMissing++; }
+          }
+          delete o.assetId; delete o.attachedAssetId; delete o.mediaState; delete o.mediaId;
+          objs.push(o);
+        }
+        total += objs.length;
+        out.push({name: boards[i].name, subtitle: boards[i].subtitle || "", notes: objs});
+      }
+      downloadText("stick-it-account-" + new Date().toISOString().slice(0, 10) + ".json",
+        JSON.stringify({app: "stick-it", version: 2, kind: "account-export", exportedAt: new Date().toISOString(), boards: out}, null, 2));
+      toast("Downloaded " + out.length + (out.length === 1 ? " board" : " boards") + " (" + total + " items)." +
+        (avSkipped ? " " + avSkipped + " voice memo/video item" + (avSkipped === 1 ? "" : "s") + " kept their place but not their files." : "") +
+        (imgMissing ? " " + imgMissing + " picture" + (imgMissing === 1 ? "" : "s") + " couldn't be fetched." : ""));
+    }catch(e){
+      toast("Couldn't export: " + Stick.errors.friendly(Stick.errors.parse(e)));
+    }
+    btn.disabled = false; btn.textContent = label;
+  }
+
+  async function openManageShares(onChange){
+    var content = document.createElement("div");
+    content.className = "acctSub"; content.style.textAlign = "left";
+    content.textContent = "Loading\u2026";
+    openModal({title: "Your active links", content: content, width: 460, actions: [{label: "Done", kind: "primary", value: true}]});
+    try{
+      var list = await Stick.share.list();
+      var names = {};
+      try{ (await Stick.repo.listBoards()).forEach(function(b){ names[b.id] = b.name; }); }catch(e){}
+      var act = list.filter(function(x){ return x.is_active; });
+      content.innerHTML = "";
+      if(!act.length){ content.textContent = "You have no active share links."; return; }
+      var note = document.createElement("p"); note.style.margin = "0 0 10px";
+      note.textContent = "Anyone with one of these links can view it. Turn a link off and it stops working straight away.";
+      content.appendChild(note);
+      act.forEach(function(x){
+        var row = makeDiv("asRow");
+        var t = document.createElement("div");
+        var kind = x.share_type === "board_live" ? "Live board" : x.share_type === "group_snapshot" ? "Group of items" : "Single item";
+        t.innerHTML = "<span></span><small></small>";
+        t.firstChild.textContent = kind + (x.board_id && names[x.board_id] ? " \u00b7 " + names[x.board_id] : "");
+        t.lastChild.textContent = "Created " + new Date(x.created_at).toLocaleDateString();
+        var b = document.createElement("button"); b.className = "pillBtn danger"; b.textContent = "Turn off";
+        b.addEventListener("click", function(){
+          b.disabled = true;
+          Stick.share.disable(x.id).then(function(){ row.remove(); if(onChange) onChange(-1); toast("That link no longer works."); },
+            function(){ b.disabled = false; toast("Couldn't turn it off. Try again."); });
+        });
+        row.appendChild(t); row.appendChild(b); content.appendChild(row);
+      });
+    }catch(e){ content.textContent = "Couldn't load your links: " + Stick.errors.friendly(Stick.errors.parse(e)); }
+  }
+
+  function openDeleteAccount(){
+    var content = document.createElement("div");
+    content.className = "acctSub"; content.style.textAlign = "left";
+    content.innerHTML = '<p style="margin:0 0 8px;">This permanently deletes your account: every board, note, photo, recording and video stored in it, and your profile.</p>' +
+      '<p style="margin:0 0 8px;"><b>Every share link you made stops working</b> (snapshots too), and people you shared boards with lose access.</p>' +
+      '<p style="margin:0 0 8px;">It can\u2019t be undone. Boards saved as a guest on this device are not touched. Consider exporting first.</p>' +
+      '<label class="asField" style="margin-top:12px;"><span>Type DELETE to confirm</span><input type="text" id="delConfirm" autocomplete="off" spellcheck="false"></label>' +
+      '<p class="asErr" id="delErr"></p>';
+    var m = openModal({
+      title: "Delete your account?", content: content, width: 440,
+      actions: [{label: "Cancel", value: false}, {label: "Delete forever", kind: "dangerFill", id: "delGo", onClick: function(close, btn){
+        var errEl = content.querySelector("#delErr");
+        btn.disabled = true; btn.textContent = "Deleting\u2026"; errEl.textContent = "";
+        var uid = Stick.mode.uid;
+        Stick.account.deleteAccount().then(async function(){
+          cloudSigningOut = true;
+          try{ await Stick.auth.signOut("local"); }catch(e){}
+          if(uid) wipeCloudCache(uid);
+          try{ await Stick.assets.cacheClear(); }catch(e){}
+          settings.account = null; settings.accountPrefs = null; saveSettings();
+          content.innerHTML = '<p style="margin:0;">Your account and its data have been deleted.</p>';
+          var act = m.card.querySelector(".modalActions"); if(act) act.remove();
+          var ok = document.createElement("button"); ok.className = "pillBtn primary"; ok.textContent = "OK"; ok.style.marginTop = "14px";
+          ok.addEventListener("click", function(){ location.hash = ""; location.reload(); });
+          content.appendChild(ok);
+        }, function(e){
+          btn.textContent = "Delete forever"; btn.disabled = content.querySelector("#delConfirm").value !== "DELETE";
+          errEl.textContent = (e && e.message) || "Couldn't delete the account.";
+        });
+        return false;
+      }}]
+    });
+    var go = m.card.querySelector("#delGo"), inp = content.querySelector("#delConfirm");
+    go.disabled = true;
+    inp.addEventListener("input", function(){ go.disabled = inp.value !== "DELETE"; });
+    setTimeout(function(){ inp.focus(); }, 30);
+  }
+
+  function renderAccountSettings(card){
+    card.className = "acctCard acctWide";
+    var acc = settings.account, user = Stick.auth.user() || {};
+    var pf = acc.prof || {};
+    var pr = Object.assign({}, Stick.account.DEFAULTS, settings.accountPrefs || {});
+    var provider = (user.app_metadata && user.app_metadata.provider) || "google";
+    var providerUrl = acc.providerUrl || "";
+    var draft = {
+      displayName: acc.name || "", avatarStyle: pf.avatarStyle || "initials", avatarColor: pf.avatarColor || "", avatarEmoji: pf.avatarEmoji || "",
+      bio: pr.bio, handle: pr.handle, shareDefaultIdentity: pr.shareDefaultIdentity, shareShowAvatar: pr.shareShowAvatar, shareShowBio: pr.shareShowBio,
+      shareDefaultBoardMode: pr.shareDefaultBoardMode, preferredFont: pr.preferredFont, defaultNoteColor: pr.defaultNoteColor
+    };
+    var stage = {action: "keep", blob: null, url: null};
+
+    card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>' +
+      '<div class="acctScroll">' +
+        '<h3>Account settings</h3>' +
+        '<p class="acctSub" style="text-align:left;margin-bottom:6px;">Who you are in Stick-It. How this device looks and behaves is in Settings.</p>' +
+
+        '<div class="asSec"><h4>Profile</h4>' +
+          '<div class="asAvatar"><div class="pic" id="asPic"></div><div>' +
+            '<div class="asBtns"><button class="pillBtn" id="asUpload">Upload photo</button><button class="pillBtn" id="asRemove">Remove photo</button><button class="pillBtn" id="asProv"></button></div>' +
+            '<input type="file" id="asFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden>' +
+            '<small style="display:block;margin-top:6px;font-size:0.72rem;color:var(--ink-soft);">JPG, PNG, WebP or GIF. It\u2019s cropped square and shrunk on this device first.</small>' +
+          '</div></div>' +
+          '<div class="asField"><span>Without a photo, show</span><div class="asSeg" id="asStyle"></div>' +
+            '<div class="asSwatches" id="asSwatches"></div>' +
+            '<div id="asEmojiBox" hidden><input type="text" id="asEmoji" maxlength="8" placeholder="Pick one or type your own" dir="auto" style="max-width:220px;"><div class="asEmojis" id="asEmojiList"></div></div>' +
+          '</div>' +
+          '<label class="asField" id="asNameF"><span>Display name</span><input type="text" id="asName" maxlength="60" autocomplete="nickname" dir="auto"></label>' +
+          '<label class="asField" id="asHandleF"><span>Username (optional)</span><div class="asHandle"><b>@</b><input type="text" id="asHandle" maxlength="20" autocomplete="off" spellcheck="false" placeholder="letters, numbers, _"></div></label>' +
+          '<label class="asField" id="asBioF"><span>Bio <span class="cnt" id="asBioCnt"></span></span><textarea id="asBio" maxlength="120" dir="auto" placeholder="Musician, designer, chronic idea hoarder."></textarea></label>' +
+        '</div>' +
+
+        '<div class="asSec"><h4>Sharing</h4>' +
+          '<div class="asRow"><div>Share links as<small>Used for every link you create. Nothing is shared until you make a link.</small></div><div class="asSeg" id="asIdent"></div></div>' +
+          '<label class="asCheck"><input type="checkbox" id="asShowAv"><span>Show my photo on shared boards and notes<small>Only if you share as yourself.</small></span></label>' +
+          '<label class="asCheck"><input type="checkbox" id="asShowBio"><span>Show my bio on public shares<small>Off by default.</small></span></label>' +
+          '<div class="asRow"><div>New board links<small>\u201cRead only\u201d makes a live view-only link. \u201cAsk\u201d confirms first.</small></div><div class="asSeg" id="asBoardMode"></div></div>' +
+          '<p class="acctSub" style="text-align:left;margin:6px 0 0;font-size:0.72rem;">Your e-mail is never shown on a share. What a link shows is fixed when you create it.</p>' +
+        '</div>' +
+
+        '<div class="asSec"><h4>Personalization</h4>' +
+          '<label class="asField"><span>Preferred handwriting</span><select id="asFont"></select></label>' +
+          '<div class="asField"><span>New note colour</span><div class="asSwatches" id="asNoteColors"></div></div>' +
+          '<p class="acctSub" style="text-align:left;margin:0;font-size:0.72rem;">A preference, not a rule: writing a font can\u2019t draw (another language, say) picks a suitable one instead.</p>' +
+        '</div>' +
+
+        '<div class="asSec"><h4>Account</h4>' +
+          '<div class="asRow"><div>Signed in with <b>' + escapeHtml(providerName(provider)) + '</b><small id="asLinked"></small></div><div id="asLinkBtns" class="asBtns"></div></div>' +
+          '<div class="asRow"><div>E-mail<small>Only you can see this.</small></div><div style="font-size:0.84rem;">' + escapeHtml(acc.email || "") + '</div></div>' +
+          '<div class="asPlan"><div><b id="asPlanName">' + escapeHtml((acc.plan || "free").charAt(0).toUpperCase() + (acc.plan || "free").slice(1)) + '</b> plan<small style="display:block;font-size:0.72rem;color:var(--ink-soft);" id="asPlanNote"></small></div></div>' +
+          '<div class="asStats" id="asStats"><div><span>Boards</span>\u2026</div><div><span>Items</span>\u2026</div><div style="grid-column:1/-1"><span>Media storage</span>\u2026</div><div><span>Member since</span>\u2026</div></div>' +
+        '</div>' +
+
+        '<div class="asSec"><h4>Data &amp; privacy</h4>' +
+          '<div class="asBtns"><button class="pillBtn" id="asExport">Export all my boards</button><button class="pillBtn" id="asShares">Manage active links</button><button class="pillBtn" id="asSignAll">Sign out of all devices</button></div>' +
+          '<p class="acctSub" style="text-align:left;margin:8px 0 0;font-size:0.72rem;">The export includes text, layout and pictures. Voice memos and videos are not in the file yet; they stay in your account.</p>' +
+        '</div>' +
+
+        '<div class="asDanger"><h4>Danger zone</h4><p>Deleting your account removes your boards, media and share links for good.</p><button class="pillBtn danger" id="asDelete">Delete account\u2026</button></div>' +
+        '<p class="asErr" id="asErr" role="alert"></p>' +
+      '</div>' +
+      '<div class="acctFoot"><button class="pillBtn" id="asSignOut">Sign out</button><span class="spacer"></span><button class="pillBtn" id="asCancel">Cancel</button><button class="pillBtn primary" id="asSave">Save</button></div>';
+
+    var $ = function(id){ return card.querySelector("#" + id); };
+    var picEl = $("asPic");
+
+    // --- avatar
+    function effSource(){
+      if(stage.action === "upload") return "upload";
+      if(stage.action === "provider" || stage.action === "none") return stage.action;
+      var src = pf.avatarSource || "provider";
+      return (src === "provider" && !providerUrl) ? "none" : src;
+    }
+    function refreshAvatar(){
+      var eff = effSource();
+      paintAvatar(picEl, {name: draft.displayName, source: eff === "upload" ? "none" : eff, assetId: eff === "custom" ? pf.avatarAssetId : null,
+        providerUrl: providerUrl, style: draft.avatarStyle, color: draft.avatarColor, emoji: draft.avatarEmoji, url: eff === "upload" ? stage.url : null});
+      $("asRemove").hidden = eff === "none";
+      $("asProv").hidden = !providerUrl || eff === "provider";
+      $("asProv").textContent = "Use my " + providerName(provider) + " photo";
+      $("asUpload").textContent = (eff === "custom" || eff === "upload") ? "Replace photo" : "Upload photo";
+      var showFallback = eff === "none";
+      $("asStyle").parentNode.style.opacity = showFallback ? "1" : "0.55";
+    }
+    $("asUpload").addEventListener("click", function(){ $("asFile").click(); });
+    $("asFile").addEventListener("change", async function(){
+      var f = $("asFile").files[0]; $("asFile").value = "";
+      if(!f) return;
+      var blob = await openAvatarCropper(f);
+      if(!blob) return;
+      if(stage.url) URL.revokeObjectURL(stage.url);
+      stage = {action: "upload", blob: blob, url: URL.createObjectURL(blob)};
+      refreshAvatar();
+    });
+    $("asRemove").addEventListener("click", function(){ if(stage.url) URL.revokeObjectURL(stage.url); stage = {action: "none", blob: null, url: null}; refreshAvatar(); });
+    $("asProv").addEventListener("click", function(){ if(stage.url) URL.revokeObjectURL(stage.url); stage = {action: "provider", blob: null, url: null}; refreshAvatar(); });
+
+    function seg(id, options, get, set){
+      var box = $(id);
+      function paint(){ box.innerHTML = ""; options.forEach(function(o){
+        var b = document.createElement("button"); b.type = "button"; b.textContent = o[1]; b.className = get() === o[0] ? "on" : "";
+        b.addEventListener("click", function(){ set(o[0]); paint(); }); box.appendChild(b); }); }
+      paint();
+    }
+    function paintSwatches(){
+      var box = $("asSwatches"); box.innerHTML = "";
+      var auto = document.createElement("button"); auto.type = "button"; auto.className = "auto" + (!draft.avatarColor ? " on" : ""); auto.textContent = "Automatic";
+      auto.addEventListener("click", function(){ draft.avatarColor = ""; paintSwatches(); refreshAvatar(); }); box.appendChild(auto);
+      Stick.account.AVATAR_COLORS.forEach(function(c){
+        var b = document.createElement("button"); b.type = "button"; b.style.background = c; b.setAttribute("aria-label", c); b.className = draft.avatarColor === c ? "on" : "";
+        b.addEventListener("click", function(){ draft.avatarColor = c; paintSwatches(); refreshAvatar(); }); box.appendChild(b);
+      });
+    }
+    function paintStyleBits(){ $("asEmojiBox").hidden = draft.avatarStyle !== "emoji"; }
+    seg("asStyle", [["initials", "Initials"], ["emoji", "Emoji"]], function(){ return draft.avatarStyle; }, function(v){ draft.avatarStyle = v; paintStyleBits(); refreshAvatar(); });
+    paintSwatches(); paintStyleBits();
+    $("asEmoji").value = draft.avatarEmoji;
+    $("asEmoji").addEventListener("input", function(){ draft.avatarEmoji = Array.from($("asEmoji").value).slice(0, 2).join(""); refreshAvatar(); });
+    AV_EMOJIS.forEach(function(em){
+      var b = document.createElement("button"); b.type = "button"; b.textContent = em;
+      b.addEventListener("click", function(){ draft.avatarEmoji = em; $("asEmoji").value = em; refreshAvatar(); });
+      $("asEmojiList").appendChild(b);
+    });
+
+    // --- text fields
+    function clearErr(){ $("asErr").textContent = ""; card.querySelectorAll(".asField.err").forEach(function(f){ f.classList.remove("err"); }); }
+    function showErr(msg, field){
+      $("asErr").textContent = msg;
+      var f = field && $({name: "asNameF", handle: "asHandleF", bio: "asBioF"}[field] || "");
+      if(f){ f.classList.add("err"); var i = f.querySelector("input,textarea"); if(i) i.focus(); }
+    }
+    $("asName").value = draft.displayName;
+    $("asName").addEventListener("input", function(){ draft.displayName = $("asName").value; clearErr(); refreshAvatar(); });
+    $("asHandle").value = draft.handle;
+    $("asHandle").addEventListener("input", function(){
+      var v = $("asHandle").value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
+      $("asHandle").value = v; draft.handle = v; clearErr();
+    });
+    $("asBio").value = draft.bio;
+    function bioCount(){ $("asBioCnt").textContent = Array.from($("asBio").value).length + " / 120"; }
+    bioCount();
+    $("asBio").addEventListener("input", function(){ draft.bio = $("asBio").value; bioCount(); clearErr(); });
+
+    // --- sharing
+    function paintShareChecks(){
+      var named = draft.shareDefaultIdentity !== "anonymous";
+      [["asShowAv", "shareShowAvatar"], ["asShowBio", "shareShowBio"]].forEach(function(p){
+        var cb = $(p[0]); cb.checked = named && !!draft[p[1]]; cb.disabled = !named; cb.parentNode.style.opacity = named ? "1" : "0.5";
+      });
+    }
+    seg("asIdent", [["named", "Me (" + (acc.name || "name") + ")"], ["anonymous", "Anonymous"]], function(){ return draft.shareDefaultIdentity; }, function(v){ draft.shareDefaultIdentity = v; paintShareChecks(); });
+    seg("asBoardMode", [["view", "Read only"], ["ask", "Ask every time"]], function(){ return draft.shareDefaultBoardMode; }, function(v){ draft.shareDefaultBoardMode = v; });
+    $("asShowAv").addEventListener("change", function(){ draft.shareShowAvatar = $("asShowAv").checked; });
+    $("asShowBio").addEventListener("change", function(){ draft.shareShowBio = $("asShowBio").checked; });
+    paintShareChecks();
+
+    // --- personalization
+    var fs = $("asFont");
+    var auto = document.createElement("option"); auto.value = ""; auto.textContent = "Let Stick-It choose"; fs.appendChild(auto);
+    ["latin", "hebrew", "zh", "ja", "ko"].forEach(function(sc){
+      var g = document.createElement("optgroup"); g.label = SCRIPT_NAMES[sc];
+      fontPool(sc).forEach(function(f){ var o = document.createElement("option"); o.value = f.name; o.textContent = f.name; o.style.fontFamily = fontStack(f.name); g.appendChild(o); });
+      fs.appendChild(g);
+    });
+    fs.value = FONT_BY_NAME[draft.preferredFont] ? draft.preferredFont : "";
+    fs.addEventListener("change", function(){ draft.preferredFont = fs.value; });
+    function paintNoteColors(){
+      var box = $("asNoteColors"); box.innerHTML = "";
+      var a = document.createElement("button"); a.type = "button"; a.className = "auto" + (!draft.defaultNoteColor ? " on" : ""); a.textContent = "Surprise me";
+      a.addEventListener("click", function(){ draft.defaultNoteColor = ""; paintNoteColors(); }); box.appendChild(a);
+      PAPER_COLORS.forEach(function(c){
+        var b = document.createElement("button"); b.type = "button"; b.style.background = c.bg; b.title = c.name; b.setAttribute("aria-label", c.name);
+        b.className = draft.defaultNoteColor === c.name ? "on" : "";
+        b.addEventListener("click", function(){ draft.defaultNoteColor = c.name; paintNoteColors(); }); box.appendChild(b);
+      });
+    }
+    paintNoteColors();
+
+    // --- account facts (loaded, never invented)
+    var planNote = (acc.plan === "premium") ? "Thanks for supporting Stick-It." : "Premium is coming later. Nothing to buy yet.";
+    $("asPlanNote").textContent = planNote;
+    var activeShares = null;
+    Stick.account.usage().then(function(u){
+      if(!card.isConnected) return;
+      $("asPlanName").textContent = String(u.plan).charAt(0).toUpperCase() + String(u.plan).slice(1);
+      var pct = u.storage_quota ? Math.min(100, Math.round(100 * u.storage_used / u.storage_quota)) : 0;
+      $("asStats").innerHTML = '<div><span>Boards</span>' + u.boards + ' / ' + u.boards_limit + '</div><div><span>Items</span>' + u.objects + '</div>' +
+        '<div style="grid-column:1/-1"><span>Media storage</span>' + fmtBytes(u.storage_used) + ' of ' + fmtBytes(u.storage_quota) + '<div class="asBar"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div><span>Member since</span>' + escapeHtml(monthYear(u.member_since)) + '</div>';
+      activeShares = u.active_shares;
+      $("asShares").textContent = "Manage active links (" + activeShares + ")";
+    }, function(){ if(card.isConnected) $("asStats").textContent = "Couldn\u2019t load your numbers right now."; });
+    Stick.auth.identities().then(function(list){
+      if(!card.isConnected) return;
+      var have = list.map(function(i){ return i.provider; });
+      $("asLinked").textContent = have.length > 1 ? "Linked: " + have.map(providerName).join(", ") : "";
+      var box = $("asLinkBtns"); box.innerHTML = "";
+      ["google", "github"].filter(function(pv){ return have.indexOf(pv) === -1; }).forEach(function(pv){
+        var b = document.createElement("button"); b.className = "pillBtn"; b.textContent = "Link " + providerName(pv);
+        b.addEventListener("click", function(){
+          Stick.auth.linkProvider(pv).catch(function(e){
+            var er = Stick.errors.parse(e);
+            toast(/manual linking|linking is disabled|not enabled/i.test(er.message) ? "Linking another sign-in isn\u2019t switched on for this project yet." : "Couldn\u2019t link " + providerName(pv) + ": " + Stick.errors.friendly(er));
+          });
+        });
+        box.appendChild(b);
+      });
+    }, function(){});
+
+    // --- immediate actions (never staged)
+    $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport")); });
+    $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; $("asShares").textContent = "Manage active links (" + activeShares + ")"; } }); });
+    $("asSignAll").addEventListener("click", async function(){
+      var go = await confirmDialog({title: "Sign out of all devices?", body: "You\u2019ll be signed out everywhere, including here. Your boards stay safe in your account.", confirm: "Sign out everywhere", danger: true});
+      if(go) cloudSignOut("global");
+    });
+    $("asSignOut").addEventListener("click", function(){ cloudSignOut("local"); });
+    $("asDelete").addEventListener("click", openDeleteAccount);
+
+    // --- Cancel discards, Save validates and persists everything staged
+    function cleanup(){ if(stage.url) URL.revokeObjectURL(stage.url); }
+    $("asCancel").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
+    $("acctCloseBtn").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
+    $("asSave").addEventListener("click", async function(){
+      clearErr();
+      var bad = Stick.account.validate(draft);
+      if(bad){ showErr(bad.message, bad.field); return; }
+      var btn = $("asSave"); btn.disabled = true; btn.textContent = "Saving\u2026";
+      try{
+        var res = await Stick.account.save(draft, stage);
+        applyAccountData(res);
+        cleanup();
+        closeAccountModal();
+        toast("Account settings saved.");
+      }catch(e){
+        var er = Stick.errors.parse(e);
+        btn.disabled = false; btn.textContent = "Save";
+        showErr(er.code === "INVALID" ? e.message : Stick.errors.friendly(er), e.field || (er.code === "HANDLE_TAKEN" ? "handle" : null));
+      }
+    });
+    refreshAvatar();
+    setTimeout(function(){ var n = $("asName"); if(n && !("ontouchstart" in window)) n.focus(); }, 60);
+  }
+
+  var GITHUB_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>';
+  function mountGitHubButton(){
+    var gh = document.getElementById("githubBtn");
+    if(!gh) return;
+    if(!CLOUD_OK){ gh.style.display = "none"; return; }       // needs the cloud backend
+    gh.innerHTML = GITHUB_ICON + "<span>Continue with GitHub</span>";
+    gh.addEventListener("click", function(){
+      toast("Opening GitHub\u2026");
+      Stick.auth.signInWithProvider("github").catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+    });
+  }
   function mountGoogleButton(){
+    mountGitHubButton();
     var fallback = document.getElementById("googleBtnFallback");
     var holder = document.getElementById("googleBtnHolder");
     if(!fallback || !holder) return;
@@ -5999,6 +6585,7 @@
   }
 
   accountBtn.addEventListener("click", openAccountModal);
+  document.getElementById("openAcctFromSettings").addEventListener("click", function(e){ e.preventDefault(); cancelSettings(); openAccountModal(); });
   updateAccountIcon();
 
   // ---------- settings controls ----------
@@ -6392,8 +6979,8 @@
     shareResult.innerHTML = '<p class="muted">Getting your board ready\u2026</p>';
     var ready = await cloudSync.settle(60000);
     if(!ready){ shareResult.innerHTML = '<p class="muted">Couldn\'t finish saving to your account yet. Check your connection and try again.</p>'; return; }
-    var info;
-    try{ info = await Stick.share.createLive(activeBoardId, getDisplayName()); }
+    var info, ident = shareIdentity();
+    try{ info = await Stick.share.createLive(activeBoardId, ident.name, ident); }
     catch(e){
       var er = Stick.errors.parse(e);
       shareResult.innerHTML = '<p class="muted">' + escapeHtml(er.code === "FORBIDDEN" ? "Only the board's owner can publish a live link. You can still share selected items." : Stick.errors.friendly(er)) + '</p>';
@@ -6443,7 +7030,14 @@
     }catch(e){}
   }
   publishBtn.addEventListener("click", async function(){
-    if(CLOUD && cloudSync && !viewerMode){ return publishLiveBoard(); }
+    if(CLOUD && cloudSync && !viewerMode){
+      var pr = settings.accountPrefs;
+      if(pr && pr.shareDefaultBoardMode === "ask"){       // account default: ask before every live link
+        var yes = await confirmDialog({title:"Create a live link to this board?", body:"Anyone with the link will be able to see this board (read only) and follow your changes until you turn the link off.", confirm:"Create link"});
+        if(!yes){ shareResult.innerHTML = ""; return; }
+      }
+      return publishLiveBoard();
+    }
     shareResult.innerHTML = '<p class="muted">Preparing link\u2026</p>';
     var payload = await PublicShare.prepare(notes.filter(function(n){ return !isAV(n); }).map(PublicShare.toPublicNote));
     var link = null;
@@ -7442,14 +8036,30 @@
 
   function rememberAccount(user, profile){
     var meta = (user && user.user_metadata) || {};
+    var prev = settings.account || {};
     settings.account = {
-      name: (profile && profile.display_name) || meta.full_name || meta.name || String(user.email || "").split("@")[0],
-      email: user.email, picture: meta.avatar_url || meta.picture || "", sub: user.id,
-      plan: (profile && profile.plan) || "free", cloud: true
+      name: (profile && profile.display_name) || meta.full_name || meta.name || meta.user_name || String(user.email || "").split("@")[0],
+      email: user.email, sub: user.id, cloud: true,
+      picture: (profile && profile.avatar_url) || meta.avatar_url || meta.picture || "",
+      providerUrl: (profile && profile.avatar_url) || meta.avatar_url || meta.picture || "",
+      plan: (profile && profile.plan) || "free",
+      prof: profile ? {avatarSource: profile.avatar_source, avatarAssetId: profile.avatar_asset_id, avatarStyle: profile.avatar_style,
+                       avatarColor: profile.avatar_color, avatarEmoji: profile.avatar_emoji} : prev.prof
     };
     settings.guestConfirmed = false;
     saveSettings();
     updateAccountIcon();
+  }
+  // server truth -> what this device shows and uses (also the offline mirror)
+  function applyAccountData(res){
+    if(!res || !res.profile || !settings.account) return;
+    rememberAccount(Stick.auth.user() || {id: settings.account.sub, email: settings.account.email}, res.profile);
+    settings.accountPrefs = res.settings;
+    saveSettings();
+  }
+  function refreshAccountData(){
+    if(!CLOUD || !window.Stick || !Stick.auth.user()) return Promise.resolve();
+    return Stick.account.load().then(applyAccountData, function(){});
   }
 
   function beginGoogleSignIn(){
@@ -7460,17 +8070,18 @@
     var prefix = "stickyboard.cloud." + uid + ".";
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf(prefix) === 0) localStorage.removeItem(k); });
   }
-  async function cloudSignOut(){
+  async function cloudSignOut(scope){
+    scope = scope === "global" ? "global" : "local";
     if(cloudSync && cloudSync.hasPending()){
       var go = await confirmDialog({title:"Sign out with unsynced changes?", body:"Some recent changes haven't reached your account yet. Signing out on this device will lose them.", confirm:"Sign out anyway", danger:true});
       if(!go) return;
     } else if(cloudSync){ try{ await cloudSync.flush(); }catch(e){} }
     cloudSigningOut = true;
     var uid = Stick.mode.uid;
-    try{ await Stick.auth.signOut(); }catch(e){}
+    try{ await Stick.auth.signOut(scope); }catch(e){}
     if(uid) wipeCloudCache(uid);                  // a shared computer keeps nothing of your account afterwards
     try{ await Stick.assets.cacheClear(); }catch(e){}
-    settings.account = null; saveSettings();
+    settings.account = null; settings.accountPrefs = null; saveSettings();
     location.hash = ""; location.reload();
   }
 
@@ -7675,6 +8286,11 @@
     var profile = null;
     try{ profile = await Stick.auth.profile(); }catch(e){}
     rememberAccount(session.user, profile);
+    refreshAccountData();                               // preferences + photo; the mirror in settings covers offline
+    var lastAcctRefresh = Date.now();
+    document.addEventListener("visibilitychange", function(){
+      if(document.visibilityState === "visible" && Date.now() - lastAcctRefresh > 120000){ lastAcctRefresh = Date.now(); refreshAccountData(); }
+    });
     try{
       if(needsCloudBootstrap){ await firstCloudLoad(session.user, profile); return; }
       if(needsBoardFill){ await fillBoardAndReload(activeBoardId); return; }

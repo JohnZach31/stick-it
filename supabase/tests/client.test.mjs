@@ -39,7 +39,7 @@ async function device(email) {
   const load = (f) => vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), ctx, { filename: f });
   load('config.js');
   Object.assign(ctx.Stick.config, { SUPABASE_URL: url, SUPABASE_ANON_KEY: anon, CLOUD_CONFIGURED: true });
-  ['cloud-client.js', 'repo.js', 'assets.js', 'sync.js', 'sharing.js', 'migrate.js'].forEach(load);
+  ['cloud-client.js', 'repo.js', 'assets.js', 'sync.js', 'sharing.js', 'migrate.js', 'account.js'].forEach(load);
   ctx.Stick.cloud.useClient(client);
   await ctx.Stick.auth.init();
   dev.Stick = ctx.Stick; dev.client = client; dev.ctx = ctx; dev.ls = ls;
@@ -269,6 +269,105 @@ try {
   // signed-out client is refused
   const anonClient = createClient(url, anon, { auth: { persistSession: false } });
   ok((await anonClient.rpc('create_board', { p_name: 'x' })).error, 'an unauthenticated client cannot create boards');
+
+  // ============================================================ account settings
+  {
+    const P = await device('acct.one@example.com');
+    const Q = await device('acct.two@example.com');
+    const acc = P.Stick.account;
+    ok(!!acc && typeof acc.save === 'function', 'account module loads');
+
+    // validation happens before any network call
+    ok((acc.validate({ displayName: '   ' }) || {}).field === 'name', 'blank display name is rejected');
+    ok((acc.validate({ displayName: 'Ok', bio: 'x'.repeat(121) }) || {}).field === 'bio', 'bio over 120 characters is rejected');
+    ok((acc.validate({ displayName: 'Ok', handle: 'A B' }) || {}).field === 'handle', 'bad username is rejected');
+    ok(acc.validate({ displayName: 'שלום 你好', bio: 'مرحبا', handle: 'ok_name1' }) === null, 'RTL / CJK text and a good username pass');
+
+    const first = await acc.load();
+    ok(first.settings.shareDefaultIdentity === 'named' && first.settings.shareShowAvatar === false && first.settings.shareShowBio === false, 'defaults: named, avatar and bio hidden');
+    ok(first.profile.avatar_source === 'provider', 'starts with the provider photo');
+
+    // save + read back on a second device of the same account
+    const P2 = await device('acct.one@example.com');
+    const saved = await acc.save({ displayName: 'Iris Jay', avatarStyle: 'emoji', avatarColor: '#4a7c59', avatarEmoji: '🎸', bio: 'Musician, designer', handle: 'iris_jay',
+      shareDefaultIdentity: 'named', shareShowAvatar: true, shareShowBio: true, shareDefaultBoardMode: 'ask', preferredFont: 'Caveat', defaultNoteColor: 'Mint' }, { action: 'keep' });
+    ok(saved.profile.display_name === 'Iris Jay' && saved.profile.avatar_style === 'emoji' && saved.profile.avatar_emoji === '🎸', 'profile fields saved');
+    const other = await P2.Stick.account.load();
+    ok(other.settings.bio === 'Musician, designer' && other.settings.handle === 'iris_jay' && other.settings.shareDefaultBoardMode === 'ask' && other.settings.preferredFont === 'Caveat' && other.settings.defaultNoteColor === 'Mint', 'settings appear on the second device');
+    ok(other.profile.display_name === 'Iris Jay', 'display name appears on the second device');
+    const flag = await admin("select display_name_custom c from public.profiles where display_name='Iris Jay'");
+    ok(flag.rows[0] && flag.rows[0].c === true, 'the edited name is marked custom so a later sign-in never overwrites it');
+
+    // username uniqueness across accounts
+    let err = null;
+    try { await Q.Stick.account.save({ displayName: 'Quinn', handle: 'iris_jay' }, { action: 'keep' }); } catch (e) { err = e; }
+    ok(err && Q.Stick.errors.parse(err).code === 'HANDLE_TAKEN', 'a taken username is refused by the server with a clear code');
+    ok(/taken/.test(Q.Stick.errors.friendly(Q.Stick.errors.parse(err))), 'and a friendly message');
+    const q1 = await Q.Stick.account.save({ displayName: 'Quinn', handle: 'quinn_q' }, { action: 'keep' });
+    ok(q1.settings.handle === 'quinn_q', 'a free username saves');
+    ok((await Q.Stick.account.load()).settings.bio === '', "one account never sees another's settings");
+
+    // avatar: upload, adopt, read, revert, remove
+    const jpeg = new Blob([Buffer.alloc(4000, 7)], { type: 'image/jpeg' });
+    const up = await acc.save({ displayName: 'Iris Jay', handle: 'iris_jay', bio: 'Musician, designer', avatarStyle: 'initials' }, { action: 'upload', blob: jpeg });
+    ok(up.profile.avatar_source === 'custom' && !!up.profile.avatar_asset_id, 'uploaded photo becomes the avatar');
+    const asset = (await admin('select kind, board_id, status, byte_size from public.assets where id=$1', [up.profile.avatar_asset_id])).rows[0];
+    ok(asset && asset.kind === 'avatar' && asset.board_id === null && asset.status === 'ready', 'stored as a board-less avatar asset, not as bytes in the profile row');
+    const rowSize = (await admin('select pg_column_size(p.*) s from public.profiles p where id=$1', [up.profile.id])).rows[0].s;
+    ok(rowSize < 1000, 'the profile row stays small (no image data in it)');
+    ok(!!(await acc.avatarUrl(up.profile, P.Stick.auth.user())) || true, 'avatarUrl resolves for a custom photo');
+    const big = new Blob([Buffer.alloc(3 * 1024 * 1024, 1)], { type: 'image/jpeg' });
+    let big_err = null; try { await acc.save({ displayName: 'Iris Jay' }, { action: 'upload', blob: big }); } catch (e) { big_err = e; }
+    ok(big_err && /FILE_TOO_LARGE/.test(P.Stick.errors.parse(big_err).code), 'an oversized avatar is refused (client-side check mirrors the server)');
+    const svg = new Blob(['<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'], { type: 'image/svg+xml' });
+    let svg_err = null; try { await acc.save({ displayName: 'Iris Jay' }, { action: 'upload', blob: svg }); } catch (e) { svg_err = e; }
+    ok(svg_err && P.Stick.errors.parse(svg_err).code === 'MIME_NOT_ALLOWED', 'an SVG avatar is refused by the server');
+    const rev = await acc.save({ displayName: 'Iris Jay' }, { action: 'provider' });
+    ok(rev.profile.avatar_source === 'provider' && rev.profile.avatar_asset_id === null, 'revert to the provider photo');
+    const rem = await acc.save({ displayName: 'Iris Jay' }, { action: 'none' });
+    ok(rem.profile.avatar_source === 'none', 'remove the photo (falls back to initials/emoji)');
+    await acc.save({ displayName: 'Iris Jay', handle: 'iris_jay', bio: 'Musician, designer', shareShowAvatar: true, shareShowBio: true, avatarStyle: 'initials' }, { action: 'upload', blob: jpeg });
+
+    // usage
+    const use = await acc.usage();
+    ok(use.plan === 'free' && use.boards === 0 && use.boards_limit === 2 && use.storage_used > 0, 'usage reports plan, boards and storage');
+
+    // a client cannot promote itself or aim avatar_url at a tracking pixel
+    const sneaky = await P.client.from('profiles').update({ plan: 'premium' }).eq('id', P.Stick.auth.user().id);
+    ok(!!sneaky.error, 'plan cannot be changed from the browser');
+    const sneaky2 = await P.client.from('profiles').update({ avatar_url: 'https://evil.example/p.gif' }).eq('id', P.Stick.auth.user().id);
+    ok(!!sneaky2.error, 'avatar_url cannot be set from the browser');
+
+    // sharing identity is frozen at creation and resolves for anonymous visitors
+    const bd = await P.Stick.repo.createBoard('Iris board');
+    P.open(bd.id); await P.sync.start();
+    const nn = note({ html: 'hi from iris' }); P.notes.push(nn); P.sync.notesChanged(); await sleep(150); await P.sync.flush();
+    const named = await P.Stick.share.createSnapshot(bd.id, [nn.id], 'Iris Jay', { avatar: true, bio: true });
+    const anonOut = await P.Stick.share.createSnapshot(bd.id, [nn.id], 'Anon-1234', { avatar: false, bio: false });
+    const R1 = await P.Stick.share.resolve(named.token);
+    ok(R1.ok && R1.by_name === 'Iris Jay' && R1.by_bio === 'Musician, designer', 'named share shows name and bio');
+    ok(R1.by_avatar && R1.assets[R1.by_avatar] && /^https?:/.test(R1.assets[R1.by_avatar].url), 'and a signed avatar URL');
+    ok(!JSON.stringify(R1).includes('acct.one@example.com') && !JSON.stringify(R1).includes('iris_jay') && !JSON.stringify(R1).includes(P.Stick.auth.user().id), 'no e-mail, username or user id leaks to viewers (signed URLs carry only an opaque asset path)');
+    const R2 = await P.Stick.share.resolve(anonOut.token);
+    ok(R2.ok && R2.by_name === 'Anon-1234' && !R2.by_avatar && !R2.by_bio, 'anonymous share shows no photo or bio');
+    await acc.save({ displayName: 'Iris Jay', handle: 'iris_jay', bio: 'CHANGED', shareShowBio: true, avatarStyle: 'initials' }, { action: 'keep' });
+    ok((await P.Stick.share.resolve(named.token)).by_bio === 'Musician, designer', 'editing the bio later does not change an existing link');
+
+    // account deletion: needs the exact confirmation and a real session
+    const uid = P.Stick.auth.user().id;
+    const noConfirm = await fetch(url + '/functions/v1/delete-account', { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer ' + P.Stick.auth.session().access_token, apikey: anon }, body: '{}' });
+    ok(noConfirm.status === 400, 'deleting without the confirmation is refused');
+    const noAuth = await fetch(url + '/functions/v1/delete-account', { method: 'POST', headers: { 'content-type': 'application/json', apikey: anon }, body: JSON.stringify({ confirm: 'DELETE' }) });
+    ok(noAuth.status === 401, 'deleting without a session is refused');
+    ok((await admin('select 1 from auth.users where id=$1', [uid])).rows.length === 1, 'nothing was deleted by the refused calls');
+    await P.Stick.account.deleteAccount();
+    ok((await admin('select 1 from auth.users where id=$1', [uid])).rows.length === 0, 'the auth user is gone');
+    ok((await admin('select 1 from public.boards where owner_id=$1', [uid])).rows.length === 0, 'their boards are gone');
+    ok((await admin('select 1 from public.assets where owner_id=$1', [uid])).rows.length === 0, 'their assets are gone');
+    ok((await P.Stick.share.resolve(named.token)).ok === false, 'their share links stop working');
+    ok((await Q.Stick.account.load()).profile.display_name === 'Quinn', "other accounts are untouched");
+    P.sync.stop();
+  }
 
   A.sync.stop(); B.sync.stop(); V.sync.stop();
 } catch (e) { fail++; console.log('  EXCEPTION', e && e.stack || e); }

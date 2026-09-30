@@ -10,7 +10,7 @@
   // ------------------------------------------------------------------ errors
   var KNOWN = ["BOARD_LIMIT_REACHED", "STORAGE_QUOTA_EXCEEDED", "FILE_TOO_LARGE", "MIME_NOT_ALLOWED", "NOT_AUTHENTICATED",
     "FORBIDDEN", "OBJECT_LIMIT_REACHED", "UNSAFE_HTML", "INVITE_NOT_FOUND", "INVITE_USED", "INVITE_EXPIRED",
-    "INVITE_EMAIL_MISMATCH", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
+    "INVITE_EMAIL_MISMATCH", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
   Stick.errors = {
     // Turns whatever a Supabase call threw/returned into {code, message, offline, retryable}
     parse: function (e) {
@@ -18,6 +18,7 @@
       var msg = String(e.message || e.error_description || e.error || e);
       var code = "UNKNOWN";
       for (var i = 0; i < KNOWN.length; i++) if (msg.indexOf(KNOWN[i]) !== -1) { code = KNOWN[i]; break; }
+      if (/profile_settings_handle_key/.test(msg)) code = "HANDLE_TAKEN";
       var offline = e instanceof TypeError || /Failed to fetch|NetworkError|Load failed|network|fetch failed|ECONNREFUSED/i.test(msg);
       if (offline) code = "OFFLINE";
       var status = e.status || e.statusCode;
@@ -35,6 +36,7 @@
       if (c === "FILE_TOO_LARGE") return "That file is too large to upload.";
       if (c === "MIME_NOT_ALLOWED") return "That file type isn't supported.";
       if (c === "OBJECT_LIMIT_REACHED") return "This board has reached its maximum number of items.";
+      if (c === "HANDLE_TAKEN") return "That username is already taken.";
       if (c === "OFFLINE") return "You appear to be offline.";
       if (c === "FORBIDDEN") return "You don't have permission to do that here.";
       return err && err.message ? err.message : "Something went wrong.";
@@ -118,15 +120,32 @@
     },
     onChange: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; },
 
-    signInWithGoogle: function () {
+    // provider: "google" | "github" (must be enabled in the Supabase dashboard)
+    signInWithProvider: function (provider) {
       return Stick.cloud.load().then(function (c) {
         var redirectTo = cfg.REDIRECT_URL || (root.location.origin + root.location.pathname);
-        return c.auth.signInWithOAuth({ provider: "google", options: { redirectTo: redirectTo } });
+        return c.auth.signInWithOAuth({ provider: provider, options: { redirectTo: redirectTo } });
       }).then(function (r) { if (r && r.error) throw r.error; return r; });
     },
+    signInWithGoogle: function () { return Stick.auth.signInWithProvider("google"); },
 
-    signOut: function () {
-      return Stick.cloud.load().then(function (c) { return c.auth.signOut(); }).then(function () { lastSession = null; cachedProfile = null; });
+    // sign-in methods attached to this account, and adding another (needs "manual linking" enabled in Supabase)
+    identities: function () {
+      return Stick.cloud.load().then(function (c) { return c.auth.getUserIdentities(); }).then(function (r) {
+        if (r.error) throw Stick.errors.parse(r.error);
+        return (r.data && r.data.identities) || [];
+      });
+    },
+    linkProvider: function (provider) {
+      return Stick.cloud.load().then(function (c) {
+        var redirectTo = cfg.REDIRECT_URL || (root.location.origin + root.location.pathname);
+        return c.auth.linkIdentity({ provider: provider, options: { redirectTo: redirectTo } });
+      }).then(function (r) { if (r && r.error) throw Stick.errors.parse(r.error); return r; });
+    },
+
+    // scope: "local" (this device, default) | "global" (every device)
+    signOut: function (scope) {
+      return Stick.cloud.load().then(function (c) { return c.auth.signOut({ scope: scope || "local" }); }).then(function () { lastSession = null; cachedProfile = null; });
     },
 
     // The account row. Created on sign-up by a database trigger; ensure_profile() covers the rare miss.

@@ -6,7 +6,7 @@
 //   /auth/v1      Google-style PKCE sign-in with a fake account picker, token, refresh, user, logout
 //   /rest/v1      PostgREST subset (select/insert/update/delete with filters, rpc)
 //   /storage/v1   upload, authenticated download, signed URLs, remove (same RLS policies as production)
-//   /functions/v1 resolve-share, report-share (the real handler code)
+//   /functions/v1 resolve-share, report-share, delete-account (the real handler code)
 //   /__admin      test helpers (run SQL, reset)
 //
 //   node --experimental-strip-types fake-supabase/server.mjs [port]
@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { PGlite } from '@electric-sql/pglite';
 import { makeResolveHandler } from '../../functions/resolve-share/handler.ts';
 import { makeReportHandler } from '../../functions/report-share/handler.ts';
+import { makeDeleteHandler } from '../../functions/delete-account/handler.ts';
 import { RateLimiter } from '../../functions/_shared/http.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -167,7 +168,7 @@ async function handleAuth(req, res, url, body) {
     const c = verify((req.headers.authorization || '').replace(/^Bearer\s+/i, ''));
     if (!c || !c.sub) return send(req, res, 401, { message: 'invalid JWT' });
     const u = (await asSuper(d => d.query('select id, email, raw_user_meta_data from auth.users where id=$1', [c.sub]))).rows[0];
-    return send(req, res, 200, { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.raw_user_meta_data, app_metadata: { provider: 'google' } });
+    return send(req, res, 200, { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.raw_user_meta_data, app_metadata: { provider: 'google', providers: ['google'] }, identities: [{ id: u.id, user_id: u.id, provider: 'google', identity_data: u.raw_user_meta_data }] });
   }
   if (p === '/logout') return send(req, res, 204);
   if (p === '/settings') return send(req, res, 200, { external: { google: true }, disable_signup: false });
@@ -370,9 +371,18 @@ const reportHandler = makeReportHandler({
     return true;
   },
 });
+const deleteHandler = makeDeleteHandler({
+  allowedOrigins: ['http://127.0.0.1:8123', 'http://localhost:8123', 'https://johnzach31.github.io'],
+  limiter: new RateLimiter(50, 60000),
+  userFromToken: async (jwt) => { const c = verify(jwt); return c && c.sub ? c.sub : null; },
+  listAssetPaths: async (uid) => (await asSuper(d => d.query('select storage_path from public.assets where owner_id=$1', [uid]))).rows.map(r => r.storage_path),
+  purge: async (uid) => { await asCaller({ role: 'service_role' }, d => d.query('select public.purge_user_data($1)', [uid])); },
+  deleteAuthUser: async (uid) => { await asSuper(d => d.query('delete from auth.users where id=$1', [uid])); },
+  removeFiles: async (paths) => { for (const p of paths) blobs.delete(p); },
+});
 async function handleFunction(req, res, url, body) {
   const name = url.pathname.replace('/functions/v1/', '');
-  const h = name === 'resolve-share' ? resolveHandler : name === 'report-share' ? reportHandler : null;
+  const h = name === 'resolve-share' ? resolveHandler : name === 'report-share' ? reportHandler : name === 'delete-account' ? deleteHandler : null;
   if (!h) return send(req, res, 404, { message: 'function not found' });
   const r = await h(new Request(ORIGIN + url.pathname, { method: req.method, headers: req.headers, body: ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? undefined : body }));
   const out = Buffer.from(await r.arrayBuffer());

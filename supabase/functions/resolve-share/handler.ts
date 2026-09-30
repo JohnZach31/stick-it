@@ -44,6 +44,9 @@ export function makeResolveHandler(deps: ResolveDeps) {
     }
     return json(200, {
       ok: true, type: res.type, by_name: res.by_name, created_at: res.created_at,
+      by_bio: res.by_bio ?? null,
+      // only meaningful if the avatar could be signed; the id is not a secret, the URL is short-lived
+      by_avatar: res.by_avatar && outAssets[res.by_avatar] ? res.by_avatar : null,
       board: res.board ?? null, objects: res.objects ?? [], assets: outAssets,
     }, { ...cors, "cache-control": "private, max-age=60" });
   };

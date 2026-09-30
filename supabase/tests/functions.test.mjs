@@ -4,6 +4,7 @@ import { RateLimiter } from '../functions/_shared/http.ts';
 import { makeResolveHandler } from '../functions/resolve-share/handler.ts';
 import { makeReportHandler } from '../functions/report-share/handler.ts';
 import { makeGcHandler } from '../functions/gc-assets/handler.ts';
+import { makeDeleteHandler } from '../functions/delete-account/handler.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log('  FAIL  ' + m); } };
@@ -93,6 +94,62 @@ const req = (body, { method = 'POST', origin = ORIGIN, ip = '1.1.1.1' } = {}) =>
   const partial = []; let n = 0;
   await call(makeGcHandler(deps({ removeFiles: async (p) => { if (++n === 2) throw new Error('storage error'); partial.push(p.length); }, clearTombstones: async () => {} })), 's3cret-value').catch(() => {});
   ok(partial.length === 1, 'a failing batch stops the run (the rest stay queued for next time)');
+}
+
+// ---------------------------------------------------------------- delete-account
+{
+  const log = [];
+  const mk = (over = {}) => makeDeleteHandler({
+    allowedOrigins: [ORIGIN], limiter: new RateLimiter(3, 60000),
+    userFromToken: async (jwt) => (jwt === 'good-token' ? 'user-1' : null),
+    listAssetPaths: async (u) => { log.push('list:' + u); return ['a/1/x.jpg', 'a/2/y.png']; },
+    purge: async (u) => { log.push('purge:' + u); },
+    deleteAuthUser: async (u) => { log.push('auth:' + u); },
+    removeFiles: async (p) => { log.push('files:' + p.length); },
+    ...over });
+  const dreq = (body, token = 'good-token', o = {}) => {
+    const r = req(body, o); if (token) r.headers.set('authorization', 'Bearer ' + token); return r;
+  };
+  let r = await mk()(dreq({ confirm: 'DELETE' }, null));
+  ok(r.status === 401 && log.length === 0, 'no token: nothing happens');
+  r = await mk()(dreq({ confirm: 'DELETE' }, 'forged'));
+  ok(r.status === 401 && log.length === 0, 'bad token: nothing happens');
+  r = await mk()(dreq({}));
+  ok(r.status === 400 && log.length === 0, 'missing confirmation: nothing happens');
+  r = await mk()(dreq({ confirm: 'delete' }));
+  ok(r.status === 400 && log.length === 0, 'confirmation is exact');
+  r = await mk()(dreq({ confirm: 'DELETE', user_id: 'someone-else' }));
+  ok(r.status === 200 && log.join() === 'list:user-1,purge:user-1,auth:user-1,files:2', 'deletes only the caller, in the right order (ignores any user id in the body)');
+  log.length = 0;
+  r = await mk({ purge: async () => { throw new Error('db'); } })(dreq({ confirm: 'DELETE' }));
+  ok(r.status === 500 && !log.some(l => l.startsWith('auth:')), 'if the purge fails the auth user is kept and failure is reported');
+  r = await mk({ removeFiles: async () => { throw new Error('storage'); } })(dreq({ confirm: 'DELETE' }));
+  ok(r.status === 200, 'file removal failures are left to the garbage collector, not reported as failure');
+  r = await mk()(dreq({ confirm: 'DELETE' }, 'good-token', { method: 'GET' }));
+  ok(r.status === 405, 'only POST');
+  r = await mk()(new Request('https://x.test/fn', { method: 'OPTIONS', headers: { origin: ORIGIN } }));
+  ok(r.status === 204 && r.headers.get('access-control-allow-origin') === ORIGIN, 'CORS preflight for the app origin');
+  r = await mk()(dreq({ confirm: 'DELETE' }, 'good-token', { origin: 'https://evil.example' }));
+  ok(!r.headers.get('access-control-allow-origin'), 'other origins get no CORS access');
+  const lim = mk({ limiter: new RateLimiter(2, 60000) });
+  await lim(dreq({ confirm: 'DELETE' }, 'forged')); await lim(dreq({ confirm: 'DELETE' }, 'forged'));
+  ok((await lim(dreq({ confirm: 'DELETE' }, 'forged'))).status === 429, 'rate limited');
+}
+
+// ---------------------------------------------------------------- resolve-share identity passthrough
+{
+  const avatarPath = 'a/33333333-3333-3333-3333-333333333333/me.jpg';
+  const share = { ok: true, type: 'object_snapshot', by_name: 'Iris', by_bio: 'Hello', by_avatar: 'AV', created_at: 'now', board: null,
+    objects: [], assets: { AV: { path: avatarPath, mime: 'image/jpeg', kind: 'avatar', width: 256, height: 256, duration: null } } };
+  const mk = (s) => makeResolveHandler({ allowedOrigins: [ORIGIN], limiter: new RateLimiter(9, 60000),
+    resolve: async () => s, sign: async (paths) => Object.fromEntries(paths.map(p => [p, 'https://signed.example/x?t=1'])) });
+  let b = await (await mk(share)(req({ token: TOKEN }))).json();
+  ok(b.by_bio === 'Hello' && b.by_avatar === 'AV' && b.assets.AV.url.startsWith('https://signed'), 'name, bio and a signed avatar url reach the viewer');
+  ok(!JSON.stringify(b).includes(avatarPath), 'the avatar storage path is never returned');
+  b = await (await makeResolveHandler({ allowedOrigins: [ORIGIN], limiter: new RateLimiter(9, 60000), resolve: async () => share, sign: async () => ({}) })(req({ token: TOKEN }))).json();
+  ok(b.by_avatar === null, 'an avatar that could not be signed is not advertised');
+  b = await (await mk({ ...share, by_bio: undefined, by_avatar: null, by_name: null, assets: {} })(req({ token: TOKEN }))).json();
+  ok(b.by_bio === null && b.by_avatar === null && b.by_name === null, 'anonymous shares carry no identity');
 }
 
 console.log(`${pass} passed, ${fail} failed`);

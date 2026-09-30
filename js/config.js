@@ -28,6 +28,7 @@
     MEDIA_LIMITS: {
       image:       { maxBytes: 10 * 1024 * 1024 },
       board_cover: { maxBytes: 5 * 1024 * 1024 },
+      avatar:      { maxBytes: 2 * 1024 * 1024 },
       audio:       { maxBytes: 25 * 1024 * 1024 },
       video:       { maxBytes: 50 * 1024 * 1024 }   // Supabase Free caps a single upload at 50 MB
     },

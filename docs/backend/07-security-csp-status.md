@@ -21,6 +21,6 @@ Not shipped now because it would risk breaking the existing app. Decision record
 - **Realtime/presence (phase 8)**: the migration enables the publication, but the client polls (20 s) and the local test double has no websockets, so it could not be verified. Not shipped as a claim.
 - Comments/reminders: schema only. Billing, AI, CRDT, push: none.
 - Moderation: reporting + link disabling only.
-- Settings sync: display name is synced; theme, font lock, cleanup and tutorial state stay device-local by design.
+- Settings sync: account profile and sharing/personalization preferences are synced (see 08-account-settings.md); theme, font lock, cleanup and tutorial state stay device-local by design.
 - Export/import: pictures are embedded in the export file; voice memos/videos are not (the dialog says so).
 - Tested against a local stand-in only. **The live smoke test in 06-setup.md is still required.**
