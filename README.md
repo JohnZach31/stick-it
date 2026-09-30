@@ -31,7 +31,7 @@ Share a board with a link that just *works*.
 | 🔍 **Search, minimap, undo** | Type to filter notes, jump around a big board, and undo almost anything: moves, deletes, colours, fonts, imports. |
 | 🧲 **Handle a few at once** | Ctrl/Cmd+click or drag a box to select notes, then move, duplicate, copy/paste, share or send them to another board together. |
 | ⌨️ **Real keyboard shortcuts** | Select, nudge, resize, zoom, all documented in-app, one hover away. |
-| 📱 **Built for touch too** | Bigger tap targets on mobile, and the on-screen keyboard won't swallow the note you're typing into. |
+| 📱 **Quick capture on your phone** | Tap the board and choose what to put down: a sticky, a photo, a voice memo or a video. Bigger tap targets, and the on-screen keyboard won't swallow the note you're typing into. |
 
 ---
 

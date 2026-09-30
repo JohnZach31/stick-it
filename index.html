@@ -346,6 +346,90 @@
   #snapStage .pBack{ transform:translate(var(--bx, 3px), var(--by, 4px)); }
   #snapStage .pCaption{ box-shadow:none !important; }
 
+  /* ---------- mobile quick capture ---------- */
+  .captureMenu{
+    position:fixed; z-index:10040; display:grid; grid-template-columns:repeat(4, 64px); gap:4px; padding:6px;
+    background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 12px 30px var(--shadow), 0 1px 0 rgba(255,255,255,0.5) inset;
+    animation:capIn .16s cubic-bezier(.3,1.4,.6,1) both;
+  }
+  @keyframes capIn{ from{ opacity:0; transform:scale(.9) translateY(6px); } to{ opacity:1; transform:none; } }
+  .captureMenu button{
+    all:unset; box-sizing:border-box; height:62px; border-radius:12px; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    font:600 0.72rem 'Sora', sans-serif; color:var(--ink); -webkit-tap-highlight-color:transparent;
+  }
+  .captureMenu button:active, .captureMenu button:hover{ background:var(--accent-soft); }
+  .captureMenu button svg{ width:22px; height:22px; color:var(--accent); }
+  .captureDot{ position:fixed; z-index:10039; width:10px; height:10px; margin:-5px 0 0 -5px; border-radius:50%; background:var(--accent); opacity:0.5; pointer-events:none; }
+  /* recording sheet */
+  .recSheet{
+    position:fixed; left:50%; bottom:calc(18px + env(safe-area-inset-bottom, 0px)); transform:translateX(-50%);
+    z-index:10041; display:flex; align-items:center; gap:10px; padding:10px 10px 10px 16px;
+    background:var(--panel); border:1px solid var(--line); border-radius:999px; box-shadow:0 12px 30px var(--shadow);
+    font:600 0.86rem 'Sora', sans-serif; color:var(--ink); white-space:nowrap; max-width:calc(100vw - 24px);
+  }
+  .recDot{ width:10px; height:10px; border-radius:50%; background:#d64236; animation:recPulse 1.2s ease-in-out infinite; flex:none; }
+  @keyframes recPulse{ 50%{ opacity:0.3; } }
+  .recTime{ font-variant-numeric:tabular-nums; min-width:3.2em; }
+  /* board media objects: a paper voice-memo strip and a film still */
+  .boardObj{
+    position:absolute; transform:rotate(var(--rot, 0deg)); cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none;
+    transition:transform .18s ease;
+  }
+  .boardObj:hover{ transform:rotate(var(--rot, 0deg)) translateY(-3px); z-index:9998 !important; }
+  .boardObj.dragging{ cursor:grabbing; transition:none; z-index:9999 !important; transform:rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important; animation:wobbleSoft .8s ease-in-out infinite; }
+  .boardObj.new{ animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }
+  .boardObj.removing{ animation:popOut .26s ease-in forwards; pointer-events:none; }
+  .boardObj.selected{ outline:1.5px solid var(--sel-ring); outline-offset:6px; }
+  .boardObj.selected .pCtl{ display:flex; }
+  .boardObj.static{ cursor:default; }
+  .boardObj.static:hover{ transform:rotate(var(--rot, 0deg)); }
+  .memoObj{
+    width:236px; padding:10px 14px 10px 10px; display:flex; align-items:center; gap:10px;
+    background-color:#f5eedb;
+    background-image:repeating-linear-gradient(180deg, transparent 0 17px, rgba(90,120,160,0.12) 17px 18px);
+    border-radius:2px 3px 2px 4px; box-shadow:0 1px 1.5px rgba(0,0,0,0.16), 3px 7px 14px var(--shadow); color:#3a3528;
+  }
+  .memoObj .mTape{ position:absolute; top:-8px; left:18px; width:44px; height:16px; background:rgba(255,255,255,0.55); transform:rotate(-4deg); box-shadow:0 1px 2px rgba(0,0,0,0.1); }
+  .mPlay, .fPlay{
+    all:unset; box-sizing:border-box; flex:none; display:flex; align-items:center; justify-content:center; cursor:pointer;
+    width:38px; height:38px; border:2px solid #3a3528; border-radius:48% 52% 50% 46% / 52% 46% 54% 48%; color:#3a3528;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mPlay svg, .fPlay svg{ width:15px; height:15px; }
+  .mPlay:active, .fPlay:active{ transform:scale(0.92); }
+  .memoObj .mBody{ flex:1; min-width:0; }
+  .memoObj .pCaption{ font-size:1.05rem; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .memoObj .pCaption.editing{ white-space:normal; }
+  .memoObj .mWave{ display:block; width:100%; height:16px; margin-top:3px; color:#3a3528; opacity:0.55; }
+  .memoObj .mTime{ flex:none; font:600 0.72rem 'Sora', sans-serif; opacity:0.7; font-variant-numeric:tabular-nums; }
+  .boardObj.missing .mPlay, .boardObj.missing .fPlay{ opacity:0.35; cursor:default; }
+  .boardObj .mNote{ font:500 0.62rem 'Sora', sans-serif; opacity:0.7; margin-top:2px; }
+  .filmObj{ width:calc(var(--pw, 200px) + 16px); }
+  .filmObj .fStrip{
+    padding:15px 8px; border-radius:2px;
+    background:
+      repeating-linear-gradient(90deg, #e8e1cf 0 7px, transparent 7px 15px) 6px 4px / calc(100% - 12px) 6px no-repeat,
+      repeating-linear-gradient(90deg, #e8e1cf 0 7px, transparent 7px 15px) 6px calc(100% - 4px) / calc(100% - 12px) 6px no-repeat,
+      #1f1c1a;
+    box-shadow:0 1px 2px rgba(0,0,0,0.25), 3px 8px 16px var(--shadow);
+  }
+  .filmObj .fFrame{ position:relative; width:var(--pw, 200px); aspect-ratio:var(--ar, 16 / 9); background:#35302b; overflow:hidden; }
+  .filmObj .fFrame img{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; }
+  .filmObj .fPlay{ position:absolute; left:50%; top:50%; margin:-19px 0 0 -19px; border-color:#f3eee2; color:#f3eee2; background:rgba(0,0,0,0.25); }
+  .filmObj .fTime{ position:absolute; right:6px; bottom:5px; font:600 0.66rem 'Sora', sans-serif; color:#f3eee2; background:rgba(0,0,0,0.45); padding:1px 5px; border-radius:4px; }
+  .filmObj .pCaption{
+    display:table; margin:7px auto 0; max-width:var(--pw, 200px); background:#fbf8ef; color:#3a3528; padding:2px 10px 3px;
+    font-size:1rem; transform:rotate(-2deg); box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  }
+  .filmObj .pCaption.empty:not(.editing){ display:none; }
+  .filmObj .pCaption.editing{ display:block; width:fit-content; min-width:5em; min-height:1.3em; }
+  .boardObj .pCaption{ outline:none; }
+  .boardObj .pCaption.editing{ cursor:text; background:rgba(255,255,255,0.4); user-select:text; -webkit-user-select:text; touch-action:auto; }
+  #snapStage .memoObj, #snapStage .fStrip{ box-shadow:none !important; }
+  .videoModal video{ width:100%; max-height:70vh; border-radius:10px; background:#000; display:block; }
+
   /* focus mode: the note is picked up and brought close; the board dims behind it */
   .focusScrim{ position:fixed; inset:0; z-index:10003; background:rgba(40,32,12,0.32); animation:acctFade .18s ease both; }
   body.dark .focusScrim{ background:rgba(3,2,10,0.55); }
@@ -1473,6 +1557,12 @@
     download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 20h16"></path></svg>',
     bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>',
     tick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 12.5 9.5 18 20 6.5"></polyline></svg>',
+    mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>',
+    camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>',
+    film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"></path></svg>',
+    sticky: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v10l-6 6H4z"></path><path d="M14 20v-6h6"></path></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"></path></svg>',
+    pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>',
     pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>'
   };
 
@@ -1728,6 +1818,7 @@
   }
   // Notes from before this existed get stable values derived from their id.
   function ensurePhys(n){
+    if(isAV(n)){ if(!n.phys || typeof n.phys !== "object") n.phys = {}; return n.phys; }
     if(isPhoto(n)){
       if(!n.phys || typeof n.phys !== "object" || n.phys.cut == null) n.phys = makePhotoPhys(seededRng(hashStr(String(n.id || n.image.length))));
       return n.phys;
@@ -1837,8 +1928,28 @@
   var PHOTO_STYLE_NAMES = {polaroid:"Polaroid", cutout:"Cut-out", mounted:"Mounted cut-out"};
   var PHOTO_MIN_W = 80, PHOTO_MAX_W = 900;
   function isPhoto(n){ return !!n && n.type === "photo"; }
+  // Voice memos and videos: the board keeps metadata (and a small poster frame);
+  // the media file itself lives in this device's IndexedDB under `mediaId`.
+  function isAV(n){ return !!n && (n.type === "audio" || n.type === "video"); }
+  function isObj(n){ return isPhoto(n) || isAV(n); }
   function normalizeIncoming(item){
     item = item || {};
+    if(item.type === "audio" || item.type === "video"){
+      var mid = /^[\w-]{1,64}$/.test(String(item.mediaId || "")) ? String(item.mediaId) : null;
+      if(!mid) return null;
+      return {
+        id: newId(), type: item.type,
+        x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0),
+        w: Math.round(clampNum(item.w, 120, 480, 200)),
+        imgRatio: clampNum(item.imgRatio, 0.2, 5, 0.5625),
+        rot: clampNum(item.rot, -12, 12, 0), z: 1,
+        mediaId: mid, duration: clampNum(item.duration, 0, 86400, 0),
+        mime: String(item.mime || "").slice(0, 60), poster: safeImage(item.poster),
+        caption: String(item.caption || "").replace(/\s+/g, " ").trim().slice(0, 120),
+        font: FONT_BY_NAME[item.font] ? item.font : pickFont(),
+        createdAt: clampNum(item.createdAt, 0, 1e14, Date.now()), phys: {}
+      };
+    }
     if(item.type === "photo"){
       var src = safeImage(item.image);
       if(!src) return null;
@@ -1877,7 +1988,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","mediaId","duration","mime","poster","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1959,7 +2070,7 @@
   // Desktop: double-click makes a note (single clicks stay free for selecting).
   // Touch screens keep one-tap notes until mobile capture gets its own design.
   var COARSE = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-  var CREATE_HINT = COARSE ? "Tap anywhere to stick a note" : "Double-click anywhere to stick a note";
+  var CREATE_HINT = COARSE ? "Tap anywhere to add something" : "Double-click anywhere to stick a note";
   var singleNoteMode = /^#s[ng]=/.test(location.hash); // a public note or group of notes
   if(readOnly) document.body.classList.add("read-only");
 
@@ -1992,7 +2103,7 @@
     var stored = safeGet(NOTES_KEY);
     firstRun = !stored;
     notes = stored || [
-      {id:"seed-1", x:60, y:40, html:(COARSE ? "Tap" : "Double-click") + " anywhere on the board to stick a new note here.", bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
+      {id:"seed-1", x:60, y:40, html:(COARSE ? "Tap anywhere on the board to add a note, a photo, a voice memo or a video." : "Double-click anywhere on the board to stick a new note here."), bg:randomColor(), font:pickFont(), rot:rand(-6,4), z:1, categoryIndex:0},
       {id:"seed-2", x:320, y:170, html:"Drag the little tab at the top to move me around.", bg:randomColor(), font:pickFont(), rot:rand(-4,6), z:2, categoryIndex:0},
       {id:"seed-3", x:70, y:280, html:"Tap \u2022\u2022\u2022 on a note for headings, checklists, a highlighter, colours and more.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
     ];
@@ -2716,16 +2827,17 @@
   // ---------- note content helpers ----------
   // the words someone can see on an item (a note's writing, a photo's caption)
   function itemText(n){
-    if(isPhoto(n)) return n.caption || "";
+    if(isObj(n)) return n.caption || "";
     return n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "").trim();
   }
   function itemWord(list){
-    var photos = list.filter(isPhoto).length;
-    if(list.length === 1) return photos ? "photo" : "note";
-    return photos === list.length ? "photos" : (photos ? "items" : "notes");
+    function kind(n){ return n.type === "audio" ? "recording" : n.type === "video" ? "video" : isPhoto(n) ? "photo" : "note"; }
+    var kinds = list.map(kind);
+    if(list.length === 1) return kinds[0];
+    return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
-    if(isPhoto(n) || n.image) return true;
+    if(isObj(n) || n.image) return true;
     if(n.isTask && n.due) return true;
     var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
     if(/<ul[^>]*checklist/i.test(html)) return true;
@@ -3494,7 +3606,8 @@
       cap.classList.toggle("empty", !v);
       if(v === (n.caption || "")) return;
       n.caption = v;
-      if(n.el) n.el.querySelector("img").alt = v;
+      var alt = n.el && n.el.querySelector(".pFrame img");
+      if(alt) alt.alt = v;
       saveNotes();
       recordChange(v ? (before[n.id].caption ? "Edit caption" : "Add caption") : "Remove caption", before);
     }
@@ -3643,6 +3756,382 @@
     }).catch(function(){ toast("That image couldn't be read."); });
   }
 
+  // ---------- local media store (IndexedDB) for voice memos and videos ----------
+  // localStorage can't hold audio/video, so files go to IndexedDB on this device.
+  // They don't sync, aren't in exported JSON or shared links, and a missing file
+  // shows as "not on this device". Remote media storage is a backend task.
+  var MediaStore = (function(){
+    var dbp = null, urls = new Map();
+    function db(){
+      if(!dbp) dbp = new Promise(function(resolve, reject){
+        if(!window.indexedDB){ reject(new Error("IndexedDB unavailable")); return; }
+        var req = indexedDB.open("stickit-media", 1);
+        req.onupgradeneeded = function(){ req.result.createObjectStore("media"); };
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ reject(req.error); };
+      });
+      return dbp;
+    }
+    function run(mode, fn){
+      return db().then(function(d){
+        return new Promise(function(resolve, reject){
+          var t = d.transaction("media", mode), r = fn(t.objectStore("media"));
+          t.oncomplete = function(){ resolve(r && r.result); };
+          t.onerror = t.onabort = function(){ reject(t.error); };
+        });
+      });
+    }
+    return {
+      put: function(id, blob){ return run("readwrite", function(st){ return st.put(blob, id); }); },
+      remember: function(id, blob){ var u = URL.createObjectURL(blob); urls.set(id, u); return u; },
+      url: function(id){
+        if(urls.has(id)) return Promise.resolve(urls.get(id));
+        return run("readonly", function(st){ return st.get(id); }).then(function(b){
+          if(!b) return null;
+          var u = URL.createObjectURL(b); urls.set(id, u); return u;
+        }).catch(function(){ return null; });
+      }
+    };
+  })();
+  var MAX_STORED_VIDEO = 60 * 1024 * 1024;
+  function fmtDur(sec){
+    sec = Math.max(0, Math.round(sec || 0));
+    return Math.floor(sec / 60) + ":" + pad2(sec % 60);
+  }
+  function objSize(n){
+    if(isPhoto(n)) return photoFrameSize(n);
+    if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
+    if(n.type === "audio") return {w:236, h:66};
+    var w = n.w || 200;
+    return {w:w + 16, h:w * (n.imgRatio || 0.5625) + 30 + (n.caption ? 32 : 0)};
+  }
+  function waveSvg(seed){
+    var rng = seededRng(hashStr(String(seed))), bars = "";
+    for(var i = 0; i < 34; i++){
+      var h = 2 + Math.round(rng() * 12 * (0.45 + 0.55 * Math.sin((i / 33) * Math.PI)));
+      bars += '<rect x="' + (i * 6) + '" y="' + (8 - h / 2) + '" width="3" height="' + h + '" rx="1.5"></rect>';
+    }
+    return '<svg class="mWave" viewBox="0 0 204 16" preserveAspectRatio="none" fill="currentColor">' + bars + "</svg>";
+  }
+  function buildAVEl(item){
+    var el, cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
+    cap.dir = "auto";
+    cap.textContent = item.caption || "";
+    cap.style.fontFamily = fontStack(item.font);
+    var play = document.createElement("button");
+    play.innerHTML = ICONS.play;
+    play.setAttribute("aria-label", "Play");
+    if(item.type === "audio"){
+      el = makeDiv("boardObj memoObj");
+      el.appendChild(makeDiv("mTape"));
+      play.className = "mPlay";
+      el.appendChild(play);
+      var body = makeDiv("mBody");
+      body.appendChild(cap);
+      var wave = document.createElement("div");
+      wave.innerHTML = waveSvg(item.mediaId || item.id);
+      body.appendChild(wave.firstChild);
+      el.appendChild(body);
+      var tm = makeDiv("mTime"); tm.textContent = fmtDur(item.duration);
+      el.appendChild(tm);
+    } else {
+      el = makeDiv("boardObj filmObj");
+      el.style.setProperty("--pw", (item.w || 200) + "px");
+      var strip = makeDiv("fStrip"), frame = makeDiv("fFrame");
+      frame.style.setProperty("--ar", "1 / " + (item.imgRatio || 0.5625));
+      if(item.poster){ var im = document.createElement("img"); im.alt = ""; im.draggable = false; im.src = item.poster; frame.appendChild(im); }
+      play.className = "fPlay";
+      frame.appendChild(play);
+      if(item.duration){ var ft = makeDiv("fTime"); ft.textContent = fmtDur(item.duration); frame.appendChild(ft); }
+      strip.appendChild(frame);
+      el.appendChild(strip);
+      el.appendChild(cap);
+    }
+    el.style.setProperty("--rot", (item.rot || 0) + "deg");
+    return {el:el, cap:cap, play:play};
+  }
+  var playing = null; // {n, audio}
+  function stopMediaFor(n){
+    if(playing && playing.n.id === n.id){ playing.audio.pause(); playing = null; }
+  }
+  function markMissing(n){
+    if(!n.el) return;
+    n.el.classList.add("missing");
+    if(n.el.querySelector(".mNote")) return;
+    var note = makeDiv("mNote");
+    note.textContent = "Not on this device";
+    var host = n.el.querySelector(".mBody") || n.el;
+    host.appendChild(note);
+  }
+  function playAV(n, btn){
+    MediaStore.url(n.mediaId).then(function(u){
+      if(!u){ markMissing(n); toast("This " + (n.type === "audio" ? "recording" : "video") + " isn't stored on this device."); return; }
+      if(n.type === "video"){ openVideoModal(n, u); return; }
+      if(playing && playing.n.id === n.id){
+        if(playing.audio.paused){ playing.audio.play(); btn.innerHTML = ICONS.pause; }
+        else { playing.audio.pause(); btn.innerHTML = ICONS.play; }
+        return;
+      }
+      if(playing){ playing.audio.pause(); var ob = playing.n.el && playing.n.el.querySelector(".mPlay"); if(ob) ob.innerHTML = ICONS.play; }
+      var a = new Audio(u);
+      playing = {n:n, audio:a};
+      a.addEventListener("ended", function(){ btn.innerHTML = ICONS.play; if(playing && playing.audio === a) playing = null; });
+      a.play().then(function(){ btn.innerHTML = ICONS.pause; }).catch(function(){ toast("Couldn't play this recording here."); });
+    });
+  }
+  function openVideoModal(n, url){
+    var content = makeDiv("videoModal");
+    var v = document.createElement("video");
+    v.src = url; v.controls = true; v.playsInline = true; v.autoplay = true;
+    content.appendChild(v);
+    openModal({title:n.caption || "Video", content:content, width:560, onClose:function(){ v.pause(); }});
+  }
+  function renderAV(n, isNew){
+    var b = buildAVEl(n), el = b.el;
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id;
+    el.style.left = n.x + "px";
+    el.style.top = n.y + "px";
+    el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = b.cap;
+    b.play.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    b.play.addEventListener("click", function(e){ e.stopPropagation(); playAV(n, b.play); });
+    if(!readOnly){
+      var more = document.createElement("button");
+      more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options"; more.setAttribute("aria-label", "Options");
+      more.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      more.addEventListener("click", function(e){ e.stopPropagation(); openAVMenu(n, more); });
+      el.appendChild(more);
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(b.cap.isContentEditable && b.cap.contains(e.target)) return;
+        e.preventDefault();
+        endEditing(); closeCaptureMenu();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);
+      });
+      el.addEventListener("dblclick", function(e){
+        e.preventDefault(); e.stopPropagation();
+        if(b.cap.contains(e.target)) editCaption(n);
+      });
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once:true});
+    }
+    boardInner.appendChild(el);
+    MediaStore.url(n.mediaId).then(function(u){ if(!u) markMissing(n); });
+    return el;
+  }
+  function openAVMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu");
+    if(!pop) return;
+    pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Rename" : "Add a label", function(){ closeFloatingPopovers(); editCaption(n); }));
+    pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
+    var moveItem = menuItem(ICONS.move, "Move to board", function(){
+      var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
+      if(open){ moveItem.nextSibling.remove(); return; }
+      moveItem.parentNode.insertBefore(boardPicker(document.createDocumentFragment(), [n.id]), moveItem.nextSibling);
+    }, {kbd:"\u203A"});
+    pop.appendChild(moveItem);
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
+    var hint = makeDiv("menuHint");
+    hint.textContent = "Stored on this device only for now.";
+    pop.appendChild(hint);
+  }
+  function drawThumbAV(g, n, it, sc, ox, oy, dark){
+    var w = it.w * sc, h = it.h * sc;
+    g.save();
+    g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
+    g.rotate((n.rot || 0) * Math.PI / 180);
+    g.shadowColor = dark ? "rgba(0,0,0,0.6)" : "rgba(60,45,10,0.3)"; g.shadowBlur = 3; g.shadowOffsetY = 1.2;
+    g.fillStyle = n.type === "audio" ? "#f5eedb" : "#1f1c1a";
+    g.fillRect(-w/2, -h/2, w, h);
+    g.shadowColor = "transparent";
+    if(n.type === "audio"){
+      g.strokeStyle = "#3a3528"; g.lineWidth = Math.max(0.5, 2 * sc);
+      g.beginPath(); g.arc(-w/2 + 29 * sc, 0, 17 * sc, 0, 7); g.stroke();
+      g.fillStyle = "rgba(58,53,40,0.5)"; g.fillRect(-w/2 + 56 * sc, 2 * sc, w - 100 * sc, 6 * sc);
+    } else if(n.poster){
+      var im = thumbImage(n.poster);
+      if(im.complete && im.naturalWidth) g.drawImage(im, -w/2 + 8 * sc, -h/2 + 15 * sc, w - 16 * sc, (n.w || 200) * (n.imgRatio || 0.5625) * sc);
+    }
+    g.restore();
+  }
+
+  // ---------- mobile quick capture: tap the desk, choose what to put down ----------
+  var captureMenuEl = null, captureDotEl = null, captureClosedAt = 0;
+  function closeCaptureMenu(){
+    if(captureMenuEl){ captureMenuEl.remove(); captureMenuEl = null; }
+    if(captureDotEl){ captureDotEl.remove(); captureDotEl = null; }
+  }
+  document.addEventListener("pointerdown", function(e){
+    if(captureMenuEl && !captureMenuEl.contains(e.target)){ closeCaptureMenu(); captureClosedAt = Date.now(); }
+  }, true);
+  window.addEventListener("resize", closeCaptureMenu);
+  var captureInputs = {};
+  function captureInput(kind){
+    if(captureInputs[kind]) return captureInputs[kind];
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.hidden = true;
+    inp.accept = kind === "photo" ? "image/*" : "video/*"; // no `capture`: the phone offers camera *and* library
+    document.body.appendChild(inp);
+    captureInputs[kind] = inp;
+    return inp;
+  }
+  function openCaptureMenu(clientX, clientY, bx, by){
+    closeCaptureMenu();
+    closeFloatingPopovers();
+    var m = makeDiv("captureMenu");
+    m.setAttribute("role", "menu");
+    [["sticky", "Sticky", ICONS.sticky], ["photo", "Photo", ICONS.camera], ["record", "Record", ICONS.mic], ["video", "Video", ICONS.film]].forEach(function(o){
+      var b = document.createElement("button");
+      b.setAttribute("role", "menuitem");
+      b.innerHTML = o[2] + "<span></span>";
+      b.querySelector("span").textContent = o[1];
+      b.addEventListener("click", function(e){ e.stopPropagation(); closeCaptureMenu(); captureAction(o[0], bx, by); });
+      m.appendChild(b);
+    });
+    document.body.appendChild(m);
+    // keep it on screen and above the phone's bottom bars
+    var vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
+    var offX = vv ? vv.offsetLeft : 0, offY = vv ? vv.offsetTop : 0;
+    var headerBottom = document.querySelector(".topbar").getBoundingClientRect().bottom;
+    var w = m.offsetWidth, h = m.offsetHeight, top = clientY - h - 18;
+    if(top < Math.max(offY, headerBottom) + 8) top = clientY + 18; // not over the header: open below the finger
+    top = Math.min(Math.max(Math.max(offY, headerBottom) + 8, top), offY + vh - h - 12);
+    var left = Math.min(Math.max(offX + 8, clientX - w / 2), offX + vw - w - 8);
+    m.style.left = left + "px"; m.style.top = top + "px";
+    var dot = makeDiv("captureDot");
+    dot.style.left = clientX + "px"; dot.style.top = clientY + "px";
+    document.body.appendChild(dot);
+    captureMenuEl = m; captureDotEl = dot;
+  }
+  function captureAction(kind, bx, by){
+    if(kind === "sticky"){ addNoteAt(bx, by); return; }
+    if(kind === "record"){ startRecording(bx, by); return; }
+    var inp = captureInput(kind);
+    inp.value = "";
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0];
+      if(!f) return;
+      if(kind === "photo"){
+        if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a photo."); return; }
+        dropPhotoFiles([f], bx, by);
+      } else {
+        if(f.type.indexOf("video/") !== 0){ toast("That doesn't look like a video."); return; }
+        createVideoObject(f, bx, by);
+      }
+    };
+    inp.click();
+  }
+  function placeObj(n, bx, by){
+    var sz = objSize(n);
+    n.x = Math.max(0, bx - sz.w / 2);
+    n.y = Math.max(0, Math.min(boardHeight() - sz.h - 8, by - sz.h / 2));
+  }
+  function addMediaObject(n, blob, label){
+    MediaStore.remember(n.mediaId, blob);
+    var tooBig = n.type === "video" && blob.size > MAX_STORED_VIDEO;
+    var saved = tooBig ? Promise.reject(new Error("too big")) : MediaStore.put(n.mediaId, blob);
+    insertNotes([n], label);
+    recoverVertical([n]);
+    dismissHint();
+    saved.catch(function(){
+      toast(tooBig ? "This video is too large to keep on the device, so it plays only until you close the page."
+                   : "Couldn't save this on the device, so it plays only until you close the page.");
+    });
+  }
+  // Voice memo: microphone permission is asked only now, when Record is chosen.
+  var recording = null;
+  async function startRecording(bx, by){
+    if(recording) return;
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder)){
+      toast("Recording isn't supported in this browser.");
+      return;
+    }
+    var stream;
+    try{ stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+    catch(e){
+      toast(e && (e.name === "NotAllowedError" || e.name === "SecurityError")
+        ? "Microphone access was blocked. You can allow it in your browser's site settings."
+        : "Couldn't start the microphone.");
+      return;
+    }
+    var types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+    var mime = types.filter(function(t){ return MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t); })[0] || "";
+    var rec;
+    try{ rec = mime ? new MediaRecorder(stream, {mimeType:mime}) : new MediaRecorder(stream); }
+    catch(e){ stream.getTracks().forEach(function(t){ t.stop(); }); toast("Recording isn't supported in this browser."); return; }
+    var chunks = [], started = Date.now(), cancelled = false;
+    var sheet = makeDiv("recSheet");
+    sheet.innerHTML = '<span class="recDot"></span><span>Recording</span><span class="recTime">0:00</span>' +
+      '<button class="pillBtn" data-a="cancel">Cancel</button><button class="pillBtn primary" data-a="stop">Stop</button>';
+    document.body.appendChild(sheet);
+    var timeEl = sheet.querySelector(".recTime");
+    var tick = setInterval(function(){
+      var sec = (Date.now() - started) / 1000;
+      timeEl.textContent = fmtDur(sec);
+      if(sec >= 300) rec.stop(); // five minutes is plenty for a memo
+    }, 250);
+    function finish(cancel){ cancelled = cancel; if(rec.state !== "inactive") rec.stop(); }
+    sheet.querySelector('[data-a="stop"]').addEventListener("click", function(){ finish(false); });
+    sheet.querySelector('[data-a="cancel"]').addEventListener("click", function(){ finish(true); });
+    rec.ondataavailable = function(e){ if(e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = function(){
+      clearInterval(tick);
+      stream.getTracks().forEach(function(t){ t.stop(); });
+      sheet.remove();
+      recording = null;
+      if(cancelled){ toast("Recording discarded."); return; }
+      if(!chunks.length){ toast("Nothing was recorded."); return; }
+      var blob = new Blob(chunks, {type:rec.mimeType || mime || "audio/webm"});
+      var n = {id:newId(), type:"audio", x:0, y:0, rot:rand(-4, 4), mediaId:newId(), duration:(Date.now() - started) / 1000,
+               mime:blob.type, caption:"Recording", font:pickFont(), createdAt:Date.now(), phys:{}};
+      placeObj(n, bx, by);
+      addMediaObject(n, blob, "Add recording");
+    };
+    recording = {stop:function(){ finish(false); }, cancel:function(){ finish(true); }};
+    rec.start(1000);
+  }
+  // Video: the browser's own picker (camera or library); we keep a poster frame and the duration.
+  function videoInfo(url){
+    return new Promise(function(resolve){
+      var v = document.createElement("video"), done = false;
+      v.muted = true; v.playsInline = true; v.preload = "metadata"; v.src = url;
+      function finish(info){ if(done) return; done = true; v.removeAttribute("src"); v.load(); resolve(info); }
+      var t = setTimeout(function(){ finish({duration:isFinite(v.duration) ? v.duration : 0, ratio:v.videoWidth ? v.videoHeight / v.videoWidth : 0.5625, poster:null}); }, 5000);
+      v.addEventListener("loadeddata", function(){ try{ v.currentTime = Math.min(0.5, (v.duration || 1) / 3); }catch(e){} });
+      v.addEventListener("seeked", function(){
+        clearTimeout(t);
+        var poster = null, ratio = v.videoWidth ? v.videoHeight / v.videoWidth : 0.5625;
+        try{
+          var sc = Math.min(1, 320 / Math.max(v.videoWidth, v.videoHeight));
+          var c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(v.videoWidth * sc)); c.height = Math.max(1, Math.round(v.videoHeight * sc));
+          c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+          poster = c.toDataURL("image/jpeg", 0.72);
+        }catch(e){}
+        finish({duration:isFinite(v.duration) ? v.duration : 0, ratio:ratio, poster:poster});
+      });
+      v.addEventListener("error", function(){ clearTimeout(t); finish({duration:0, ratio:0.5625, poster:null}); });
+    });
+  }
+  function createVideoObject(file, bx, by){
+    var url = URL.createObjectURL(file);
+    videoInfo(url).then(function(info){
+      URL.revokeObjectURL(url);
+      var ratio = Math.min(2, Math.max(0.3, info.ratio || 0.5625));
+      var n = {id:newId(), type:"video", x:0, y:0, w:ratio > 1 ? 150 : 210, imgRatio:+ratio.toFixed(4), rot:rand(-4, 4),
+               mediaId:newId(), duration:info.duration, mime:file.type, poster:safeImage(info.poster), caption:"",
+               font:pickFont(), createdAt:Date.now(), phys:{}};
+      placeObj(n, bx, by);
+      addMediaObject(n, file, "Add video");
+    });
+  }
+
   // ---------- focus mode: pick a note up to write on it comfortably ----------
   // The element is lifted out of the (zoomed) board while focused; its saved
   // position and size never change, only the words do.
@@ -3706,6 +4195,7 @@
   // Read-only note for share previews and public pages: same paper, tape, font and formatting.
   function buildStaticNote(item){
     if(isPhoto(item)) return buildStaticPhoto(item);
+    if(isAV(item)){ var sb = buildAVEl(item); sb.el.classList.add("static"); return sb.el; }
     var el = makeDiv("note staticNote");
     el.style.width = (item.w || NOTE_W) + "px";
     applyNoteLook(el, item);
@@ -3727,6 +4217,7 @@
 
   function renderNote(n, isNew, opts){
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
+    if(isAV(n)) return renderAV(n, isNew, opts);
     opts = opts || {};
     var el = document.createElement("div");
     el.className = "note" + (isNew ? " new" : "");
@@ -4049,6 +4540,7 @@
   }
 
   function removeNoteEl(n, animate){
+    if(isAV(n)) stopMediaFor(n);
     var elRef = n.el;
     if(!elRef) return;
     if(!animate){ elRef.remove(); return; }
@@ -4294,7 +4786,7 @@
   function paperCopy(src){
     var c = normalizeIncoming(src);
     if(!c) return null;
-    c.phys = isPhoto(c) ? makePhotoPhys() : makePhys();
+    c.phys = isPhoto(c) ? makePhotoPhys() : isAV(c) ? {} : makePhys();
     c.rot = isPhoto(c) ? rand(-5, 5) : rand(-6, 6);
     c.fontManual = !!src.fontManual;
     return c;
@@ -4696,7 +5188,9 @@
     return {el:outer, fit:fit};
   }
   async function openShareModal(list){
-    var shareable = list.filter(noteHasContent);
+    var avLeft = list.filter(isAV).length;
+    var shareable = list.filter(function(n){ return noteHasContent(n) && !isAV(n); });
+    if(!shareable.length && avLeft){ toast("Voice memos and videos stay on this device for now, so they can't be shared by link yet."); return; }
     if(!shareable.length){
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
       return;
@@ -4741,7 +5235,8 @@
     fine.textContent = "Anyone with the link can view " + (isGroup ? "these notes" : "this note") +
       ", no account needed. Shared links don't expire, so think of it like handing over a paper note: once it's sent, they can keep it." +
       (isGroup ? " Only the selected notes are included, never the rest of your board." : "") +
-      (skipped ? " (" + skipped + " empty note" + (skipped > 1 ? "s were" : " was") + " left out.)" : "") +
+      (skipped - avLeft > 0 ? " (" + (skipped - avLeft) + " empty note" + (skipped - avLeft > 1 ? "s were" : " was") + " left out.)" : "") +
+      (avLeft ? " Voice memos and videos stay on this device for now, so they aren't included." : "") +
       (link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "");
     content.appendChild(fine);
 
@@ -4821,10 +5316,37 @@
       if(e.ctrlKey || e.metaKey || e.shiftKey) return;
       var touchLike = lastBoardPointer === "touch" || lastBoardPointer === "pen";
       if(selected.size > 1){ clearSelection(); return; }
+      if(!touchLike){ clearSelection(); endEditing(); return; }
+      // touch: the first tap just puts down whatever you were holding (keyboard, selection);
+      // a tap on a clear desk opens the capture menu
+      var busy = selected.size > 0 || isTyping() || Date.now() - captureClosedAt < 450;
       clearSelection();
       endEditing();
-      if(touchLike) noteAtEvent(e);
+      if(busy) return;
+      var rect = boardInner.getBoundingClientRect();
+      openCaptureMenu(e.clientX, e.clientY, (e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
     });
+    // long-press on empty board: a sticky straight away (a shortcut; the menu stays the main way)
+    var pressT = null, pressStart = null;
+    boardInner.addEventListener("pointerdown", function(e){
+      if(e.target !== boardInner || e.pointerType !== "touch") return;
+      pressStart = {x:e.clientX, y:e.clientY};
+      clearTimeout(pressT);
+      pressT = setTimeout(function(){
+        pressT = null;
+        closeCaptureMenu();
+        suppressBoardClick = true;
+        setTimeout(function(){ suppressBoardClick = false; }, 700);
+        if(navigator.vibrate) try{ navigator.vibrate(12); }catch(err){}
+        var rect = boardInner.getBoundingClientRect();
+        addNoteAt((pressStart.x - rect.left) / boardZoom, (pressStart.y - rect.top) / boardZoom);
+      }, 550);
+    });
+    boardInner.addEventListener("pointermove", function(e){
+      if(pressT && pressStart && Math.abs(e.clientX - pressStart.x) + Math.abs(e.clientY - pressStart.y) > 10){ clearTimeout(pressT); pressT = null; }
+    });
+    ["pointerup", "pointercancel"].forEach(function(t){ boardInner.addEventListener(t, function(){ clearTimeout(pressT); pressT = null; }); });
+    boardInner.addEventListener("contextmenu", function(e){ if(e.target === boardInner && COARSE) e.preventDefault(); });
     boardInner.addEventListener("dragover", function(e){
       if(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") !== -1){ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }
     });
@@ -4901,7 +5423,7 @@
     clearTimeout(viewSaveT);
     viewSaveT = setTimeout(function(){ safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x}); }, 300);
   }
-  board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); }, {passive:true});
+  board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); closeCaptureMenu(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); }, {passive:true});
 
   // ---------- search ----------
   function runSearch(){
@@ -5380,7 +5902,7 @@
       m.className = "miniNote";
       m.style.left = ((n.x/boardWidth)*trackWidth) + "px";
       m.style.width = Math.max(3, (NOTE_W/boardWidth)*trackWidth) + "px";
-      m.style.background = isPhoto(n) ? "#cfc6b0" : n.bg;
+      m.style.background = isObj(n) ? (n.type === "video" ? "#4a433c" : "#cfc6b0") : n.bg;
       minimapTrack.appendChild(m);
     });
     var view = document.createElement("div");
@@ -5450,12 +5972,12 @@
     stage.appendChild(dots);
     notes.slice().sort(function(a, b){ return (a.z || 0) - (b.z || 0); }).forEach(function(n){
       var h = (n.el && n.el.offsetHeight) || NOTE_H;
-      var wReach = isPhoto(n) ? photoFrameSize(n).w : (n.w || NOTE_W);
+      var wReach = isObj(n) ? objSize(n).w : (n.w || NOTE_W);
       if(n.x + wReach < region.x - 40 || n.x > region.x + region.w + 40) return;
       var el = buildStaticNote(n);
       el.style.left = (n.x - region.x) + "px";
       el.style.top = (n.y - region.y) + "px";
-      if(!isPhoto(n)) el.style.minHeight = h + "px";
+      if(!isObj(n)) el.style.minHeight = h + "px";
       stage.appendChild(el);
     });
     document.body.appendChild(stage);
@@ -5541,7 +6063,7 @@
   // ---------- share: interactive link ----------
   publishBtn.addEventListener("click", async function(){
     shareResult.innerHTML = '<p class="muted">Preparing link\u2026</p>';
-    var payload = await PublicShare.prepare(notes.map(PublicShare.toPublicNote));
+    var payload = await PublicShare.prepare(notes.filter(function(n){ return !isAV(n); }).map(PublicShare.toPublicNote));
     var link = null;
     try{ link = await PublicShare.createLink("board", payload); }catch(e){}
     if(!link){
@@ -5617,10 +6139,14 @@
   function buildTourSteps(){
     var steps = [
       {sel:null, title:"Welcome to Stick-It", body:"A little corkboard for quick notes. Let's walk through what you can do. Hit Next to begin."},
-      {sel:"#boardInner", title:"Stick a note", body:(COARSE ? "Tap" : "Double-click") + " any empty spot on the board to pin a new note there, ready to type into right away."},
+      {sel:"#boardInner", title:COARSE ? "Add something" : "Stick a note", body:COARSE
+        ? "Tap anywhere on the board and choose what to put down: a sticky, a photo, a voice memo or a video. Press and hold for a sticky straight away."
+        : "Double-click any empty spot on the board to pin a new note there, ready to type into right away."},
       {sel:".note", title:"Move, format, delete", body:"Drag a note by its tape to move it. Tap \u2022\u2022\u2022 for headings, checklists, the highlighter, links, colours, duplicate and move. A selected note has a little Aa button that tries another handwriting."},
-      {sel:null, title:"Photos & focus", body:"Drop or paste a photo onto the board to pin it as a print, then use its little style button for a Polaroid or a cut-out. Double-click any note to pick it up and write comfortably; Esc puts it back."},
-      {sel:null, title:"Handle a few at once", body:"Ctrl/Cmd+click notes, or drag a box on empty board, to select several. Then move, duplicate, share or delete them together. Ctrl/Cmd+Z undoes almost anything on the board."},
+      {sel:null, title:"Photos & focus", body:COARSE
+        ? "Photos you add become prints; their little style button switches between a Polaroid and a cut-out. Double-tap a note to pick it up and write comfortably."
+        : "Drop or paste a photo onto the board to pin it as a print, then use its little style button for a Polaroid or a cut-out. Double-click any note to pick it up and write comfortably; Esc puts it back."},
+      {sel:null, title:"Handle a few at once", body:"Ctrl/Cmd+click notes, or drag a box on empty board, to select several. Then move, duplicate, share or delete them together. Ctrl/Cmd+Z undoes almost anything on the board.", desktopOnly:true},
       {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match. Click a match to jump back to the full board with it selected."},
       {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump straight there."},
       {sel:"#accountBtn", title:"Sign in (optional)", body:"Sign in with Google so your real name and photo show up on notes you share, or stay a guest. Totally up to you."},
@@ -5629,6 +6155,7 @@
       {sel:null, title:"That's it!", body:"Click anywhere on the board to get started."}
     ];
     return steps.filter(function(s){
+      if(s.desktopOnly && COARSE) return false;
       if(!s.sel) return true;
       var el = document.querySelector(s.sel);
       if(!el) return false;
@@ -5798,7 +6325,7 @@
     return im;
   }
   function estimateNoteH(n){
-    if(isPhoto(n)) return photoFrameSize(n).h;
+    if(isObj(n)) return objSize(n).h;
     if(n.el && n.el.offsetHeight) return n.el.offsetHeight;
     var inner = (n.w || NOTE_W) - 28, h = 40;
     if(n.image){ var iw = Math.min(inner, n.imgW || defaultImgW(n) || inner); h += iw * (n.imgRatio || 0.75) + 8; }
@@ -5816,7 +6343,7 @@
     g.fillStyle = cs.getPropertyValue("--paper").trim() || "#faf6e8";
     g.fillRect(0, 0, THUMB_W, THUMB_H);
     var pending = false;
-    var items = list.map(function(n){ return {n:n, w:isPhoto(n) ? photoFrameSize(n).w : (n.w || NOTE_W), h:estimateNoteH(n)}; });
+    var items = list.map(function(n){ return {n:n, w:isObj(n) ? objSize(n).w : (n.w || NOTE_W), h:estimateNoteH(n)}; });
     var x1 = 0, y1 = 0, x2 = 900, y2 = 560;
     if(items.length){
       x1 = Math.min.apply(null, items.map(function(i){ return i.n.x; })) - 40;
@@ -5839,6 +6366,7 @@
     items.sort(function(a, b){ return (a.n.z || 0) - (b.n.z || 0); }).forEach(function(it){
       var n = it.n, w = it.w * sc, h = it.h * sc, p = ensurePhys(n);
       if(isPhoto(n)){ if(drawThumbPhoto(g, n, it, sc, ox, oy, dark)) pending = true; return; }
+      if(isAV(n)){ drawThumbAV(g, n, it, sc, ox, oy, dark); return; }
       g.save();
       g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
       g.rotate((n.rot || 0) * Math.PI / 180);
@@ -6230,6 +6758,8 @@
       var mod = e.ctrlKey || e.metaKey;
       var key = e.key;
       if(key === "Escape"){
+        if(captureMenuEl){ closeCaptureMenu(); return; }
+        if(recording){ recording.cancel(); return; }
         if(openPopover){ closeFloatingPopovers(); return; }
         if(focusState){ e.preventDefault(); exitFocus(); return; }
         if(modalOpen()) return;
@@ -6266,6 +6796,7 @@
         if(sel.length){
           var before = captureState(sel.map(function(n){ return n.id; }));
           sel.forEach(function(selNote){
+            if(isAV(selNote)) return; // memo strips and film stills keep their size
             if(isPhoto(selNote)){
               selNote.w = key === "0" ? defaultPhotoW(selNote) : Math.round(Math.min(PHOTO_MAX_W, Math.max(PHOTO_MIN_W, selNote.w * ((key === "-" || key === "_") ? 0.9 : 1.1))));
               if(selNote.el) selNote.el.style.setProperty("--pw", selNote.w + "px");
