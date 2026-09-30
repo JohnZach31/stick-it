@@ -6,7 +6,7 @@
 <title>Stick-It</title>
 <meta name="description" content="A playful sticky-note corkboard. Drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
 <link rel="icon" id="faviconLink" href="data:,">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&family=Secular+One&family=Rubik:wght@500;700&family=Heebo:wght@500;700&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Klee+One:wght@600&family=Yomogi&family=Hachi+Maru+Pop&family=Gaegu:wght@700&family=Amatic+SC:wght@700&family=Karantina:wght@400;700&family=Solitreo&family=Playpen+Sans+Hebrew:wght@400;600&family=Varela+Round&family=Suez+One&family=Fredoka:wght@500&family=Gamja+Flower&family=Hi+Melody&family=Poor+Story&family=Zen+Kurenaido&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&family=Secular+One&family=Rubik:wght@500;700&family=Heebo:wght@500;700&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Klee+One:wght@600&family=Yomogi&family=Hachi+Maru+Pop&family=Gaegu:wght@700&family=Amatic+SC:wght@700&family=Karantina:wght@400;700&family=Solitreo&family=Playpen+Sans+Hebrew:wght@400;600&family=Varela+Round&family=Suez+One&family=Fredoka:wght@500&family=Gamja+Flower&family=Hi+Melody&family=Poor+Story&family=Zen+Kurenaido&family=Gloria+Hallelujah&family=Just+Another+Hand&family=Sue+Ellen+Francisco&family=Walter+Turncoat&family=Rancho&family=Nothing+You+Could+Do&family=Shadows+Into+Light+Two&family=Swanky+and+Moo+Moo&family=Mansalva&family=Delicious+Handrawn&family=Short+Stack&family=Loved+by+the+King&family=Give+You+Glory&family=Waiting+for+the+Sunrise&family=Over+the+Rainbow&family=Kristi&family=Gveret+Levin&family=Rubik+Scribble&family=Alef&family=Miriam+Libre&family=Frank+Ruhl+Libre&family=Bellefair&family=David+Libre&family=Marck+Script&family=Bad+Script&family=Pangolin&family=Comforter&family=Underdog&family=Ruslan+Display&family=Aref+Ruqaa&family=Katibeh&family=Marhey&family=Rakkas&family=Lalezar&family=Reem+Kufi&family=Mada&family=Lateef&family=Harmattan&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
@@ -1319,57 +1319,147 @@
   .migRow .t small{ display:block; color:var(--ink-soft); font-size:0.72rem; margin-top:1px; }
   .migProgress{ height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
   .migProgress > i{ display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease; }
-  /* account settings */
-  .acctCard.acctWide{ width:min(560px, 94vw); max-height:88vh; padding:0; display:flex; flex-direction:column; overflow:hidden; }
-  .acctScroll{ overflow-y:auto; padding:24px 26px 8px; flex:1; min-height:0; }
-  .acctScroll h3{ text-align:left; margin:0 0 2px; }
-  .acctFoot{ display:flex; gap:8px; align-items:center; padding:12px 20px; border-top:1px solid var(--line); background:var(--panel); }
-  .acctFoot .spacer{ flex:1; }
-  .asSec{ margin:18px 0 0; padding-top:14px; border-top:1px solid var(--line); }
-  .asSec:first-of-type{ border-top:0; padding-top:0; margin-top:8px; }
-  .asSec h4{ margin:0 0 10px; font:700 0.68rem 'Sora',sans-serif; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink-soft); }
-  .asRow{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:5px 0; font-size:0.86rem; }
-  .asRow small{ display:block; font-size:0.72rem; color:var(--ink-soft); line-height:1.35; margin-top:1px; }
-  .asField{ display:block; margin:0 0 10px; }
-  .asField > span{ display:block; font-size:0.74rem; font-weight:600; color:var(--ink-soft); margin-bottom:4px; }
-  .asField input[type=text], .asField textarea, .asField select{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:inherit; font-size:0.9rem; }
-  .asField textarea{ resize:vertical; min-height:56px; }
-  .asField.err input, .asField.err textarea{ border-color:var(--danger); }
-  .asField .cnt{ float:right; font-weight:400; }
-  .asHandle{ display:flex; align-items:center; gap:6px; }
-  .asHandle b{ color:var(--ink-soft); font-weight:600; }
-  .asErr{ margin:8px 0 0; font-size:0.8rem; color:var(--danger); min-height:1em; }
+  /* account settings: a personal profile first, then quiet paper cards */
+  /* avatar circles (top bar, profile, share previews) */
   .acctAv{ display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; flex:none; font-weight:700; color:#fff; user-select:none; width:100%; height:100%; line-height:1; }
   .acctAv img{ width:100%; height:100%; object-fit:cover; display:block; }
   .acctAv.emoji{ font-size:1.5em; }
-  .asAvatar{ display:flex; gap:16px; align-items:center; margin-bottom:12px; }
-  .asAvatar .pic{ width:76px; height:76px; font-size:1.6rem; flex:none; }
-  .asBtns{ display:flex; flex-wrap:wrap; gap:6px; }
-  .asBtns .pillBtn{ padding:6px 12px; font-size:0.78rem; }
+  .acctCard.acctWide{ width:min(660px, 94vw); max-height:min(90vh, 920px); padding:0; display:flex; flex-direction:column; overflow:hidden; }
+  .acctWide .acctClose{ z-index:4; top:12px; right:12px; background:var(--panel); box-shadow:0 1px 5px var(--shadow); }
+  .acctScroll{ overflow-y:auto; overscroll-behavior:contain; padding:26px 28px 24px; flex:1; min-height:0; display:flex; flex-direction:column; gap:16px; scrollbar-width:thin; }
+  .asFoot{ display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px 22px; border-top:1px solid var(--line); background:var(--panel); }
+  .asFoot .asErr{ flex:1; margin:0; text-align:left; font-size:0.8rem; min-width:0; }
+  .asFoot .pillBtn{ min-width:88px; padding:9px 18px; }
+  .asFoot .pillBtn.primary{ box-shadow:0 2px 0 color-mix(in srgb, var(--accent) 70%, #000); }
+  /* hero */
+  .asHero{ position:relative; display:flex; gap:22px; align-items:center; padding:24px 22px 22px; margin-top:6px; border-radius:18px;
+    background:linear-gradient(160deg, var(--accent-soft), color-mix(in srgb, var(--accent-soft) 35%, var(--panel)));
+    box-shadow:0 1px 0 rgba(255,255,255,0.45) inset, 0 8px 18px -12px var(--shadow); }
+  .asHero::before{ content:""; position:absolute; top:-9px; left:50%; width:70px; height:19px; margin-left:-35px; transform:rotate(-2.5deg);
+    background:rgba(255,255,255,0.5); box-shadow:0 1px 2px rgba(0,0,0,0.12); border-radius:2px; }
+  body.dark .asHero::before{ background:rgba(255,255,255,0.22); }
+  .asHero .pic{ width:96px; height:96px; font-size:2.1rem; box-shadow:0 0 0 4px var(--panel), 0 6px 14px -6px var(--shadow); flex:none; }
+  .asHeroText{ min-width:0; flex:1; }
+  .acctWide h3.asHeroName{ margin:0; text-align:start; font:700 1.4rem/1.15 'Sora',sans-serif; color:var(--ink); overflow-wrap:anywhere; unicode-bidi:plaintext; text-align:start; }
+  .asHeroHandle{ margin:3px 0 0; font-size:0.86rem; color:var(--ink-soft); overflow-wrap:anywhere; }
+  .asHeroBio{ margin:9px 0 0; font-size:0.92rem; line-height:1.4; color:var(--ink); overflow-wrap:anywhere; unicode-bidi:plaintext; text-align:start; }
+  .asHeroActions{ margin-top:12px; }
+  .asMenuWrap{ position:relative; display:inline-block; }
+  .asPhotoBtn{ all:unset; box-sizing:border-box; cursor:pointer; display:inline-flex; align-items:center; gap:7px; padding:7px 14px; border-radius:999px; font-size:0.82rem; font-weight:600; color:var(--ink);
+    background:color-mix(in srgb, var(--panel) 80%, transparent); border:1px solid color-mix(in srgb, var(--ink) 16%, transparent); }
+  .asPhotoBtn:hover{ background:var(--panel); }
+  .asPhotoBtn:focus-visible, .asAction:focus-visible, .asSelect:focus-visible, .asMenu button:focus-visible, .asSwatches button:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
+  .asPhotoBtn svg{ width:15px; height:15px; }
+  .asMenu{ position:absolute; z-index:6; top:calc(100% + 6px); left:0; min-width:220px; max-width:min(300px, 86vw); padding:5px; border-radius:12px;
+    background:var(--panel); border:1px solid var(--line); box-shadow:0 14px 30px -10px var(--shadow); animation:acctPop .14s ease both; }
+  .asMenu.right{ left:auto; right:0; }
+  .asMenu > button{ all:unset; box-sizing:border-box; display:block; width:100%; padding:9px 12px; border-radius:8px; cursor:pointer; font-size:0.86rem; color:var(--ink); }
+  .asMenu > button:hover, .asMenu > button:focus-visible{ background:var(--accent-soft); }
+  .asMenu > button.danger{ color:var(--danger); }
+  .asMenu .asSwatches{ padding:8px 8px 6px; margin:0; max-width:230px; }
+  /* cards */
+  .asCard{ background:var(--field); border:1px solid var(--line); border-radius:16px; padding:2px 18px 4px; box-shadow:0 1px 2px rgba(60,45,10,0.05); }
+  .asCard h4{ margin:16px 0 2px; font:700 0.68rem 'Sora',sans-serif; letter-spacing:0.09em; text-transform:uppercase; color:var(--ink-soft); }
+  .asCard h5{ margin:14px 0 0; font:600 0.72rem 'Sora',sans-serif; color:var(--ink-soft); }
+  .asItem{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 0; border-top:1px solid color-mix(in srgb, var(--line) 75%, transparent); }
+  .asCard > h4 + .asItem, .asCard > h5 + .asItem{ border-top:0; }
+  .asItem .lbl{ flex:1 1 0; min-width:0; font-size:0.9rem; color:var(--ink); }
+  .asItem .lbl small{ display:block; margin-top:2px; font-size:0.74rem; line-height:1.35; color:var(--ink-soft); font-weight:400; }
+  .asItem .val{ flex:none; max-width:55%; text-align:right; font-size:0.86rem; color:var(--ink-soft); overflow-wrap:anywhere; }
+  .asItem .val b{ color:var(--ink); font-weight:600; }
+  .asHint{ margin:2px 0 12px; font-size:0.74rem; line-height:1.4; color:var(--ink-soft); }
+  /* fields */
+  .asField{ display:block; margin:12px 0 0; }
+  .asField > .l{ display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.76rem; font-weight:600; color:var(--ink-soft); }
+  .asField > .l .cnt{ font-weight:400; }
+  .asIn, .asPfx{ box-sizing:border-box; width:100%; border:1px solid var(--field-line); border-radius:10px; background:var(--field); color:var(--ink); font:inherit; font-size:0.92rem; }
+  .asIn{ padding:10px 12px; }
+  textarea.asIn{ resize:none; min-height:64px; line-height:1.4; }
+  .asPfx{ display:flex; align-items:center; padding:0 12px; }
+  .asPfx span{ color:var(--ink-soft); margin-right:2px; user-select:none; }
+  .asPfx input{ all:unset; flex:1; min-width:0; padding:10px 0; font-size:0.92rem; color:var(--ink); }
+  .asIn:focus, .asPfx:focus-within{ outline:2px solid var(--sel-ring); outline-offset:1px; }
+  .asField.err .asIn, .asField.err .asPfx{ border-color:var(--danger); }
+  .asField .help{ margin:5px 0 0; font-size:0.72rem; line-height:1.35; color:var(--ink-soft); min-height:1em; }
+  .asField .help.bad{ color:var(--danger); } .asField .help.good{ color:#3b7a4d; } body.dark .asField .help.good{ color:#7fcf94; }
+  .acctWide input[dir=auto], .acctWide textarea{ unicode-bidi:plaintext; }
+  .asEdit{ padding-bottom:14px; }
+  .asEdit h4{ margin-bottom:0; }
+  /* compact controls */
+  .asSel{ position:relative; display:inline-flex; align-items:center; flex:none; max-width:58%; min-width:0; }
+  .asSel::after{ content:""; position:absolute; right:9px; top:50%; width:6px; height:6px; margin-top:-5px; border-right:1.6px solid var(--ink-soft); border-bottom:1.6px solid var(--ink-soft); transform:rotate(45deg); pointer-events:none; }
+  .asSelect{ appearance:none; -webkit-appearance:none; max-width:100%; border:0; background:transparent; color:var(--ink); font:inherit; font-size:0.88rem; padding:7px 26px 7px 10px; border-radius:8px; cursor:pointer; text-align:right; text-overflow:ellipsis; }
+  .asSelect:hover{ background:color-mix(in srgb, var(--accent-soft) 50%, transparent); }
+  .asSelect option, .asSelect optgroup{ background:var(--panel); color:var(--ink); }
+  input.asSw{ appearance:none; -webkit-appearance:none; flex:none; position:relative; width:36px; height:21px; margin:0; border-radius:999px; background:color-mix(in srgb, var(--ink-soft) 35%, var(--field)); cursor:pointer; transition:background .15s; }
+  input.asSw::after{ content:""; position:absolute; top:2.5px; left:2.5px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.3); transition:transform .15s; }
+  input.asSw:checked{ background:var(--accent); } input.asSw:checked::after{ transform:translateX(15px); }
+  input.asSw:disabled{ opacity:0.4; cursor:default; }
+  input.asSw:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
+  .asItem.off .lbl{ opacity:0.5; }
+  .asAction{ all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 0; cursor:pointer; border-top:1px solid color-mix(in srgb, var(--line) 75%, transparent); }
+  .asCard > h4 + .asAction{ border-top:0; }
+  .asAction .lbl{ min-width:0; font-size:0.9rem; color:var(--ink); }
+  .asAction .lbl small{ display:block; margin-top:2px; font-size:0.74rem; line-height:1.35; color:var(--ink-soft); }
+  .asAction .go{ flex:none; color:var(--ink-soft); font-size:0.86rem; display:inline-flex; align-items:center; gap:8px; }
+  .asAction:hover .lbl{ text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--ink) 30%, transparent); text-underline-offset:3px; }
+  .asAction[disabled]{ opacity:0.5; cursor:default; }
+  .asLink{ all:unset; cursor:pointer; color:var(--accent); font-size:0.82rem; font-weight:600; padding:4px 2px; }
+  .asLink:hover{ text-decoration:underline; } .asLink:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
+  .asChip{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.68rem; font-weight:600; background:var(--accent-soft); color:var(--ink); margin-left:6px; }
+  /* fallback avatar (secondary) */
+  .asFallRow[aria-expanded="true"] .go .chev{ transform:rotate(90deg); }
+  .asFallRow .chev{ display:inline-block; transition:transform .15s; }
+  .asFall{ padding:2px 0 14px; }
   .asSeg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; }
-  .asSeg button{ all:unset; cursor:pointer; padding:6px 13px; font-size:0.8rem; color:var(--ink-soft); }
+  .asSeg button{ all:unset; cursor:pointer; padding:6px 14px; font-size:0.8rem; color:var(--ink-soft); }
   .asSeg button.on{ background:var(--accent-soft); color:var(--ink); font-weight:600; }
-  .asSwatches{ display:flex; flex-wrap:wrap; gap:7px; margin:6px 0 10px; }
-  .asSwatches button{ all:unset; cursor:pointer; width:24px; height:24px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); }
+  .asSeg button:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:-2px; }
+  .asSwatches{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0; }
+  .asSwatches button{ all:unset; box-sizing:border-box; cursor:pointer; width:26px; height:26px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.18); }
   .asSwatches button.on{ outline:2px solid var(--accent); outline-offset:2px; }
-  .asSwatches button.auto{ display:flex; align-items:center; justify-content:center; width:auto; padding:0 9px; border-radius:999px; font-size:0.7rem; color:var(--ink-soft); }
-  .asEmojis{ display:flex; gap:4px; flex-wrap:wrap; margin-top:6px; }
-  .asEmojis button{ all:unset; cursor:pointer; font-size:1.15rem; padding:2px 5px; border-radius:6px; }
-  .asEmojis button:hover{ background:var(--accent-soft); }
-  .asCheck{ display:flex; align-items:flex-start; gap:10px; padding:5px 0; font-size:0.86rem; cursor:pointer; }
-  .asCheck input{ margin-top:3px; accent-color:var(--accent); }
-  .asCheck small{ display:block; font-size:0.72rem; color:var(--ink-soft); line-height:1.35; }
-  .asPlan{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:12px; background:var(--accent-soft); margin:6px 0 10px; font-size:0.86rem; }
-  .asStats{ display:grid; grid-template-columns:1fr 1fr; gap:6px 14px; font-size:0.82rem; }
-  .asStats div span{ display:block; font-size:0.7rem; color:var(--ink-soft); }
-  .asBar{ height:6px; border-radius:6px; background:rgba(128,128,128,0.22); overflow:hidden; margin-top:3px; }
+  .asSwatches button.auto{ width:auto; padding:0 11px; border-radius:999px; font-size:0.72rem; display:flex; align-items:center; color:var(--ink-soft); box-shadow:inset 0 0 0 1px var(--line); }
+  .asEmojis{ display:flex; gap:2px; flex-wrap:wrap; margin-top:8px; }
+  .asEmojis button{ all:unset; cursor:pointer; font-size:1.2rem; padding:3px 6px; border-radius:8px; }
+  .asEmojis button:hover, .asEmojis button:focus-visible{ background:var(--accent-soft); }
+  .dot{ display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:-1px; margin-right:6px; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.2); }
+  /* what a recipient sees */
+  .asPreview{ display:flex; gap:10px; align-items:center; margin:2px 0 12px; padding:10px 12px; border-radius:12px; background:color-mix(in srgb, var(--accent-soft) 40%, transparent); font-size:0.8rem; }
+  .asPreview .pv{ width:32px; height:32px; font-size:0.8rem; flex:none; }
+  .asPreview .t{ min-width:0; } .asPreview .t small{ display:block; color:var(--ink-soft); font-size:0.7rem; }
+  .asPreview .t b{ font-weight:600; unicode-bidi:plaintext; overflow-wrap:anywhere; }
+  .asPreview .t i{ display:block; font-style:normal; color:var(--ink-soft); unicode-bidi:plaintext; overflow-wrap:anywhere; }
+  /* account facts */
+  .asStats{ display:grid; grid-template-columns:repeat(4, 1fr); gap:8px 14px; padding:12px 0 6px; border-top:1px solid color-mix(in srgb, var(--line) 75%, transparent); }
+  .asStat{ min-width:0; font-size:0.92rem; font-weight:600; color:var(--ink); overflow-wrap:anywhere; }
+  .asStat small{ display:block; margin-bottom:2px; font-size:0.68rem; font-weight:500; color:var(--ink-soft); }
+  .asStat.wide{ grid-column:1 / -1; }
+  .asBar{ height:5px; border-radius:5px; background:color-mix(in srgb, var(--ink-soft) 25%, transparent); overflow:hidden; margin-top:5px; }
   .asBar i{ display:block; height:100%; background:var(--accent); }
-  .asDanger{ border:1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius:12px; padding:12px 14px; margin-top:18px; }
-  .asDanger h4{ color:var(--danger); }
-  .asDanger p{ margin:0 0 10px; font-size:0.78rem; color:var(--ink-soft); line-height:1.45; }
+  .asSkel{ display:block; height:1.05em; width:60%; border-radius:6px; background:linear-gradient(90deg, var(--line), color-mix(in srgb, var(--line) 40%, var(--field)), var(--line)); background-size:200% 100%; animation:asShimmer 1.3s linear infinite; }
+  @keyframes asShimmer{ to{ background-position:-200% 0; } }
+  .asProv .lbl small{ overflow-wrap:anywhere; }
+  /* danger */
+  .asDanger{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 18px; border-radius:16px;
+    border:1px solid color-mix(in srgb, var(--danger) 32%, var(--line)); background:color-mix(in srgb, var(--danger) 4%, var(--field)); }
+  .asDanger .lbl{ min-width:0; font-size:0.9rem; color:var(--ink); } .asDanger .lbl small{ display:block; margin-top:2px; font-size:0.74rem; line-height:1.4; color:var(--ink-soft); }
+  .asDanger .lbl .k{ display:block; margin-bottom:3px; font:700 0.68rem 'Sora',sans-serif; letter-spacing:0.09em; text-transform:uppercase; color:var(--danger); }
+  .asErr{ font-size:0.8rem; color:var(--danger); }
+  .asField.err + .asErr{ display:block; }
   .pillBtn.dangerFill[disabled]{ opacity:0.4; }
-  .acctScroll input[dir=auto], .acctScroll textarea{ unicode-bidi:plaintext; }
-  @media (max-width:520px){ .acctScroll{ padding:20px 16px 6px; } .asStats{ grid-template-columns:1fr; } .acctFoot{ padding:10px 14px; } }
+  @media (max-width:560px){
+    .acctCard.acctWide{ width:calc(100vw - 14px); max-height:calc(100vh - 14px); max-height:calc(100dvh - 14px); border-radius:16px; }
+    .acctScroll{ padding:22px 14px 18px; gap:14px; }
+    .asHero{ flex-direction:column; text-align:center; gap:14px; padding:24px 16px 18px; }
+    .asHeroText{ width:100%; } .acctWide h3.asHeroName, .asHeroBio{ text-align:center; }
+    .asHero .pic{ width:88px; height:88px; }
+    .asMenu{ left:50%; transform:translateX(-50%); animation:none; } .asMenu.right{ left:auto; right:0; transform:none; }
+    .asCard{ padding:2px 14px 4px; }
+    .asStats{ grid-template-columns:1fr 1fr; }
+    .asDanger{ flex-direction:column; align-items:stretch; text-align:left; }
+    .asFoot{ padding:10px 14px; } .asFoot .pillBtn{ flex:1; }
+    .asItem .val{ max-width:60%; }
+  }
   .shareLinks{ margin-top:12px; border-top:1px solid var(--line); padding-top:10px; }
   .shareLinks .row{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:0.78rem; margin-bottom:6px; }
 
@@ -1558,7 +1648,7 @@
   // fallback for other scripts so mixed-language notes still look like one hand.
   // `pool:false` fonts stay renderable for old notes but aren't picked or cycled.
   var FONTS = [
-    {name:"Caveat", script:"latin", mood:"pen"},
+    {name:"Caveat", script:"latin", mood:"pen", also:["cyrillic"]},
     {name:"Kalam", script:"latin", mood:"pen"},
     {name:"Shadows Into Light", script:"latin", mood:"pen"},
     {name:"Indie Flower", script:"latin", mood:"round"},
@@ -1571,23 +1661,61 @@
     {name:"Covered By Your Grace", script:"latin", mood:"pen"},
     {name:"Schoolbell", script:"latin", mood:"round"},
     {name:"Crafty Girls", script:"latin", mood:"round"},
-    {name:"Neucha", script:"latin", mood:"neat"},
+    {name:"Neucha", script:"latin", mood:"neat", also:["cyrillic"]},
     {name:"Dancing Script", script:"latin", mood:"script"},
     {name:"Handlee", script:"latin", mood:"neat"},
     {name:"Caveat Brush", script:"latin", mood:"marker"},
     {name:"Sriracha", script:"latin", mood:"round"},
     {name:"Zeyada", script:"latin", mood:"script"},
     {name:"Rock Salt", script:"latin", mood:"marker"},
+    {name:"Gloria Hallelujah", script:"latin", mood:"round"},
+    {name:"Just Another Hand", script:"latin", mood:"marker"},
+    {name:"Sue Ellen Francisco", script:"latin", mood:"pen"},
+    {name:"Walter Turncoat", script:"latin", mood:"round"},
+    {name:"Rancho", script:"latin", mood:"round"},
+    {name:"Nothing You Could Do", script:"latin", mood:"script"},
+    {name:"Shadows Into Light Two", script:"latin", mood:"pen"},
+    {name:"Swanky and Moo Moo", script:"latin", mood:"round"},
+    {name:"Mansalva", script:"latin", mood:"pen"},
+    {name:"Delicious Handrawn", script:"latin", mood:"neat"},
+    {name:"Short Stack", script:"latin", mood:"round"},
+    {name:"Loved by the King", script:"latin", mood:"script"},
+    {name:"Give You Glory", script:"latin", mood:"pen"},
+    {name:"Waiting for the Sunrise", script:"latin", mood:"pen"},
+    {name:"Over the Rainbow", script:"latin", mood:"script"},
+    {name:"Kristi", script:"latin", mood:"script"},
     {name:"Solitreo", script:"hebrew", mood:"script"},
-    {name:"Amatic SC", script:"hebrew", mood:"pen"},
+    {name:"Amatic SC", script:"hebrew", mood:"pen", also:["cyrillic"]},
     {name:"Playpen Sans Hebrew", script:"hebrew", mood:"round"},
     {name:"Karantina", script:"hebrew", mood:"marker"},
     {name:"Varela Round", script:"hebrew", mood:"neat"},
     {name:"Fredoka", script:"hebrew", mood:"round"},
     {name:"Suez One", script:"hebrew", mood:"marker"},
     {name:"Secular One", script:"hebrew", mood:"marker"},
-    {name:"Rubik", script:"hebrew", mood:"neat"},
+    {name:"Rubik", script:"hebrew", mood:"neat", also:["cyrillic"]},
+    {name:"Gveret Levin", script:"hebrew", mood:"script"},
+    {name:"Rubik Scribble", script:"hebrew", mood:"marker", also:["cyrillic"]},
+    {name:"Alef", script:"hebrew", mood:"neat", rand:false},
+    {name:"Miriam Libre", script:"hebrew", mood:"neat", rand:false},
+    {name:"Frank Ruhl Libre", script:"hebrew", mood:"script", rand:false},
+    {name:"Bellefair", script:"hebrew", mood:"script", rand:false},
+    {name:"David Libre", script:"hebrew", mood:"neat", rand:false},
     {name:"Heebo", script:"hebrew", mood:"neat", pool:false},
+    {name:"Marck Script", script:"cyrillic", mood:"script"},
+    {name:"Bad Script", script:"cyrillic", mood:"pen"},
+    {name:"Pangolin", script:"cyrillic", mood:"round"},
+    {name:"Comforter", script:"cyrillic", mood:"script"},
+    {name:"Underdog", script:"cyrillic", mood:"marker"},
+    {name:"Ruslan Display", script:"cyrillic", mood:"marker"},
+    {name:"Aref Ruqaa", script:"arabic", mood:"script"},
+    {name:"Katibeh", script:"arabic", mood:"pen"},
+    {name:"Marhey", script:"arabic", mood:"round"},
+    {name:"Rakkas", script:"arabic", mood:"marker"},
+    {name:"Lalezar", script:"arabic", mood:"marker"},
+    {name:"Reem Kufi", script:"arabic", mood:"neat"},
+    {name:"Mada", script:"arabic", mood:"neat"},
+    {name:"Lateef", script:"arabic", mood:"script"},
+    {name:"Harmattan", script:"arabic", mood:"neat"},
     {name:"Ma Shan Zheng", script:"zh", mood:"neat"},
     {name:"Zhi Mang Xing", script:"zh", mood:"script"},
     {name:"Long Cang", script:"zh", mood:"pen"},
@@ -1606,13 +1734,14 @@
   FONTS.forEach(function(f){ FONT_BY_NAME[f.name] = f; });
   // mood -> fallback font per script, used to build harmonious stacks
   var MOOD_FALLBACK = {
-    pen:    {latin:"Caveat",           hebrew:"Amatic SC",           zh:"Long Cang",        ja:"Yomogi",         ko:"Nanum Pen Script"},
-    round:  {latin:"Indie Flower",     hebrew:"Playpen Sans Hebrew", zh:"Ma Shan Zheng",    ja:"Hachi Maru Pop", ko:"Gaegu"},
-    neat:   {latin:"Patrick Hand",     hebrew:"Varela Round",        zh:"Ma Shan Zheng",    ja:"Klee One",       ko:"Gamja Flower"},
-    marker: {latin:"Permanent Marker", hebrew:"Karantina",           zh:"Liu Jian Mao Cao", ja:"Hachi Maru Pop", ko:"Poor Story"},
-    script: {latin:"Dancing Script",   hebrew:"Solitreo",            zh:"Zhi Mang Xing",    ja:"Zen Kurenaido",  ko:"Hi Melody"}
+    pen:    {latin:"Caveat",           hebrew:"Amatic SC",           cyrillic:"Bad Script",  arabic:"Katibeh",    zh:"Long Cang",        ja:"Yomogi",         ko:"Nanum Pen Script"},
+    round:  {latin:"Indie Flower",     hebrew:"Playpen Sans Hebrew", cyrillic:"Pangolin",    arabic:"Marhey",     zh:"Ma Shan Zheng",    ja:"Hachi Maru Pop", ko:"Gaegu"},
+    neat:   {latin:"Patrick Hand",     hebrew:"Varela Round",        cyrillic:"Neucha",      arabic:"Mada",       zh:"Ma Shan Zheng",    ja:"Klee One",       ko:"Gamja Flower"},
+    marker: {latin:"Permanent Marker", hebrew:"Karantina",           cyrillic:"Underdog",    arabic:"Lalezar",    zh:"Liu Jian Mao Cao", ja:"Hachi Maru Pop", ko:"Poor Story"},
+    script: {latin:"Dancing Script",   hebrew:"Solitreo",            cyrillic:"Marck Script",arabic:"Aref Ruqaa", zh:"Zhi Mang Xing",    ja:"Zen Kurenaido",  ko:"Hi Melody"}
   };
-  var SCRIPT_NAMES = {latin:"Latin", hebrew:"Hebrew", zh:"Chinese", ja:"Japanese", ko:"Korean"};
+  var SCRIPT_NAMES = {latin:"Latin", hebrew:"Hebrew", cyrillic:"Cyrillic", arabic:"Arabic", zh:"Chinese", ja:"Japanese", ko:"Korean"};
+  var SCRIPT_ORDER = ["latin","hebrew","cyrillic","arabic","zh","ja","ko"];
 
   // Curated paper colours for the picker. Random new-note colours stay as they were.
   var PAPER_COLORS = [
@@ -1840,30 +1969,36 @@
     var f = fontInfo(name);
     var fb = MOOD_FALLBACK[f.mood] || MOOD_FALLBACK.pen;
     var names = [f.name];
-    ["latin","hebrew","zh","ja","ko"].forEach(function(sc){
+    SCRIPT_ORDER.forEach(function(sc){
       if(sc === f.script) return;
       var alt = fb[sc];
       if(alt && names.indexOf(alt) === -1) names.push(alt);
     });
     return names.map(function(x){ return "'" + x + "'"; }).join(", ") + ", cursive";
   }
+  // fonts that can draw a script: its own, plus ones from other lists that also ship its letters (e.g. Caveat has Cyrillic)
   function fontPool(script){
-    return FONTS.filter(function(f){ return f.pool !== false && f.script === (script || "latin"); });
+    script = script || "latin";
+    return FONTS.filter(function(f){ return f.pool !== false && (f.script === script || (f.also || []).indexOf(script) !== -1); });
   }
-  // Latin is covered by every font (Hebrew and CJK fonts ship Latin glyphs too).
-  function fontCovers(name, script){ return script === "latin" || fontInfo(name).script === script; }
+  // the fonts filed under a script (for pickers, so a font is listed once)
+  function fontsOfScript(script){ return FONTS.filter(function(f){ return f.pool !== false && f.script === script; }); }
+  // Latin is covered by every font (Hebrew, Cyrillic, Arabic and CJK fonts ship Latin glyphs too).
+  function fontCovers(name, script){ var f = fontInfo(name); return script === "latin" || f.script === script || (f.also || []).indexOf(script) !== -1; }
   function detectScript(text){
-    var c = {hebrew:0, zh:0, ja:0, ko:0};
+    var c = {hebrew:0, cyrillic:0, arabic:0, zh:0, ja:0, ko:0};
     for(var i=0; i<text.length; i++){
       var code = text.charCodeAt(i);
       if(code >= 0x0590 && code <= 0x05FF) c.hebrew++;
+      else if(code >= 0x0400 && code <= 0x052F) c.cyrillic++;
+      else if((code >= 0x0600 && code <= 0x06FF) || (code >= 0x0750 && code <= 0x077F) || (code >= 0xFB50 && code <= 0xFDFF) || (code >= 0xFE70 && code <= 0xFEFF)) c.arabic++;
       else if(code >= 0x3040 && code <= 0x30FF) c.ja++;
       else if((code >= 0xAC00 && code <= 0xD7AF) || (code >= 0x1100 && code <= 0x11FF) || (code >= 0x3130 && code <= 0x318F)) c.ko++;
       else if((code >= 0x4E00 && code <= 0x9FFF) || (code >= 0x3400 && code <= 0x4DBF)) c.zh++;
     }
     if(c.ja > 0 && c.ja + c.zh >= 2) return "ja"; // any kana means Japanese, kanji included
     var best = "latin", bestN = 1;
-    ["hebrew","zh","ko"].forEach(function(k){ if(c[k] > bestN){ best = k; bestN = c[k]; } });
+    ["hebrew","cyrillic","arabic","zh","ko"].forEach(function(k){ if(c[k] > bestN){ best = k; bestN = c[k]; } });
     return best;
   }
   function preferredScript(){
@@ -1872,6 +2007,8 @@
     if(/^zh/.test(lang)) return "zh";
     if(/^ja/.test(lang)) return "ja";
     if(/^ko/.test(lang)) return "ko";
+    if(/^(ru|uk|bg|sr|be|kk|mk|mn)/.test(lang)) return "cyrillic";
+    if(/^(ar|fa|ur|ps|ckb)/.test(lang)) return "arabic";
     return "latin";
   }
   function pickFont(script, mood){
@@ -1880,6 +2017,8 @@
     var pf = CLOUD && settings.accountPrefs && settings.accountPrefs.preferredFont;      // a preference, never an override: text it can't draw falls back
     if(pf && FONT_BY_NAME[pf] && fontCovers(pf, script)) return pf;
     var pool = fontPool(script);
+    var handy = pool.filter(function(f){ return f.rand !== false; });     // print-style fonts are pick-only: never a random handwriting
+    if(handy.length) pool = handy;
     if(mood){
       var same = pool.filter(function(f){ return f.mood === mood; });
       if(same.length) pool = same;
@@ -6191,9 +6330,9 @@
   }
 
   // everything on the account as one file. Pictures are embedded; voice memos and videos are not.
-  async function exportAllCloud(btn){
-    var label = btn.textContent;
-    btn.disabled = true; btn.textContent = "Preparing\u2026";
+  async function exportAllCloud(lblEl){
+    var btn = lblEl.closest("button"), label = lblEl.firstChild.textContent;
+    btn.disabled = true; lblEl.firstChild.textContent = "Preparing\u2026";
     try{
       if(cloudSync){ try{ await cloudSync.flush(); }catch(e){} }
       var boards = await Stick.repo.listBoards();
@@ -6224,7 +6363,7 @@
     }catch(e){
       toast("Couldn't export: " + Stick.errors.friendly(Stick.errors.parse(e)));
     }
-    btn.disabled = false; btn.textContent = label;
+    btn.disabled = false; lblEl.firstChild.textContent = label;
   }
 
   async function openManageShares(onChange){
@@ -6248,7 +6387,8 @@
         var kind = x.share_type === "board_live" ? "Live board" : x.share_type === "group_snapshot" ? "Group of items" : "Single item";
         t.innerHTML = "<span></span><small></small>";
         t.firstChild.textContent = kind + (x.board_id && names[x.board_id] ? " \u00b7 " + names[x.board_id] : "");
-        t.lastChild.textContent = "Created " + new Date(x.created_at).toLocaleDateString();
+        t.lastChild.textContent = "Created " + new Date(x.created_at).toLocaleDateString() + (x.by_name ? " \u00b7 shown as " + x.by_name : "") +
+          (x.by_avatar_asset_id ? " \u00b7 with photo" : "") + (x.by_bio ? " \u00b7 with bio" : "");
         var b = document.createElement("button"); b.className = "pillBtn danger"; b.textContent = "Turn off";
         b.addEventListener("click", function(){
           b.disabled = true;
@@ -6298,133 +6438,196 @@
     setTimeout(function(){ inp.focus(); }, 30);
   }
 
+  var AV_COLOR_NAMES = ["Green", "Amber", "Plum", "Blue", "Rust", "Slate", "Gold", "Teal"];
+  function avColorName(c){ var i = Stick.account.AVATAR_COLORS.indexOf(c); return i >= 0 ? AV_COLOR_NAMES[i] : "Auto colour"; }
+  var CAMERA_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.6-2h6.8L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg>';
+
+  // one small popover at a time: click-outside, Esc and Tab close it; arrows move between items
+  var openMenuState = null;
+  function closeMenu(refocus){
+    var st = openMenuState; if(!st) return;
+    openMenuState = null;
+    st.menu.remove(); st.anchor.setAttribute("aria-expanded", "false");
+    document.removeEventListener("mousedown", st.outside, true); document.removeEventListener("keydown", st.keys, true);
+    if(refocus) st.anchor.focus();
+  }
+  function openMenu(anchor, menu){
+    closeMenu();
+    anchor.parentNode.appendChild(menu);
+    anchor.setAttribute("aria-expanded", "true");
+    function items(){ return Array.prototype.slice.call(menu.querySelectorAll("button")); }
+    var st = {anchor: anchor, menu: menu,
+      outside: function(e){ if(!menu.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) closeMenu(false); },
+      keys: function(e){
+        if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); closeMenu(true); return; }
+        if(e.key === "Tab"){ closeMenu(false); return; }
+        var list = items(), i = list.indexOf(document.activeElement);
+        if(e.key === "ArrowDown"){ e.preventDefault(); list[(i + 1) % list.length].focus(); }
+        else if(e.key === "ArrowUp"){ e.preventDefault(); list[(i - 1 + list.length) % list.length].focus(); }
+        else if(e.key === "Home"){ e.preventDefault(); list[0].focus(); }
+        else if(e.key === "End"){ e.preventDefault(); list[list.length - 1].focus(); }
+      }};
+    openMenuState = st;
+    document.addEventListener("mousedown", st.outside, true); document.addEventListener("keydown", st.keys, true);
+    var first = items()[0]; if(first) first.focus();
+  }
+
   function renderAccountSettings(card){
+    closeMenu();
     card.className = "acctCard acctWide";
     var acc = settings.account, user = Stick.auth.user() || {};
     var pf = acc.prof || {};
     var pr = Object.assign({}, Stick.account.DEFAULTS, settings.accountPrefs || {});
     var provider = (user.app_metadata && user.app_metadata.provider) || "google";
     var providerUrl = acc.providerUrl || "";
+    var savedHandle = pr.handle || "";
     var draft = {
       displayName: acc.name || "", avatarStyle: pf.avatarStyle || "initials", avatarColor: pf.avatarColor || "", avatarEmoji: pf.avatarEmoji || "",
       bio: pr.bio, handle: pr.handle, shareDefaultIdentity: pr.shareDefaultIdentity, shareShowAvatar: pr.shareShowAvatar, shareShowBio: pr.shareShowBio,
       shareDefaultBoardMode: pr.shareDefaultBoardMode, preferredFont: pr.preferredFont, defaultNoteColor: pr.defaultNoteColor
     };
     var stage = {action: "keep", blob: null, url: null};
+    var handleStatus = "idle";
 
     card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>' +
-      '<div class="acctScroll">' +
-        '<h3>Account settings</h3>' +
-        '<p class="acctSub" style="text-align:left;margin-bottom:6px;">Who you are in Stick-It. How this device looks and behaves is in Settings.</p>' +
+      '<div class="acctScroll" id="asScroll">' +
 
-        '<div class="asSec"><h4>Profile</h4>' +
-          '<div class="asAvatar"><div class="pic" id="asPic"></div><div>' +
-            '<div class="asBtns"><button class="pillBtn" id="asUpload">Upload photo</button><button class="pillBtn" id="asRemove">Remove photo</button><button class="pillBtn" id="asProv"></button></div>' +
-            '<input type="file" id="asFile" accept="image/jpeg,image/png,image/webp,image/gif" hidden>' +
-            '<small style="display:block;margin-top:6px;font-size:0.72rem;color:var(--ink-soft);">JPG, PNG, WebP or GIF. It\u2019s cropped square and shrunk on this device first.</small>' +
-          '</div></div>' +
-          '<div class="asField"><span>Without a photo, show</span><div class="asSeg" id="asStyle"></div>' +
-            '<div class="asSwatches" id="asSwatches"></div>' +
-            '<div id="asEmojiBox" hidden><input type="text" id="asEmoji" maxlength="8" placeholder="Pick one or type your own" dir="auto" style="max-width:220px;"><div class="asEmojis" id="asEmojiList"></div></div>' +
+        // ---------- who I am
+        '<section class="asHero" aria-label="Your profile">' +
+          '<div class="acctAv pic" id="asPic" role="img" aria-label="Your profile photo"></div>' +
+          '<div class="asHeroText">' +
+            '<h3 class="asHeroName" id="asHeroName"></h3>' +
+            '<p class="asHeroHandle" id="asHeroHandle" hidden></p>' +
+            '<p class="asHeroBio" id="asHeroBio" hidden></p>' +
+            '<div class="asHeroActions"><div class="asMenuWrap"><button type="button" class="asPhotoBtn" id="asPhotoBtn" aria-haspopup="menu" aria-expanded="false">' + CAMERA_ICON + '<span id="asPhotoLbl">Change photo</span></button></div></div>' +
           '</div>' +
-          '<label class="asField" id="asNameF"><span>Display name</span><input type="text" id="asName" maxlength="60" autocomplete="nickname" dir="auto"></label>' +
-          '<label class="asField" id="asHandleF"><span>Username (optional)</span><div class="asHandle"><b>@</b><input type="text" id="asHandle" maxlength="20" autocomplete="off" spellcheck="false" placeholder="letters, numbers, _"></div></label>' +
-          '<label class="asField" id="asBioF"><span>Bio <span class="cnt" id="asBioCnt"></span></span><textarea id="asBio" maxlength="120" dir="auto" placeholder="Musician, designer, chronic idea hoarder."></textarea></label>' +
-        '</div>' +
+        '</section>' +
 
-        '<div class="asSec"><h4>Sharing</h4>' +
-          '<div class="asRow"><div>Share links as<small>Used for every link you create. Nothing is shared until you make a link.</small></div><div class="asSeg" id="asIdent"></div></div>' +
-          '<label class="asCheck"><input type="checkbox" id="asShowAv"><span>Show my photo on shared boards and notes<small>Only if you share as yourself.</small></span></label>' +
-          '<label class="asCheck"><input type="checkbox" id="asShowBio"><span>Show my bio on public shares<small>Off by default.</small></span></label>' +
-          '<div class="asRow"><div>New board links<small>\u201cRead only\u201d makes a live view-only link. \u201cAsk\u201d confirms first.</small></div><div class="asSeg" id="asBoardMode"></div></div>' +
-          '<p class="acctSub" style="text-align:left;margin:6px 0 0;font-size:0.72rem;">Your e-mail is never shown on a share. What a link shows is fixed when you create it.</p>' +
-        '</div>' +
+        // ---------- edit profile
+        '<section class="asCard asEdit" aria-labelledby="asH1">' +
+          '<h4 id="asH1">Edit profile</h4>' +
+          '<div class="asField" id="asNameF"><label class="l" for="asName">Display name</label><input class="asIn" type="text" id="asName" maxlength="60" autocomplete="nickname" dir="auto"></div>' +
+          '<div class="asField" id="asHandleF"><label class="l" for="asHandle">Username <span class="cnt">optional</span></label><div class="asPfx"><span aria-hidden="true">@</span><input type="text" id="asHandle" maxlength="20" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="asHandleHelp"></div><p class="help" id="asHandleHelp"></p></div>' +
+          '<div class="asField" id="asBioF"><label class="l" for="asBio">Bio <span class="cnt" id="asBioCnt"></span></label><textarea class="asIn" id="asBio" maxlength="120" rows="2" dir="auto" placeholder="A little about you\u2026"></textarea></div>' +
+          '<button type="button" class="asAction asFallRow" id="asFallRow" aria-expanded="false" aria-controls="asFall" style="margin-top:10px;"><span class="lbl">Avatar fallback<small>Shown when you have no photo</small></span><span class="go"><span id="asFallVal"></span><span class="chev" aria-hidden="true">\u203A</span></span></button>' +
+          '<div class="asFall" id="asFall" hidden>' +
+            '<div class="asSeg" id="asStyle" role="group" aria-label="Fallback style"></div>' +
+            '<div class="asSwatches" id="asSwatches" role="group" aria-label="Fallback colour"></div>' +
+            '<div id="asEmojiBox" hidden><label class="l" for="asEmoji" style="font-size:0.76rem;font-weight:600;color:var(--ink-soft);">Emoji</label><input class="asIn" type="text" id="asEmoji" maxlength="8" placeholder="Pick one or type your own" dir="auto" style="max-width:240px;margin-top:4px;"><div class="asEmojis" id="asEmojiList"></div></div>' +
+          '</div>' +
+        '</section>' +
 
-        '<div class="asSec"><h4>Personalization</h4>' +
-          '<label class="asField"><span>Preferred handwriting</span><select id="asFont"></select></label>' +
-          '<div class="asField"><span>New note colour</span><div class="asSwatches" id="asNoteColors"></div></div>' +
-          '<p class="acctSub" style="text-align:left;margin:0;font-size:0.72rem;">A preference, not a rule: writing a font can\u2019t draw (another language, say) picks a suitable one instead.</p>' +
-        '</div>' +
+        // ---------- sharing
+        '<section class="asCard" aria-labelledby="asH2">' +
+          '<h4 id="asH2">Sharing</h4>' +
+          '<div class="asItem"><label class="lbl" for="asIdent">Share as</label><span class="asSel"><select class="asSelect" id="asIdent"></select></span></div>' +
+          '<div class="asItem" id="asAvRow"><label class="lbl" for="asShowAv">Show profile photo</label><input type="checkbox" class="asSw" id="asShowAv" role="switch"></div>' +
+          '<div class="asItem" id="asBioRow"><label class="lbl" for="asShowBio">Show bio</label><input type="checkbox" class="asSw" id="asShowBio" role="switch"></div>' +
+          '<div class="asItem"><label class="lbl" for="asBoardMode">New board links<small>Nothing is shared until you make a link.</small></label><span class="asSel"><select class="asSelect" id="asBoardMode"><option value="view">Read only</option><option value="ask">Ask every time</option></select></span></div>' +
+          '<div class="asPreview" id="asPreview" aria-live="polite"></div>' +
+        '</section>' +
 
-        '<div class="asSec"><h4>Account</h4>' +
-          '<div class="asRow"><div>Signed in with <b>' + escapeHtml(providerName(provider)) + '</b><small id="asLinked"></small></div><div id="asLinkBtns" class="asBtns"></div></div>' +
-          '<div class="asRow"><div>E-mail<small>Only you can see this.</small></div><div style="font-size:0.84rem;">' + escapeHtml(acc.email || "") + '</div></div>' +
-          '<div class="asPlan"><div><b id="asPlanName">' + escapeHtml((acc.plan || "free").charAt(0).toUpperCase() + (acc.plan || "free").slice(1)) + '</b> plan<small style="display:block;font-size:0.72rem;color:var(--ink-soft);" id="asPlanNote"></small></div></div>' +
-          '<div class="asStats" id="asStats"><div><span>Boards</span>\u2026</div><div><span>Items</span>\u2026</div><div style="grid-column:1/-1"><span>Media storage</span>\u2026</div><div><span>Member since</span>\u2026</div></div>' +
-        '</div>' +
+        // ---------- personalization
+        '<section class="asCard" aria-labelledby="asH3">' +
+          '<h4 id="asH3">Personalization</h4>' +
+          '<div class="asItem"><label class="lbl" for="asFont">Preferred handwriting</label><span class="asSel"><select class="asSelect" id="asFont"></select></span></div>' +
+          '<div class="asItem"><span class="lbl" id="asNoteLbl">Default note colour</span><div class="asMenuWrap"><button type="button" class="asAction" id="asNoteBtn" style="width:auto;border:0;padding:6px 8px;" aria-haspopup="menu" aria-expanded="false" aria-labelledby="asNoteLbl asNoteVal"><span class="go" id="asNoteVal"></span></button></div></div>' +
+          '<p class="asHint">A preference, not a rule: text a font can\u2019t draw gets a suitable one instead.</p>' +
+        '</section>' +
 
-        '<div class="asSec"><h4>Data &amp; privacy</h4>' +
-          '<div class="asBtns"><button class="pillBtn" id="asExport">Export all my boards</button><button class="pillBtn" id="asShares">Manage active links</button><button class="pillBtn" id="asSignAll">Sign out of all devices</button></div>' +
-          '<p class="acctSub" style="text-align:left;margin:8px 0 0;font-size:0.72rem;">The export includes text, layout and pictures. Voice memos and videos are not in the file yet; they stay in your account.</p>' +
-        '</div>' +
+        // ---------- account
+        '<section class="asCard" aria-labelledby="asH4">' +
+          '<h4 id="asH4">Account</h4>' +
+          '<div class="asItem"><span class="lbl">E-mail<small>Only you can see this.</small></span><span class="val">' + escapeHtml(acc.email || "") + '</span></div>' +
+          '<div class="asItem"><span class="lbl">Plan<small id="asPlanNote"></small></span><span class="val"><b id="asPlanName">' + escapeHtml((acc.plan || "free").charAt(0).toUpperCase() + (acc.plan || "free").slice(1)) + '</b></span></div>' +
+          '<div class="asStats" id="asStats" aria-live="polite"></div>' +
+          '<h5>Connected accounts</h5>' +
+          '<div id="asProviders"></div>' +
+          '<button type="button" class="asAction" id="asSignOut"><span class="lbl">Sign out<small>On this device only.</small></span></button>' +
+        '</section>' +
 
-        '<div class="asDanger"><h4>Danger zone</h4><p>Deleting your account removes your boards, media and share links for good.</p><button class="pillBtn danger" id="asDelete">Delete account\u2026</button></div>' +
-        '<p class="asErr" id="asErr" role="alert"></p>' +
+        // ---------- data & privacy
+        '<section class="asCard" aria-labelledby="asH5">' +
+          '<h4 id="asH5">Data &amp; privacy</h4>' +
+          '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
+          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
+          '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
+        '</section>' +
+
+        // ---------- danger
+        '<section class="asDanger" aria-labelledby="asH6">' +
+          '<div class="lbl"><span class="k" id="asH6">Danger zone</span>Delete account<small>Permanently deletes your account and cloud data. Your public shares will stop working.</small></div>' +
+          '<button type="button" class="pillBtn danger" id="asDelete">Delete account\u2026</button>' +
+        '</section>' +
       '</div>' +
-      '<div class="acctFoot"><button class="pillBtn" id="asSignOut">Sign out</button><span class="spacer"></span><button class="pillBtn" id="asCancel">Cancel</button><button class="pillBtn primary" id="asSave">Save</button></div>';
+      '<div class="asFoot"><p class="asErr" id="asErr" role="alert"></p><button type="button" class="pillBtn" id="asCancel">Cancel</button><button type="button" class="pillBtn primary" id="asSave">Save</button></div>';
 
     var $ = function(id){ return card.querySelector("#" + id); };
     var picEl = $("asPic");
 
-    // --- avatar
+    // ---------- avatar
     function effSource(){
       if(stage.action === "upload") return "upload";
       if(stage.action === "provider" || stage.action === "none") return stage.action;
       var src = pf.avatarSource || "provider";
       return (src === "provider" && !providerUrl) ? "none" : src;
     }
-    function refreshAvatar(){
+    function avSpec(){
       var eff = effSource();
-      paintAvatar(picEl, {name: draft.displayName, source: eff === "upload" ? "none" : eff, assetId: eff === "custom" ? pf.avatarAssetId : null,
-        providerUrl: providerUrl, style: draft.avatarStyle, color: draft.avatarColor, emoji: draft.avatarEmoji, url: eff === "upload" ? stage.url : null});
-      $("asRemove").hidden = eff === "none";
-      $("asProv").hidden = !providerUrl || eff === "provider";
-      $("asProv").textContent = "Use my " + providerName(provider) + " photo";
-      $("asUpload").textContent = (eff === "custom" || eff === "upload") ? "Replace photo" : "Upload photo";
-      var showFallback = eff === "none";
-      $("asStyle").parentNode.style.opacity = showFallback ? "1" : "0.55";
+      return {name: draft.displayName, source: eff === "upload" ? "none" : eff, assetId: eff === "custom" ? pf.avatarAssetId : null,
+        providerUrl: providerUrl, style: draft.avatarStyle, color: draft.avatarColor, emoji: draft.avatarEmoji, url: eff === "upload" ? stage.url : null};
     }
-    $("asUpload").addEventListener("click", function(){ $("asFile").click(); });
-    $("asFile").addEventListener("change", async function(){
-      var f = $("asFile").files[0]; $("asFile").value = "";
-      if(!f) return;
-      var blob = await openAvatarCropper(f);
-      if(!blob) return;
-      if(stage.url) URL.revokeObjectURL(stage.url);
-      stage = {action: "upload", blob: blob, url: URL.createObjectURL(blob)};
-      refreshAvatar();
-    });
-    $("asRemove").addEventListener("click", function(){ if(stage.url) URL.revokeObjectURL(stage.url); stage = {action: "none", blob: null, url: null}; refreshAvatar(); });
-    $("asProv").addEventListener("click", function(){ if(stage.url) URL.revokeObjectURL(stage.url); stage = {action: "provider", blob: null, url: null}; refreshAvatar(); });
-
-    function seg(id, options, get, set){
-      var box = $(id);
-      function paint(){ box.innerHTML = ""; options.forEach(function(o){
-        var b = document.createElement("button"); b.type = "button"; b.textContent = o[1]; b.className = get() === o[0] ? "on" : "";
-        b.addEventListener("click", function(){ set(o[0]); paint(); }); box.appendChild(b); }); }
-      paint();
+    function anonymous(){ return draft.shareDefaultIdentity === "anonymous"; }
+    function refreshPreview(){
+      var box = $("asPreview"); box.innerHTML = "";
+      if(anonymous()){ box.textContent = "Shared anonymously. Your name, photo and bio aren\u2019t shown."; return; }
+      var showPhoto = !!draft.shareShowAvatar;
+      var av = makeDiv("acctAv pv");
+      if(showPhoto) paintAvatar(av, avSpec());
+      else { av.style.background = "transparent"; av.style.boxShadow = "inset 0 0 0 1px var(--line)"; av.style.color = "var(--ink-soft)"; av.textContent = "?"; }
+      var t = makeDiv("t"), small = document.createElement("small"), b = document.createElement("b");
+      small.textContent = "What people see"; b.textContent = "Shared by " + (draft.displayName.trim() || "you");
+      t.appendChild(small); t.appendChild(b);
+      if(draft.shareShowBio && draft.bio.trim()){ var i = document.createElement("i"); i.textContent = draft.bio.trim(); t.appendChild(i); }
+      box.appendChild(av); box.appendChild(t);
     }
-    function paintSwatches(){
-      var box = $("asSwatches"); box.innerHTML = "";
-      var auto = document.createElement("button"); auto.type = "button"; auto.className = "auto" + (!draft.avatarColor ? " on" : ""); auto.textContent = "Automatic";
-      auto.addEventListener("click", function(){ draft.avatarColor = ""; paintSwatches(); refreshAvatar(); }); box.appendChild(auto);
-      Stick.account.AVATAR_COLORS.forEach(function(c){
-        var b = document.createElement("button"); b.type = "button"; b.style.background = c; b.setAttribute("aria-label", c); b.className = draft.avatarColor === c ? "on" : "";
-        b.addEventListener("click", function(){ draft.avatarColor = c; paintSwatches(); refreshAvatar(); }); box.appendChild(b);
+    function refreshHero(){
+      var name = draft.displayName.trim();
+      $("asHeroName").textContent = name || "Your name";
+      $("asHeroName").style.opacity = name ? "1" : "0.5";
+      var hd = $("asHeroHandle"); hd.hidden = !draft.handle; hd.textContent = draft.handle ? "@" + draft.handle : "";
+      var hb = $("asHeroBio"); hb.hidden = !draft.bio.trim(); hb.textContent = draft.bio.trim();
+      var eff = effSource();
+      paintAvatar(picEl, avSpec());
+      $("asPhotoLbl").textContent = (eff === "none" ? "Add photo" : "Change photo");
+      $("asFallVal").textContent = (draft.avatarStyle === "emoji" ? "Emoji" : "Initials") + " \u00B7 " + avColorName(draft.avatarColor);
+      refreshPreview();
+    }
+    function setStage(next){ if(stage.url) URL.revokeObjectURL(stage.url); stage = next; refreshHero(); }
+    async function pickPhoto(){
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/jpeg,image/png,image/webp,image/gif";
+      inp.addEventListener("change", async function(){
+        var f = inp.files[0]; if(!f) return;
+        var blob = await openAvatarCropper(f);
+        if(blob) setStage({action: "upload", blob: blob, url: URL.createObjectURL(blob)});
       });
+      inp.click();
     }
-    function paintStyleBits(){ $("asEmojiBox").hidden = draft.avatarStyle !== "emoji"; }
-    seg("asStyle", [["initials", "Initials"], ["emoji", "Emoji"]], function(){ return draft.avatarStyle; }, function(v){ draft.avatarStyle = v; paintStyleBits(); refreshAvatar(); });
-    paintSwatches(); paintStyleBits();
-    $("asEmoji").value = draft.avatarEmoji;
-    $("asEmoji").addEventListener("input", function(){ draft.avatarEmoji = Array.from($("asEmoji").value).slice(0, 2).join(""); refreshAvatar(); });
-    AV_EMOJIS.forEach(function(em){
-      var b = document.createElement("button"); b.type = "button"; b.textContent = em;
-      b.addEventListener("click", function(){ draft.avatarEmoji = em; $("asEmoji").value = em; refreshAvatar(); });
-      $("asEmojiList").appendChild(b);
+    $("asPhotoBtn").addEventListener("click", function(){
+      if(openMenuState && openMenuState.anchor === $("asPhotoBtn")){ closeMenu(true); return; }
+      var eff = effSource(), menu = makeDiv("asMenu");
+      menu.setAttribute("role", "menu");
+      function item(label, fn, cls){
+        var b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem"); b.textContent = label; if(cls) b.className = cls;
+        b.addEventListener("click", function(){ closeMenu(true); fn(); }); menu.appendChild(b);
+      }
+      item(eff === "none" ? "Upload photo" : "Upload a new photo", pickPhoto);
+      if(providerUrl && eff !== "provider") item("Use " + providerName(provider) + " photo", function(){ setStage({action: "provider", blob: null, url: null}); });
+      if(eff !== "none") item("Remove photo", function(){ setStage({action: "none", blob: null, url: null}); }, "danger");
+      openMenu($("asPhotoBtn"), menu);
     });
 
-    // --- text fields
+    // ---------- fields
     function clearErr(){ $("asErr").textContent = ""; card.querySelectorAll(".asField.err").forEach(function(f){ f.classList.remove("err"); }); }
     function showErr(msg, field){
       $("asErr").textContent = msg;
@@ -6432,86 +6635,194 @@
       if(f){ f.classList.add("err"); var i = f.querySelector("input,textarea"); if(i) i.focus(); }
     }
     $("asName").value = draft.displayName;
-    $("asName").addEventListener("input", function(){ draft.displayName = $("asName").value; clearErr(); refreshAvatar(); });
-    $("asHandle").value = draft.handle;
-    $("asHandle").addEventListener("input", function(){
-      var v = $("asHandle").value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
-      $("asHandle").value = v; draft.handle = v; clearErr();
-    });
+    $("asName").addEventListener("input", function(){ draft.displayName = $("asName").value; clearErr(); refreshHero(); });
     $("asBio").value = draft.bio;
     function bioCount(){ $("asBioCnt").textContent = Array.from($("asBio").value).length + " / 120"; }
     bioCount();
-    $("asBio").addEventListener("input", function(){ draft.bio = $("asBio").value; bioCount(); clearErr(); });
+    $("asBio").addEventListener("input", function(){ draft.bio = $("asBio").value; bioCount(); clearErr(); refreshHero(); });
 
-    // --- sharing
-    function paintShareChecks(){
-      var named = draft.shareDefaultIdentity !== "anonymous";
-      [["asShowAv", "shareShowAvatar"], ["asShowBio", "shareShowBio"]].forEach(function(p){
-        var cb = $(p[0]); cb.checked = named && !!draft[p[1]]; cb.disabled = !named; cb.parentNode.style.opacity = named ? "1" : "0.5";
+    // username: normalise as typed, ask the server (politely, debounced) whether it is free
+    var hTimer = null;
+    function paintHandleHelp(){
+      var help = $("asHandleHelp"); help.className = "help";
+      var v = draft.handle;
+      if(!v || v === savedHandle){ help.textContent = "Used as your Stick-It handle. Letters, numbers and _ (3\u201320)."; return; }
+      if(!Stick.account.HANDLE_RE.test(v)){ help.textContent = "Use 3\u201320 letters, numbers or _."; help.classList.add("bad"); return; }
+      if(handleStatus === "checking") help.textContent = "Checking\u2026";
+      else if(handleStatus === "ok"){ help.textContent = "\u2713 Available"; help.classList.add("good"); }
+      else if(handleStatus === "taken"){ help.textContent = "That username is taken."; help.classList.add("bad"); }
+      else help.textContent = "Used as your Stick-It handle. Letters, numbers and _ (3\u201320).";
+    }
+    $("asHandle").value = draft.handle;
+    $("asHandle").addEventListener("input", function(){
+      var v = $("asHandle").value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20);
+      $("asHandle").value = v; draft.handle = v; clearErr(); handleStatus = "idle";
+      clearTimeout(hTimer);
+      if(v && v !== savedHandle && Stick.account.HANDLE_RE.test(v)){
+        handleStatus = "checking";
+        hTimer = setTimeout(function(){
+          Stick.account.handleAvailable(v).then(function(ok){ if(draft.handle === v){ handleStatus = ok ? "ok" : "taken"; paintHandleHelp(); } },
+            function(){ if(draft.handle === v){ handleStatus = "idle"; paintHandleHelp(); } });     // can't check right now: the server still decides on Save
+        }, 450);
+      }
+      paintHandleHelp(); refreshHero();
+    });
+    paintHandleHelp();
+
+    // ---------- avatar fallback (collapsed by default)
+    $("asFallRow").addEventListener("click", function(){
+      var open = $("asFall").hidden; $("asFall").hidden = !open; $("asFallRow").setAttribute("aria-expanded", String(open));
+    });
+    function seg(id, options, get, set){
+      var box = $(id);
+      function paint(){ box.innerHTML = ""; options.forEach(function(o){
+        var b = document.createElement("button"); b.type = "button"; b.textContent = o[1]; b.className = get() === o[0] ? "on" : ""; b.setAttribute("aria-pressed", String(get() === o[0]));
+        b.addEventListener("click", function(){ set(o[0]); paint(); }); box.appendChild(b); }); }
+      paint();
+    }
+    function paintSwatches(){
+      var box = $("asSwatches"); box.innerHTML = "";
+      var auto = document.createElement("button"); auto.type = "button"; auto.className = "auto" + (!draft.avatarColor ? " on" : ""); auto.textContent = "Automatic";
+      auto.addEventListener("click", function(){ draft.avatarColor = ""; paintSwatches(); refreshHero(); }); box.appendChild(auto);
+      Stick.account.AVATAR_COLORS.forEach(function(c, i){
+        var b = document.createElement("button"); b.type = "button"; b.style.background = c; b.setAttribute("aria-label", AV_COLOR_NAMES[i]); b.title = AV_COLOR_NAMES[i]; b.className = draft.avatarColor === c ? "on" : "";
+        b.addEventListener("click", function(){ draft.avatarColor = c; paintSwatches(); refreshHero(); }); box.appendChild(b);
       });
     }
-    seg("asIdent", [["named", "Me (" + (acc.name || "name") + ")"], ["anonymous", "Anonymous"]], function(){ return draft.shareDefaultIdentity; }, function(v){ draft.shareDefaultIdentity = v; paintShareChecks(); });
-    seg("asBoardMode", [["view", "Read only"], ["ask", "Ask every time"]], function(){ return draft.shareDefaultBoardMode; }, function(v){ draft.shareDefaultBoardMode = v; });
-    $("asShowAv").addEventListener("change", function(){ draft.shareShowAvatar = $("asShowAv").checked; });
-    $("asShowBio").addEventListener("change", function(){ draft.shareShowBio = $("asShowBio").checked; });
+    function paintStyleBits(){ $("asEmojiBox").hidden = draft.avatarStyle !== "emoji"; }
+    seg("asStyle", [["initials", "Initials"], ["emoji", "Emoji"]], function(){ return draft.avatarStyle; }, function(v){ draft.avatarStyle = v; paintStyleBits(); refreshHero(); });
+    paintSwatches(); paintStyleBits();
+    $("asEmoji").value = draft.avatarEmoji;
+    $("asEmoji").addEventListener("input", function(){ draft.avatarEmoji = Array.from($("asEmoji").value).slice(0, 2).join(""); refreshHero(); });
+    AV_EMOJIS.forEach(function(em){
+      var b = document.createElement("button"); b.type = "button"; b.textContent = em; b.setAttribute("aria-label", "Use " + em);
+      b.addEventListener("click", function(){ draft.avatarEmoji = em; $("asEmoji").value = em; refreshHero(); });
+      $("asEmojiList").appendChild(b);
+    });
+
+    // ---------- sharing: one identity choice; photo/bio only make sense when sharing as yourself
+    function paintIdent(){
+      var sel = $("asIdent"); sel.innerHTML = "";
+      var o1 = document.createElement("option"); o1.value = "named"; o1.textContent = draft.displayName.trim() || "Me";
+      var o2 = document.createElement("option"); o2.value = "anonymous"; o2.textContent = "Anonymous";
+      sel.appendChild(o1); sel.appendChild(o2); sel.value = draft.shareDefaultIdentity === "anonymous" ? "anonymous" : "named";
+    }
+    function paintShareChecks(){
+      var anon = anonymous();
+      [["asShowAv", "shareShowAvatar", "asAvRow"], ["asShowBio", "shareShowBio", "asBioRow"]].forEach(function(p){
+        var cb = $(p[0]); cb.checked = !anon && !!draft[p[1]]; cb.disabled = anon; $(p[2]).classList.toggle("off", anon);
+      });
+      refreshPreview();
+    }
+    paintIdent();
+    $("asIdent").addEventListener("change", function(){ draft.shareDefaultIdentity = $("asIdent").value; paintShareChecks(); });
+    $("asName").addEventListener("input", paintIdent);
+    $("asBoardMode").value = draft.shareDefaultBoardMode === "ask" ? "ask" : "view";
+    $("asBoardMode").addEventListener("change", function(){ draft.shareDefaultBoardMode = $("asBoardMode").value; });
+    $("asShowAv").addEventListener("change", function(){ draft.shareShowAvatar = $("asShowAv").checked; refreshPreview(); });
+    $("asShowBio").addEventListener("change", function(){ draft.shareShowBio = $("asShowBio").checked; refreshPreview(); });
     paintShareChecks();
 
-    // --- personalization
+    // ---------- personalization
     var fs = $("asFont");
     var auto = document.createElement("option"); auto.value = ""; auto.textContent = "Let Stick-It choose"; fs.appendChild(auto);
-    ["latin", "hebrew", "zh", "ja", "ko"].forEach(function(sc){
+    SCRIPT_ORDER.forEach(function(sc){
       var g = document.createElement("optgroup"); g.label = SCRIPT_NAMES[sc];
-      fontPool(sc).forEach(function(f){ var o = document.createElement("option"); o.value = f.name; o.textContent = f.name; o.style.fontFamily = fontStack(f.name); g.appendChild(o); });
+      fontsOfScript(sc).forEach(function(f){ var o = document.createElement("option"); o.value = f.name; o.textContent = f.name; o.style.fontFamily = fontStack(f.name); g.appendChild(o); });
       fs.appendChild(g);
     });
     fs.value = FONT_BY_NAME[draft.preferredFont] ? draft.preferredFont : "";
     fs.addEventListener("change", function(){ draft.preferredFont = fs.value; });
-    function paintNoteColors(){
-      var box = $("asNoteColors"); box.innerHTML = "";
-      var a = document.createElement("button"); a.type = "button"; a.className = "auto" + (!draft.defaultNoteColor ? " on" : ""); a.textContent = "Surprise me";
-      a.addEventListener("click", function(){ draft.defaultNoteColor = ""; paintNoteColors(); }); box.appendChild(a);
+    function paintNoteVal(){
+      var pc = PAPER_COLORS.filter(function(c){ return c.name === draft.defaultNoteColor; })[0];
+      $("asNoteVal").innerHTML = "";
+      if(pc){ var d = document.createElement("span"); d.className = "dot"; d.style.background = pc.bg; $("asNoteVal").appendChild(d); }
+      $("asNoteVal").appendChild(document.createTextNode(pc ? pc.name : "Surprise me"));
+      var chev = document.createElement("span"); chev.setAttribute("aria-hidden", "true"); chev.textContent = "\u25BE"; $("asNoteVal").appendChild(chev);
+    }
+    paintNoteVal();
+    $("asNoteBtn").addEventListener("click", function(){
+      if(openMenuState && openMenuState.anchor === $("asNoteBtn")){ closeMenu(true); return; }
+      var menu = makeDiv("asMenu right"); menu.setAttribute("role", "menu");
+      var a = document.createElement("button"); a.type = "button"; a.setAttribute("role", "menuitem"); a.textContent = "Surprise me";
+      a.addEventListener("click", function(){ draft.defaultNoteColor = ""; closeMenu(true); paintNoteVal(); }); menu.appendChild(a);
+      var sw = makeDiv("asSwatches");
       PAPER_COLORS.forEach(function(c){
-        var b = document.createElement("button"); b.type = "button"; b.style.background = c.bg; b.title = c.name; b.setAttribute("aria-label", c.name);
-        b.className = draft.defaultNoteColor === c.name ? "on" : "";
-        b.addEventListener("click", function(){ draft.defaultNoteColor = c.name; paintNoteColors(); }); box.appendChild(b);
+        var b = document.createElement("button"); b.type = "button"; b.style.background = c.bg; b.title = c.name; b.setAttribute("aria-label", c.name); b.className = draft.defaultNoteColor === c.name ? "on" : "";
+        b.addEventListener("click", function(){ draft.defaultNoteColor = c.name; closeMenu(true); paintNoteVal(); }); sw.appendChild(b);
+      });
+      menu.appendChild(sw);
+      openMenu($("asNoteBtn"), menu);
+    });
+
+    // ---------- account facts (loaded from the server; nothing invented)
+    $("asPlanNote").textContent = (acc.plan === "premium") ? "Thank you for supporting Stick-It." : "Premium is coming later. Nothing to buy yet.";
+    function statSkeleton(){
+      $("asStats").innerHTML = '<div class="asStat"><small>Boards</small><span class="asSkel"></span></div><div class="asStat"><small>Items</small><span class="asSkel"></span></div>' +
+        '<div class="asStat"><small>Storage</small><span class="asSkel"></span></div><div class="asStat"><small>Member since</small><span class="asSkel"></span></div>';
+    }
+    var activeShares = null;
+    function paintShareCount(){ $("asSharesN").textContent = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); }
+    function loadUsage(){
+      statSkeleton();
+      Stick.account.usage().then(function(u){
+        if(!card.isConnected) return;
+        $("asPlanName").textContent = String(u.plan).charAt(0).toUpperCase() + String(u.plan).slice(1);
+        var pct = u.storage_quota ? Math.min(100, Math.round(100 * u.storage_used / u.storage_quota)) : 0;
+        var cells = [];
+        if(u.boards != null) cells.push('<div class="asStat"><small>Boards</small>' + u.boards + (u.boards_limit ? ' / ' + u.boards_limit : '') + '</div>');
+        if(u.objects != null) cells.push('<div class="asStat"><small>Items</small>' + u.objects + '</div>');
+        if(u.storage_used != null) cells.push('<div class="asStat"><small>Storage</small>' + fmtBytes(u.storage_used) + '<div class="asBar" title="' + pct + '% of ' + fmtBytes(u.storage_quota) + '"><i style="width:' + pct + '%"></i></div></div>');
+        if(u.member_since) cells.push('<div class="asStat"><small>Member since</small>' + escapeHtml(monthYear(u.member_since)) + '</div>');
+        $("asStats").innerHTML = cells.join("");
+        activeShares = u.active_shares; paintShareCount();
+      }, function(){
+        if(!card.isConnected) return;
+        $("asStats").innerHTML = '<div class="asStat wide" style="font-weight:400;color:var(--ink-soft);">Couldn\u2019t load your numbers. <button type="button" class="asLink" id="asRetry">Try again</button></div>';
+        $("asRetry").addEventListener("click", loadUsage);
       });
     }
-    paintNoteColors();
+    loadUsage();
 
-    // --- account facts (loaded, never invented)
-    var planNote = (acc.plan === "premium") ? "Thanks for supporting Stick-It." : "Premium is coming later. Nothing to buy yet.";
-    $("asPlanNote").textContent = planNote;
-    var activeShares = null;
-    Stick.account.usage().then(function(u){
-      if(!card.isConnected) return;
-      $("asPlanName").textContent = String(u.plan).charAt(0).toUpperCase() + String(u.plan).slice(1);
-      var pct = u.storage_quota ? Math.min(100, Math.round(100 * u.storage_used / u.storage_quota)) : 0;
-      $("asStats").innerHTML = '<div><span>Boards</span>' + u.boards + ' / ' + u.boards_limit + '</div><div><span>Items</span>' + u.objects + '</div>' +
-        '<div style="grid-column:1/-1"><span>Media storage</span>' + fmtBytes(u.storage_used) + ' of ' + fmtBytes(u.storage_quota) + '<div class="asBar"><i style="width:' + pct + '%"></i></div></div>' +
-        '<div><span>Member since</span>' + escapeHtml(monthYear(u.member_since)) + '</div>';
-      activeShares = u.active_shares;
-      $("asShares").textContent = "Manage active links (" + activeShares + ")";
-    }, function(){ if(card.isConnected) $("asStats").textContent = "Couldn\u2019t load your numbers right now."; });
-    Stick.auth.identities().then(function(list){
-      if(!card.isConnected) return;
-      var have = list.map(function(i){ return i.provider; });
-      $("asLinked").textContent = have.length > 1 ? "Linked: " + have.map(providerName).join(", ") : "";
-      var box = $("asLinkBtns"); box.innerHTML = "";
-      ["google", "github"].filter(function(pv){ return have.indexOf(pv) === -1; }).forEach(function(pv){
-        var b = document.createElement("button"); b.className = "pillBtn"; b.textContent = "Link " + providerName(pv);
-        b.addEventListener("click", function(){
-          Stick.auth.linkProvider(pv).catch(function(e){
-            var er = Stick.errors.parse(e);
-            toast(/manual linking|linking is disabled|not enabled/i.test(er.message) ? "Linking another sign-in isn\u2019t switched on for this project yet." : "Couldn\u2019t link " + providerName(pv) + ": " + Stick.errors.friendly(er));
-          });
+    function loadProviders(){
+      var box = $("asProviders");
+      box.innerHTML = '<div class="asItem"><span class="lbl"><span class="asSkel" style="width:90px"></span></span></div>';
+      Stick.auth.identities().then(function(list){
+        if(!card.isConnected) return;
+        box.innerHTML = "";
+        var byProv = {}; list.forEach(function(i){ byProv[i.provider] = i; });
+        ["google", "github"].forEach(function(pv){
+          var idn = byProv[pv], row = makeDiv("asItem asProv");
+          var lbl = document.createElement("span"); lbl.className = "lbl";
+          lbl.textContent = providerName(pv);
+          if(idn && pv === provider){ var chip = document.createElement("span"); chip.className = "asChip"; chip.textContent = "This sign-in"; lbl.appendChild(chip); }
+          var sm = document.createElement("small"); sm.textContent = idn ? (((idn.identity_data || {}).email) || "Connected") : "Not connected"; lbl.appendChild(sm);
+          row.appendChild(lbl);
+          var right = document.createElement("span"); right.className = "val";
+          if(idn){ right.textContent = "Connected"; }
+          else {
+            var b = document.createElement("button"); b.type = "button"; b.className = "asLink"; b.textContent = "Connect";
+            b.addEventListener("click", function(){
+              Stick.auth.linkProvider(pv).catch(function(e){
+                var er = Stick.errors.parse(e);
+                toast(/manual linking|linking is disabled|not enabled|provider is not/i.test(er.message) ? providerName(pv) + " isn\u2019t switched on for this project yet." : "Couldn\u2019t connect " + providerName(pv) + ": " + Stick.errors.friendly(er));
+              });
+            });
+            right.appendChild(b);
+          }
+          row.appendChild(right); box.appendChild(row);
         });
-        box.appendChild(b);
+      }, function(){
+        if(!card.isConnected) return;
+        box.innerHTML = '<div class="asItem"><span class="lbl" style="color:var(--ink-soft);">Couldn\u2019t load your sign-ins. <button type="button" class="asLink" id="asRetryP">Try again</button></span></div>';
+        $("asRetryP").addEventListener("click", loadProviders);
       });
-    }, function(){});
+    }
+    loadProviders();
 
-    // --- immediate actions (never staged)
-    $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport")); });
-    $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; $("asShares").textContent = "Manage active links (" + activeShares + ")"; } }); });
+    // ---------- immediate actions (never staged)
+    $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
+    $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); });
     $("asSignAll").addEventListener("click", async function(){
       var go = await confirmDialog({title: "Sign out of all devices?", body: "You\u2019ll be signed out everywhere, including here. Your boards stay safe in your account.", confirm: "Sign out everywhere", danger: true});
       if(go) cloudSignOut("global");
@@ -6519,29 +6830,32 @@
     $("asSignOut").addEventListener("click", function(){ cloudSignOut("local"); });
     $("asDelete").addEventListener("click", openDeleteAccount);
 
-    // --- Cancel discards, Save validates and persists everything staged
-    function cleanup(){ if(stage.url) URL.revokeObjectURL(stage.url); }
+    // ---------- Cancel discards (nothing was uploaded); Save validates and persists everything staged
+    function cleanup(){ closeMenu(); clearTimeout(hTimer); if(stage.url) URL.revokeObjectURL(stage.url); }
     $("asCancel").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
     $("acctCloseBtn").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
     $("asSave").addEventListener("click", async function(){
       clearErr();
       var bad = Stick.account.validate(draft);
       if(bad){ showErr(bad.message, bad.field); return; }
+      if(handleStatus === "taken" && draft.handle !== savedHandle){ showErr("That username is taken. Pick another one.", "handle"); return; }
       var btn = $("asSave"); btn.disabled = true; btn.textContent = "Saving\u2026";
       try{
         var res = await Stick.account.save(draft, stage);
         applyAccountData(res);
         cleanup();
         closeAccountModal();
-        toast("Account settings saved.");
+        toast("Account updated.");
       }catch(e){
         var er = Stick.errors.parse(e);
         btn.disabled = false; btn.textContent = "Save";
-        showErr(er.code === "INVALID" ? e.message : Stick.errors.friendly(er), e.field || (er.code === "HANDLE_TAKEN" ? "handle" : null));
+        var taken = er.code === "HANDLE_TAKEN";
+        if(taken){ handleStatus = "taken"; paintHandleHelp(); }
+        showErr(er.code === "INVALID" ? e.message : Stick.errors.friendly(er), e.field || (taken ? "handle" : null));   // everything typed is still here
       }
     });
-    refreshAvatar();
-    setTimeout(function(){ var n = $("asName"); if(n && !("ontouchstart" in window)) n.focus(); }, 60);
+    refreshHero();
+    setTimeout(function(){ var n = $("asName"); if(n && !("ontouchstart" in window) && window.innerWidth > 560) n.focus({preventScroll: true}); }, 60);
   }
 
   var GITHUB_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>';
@@ -6590,10 +6904,10 @@
 
   // ---------- settings controls ----------
   (function buildFontSelect(){
-    ["latin","hebrew","zh","ja","ko"].forEach(function(sc){
+    SCRIPT_ORDER.forEach(function(sc){
       var group = document.createElement("optgroup");
       group.label = SCRIPT_NAMES[sc];
-      fontPool(sc).forEach(function(f){
+      fontsOfScript(sc).forEach(function(f){
         var opt = document.createElement("option");
         opt.value = f.name;
         opt.textContent = f.name;

@@ -572,6 +572,23 @@ group('I. account settings, avatars, frozen share identity, account deletion');
   ok((await run(u3, 'select 1 from public.boards where id=$1', [B1.id])).rows.length === 0, 'collaborators lose the deleted board');
 }
 
+// ================================================================ J. username availability
+group('J. username availability check');
+{
+  const a = mk('jay1'), b = mk('jay2');
+  for (const u of [a, b]) await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]);
+  await run(a, "insert into public.profile_settings (user_id, handle) values ($1,'taken_name')", [a.id]);
+  const chk = async (u, h) => (await run(u, 'select public.handle_available($1) as r', [h])).rows[0]?.r;
+  ok((await chk(b, 'free_name')) === true, 'an unused username is available');
+  ok((await chk(b, 'taken_name')) === false, "someone else's username is not available");
+  ok((await chk(b, 'TAKEN_NAME')) === false, 'the check is case-insensitive');
+  ok((await chk(a, 'taken_name')) === true, 'your own current username counts as available');
+  ok((await chk(b, 'no')) === false && (await chk(b, 'has space')) === false && (await chk(b, null)) === false, 'malformed usernames are never available');
+  ok(denied(await run('anon', "select public.handle_available('x_y_z')")), 'anon cannot call it');
+  ok(errIs(await run({ email: 'x@example.com' }, "select public.handle_available('abc')"), /NOT_AUTHENTICATED/), 'a role without a user id is rejected');
+  ok(errIs(await run(b, "insert into public.profile_settings (user_id, handle) values ($1,'taken_name')", [b.id]), /duplicate key|unique/i), 'the unique index still refuses a taken username');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

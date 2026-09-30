@@ -141,6 +141,13 @@
       });
     },
 
+    // "is this username free?" while typing. The unique index still decides on Save.
+    handleAvailable: function (h) {
+      h = String(h || "").trim().toLowerCase();
+      if (!HANDLE_RE.test(h)) return Promise.resolve(false);
+      return db().then(function (c) { return guard(c.rpc("handle_available", { p_handle: h })); }).then(function (v) { return v === true; });
+    },
+
     // numbers for the account page (own data only)
     usage: function () { return db().then(function (c) { return guard(c.rpc("my_usage")); }); },
 

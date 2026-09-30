@@ -68,7 +68,7 @@ Everything was verified against a local stand-in that runs the real migrations o
 
 After pulling this update:
 ```bash
-npx supabase db push                                   # applies 20260930130000_account_settings.sql
+npx supabase db push                                   # applies 20260930130000_account_settings.sql and 20260930140000_handle_available.sql
 npx supabase functions deploy delete-account --no-verify-jwt
 npx supabase functions deploy resolve-share --no-verify-jwt   # now also returns the sharer's frozen bio/avatar
 ```

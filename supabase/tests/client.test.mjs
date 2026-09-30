@@ -307,6 +307,11 @@ try {
     ok(q1.settings.handle === 'quinn_q', 'a free username saves');
     ok((await Q.Stick.account.load()).settings.bio === '', "one account never sees another's settings");
 
+    ok((await Q.Stick.account.handleAvailable('quinn_q')) === true, 'your own username reads as available');
+    ok((await Q.Stick.account.handleAvailable('iris_jay')) === false, "another account's username is reported as taken");
+    ok((await Q.Stick.account.handleAvailable('brand_new_1')) === true, 'a free username is reported as available');
+    ok((await Q.Stick.account.handleAvailable('no')) === false, 'a malformed username never reaches the server and is not available');
+
     // avatar: upload, adopt, read, revert, remove
     const jpeg = new Blob([Buffer.alloc(4000, 7)], { type: 'image/jpeg' });
     const up = await acc.save({ displayName: 'Iris Jay', handle: 'iris_jay', bio: 'Musician, designer', avatarStyle: 'initials' }, { action: 'upload', blob: jpeg });

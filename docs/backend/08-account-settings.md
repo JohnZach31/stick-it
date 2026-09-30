@@ -42,3 +42,18 @@ Google and GitHub both use the same redirect (`https://<ref>.supabase.co/auth/v1
 - Full-media export: pictures are embedded; voice memos and videos are not. The all-boards file is an archive: the app imports one board at a time.
 - Showing collaborators' names/photos in the UI: the data path exists (profiles readable by co-members) but there is no member list yet.
 - Billing / plan changes.
+
+## UX redesign (layout only)
+The dialog is now organised around identity, not a form:
+- **Profile hero** (photo, name, @username, bio, live preview) with one **Change photo** menu (upload / use provider photo / remove; only valid options appear; keyboard and Esc work).
+- **Edit profile**: display name, username (with an `@` inside the field and live "Available / taken" via `handle_available`), bio with counter. **Avatar fallback** (initials or emoji, colour) is a collapsed secondary row.
+- **Sharing**: one "Share as" dropdown (your name / Anonymous), two compact switches (photo, bio; disabled when anonymous), "New board links" dropdown, and a small preview of what recipients see.
+- **Personalization**: preferred handwriting dropdown, default note colour popover.
+- **Account**: e-mail, plan, real stats only (hidden if unavailable), connected accounts (Google / GitHub with Connected / Connect), Sign out.
+- **Data & privacy**: three action rows (export, manage active shares with a count and how each link presents you, sign out of all devices).
+- **Danger zone** at the bottom in a restrained warning card; the typed-DELETE flow is unchanged.
+- Footer is only **Cancel / Save**. Cancel discards everything, including a cropped-but-not-saved photo (nothing is uploaded until Save).
+
+No column, policy or authorization rule changed for the redesign. The one backend addition is `handle_available(text)` (migration `20260930140000`), a yes/no answer for a typed username; the unique index still decides on Save.
+
+Not done: a section index/sidebar (the dialog fits on a few screens; adding one would push it toward "admin panel").

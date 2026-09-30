@@ -37,7 +37,7 @@
     },
     // my links (never includes the token: only its hash is stored)
     list: function () {
-      return db().then(function (c) { return c.from("shares").select("id,share_type,board_id,by_name,is_active,created_at,disabled_at").order("created_at", { ascending: false }); })
+      return db().then(function (c) { return c.from("shares").select("id,share_type,board_id,by_name,by_bio,by_avatar_asset_id,is_active,created_at,disabled_at").order("created_at", { ascending: false }); })
         .then(function (r) { if (r.error) throw Stick.errors.parse(r.error); return r.data || []; });
     },
     disable: function (shareId) {
