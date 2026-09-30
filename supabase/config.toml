@@ -1,0 +1,57 @@
+# Supabase project configuration for Stick-It.
+# Used by the Supabase CLI (`supabase link`, `supabase db push`, `supabase config push`,
+# `supabase functions deploy`). Nothing secret belongs in this file: secrets are read from the
+# environment (env(...)) or set with `supabase secrets set`.
+
+project_id = "stick-it"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+# The production frontend (GitHub Pages). Used for e-mail links and as the default redirect.
+site_url = "https://johnzach31.github.io/stick-it/"
+# Every URL the app may send people back to after sign-in. Add your own local preview URL if it differs.
+additional_redirect_urls = [
+  "https://johnzach31.github.io/stick-it/",
+  "https://johnzach31.github.io/stick-it/**",
+  "http://127.0.0.1:8123/",
+  "http://127.0.0.1:8123/**",
+  "http://localhost:8123/",
+  "http://localhost:8123/**",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false      # guests stay local; they never get a server identity
+
+[auth.email]
+enable_signup = false                  # Google sign-in only for now
+enable_confirmations = true
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"    # Google OAuth client id  (not secret, but kept out of git anyway)
+secret = "env(GOOGLE_CLIENT_SECRET)"   # SECRET: only ever in your shell / Supabase dashboard
+skip_nonce_check = false
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"              # Supabase Free plan maximum for a single upload
+
+[functions.resolve-share]
+verify_jwt = false                     # public: visitors have no account; the share token is the credential
+[functions.report-share]
+verify_jwt = false
+[functions.gc-assets]
+verify_jwt = false                     # guarded by the GC_SECRET header instead

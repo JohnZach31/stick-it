@@ -1,0 +1,8 @@
+{
+  "name": "stickit-backend-tests",
+  "private": true,
+  "type": "module",
+  "description": "SQL/RLS tests for the Stick-It Supabase schema, run on PGlite (Postgres compiled to WASM).",
+  "scripts": { "test": "node run-tests.mjs" },
+  "devDependencies": { "@electric-sql/pglite": "^0.3.0" }
+}

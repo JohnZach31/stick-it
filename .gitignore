@@ -4,3 +4,14 @@ Thumbs.db
 .idea/
 node_modules/
 .claude/
+
+# backend secrets and local state: never commit
+.env
+.env.*
+!.env.example
+*.pem
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+supabase/functions/.env
+supabase/tests/node_modules/
