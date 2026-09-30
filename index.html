@@ -1404,6 +1404,7 @@
   .asAction .go{ flex:none; color:var(--ink-soft); font-size:0.86rem; display:inline-flex; align-items:center; gap:8px; }
   .asAction:hover .lbl{ text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--ink) 30%, transparent); text-underline-offset:3px; }
   .asAction[disabled]{ opacity:0.5; cursor:default; }
+  .asAction[hidden]{ display:none; }
   .asLink{ all:unset; cursor:pointer; color:var(--accent); font-size:0.82rem; font-weight:600; padding:4px 2px; }
   .asLink:hover{ text-decoration:underline; } .asLink:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
   .asChip{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.68rem; font-weight:600; background:var(--accent-soft); color:var(--ink); margin-left:6px; }
@@ -6550,6 +6551,7 @@
         '<section class="asCard" aria-labelledby="asH5">' +
           '<h4 id="asH5">Data &amp; privacy</h4>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
+          '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
           '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
         '</section>' +
@@ -6823,6 +6825,15 @@
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
     $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); });
+    try{
+      var localBoards = Stick.migrate.inspectLocal(localStorage);
+      if(localBoards.length){
+        var n = localBoards.reduce(function(a, b){ return a + b.objects; }, 0);
+        $("asImport").hidden = false;
+        $("asImportSub").textContent = localBoards.length + (localBoards.length === 1 ? " board" : " boards") + " made before you signed in · " + n + (n === 1 ? " item" : " items") + ". Your copies on this device stay untouched.";
+        $("asImport").addEventListener("click", function(){ cleanup(); closeAccountModal(); startManualImport(); });
+      }
+    }catch(e){}
     $("asSignAll").addEventListener("click", async function(){
       var go = await confirmDialog({title: "Sign out of all devices?", body: "You\u2019ll be signed out everywhere, including here. Your boards stay safe in your account.", confirm: "Sign out everywhere", danger: true});
       if(go) cloudSignOut("global");
@@ -8519,13 +8530,15 @@
     }
   }
   // from the account menu, any time later
-  async function startManualImport(){
+  // auto=true: offered by itself after sign-in (once; "Not now" is remembered). Otherwise the person asked for it.
+  async function startManualImport(auto){
     try{
       var local = Stick.migrate.inspectLocal(localStorage);
-      if(!local.length){ toast("There's nothing saved on this device to import."); return; }
+      if(!local.length){ if(auto !== true) toast("There's nothing saved on this device to import."); return; }
       var existing = await Stick.repo.listBoards();
       var profile = await Stick.auth.profile();
       var ran = await offerMigration(local, existing, profile);
+      if(auto === true && !ran && Stick.mode.uid) safeSet("stickit.migration.declined." + Stick.mode.uid, true);
       if(ran && migratedCloudId){
         cloudOverlay("Opening your board\u2026");
         await cloudSync.refreshBoards();
@@ -8618,6 +8631,13 @@
     updateSyncPill("saved");
     await cloudSync.start();
     refreshBoardsQuietly();
+    // Boards made as a guest on this device that were never imported (signed in again later, or the first offer
+    // was skipped by a reload): ask once, and always keep the manual route in Account settings.
+    try{
+      if(!viewerMode && Stick.migrate.inspectLocal(localStorage).length && !safeGet("stickit.migration.declined." + session.user.id)){
+        setTimeout(function(){ startManualImport(true); }, 900);
+      }
+    }catch(e){}
   }
 
   // ---- coming back from Google -------------------------------------------
