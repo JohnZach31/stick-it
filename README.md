@@ -42,3 +42,10 @@ Fonts from [Google Fonts](https://fonts.google.com) · snapshots via [html2canva
 ## 📄 License
 
 MIT. See [LICENSE](LICENSE).
+
+## Cloud backend (optional)
+
+Stick-It can run local-only (guest) or sync to a Supabase project. See `docs/backend/`:
+`00-audit`, `01-database-and-security`, `02-architecture-and-auth`, `03-storage-migration-sharing`,
+`06-setup` (manual steps, which values are public vs secret), `07-security-csp-status` (what is and isn't done).
+Tests: `cd supabase/tests && npm ci && npm run test:all`.
