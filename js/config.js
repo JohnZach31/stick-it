@@ -17,8 +17,8 @@
   var Stick = root.Stick = root.Stick || {};
 
   var cfg = {
-    SUPABASE_URL: "",
-    SUPABASE_ANON_KEY: "",
+    SUPABASE_URL: "https://ndgybpkkjqydvttmiyot.supabase.co",
+    SUPABASE_ANON_KEY: "sb_publishable_RMonorbZOjWuBgmNmXxjNw_O2wjbhq3",
 
     // Boards per plan. UX only (to warn before a request): the server enforces the real limit.
     PLAN_LIMITS: { guest: { boards: 1 }, free: { boards: 2 }, premium: { boards: 6 } },
