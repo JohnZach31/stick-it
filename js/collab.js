@@ -173,7 +173,14 @@
     if (!text) return Promise.reject(new Error("EMPTY"));
     var uid = S && S.opts.me.uid, board = S && S.opts.boardId;
     return db().then(function (c) { return c.from("comments").insert({ board_id: board, object_id: objectId, author_id: uid, body: text }).select("id").single(); })
-      .then(function (r) { if (r.error) throw Stick.errors.parse(r.error); C.refreshSummary(); return r.data; });
+      .then(function (r) {
+        if (r.error) throw Stick.errors.parse(r.error);
+        if (S && r.data) {                                   // show the new state at once; the refresh below only confirms it
+          if (r.data.state === "none") delete S.summary.reviews[objectId];
+          else S.summary.reviews[objectId] = { state: r.data.state, reason: r.data.reason || "" };
+        }
+        C.refreshSummary(); return r.data;
+      });
   };
   C.deleteComment = function (id) {
     return db().then(function (c) { return c.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id); })
@@ -181,7 +188,14 @@
   };
   C.setReview = function (objectId, state, reason) {
     return db().then(function (c) { return c.rpc("set_review_state", { p_object: objectId, p_state: state, p_reason: reason || null }); })
-      .then(function (r) { if (r.error) throw Stick.errors.parse(r.error); C.refreshSummary(); return r.data; });
+      .then(function (r) {
+        if (r.error) throw Stick.errors.parse(r.error);
+        if (S && r.data) {                                   // show the new state at once; the refresh below only confirms it
+          if (r.data.state === "none") delete S.summary.reviews[objectId];
+          else S.summary.reviews[objectId] = { state: r.data.state, reason: r.data.reason || "" };
+        }
+        C.refreshSummary(); return r.data;
+      });
   };
 
   // ================================================================== drawing

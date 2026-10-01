@@ -292,6 +292,33 @@ try {
   G.Stick.migrate.removeLocal(gs, [localId]);
   ok(gs.getItem('stickyboard.notes.' + localId) === null && JSON.parse(gs.getItem('stickyboard.boards.v1')).length === 0, 'the local copy can be removed afterwards, explicitly');
 
+  // ---- guest boards with the new kinds: receipt, postcard, strip frames and a real cutout come along (pictures as assets)
+  {
+    const pid = 'bpaper0001';
+    const bs = JSON.parse(gs.getItem('stickyboard.boards.v1') || '[]'); bs.push({ id: pid, name: 'Scraps' }); gs.setItem('stickyboard.boards.v1', JSON.stringify(bs));
+    G.mediaBlobs.set('co-guest-1', new Blob([Buffer.alloc(650, 8)], { type: 'image/png' }));
+    const objs = [
+      { id: 'r1', type: 'receipt', x: 10, y: 10, w: 230, rot: 1, z: 1, title: 'Cafe', date: '1 Oct', body: 'Coffee', amount: '3.50', variant: 'torn', phys: {} },
+      { id: 'pc1', type: 'postcard', x: 300, y: 10, w: 320, rot: 0, z: 2, image: tinyJpeg(41), imgRatio: 0.66, location: 'Lisbon', message: 'Hi', variant: 'classic', phys: {} },
+      { id: 'st1', type: 'photo_strip', x: 10, y: 300, w: 140, rot: 0, z: 3, variant: 'vertical', caption: 'Trip', frames: [{ image: tinyJpeg(51), ratio: 0.7 }, { image: tinyJpeg(52), ratio: 0.8 }, { image: tinyJpeg(53), ratio: 0.75 }], phys: {} },
+      { id: 'ph1', type: 'photo', x: 400, y: 300, w: 220, imgRatio: 0.7, image: tinyJpeg(61), photoStyle: 'cutout', cutoutKey: 'co-guest-1', cutoutRatio: 1.2, backing: 'kraft', font: 'Caveat', rot: 0, z: 4, phys: { cut: 3 } },
+    ];
+    gs.setItem('stickyboard.notes.' + pid, JSON.stringify(objs));
+    const pr = await G.Stick.migrate.run({ store: gs, boardIds: [pid], mediaBlob: async (id) => G.mediaBlobs.get(id) || null });
+    const prep = pr.boards[0];
+    ok(pr.ok && prep.migrated === 4 && prep.failed === 0 && prep.verified === true, 'a guest board with receipt, postcard, strip and cutout migrates completely');
+    const rows = (await admin('select type, data from public.board_objects where board_id=$1 order by z_index', [prep.cloudId])).rows;
+    const byLegacy = (id) => rows.find(r => r.data.legacyId === id);
+    ok(byLegacy('r1').data.title === 'Cafe' && byLegacy('r1').data.variant === 'torn', 'the receipt keeps its words and look');
+    ok(byLegacy('pc1').data.assetId && !JSON.stringify(byLegacy('pc1').data).includes('base64'), 'the postcard picture became an asset');
+    ok(byLegacy('st1').data.frames.length === 3 && byLegacy('st1').data.frames.every(f => f.assetId) && !JSON.stringify(byLegacy('st1').data).includes('base64'), 'every strip frame became an asset, in order');
+    const ph = byLegacy('ph1').data;
+    ok(ph.assetId && ph.cutoutAssetId && ph.backing === 'kraft' && !('cutoutKey' in ph), 'the real cutout went up next to its photo and the device key stayed behind');
+    ok((await admin("select source_asset_id from public.assets where id=$1", [ph.cutoutAssetId])).rows[0].source_asset_id === ph.assetId, 'with the original photo recorded as its source');
+    ok((await admin("select count(*)::int c from public.object_assets where object_id=(select id from public.board_objects where data->>'legacyId'='st1')")).rows[0].c === 3, 'and the server registered the strip pictures');
+    G.Stick.migrate.removeLocal(gs, [pid]);
+  }
+
   // ---- failures: too large photo, board limit, never delete an unverified board
   const F = await device('failer@example.com');
   const fs_ = F.ls;

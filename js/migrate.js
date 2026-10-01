@@ -33,7 +33,7 @@
         var notes = j(store, GUEST.notes(b.id), []);
         var objs = notes.filter(meaningful);
         var media = objs.filter(function (n) { return n.type === "audio" || n.type === "video"; }).length;
-        var images = objs.filter(function (n) { return n.type === "photo" || isDataUrl(n.image); }).length;
+        var images = objs.filter(function (n) { return n.type === "photo" || n.type === "postcard" || n.type === "photo_strip" || isDataUrl(n.image); }).length;
         return { id: b.id, name: b.name || "My Board", subtitle: b.subtitle || "", objects: objs.length, images: images, media: media,
                  hasCover: !!j(store, GUEST.cover(b.id), null), migrated: j(store, "stickyboard.migrated." + b.id, null) };
       }).filter(function (b) { return b.objects > 0 && !b.migrated; });
@@ -82,6 +82,39 @@
                 n.mediaState = "failed"; rep.failed++;                     // e.g. one photo too large: the rest still migrates
                 if (n.type === "photo") continue;                          // a photo object without its photo has nothing to show
               }
+            } else if (n.type === "postcard" && isDataUrl(n.image)) {
+              var pblob = assets.dataUrlToBlob(n.image);
+              var paid = await util.uuidFrom(key + "|img|" + lb.id + "|" + n.legacyId + "|" + repo.hashStr(n.image));
+              prog({ phase: "media", board: lb.name, label: "Uploading postcard picture", done: i, total: notes.length });
+              try {
+                var passet = await assets.upload(cloud.id, "image", pblob, { assetId: paid, filename: "postcard." + (assets.normMime(pblob.type).split("/")[1] || "jpg") });
+                assets.rememberBlob(passet.id, pblob); n.assetId = passet.id; n.mediaState = "ready"; assetIds.push(passet.id); rep.images++;
+              } catch (e3) {
+                var pe3 = e3 && e3.code ? e3 : Stick.errors.parse(e3);
+                if (pe3.offline || pe3.retryable || pe3.code === "STORAGE_QUOTA_EXCEEDED") throw pe3;
+                n.mediaState = "failed"; rep.failed++; delete n.assetId;      // the words of the postcard still migrate
+              }
+            } else if (n.type === "photo_strip" && Array.isArray(n.frames)) {
+              var kept = [];
+              for (var fi = 0; fi < n.frames.length; fi++) {
+                var fr = n.frames[fi];
+                if (fr.assetId) { kept.push({ assetId: fr.assetId, ratio: fr.ratio, cap: fr.cap }); continue; }
+                if (!isDataUrl(fr.image)) continue;
+                var fblob = assets.dataUrlToBlob(fr.image);
+                var faid = await util.uuidFrom(key + "|img|" + lb.id + "|" + n.legacyId + "|f" + fi + "|" + repo.hashStr(fr.image));
+                prog({ phase: "media", board: lb.name, label: "Uploading strip picture " + (fi + 1), done: i, total: notes.length });
+                try {
+                  var fa = await assets.upload(cloud.id, "image", fblob, { assetId: faid, filename: "strip." + (assets.normMime(fblob.type).split("/")[1] || "jpg") });
+                  assets.rememberBlob(fa.id, fblob); assetIds.push(fa.id); rep.images++;
+                  kept.push({ assetId: fa.id, ratio: fr.ratio, cap: fr.cap });
+                } catch (e4) {
+                  var pe4 = e4 && e4.code ? e4 : Stick.errors.parse(e4);
+                  if (pe4.offline || pe4.retryable || pe4.code === "STORAGE_QUOTA_EXCEEDED") throw pe4;
+                  rep.failed++;
+                }
+              }
+              if (kept.length < 2) { rep.failed++; continue; }                // a strip needs two pictures to mean anything
+              n.frames = kept;
             } else if (n.type === "audio" || n.type === "video") {
               var mb = n.mediaId ? await o.mediaBlob(n.mediaId) : null;
               if (!mb) { n.mediaState = "missing"; rep.mediaMissing++; }
@@ -99,6 +132,21 @@
                 }
               }
             }
+            if (n.type === "photo" && n.cutoutKey) {
+              var cb2 = n.assetId ? await o.mediaBlob(n.cutoutKey) : null;
+              if (cb2) {
+                try {
+                  var caid = await util.uuidFrom(key + "|cut|" + lb.id + "|" + n.legacyId + "|" + n.cutoutKey);
+                  var ca = await assets.upload(cloud.id, "cutout", cb2, { assetId: caid, sourceId: n.assetId, filename: "cutout.png" });
+                  assets.rememberBlob(ca.id, cb2); n.cutoutAssetId = ca.id; assetIds.push(ca.id); rep.images++;
+                } catch (e5) {
+                  var pe5 = e5 && e5.code ? e5 : Stick.errors.parse(e5);
+                  if (pe5.offline || pe5.retryable || pe5.code === "STORAGE_QUOTA_EXCEEDED") throw pe5;
+                  delete n.cutoutRatio; rep.failed++;                           // the photo itself still migrates; only the cutout is lost
+                }
+              } else delete n.cutoutRatio;
+            }
+            delete n.cutoutKey;
             delete n.image; delete n.cutout;
             prepared.push(n);
           }
@@ -107,11 +155,18 @@
           var rows = prepared.map(function (n) { return Object.assign(repo.toRow(n), { base_version: null }); });
           for (var s = 0; s < rows.length; s += 100) {
             var res = await repo.syncObjects(cloud.id, rows.slice(s, s + 100), []);
+            var retry = [];
             (res.results || []).forEach(function (r) {
               if (r.status === "ok") rep.migrated++;
               else if (r.status === "conflict") rep.existing++;
+              else if (r.status === "invalid" && /PREMIUM_REQUIRED/.test(String(r.error || ""))) retry.push(r.id);     // a Premium cosmetic on a free account: bring the note, not the cosmetic
               else rep.failed++;
             });
+            if (retry.length) {
+              var plain = rows.slice(s, s + 100).filter(function (rw) { return retry.indexOf(rw.id) !== -1; }).map(function (rw) { var d = Object.assign({}, rw.data); delete d.cosmetic; return Object.assign({}, rw, { data: d }); });
+              var res2 = await repo.syncObjects(cloud.id, plain, []);
+              (res2.results || []).forEach(function (r) { if (r.status === "ok") rep.migrated++; else if (r.status === "conflict") rep.existing++; else rep.failed++; });
+            }
           }
 
           // cover + subtitle
