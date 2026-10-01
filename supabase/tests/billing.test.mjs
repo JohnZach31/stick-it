@@ -78,7 +78,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(run('johnzach31.github.io', { DEV_HOSTS: [] }).dev === undefined, 'with an empty DEV_HOSTS (production) nothing is exposed');
   const cfg = fs.readFileSync(path.join(root, 'js/config.js'), 'utf8');
   ok(/DEV_HOSTS:\s*\[\s*\]/.test(cfg), 'production config has an empty DEV_HOSTS list');
-  const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const idx = ['index.html', 'js/app.js', 'css/app.css'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
   ok(!/URLSearchParams\([^)]*\)[^;]{0,120}(resetAge|ageOk|age\.ok|bypass)/i.test(idx), 'no query-string switch can bypass the age step');
   ok(!/ipify|ip-api|ipinfo|x-forwarded-for/i.test(idx), 'nothing in the app relies on an IP address');
   ok(!/Stick\.dev\s*=/.test(idx), 'index.html never assigns Stick.dev itself (only js/dev.js does, and only locally)');
@@ -86,7 +86,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
 
 // ---------------------------------------------------------------- the age bands (the real function, from index.html)
 {
-  const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const idx = ['index.html', 'js/app.js', 'css/app.css'].map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
   const start = idx.indexOf('var AGE_OK_KEY');
   const end = idx.indexOf('function ageFlag()');
   ok(start > 0 && end > start, 'found ageBandFor in the app');
@@ -108,7 +108,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
 // ---------------------------------------------------------------- repository guarantees
 {
   const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
-  const pages = ['index.html', '404.html', 'unsubscribe.html', 'legal/privacy.html', 'legal/terms.html', 'legal/copyright.html'];
+  const pages = ['index.html', '404.html', 'unsubscribe.html', 'legal/privacy.html', 'legal/terms.html', 'legal/copyright.html', 'legal/young-people.html', 'legal/storage.html', 'legal/accessibility.html', 'legal/he/privacy.html', 'legal/he/terms.html', 'legal/he/copyright.html', 'legal/he/young-people.html', 'legal/he/storage.html', 'legal/he/accessibility.html'];
   for (const f of pages) {
     const h = read(f);
     ok(!/fonts\.googleapis|fonts\.gstatic/.test(h), `${f}: no Google Fonts reference`);
@@ -119,7 +119,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const css = read('assets/fonts/fonts.css');
   ok(!/https?:\/\//.test(css), 'fonts.css only references local files');
   ok((css.match(/@font-face/g) || []).length > 1000, 'fonts.css declares the self-hosted faces');
-  const idx = read('index.html');
+  const idx = ['index.html', 'js/app.js', 'css/app.css'].map(read).join('\n');
   ok(!/document\.cookie/.test(idx) && !/document\.cookie/.test(read('js/account.js')), 'no code sets or reads cookies');
   const bad = /fullstory|hotjar|clarity\.ms|posthog|sentry|logrocket|smartlook|google-analytics|googletagmanager|mixpanel|amplitude|segment\.com|plausible|matomo|datadog|newrelic|bugsnag|fbq\(|connect\.facebook/i;
   const files = ['index.html', '404.html', 'unsubscribe.html', ...fs.readdirSync(path.join(root, 'js')).filter(f => f.endsWith('.js')).map(f => 'js/' + f)];
@@ -133,6 +133,28 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(/function beginProviderSignIn\(provider\)\{\s*if\(!ageFlag\(\)\)/.test(idx) && /beginProviderSignIn\("github"\)/.test(idx) && /function beginGoogleSignIn\(\)\{ beginProviderSignIn\("google"\); \}/.test(idx), 'both Google and GitHub sign-in go through the age step first');
   ok(!/Subscribe|Upgrade now|Start free trial|Buy Premium|Checkout/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'no subscribe / upgrade / checkout button exists in the app');
   ok(!/GDPR.compliant|COPPA.(compliant|certified)|ADA.compliant|DMCA.protected|100% (secure|private)|military.grade/i.test(idx + read('README.md')), 'no compliance badges or unsupported security claims');
+}
+
+// ---------------------------------------------------------------- Hebrew pages, strict CSP, private info
+{
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  for (const p of ['privacy', 'terms', 'copyright', 'young-people', 'storage', 'accessibility']) {
+    const he = read(`legal/he/${p}.html`), en = read(`legal/${p}.html`);
+    ok(/<html lang="he" dir="rtl">/.test(he) && /<html lang="en" dir="ltr">/.test(en), `${p}: Hebrew page is rtl, English is ltr`);
+    ok(he.includes(`href="../${p}.html"`) && en.includes(`href="he/${p}.html"`), `${p}: the language switch links both ways`);
+  }
+  const idx = read('index.html');
+  const csp = idx.match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  ok(!/script-src[^;]*unsafe-inline/.test(csp) && !/style-src [^;]*unsafe-inline/.test(csp.replace(/style-src-attr[^;]*/, '')), 'index.html CSP has no unsafe-inline for scripts or stylesheets');
+  ok(!/<script>/.test(idx) && !/<style>/.test(idx), 'index.html has no inline script or style block');
+  ok(['privacy', 'terms'].every(p => (read(`docs/legal/${p === 'privacy' ? 'privacy-policy' : 'terms'}-draft.md`).match(/^## \d+\./gm) || []).length === 21), 'English Terms and Privacy have 21 numbered sections');
+  ok(['privacy-policy', 'terms'].every(p => (read(`docs/legal/he/${p}-draft.md`).match(/^## \d+\./gm) || []).length === 21), 'Hebrew Terms and Privacy have 21 numbered sections');
+  // private-info audit over every tracked text file (strings are built from parts so this file never contains them)
+  const secret = [['Maa', 'lot 8'].join(''), ['5884', '736'].join('')];
+  const walk = (d) => fs.readdirSync(path.join(root, d), { withFileTypes: true }).flatMap(e => e.name === 'node_modules' || e.name === '.git' || e.name === '.claude' || e.name === 'fonts' ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
+  const hits = walk('.').filter(f => /\.(html|js|mjs|ts|css|md|json|sql|txt|py)$/i.test(f) && secret.some(s => read(f).includes(s)));
+  ok(hits.length === 0, 'no residential address string appears in any tracked text file');
+  ok(!/\[OWNER INPUT REQUIRED: postal address\]/.test(read('docs/legal/terms-draft.md') + read('docs/legal/privacy-policy-draft.md')), 'the policies no longer ask for the owner postal address');
 }
 
 console.log(`${pass} passed, ${fail} failed`);

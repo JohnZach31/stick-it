@@ -23,3 +23,6 @@ A sender: no e-mail provider is connected and no job sends anything. Any future 
 2. Set the secrets: `npx supabase secrets set UNSUBSCRIBE_SECRET=<long random string>` (SECRET) and the other four values, and deploy `unsubscribe`.
 3. Fill `postalAddress`, `operatorName`, `privacyEmail` in `js/legal-config.js`.
 4. Choose an e-mail provider and a consent wording; keep transactional mail on a separate stream.
+
+## Update 2026-10-01
+Marketing e-mail needs a **public** postal address (never a private/home address). Without one the guard refuses to build any message; the placeholder `[PUBLIC POSTAL ADDRESS NOT CONFIGURED]` is refused too. Israeli rules (Communications Law s.30A) are summarised in `israel-marketing-email.md`. Only adults who opted in can be in the audience.

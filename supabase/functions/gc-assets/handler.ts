@@ -9,6 +9,10 @@ export interface GcDeps {
   removeFiles(paths: string[]): Promise<void>;
   clearTombstones(paths: string[]): Promise<void>;
   finishAssets(ids: string[]): Promise<number>;
+  // Abandoned sign-ups: an account that never finished the age step, owns nothing, and is older than the grace period.
+  // Optional so an older deployment keeps working. Only the list comes from the database; each deletion is a normal auth delete.
+  abandonedAccounts?(): Promise<string[]>;
+  deleteAccount?(userId: string): Promise<void>;
 }
 
 export function makeGcHandler(deps: GcDeps) {
@@ -19,7 +23,7 @@ export function makeGcHandler(deps: GcDeps) {
       [...given].reduce((d, c, i) => d | (c.charCodeAt(0) ^ deps.secret.charCodeAt(i)), 0) === 0;
     if (!same) return new Response(JSON.stringify({ ok: false }), { status: 401 });
 
-    const out = { objectsPurged: 0, assetsClaimed: 0, filesRemoved: 0, rowsRemoved: 0 };
+    const out = { objectsPurged: 0, assetsClaimed: 0, filesRemoved: 0, rowsRemoved: 0, abandonedRemoved: 0 };
     out.objectsPurged = await deps.purgeObjects();
     const claimed = await deps.claimAssets();
     out.assetsClaimed = claimed.length;
@@ -30,6 +34,11 @@ export function makeGcHandler(deps: GcDeps) {
       await deps.removeFiles(batch);
       await deps.clearTombstones(batch);
       out.filesRemoved += batch.length;
+    }
+    if (deps.abandonedAccounts && deps.deleteAccount) {
+      for (const id of (await deps.abandonedAccounts()).slice(0, 100)) {
+        try { await deps.deleteAccount(id); out.abandonedRemoved++; } catch { /* retried on the next run */ }
+      }
     }
     return new Response(JSON.stringify({ ok: true, ...out }), { status: 200, headers: { "content-type": "application/json" } });
   };

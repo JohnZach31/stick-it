@@ -4,20 +4,28 @@
   var L = (window.Stick && window.Stick.legal) || {};
   var page = document.body.getAttribute("data-page");
   var missing = L.missing ? L.missing() : ["operatorName"];
+  var he = document.body.getAttribute("data-lang") === "he";
   var banner = document.getElementById("draftBanner");
   var notFinal = missing.length > 0 || (page === "copyright" && !L.dmcaRegistered);
   if (banner && notFinal) {
     banner.hidden = false;
-    banner.textContent = page === "copyright" && !L.dmcaRegistered
-      ? "Development-only page. No DMCA designated agent has been registered yet, and the details below are placeholders. Do not rely on this page."
-      : "Draft. This text has not been finalised or reviewed by a lawyer, and highlighted items still need the owner's details.";
+    banner.textContent = he
+      ? (page === "copyright" && !L.dmcaRegistered
+        ? "דף לפיתוח בלבד. לא נרשם סוכן DMCA והפרטים בדף הם מצייני מקום. אין להסתמך על הדף."
+        : "טיוטה. הטקסט לא נבדק על ידי עורך דין ואינו סופי; פריטים מסומנים עדיין דורשים פרטים מהבעלים.")
+      : (page === "copyright" && !L.dmcaRegistered
+        ? "Development-only page. No DMCA designated agent has been registered yet, and the details below are placeholders. Do not rely on this page."
+        : "Draft. This text has not been finalised or reviewed by a lawyer, and highlighted items still need the owner's details.");
   }
 
   // replace a highlighted placeholder with the real value when we have one
   var map = [
-    [/privacy e-?mail/i, "privacyEmail"], [/support e-?mail/i, "supportEmail"], [/security contact/i, "privacyEmail"],
-    [/legal name of the (person or company|operator)/i, "operatorName"], [/^\[OWNER INPUT REQUIRED: postal address\]$/i, "postalAddress"]
+    [/privacy e-?mail/i, "privacyEmail"], [/support e-?mail/i, "supportEmail"], [/security contact/i, "privacyEmail"], [/copyright e-?mail/i, "copyrightEmail"],
+    [/דוא"ל פרטיות|איש קשר לאבטחה/, "privacyEmail"], [/דוא"ל תמיכה|דוא"ל נגישות/, "supportEmail"], [/דוא"ל זכויות יוצרים/, "copyrightEmail"],
+    [/legal name of the (person or company|operator)/i, "operatorName"]
   ];
+  // [PUBLIC POSTAL ADDRESS NOT CONFIGURED] is replaced ONLY by a deliberately configured public address; never anything else.
+  if (L.publicPostalAddress) map.push([/PUBLIC POSTAL ADDRESS NOT CONFIGURED|כתובת דואר ציבורית לא הוגדרה/, "publicPostalAddress"]);
   Array.prototype.forEach.call(document.querySelectorAll("mark.todo"), function (m) {
     var t = m.textContent;
     if (/,/.test(t.replace(/^\[[^:]*:/, ""))) return;               // combined placeholders stay visible

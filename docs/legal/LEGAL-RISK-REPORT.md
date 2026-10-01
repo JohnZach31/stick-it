@@ -48,3 +48,12 @@ Minimum age and the adequacy of the age screen for the regions served (COPPA, UK
 5. **Existing accounts** (the owner's) are asked the age screen at the next sign-in.
 6. Everything was verified against a local stand-in for Supabase except the earlier real-project checks; the new flows need a real-project smoke test.
 7. Notes a collaborator added to someone else's board stay on that board after the collaborator deletes their account (disclosed).
+
+## Update 2026-10-01 (Israel / age bands / owner details)
+
+- **Superseded:** the 13+ block and 24-hour refusal. Replaced by adult/teen/child bands; children are guest-only until verified parental consent exists (it does not exist yet and is not faked).
+- **Operator:** Jonathan Zachevsky, individual, Israel. Public postal address and all three contact e-mails are **not configured**; the pages stay DRAFT. The owner's residential address is not stored anywhere in the repository or its history (audited).
+- **Governing law / venue** are proposals (State of Israel, Tel Aviv-Jaffa district), flagged for legal review.
+- **Israeli baseline:** `israel-compliance-audit.md`. Registration/DPO/security-level conclusions are provisional and marked UNVERIFIED where a source could not be read directly.
+- **Open risks:** the cleanup job is not scheduled (retention promises avoided in the policy); no verified consent process; teen consent under Israeli law unconfirmed; no DMCA agent (not claimed); marketing disabled and fails closed without a public address; accessibility not audited; CSP still allows `style="..."` attributes (`style-src-attr`).
+- **Not claimed anywhere:** full legal compliance, accessibility certification, DMCA registration, legal review.

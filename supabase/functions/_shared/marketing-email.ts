@@ -8,7 +8,7 @@
 import { makeUnsubscribeToken } from "./unsubscribe-token.ts";
 
 export interface MarketingEnv {
-  LEGAL_POSTAL_ADDRESS?: string;   // the sender's real physical postal address: [OWNER INPUT REQUIRED]
+  LEGAL_POSTAL_ADDRESS?: string;   // a deliberately chosen PUBLIC postal address (never a private/home address): [OWNER INPUT REQUIRED]
   LEGAL_SENDER_NAME?: string;      // the name the mail is sent as
   UNSUBSCRIBE_SECRET?: string;     // server-only secret that signs unsubscribe links (supabase secrets set)
   UNSUBSCRIBE_PAGE_URL?: string;   // the public page people land on, e.g. https://<site>/unsubscribe.html
@@ -20,7 +20,7 @@ export class MarketingConfigError extends Error {
   constructor(missing: string[]) { super("Marketing e-mail is not configured: " + missing.join(", ")); this.missing = missing; }
 }
 
-const PLACEHOLDER = /\[OWNER|TODO|CHANGE ?ME|example\.(com|org)|lorem/i;
+const PLACEHOLDER = /\[OWNER|\[PUBLIC POSTAL|NOT CONFIGURED|TODO|CHANGE ?ME|example\.(com|org)|lorem/i;
 
 export function marketingConfigProblems(env: MarketingEnv): string[] {
   const p: string[] = [];

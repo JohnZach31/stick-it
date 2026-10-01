@@ -12,17 +12,30 @@ import os
 import re
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+# (markdown source, html name, title en, title he, page id)
 PAGES = [
-    ('privacy-policy-draft.md', 'privacy.html', 'Privacy Policy', 'privacy'),
-    ('terms-draft.md', 'terms.html', 'Terms of Service', 'terms'),
-    ('copyright-page-draft.md', 'copyright.html', 'Copyright / DMCA', 'copyright'),
+    ('privacy-policy-draft.md', 'privacy.html', 'Privacy Policy', 'מדיניות פרטיות', 'privacy'),
+    ('terms-draft.md', 'terms.html', 'Terms of Service', 'תנאי שימוש', 'terms'),
+    ('copyright-page-draft.md', 'copyright.html', 'Copyright / DMCA', 'זכויות יוצרים', 'copyright'),
+    ('young-people-draft.md', 'young-people.html', 'Young people and parents', 'צעירים והורים', 'young'),
+    ('storage-notice-draft.md', 'storage.html', 'Storage notice', 'הודעת אחסון', 'storage'),
+    ('accessibility-statement-draft.md', 'accessibility.html', 'Accessibility statement', 'הצהרת נגישות', 'accessibility'),
 ]
+LANGS = {
+    'en': dict(dir='ltr', folder='', src='', up='../', other='he', otherLabel='עברית', draft='draft', skip='Skip to the text',
+               nav=[('privacy', 'Privacy'), ('terms', 'Terms'), ('copyright', 'Copyright / DMCA'), ('young', 'Young people'), ('storage', 'Storage'), ('accessibility', 'Accessibility')],
+               back='Back to Stick-It', navlabel='Legal'),
+    'he': dict(dir='rtl', folder='he/', src='he/', up='../../', other='en', otherLabel='English', draft='טיוטה', skip='דלג לטקסט',
+               nav=[('privacy', 'פרטיות'), ('terms', 'תנאים'), ('copyright', 'זכויות יוצרים'), ('young', 'צעירים'), ('storage', 'אחסון'), ('accessibility', 'נגישות')],
+               back='חזרה ל-Stick-It', navlabel='משפטי'),
+}
+FILES = {k: v[1] for k, v in ((p[4], p) for p in PAGES)}
 CSP = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
 
 def inline(t):
     t = html.escape(t, quote=False)
-    t = re.sub(r'\[((?:OWNER INPUT REQUIRED|LEGAL REVIEW)[^\]]*)\]', lambda m: '<mark class="todo">[' + m.group(1) + ']</mark>', t)
+    t = re.sub(r'\[((?:OWNER INPUT REQUIRED|LEGAL REVIEW|PUBLIC POSTAL ADDRESS|נדרש מידע מהבעלים|מומלץ סקירה משפטית|כתובת דואר ציבורית)[^\]]*)\]', lambda m: '<mark class="todo">[' + m.group(1) + ']</mark>', t)
     t = re.sub(r'`([^`]+)`', r'<code>\1</code>', t)
     t = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', t)
     t = re.sub(r'(?<![\w*])\*([^*\s][^*]*)\*(?![\w*])', r'<em>\1</em>', t)
@@ -82,20 +95,20 @@ def convert(md):
 
 
 TEMPLATE = '''<!DOCTYPE html>
-<html lang="en">
+<html lang="{lang}" dir="{dir}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="{csp}">
 <meta name="robots" content="noindex">
-<title>{title} (draft) · Stick-It</title>
-<link rel="stylesheet" href="../assets/fonts/fonts.css">
-<link rel="stylesheet" href="legal.css">
+<title>{title} ({draft}) · Stick-It</title>
+<link rel="stylesheet" href="{up}assets/fonts/fonts.css">
+<link rel="stylesheet" href="{cssup}legal.css">
 </head>
-<body data-page="{page}">
-<a class="skip" href="#main">Skip to the text</a>
-<header class="top"><a href="../index.html" class="brand">Stick-It</a>
-<nav aria-label="Legal"><a href="privacy.html">Privacy</a> <a href="terms.html">Terms</a> <a href="copyright.html">Copyright / DMCA</a></nav></header>
+<body data-page="{page}" data-lang="{lang}">
+<a class="skip" href="#main">{skip}</a>
+<header class="top"><a href="{up}index.html" class="brand">Stick-It</a>
+<nav aria-label="{navlabel}">{nav} <a class="langSwitch" href="{otherHref}" hreflang="{other}" lang="{other}">{otherLabel}</a></nav></header>
 <div id="draftBanner" class="draftBanner" role="note" hidden></div>
 <main id="main">
 <article>
@@ -103,10 +116,10 @@ TEMPLATE = '''<!DOCTYPE html>
 </article>
 {extra}
 </main>
-<footer class="foot"><a href="../index.html">Back to Stick-It</a></footer>
-<script src="../js/config.js"></script>
-<script src="../js/legal-config.js"></script>
-<script src="legal.js"></script>
+<footer class="foot"><a href="{up}index.html">{back}</a></footer>
+<script src="{up}js/config.js"></script>
+<script src="{up}js/legal-config.js"></script>
+<script src="{cssup}legal.js"></script>
 </body>
 </html>
 '''
@@ -127,12 +140,18 @@ FORM = '''<section id="copyrightForm" hidden aria-labelledby="cfH">
 </form>
 </section>'''
 
-for src, dst, title, page in PAGES:
-    md = open(os.path.join(ROOT, 'docs', 'legal', src), encoding='utf-8').read().replace('\r\n', '\n')
-    body = convert(md)
-    extra = FORM if page == 'copyright' else ''
-    out = TEMPLATE.format(csp=CSP, title=title, page=page, body=body, extra=extra)
-    os.makedirs(os.path.join(ROOT, 'legal'), exist_ok=True)
-    with open(os.path.join(ROOT, 'legal', dst), 'w', encoding='utf-8', newline='\n') as f:
-        f.write(out)
-    print('wrote legal/' + dst, len(out))
+for lang, L in LANGS.items():
+    for src, dst, title_en, title_he, page in PAGES:
+        md = open(os.path.join(ROOT, 'docs', 'legal', L['src'] + src), encoding='utf-8').read().replace('\r\n', '\n')
+        body = convert(md)
+        extra = FORM if (page == 'copyright' and lang == 'en') else ''
+        nav = ' '.join('<a href="%s"%s>%s</a>' % (FILES[pid], ' aria-current="page"' if pid == page else '', label) for pid, label in L['nav'])
+        out = TEMPLATE.format(csp=CSP, title=title_en if lang == 'en' else title_he, page=page, body=body, extra=extra, lang=lang, dir=L['dir'],
+                              up=L['up'] if lang == 'he' else '../', cssup='../' if lang == 'he' else '', draft=L['draft'], skip=L['skip'], navlabel=L['navlabel'],
+                              nav=nav, other=L['other'], otherLabel=L['otherLabel'], back=L['back'],
+                              otherHref=('he/' + dst) if lang == 'en' else ('../' + dst))
+        folder = os.path.join(ROOT, 'legal', L['folder'])
+        os.makedirs(folder, exist_ok=True)
+        with open(os.path.join(folder, dst), 'w', encoding='utf-8', newline='\n') as f:
+            f.write(out)
+        print('wrote legal/' + L['folder'] + dst, len(out))

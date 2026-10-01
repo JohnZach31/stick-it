@@ -19,14 +19,14 @@ h1{ font-size:1.8rem; line-height:1.2; margin:0 0 0.6em; }
 h2{ font-size:1.2rem; margin:1.8em 0 0.4em; }
 h3{ font-size:1.02rem; margin:1.4em 0 0.3em; }
 p, li{ overflow-wrap:anywhere; }
-.draftNote{ margin:1em 0; padding:10px 14px; border-left:4px solid var(--edge); background:var(--warn); color:var(--warn-ink); border-radius:0 8px 8px 0; }
+.draftNote{ margin:1em 0; padding:10px 14px; border-inline-start:4px solid var(--edge); background:var(--warn); color:var(--warn-ink); border-radius:8px; }
 .draftNote p{ margin:0; }
 mark.todo{ background:var(--warn); color:var(--warn-ink); padding:0 4px; border-radius:4px; }
 code{ font:0.88em ui-monospace, Consolas, monospace; background:var(--panel); padding:1px 5px; border-radius:4px; border:1px solid var(--line); }
 pre{ overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:12px; }
 .tableWrap{ overflow-x:auto; margin:1em 0; }
 table{ border-collapse:collapse; width:100%; font-size:0.9rem; }
-th, td{ border:1px solid var(--line); padding:8px 10px; text-align:left; vertical-align:top; }
+th, td{ border:1px solid var(--line); padding:8px 10px; text-align:start; vertical-align:top; }
 thead th{ background:var(--panel); }
 .foot{ max-width:760px; margin:0 auto; padding:0 20px 40px; font-size:0.9rem; }
 #copyrightForm{ margin-top:2em; padding:16px; border:1px solid var(--edge); border-radius:12px; background:var(--panel); }
@@ -38,3 +38,11 @@ thead th{ background:var(--panel); }
 @media (prefers-color-scheme: dark){ #copyrightForm button, .unsubBtn{ color:#1e1a30; } }
 .center{ text-align:center; padding-top:15vh; }
 @media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+
+/* language switch and right-to-left pages */
+.langSwitch{ font-weight:600; padding:2px 10px; border:1px solid var(--edge); border-radius:999px; text-decoration:none; }
+.top nav a[aria-current="page"]{ font-weight:700; text-decoration:underline; }
+[dir="rtl"] body, html[dir="rtl"] body{ font-family:'Heebo','Rubik','Assistant',system-ui,sans-serif; }
+html[dir="rtl"] code{ direction:ltr; unicode-bidi:isolate; }
+html[dir="rtl"] pre{ direction:ltr; text-align:left; }
+html[dir="rtl"] ul, html[dir="rtl"] ol{ padding-inline-start:1.4em; }

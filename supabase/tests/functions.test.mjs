@@ -98,6 +98,10 @@ const req = (body, { method = 'POST', origin = ORIGIN, ip = '1.1.1.1' } = {}) =>
   const partial = []; let n = 0;
   await call(makeGcHandler(deps({ removeFiles: async (p) => { if (++n === 2) throw new Error('storage error'); partial.push(p.length); }, clearTombstones: async () => {} })), 's3cret-value').catch(() => {});
   ok(partial.length === 1, 'a failing batch stops the run (the rest stay queued for next time)');
+  const gone = [];
+  const o2 = await (await call(makeGcHandler(deps({ abandonedAccounts: async () => ['u1', 'u2', 'u3'], deleteAccount: async (id) => { if (id === 'u2') throw new Error('x'); gone.push(id); } })), 's3cret-value')).json();
+  ok(gone.join() === 'u1,u3' && o2.abandonedRemoved === 2, 'abandoned accounts are deleted one by one; a failure is skipped and retried next run');
+  ok((await (await call(makeGcHandler(deps()), 's3cret-value')).json()).abandonedRemoved === 0, 'without the optional hooks nothing about accounts runs');
 }
 
 // ---------------------------------------------------------------- delete-account
@@ -205,6 +209,8 @@ const req = (body, { method = 'POST', origin = ORIGIN, ip = '1.1.1.1' } = {}) =>
   const refuses = async (env, msg = MSG) => { try { await buildMarketingEmail(env, msg); return null; } catch (x) { return x; } };
   let x = await refuses({ ...GOOD, LEGAL_POSTAL_ADDRESS: '' });
   ok(x instanceof MarketingConfigError && x.missing.includes('LEGAL_POSTAL_ADDRESS'), 'no postal address configured: it refuses to build the message');
+  x = await refuses({ ...GOOD, LEGAL_POSTAL_ADDRESS: '[PUBLIC POSTAL ADDRESS NOT CONFIGURED]' });
+  ok(x instanceof MarketingConfigError, 'the not-configured placeholder is refused too');
   x = await refuses({ ...GOOD, LEGAL_POSTAL_ADDRESS: '[OWNER INPUT REQUIRED: address]' });
   ok(x instanceof MarketingConfigError, 'a placeholder address is not accepted either');
   x = await refuses({ ...GOOD, UNSUBSCRIBE_PAGE_URL: '' });

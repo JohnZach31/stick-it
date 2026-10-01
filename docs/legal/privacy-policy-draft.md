@@ -1,102 +1,131 @@
 # Privacy Policy (DRAFT)
 
-> **Draft for review.** This text describes what Stick-It actually does today. It has not been reviewed by a lawyer and several items need the owner's input (marked `[OWNER INPUT REQUIRED: ...]`). It is not final until those are filled in and it has been reviewed.
+> **Draft for review. Not legal advice and not final.** This text describes what Stick-It actually does today. It has **not** been reviewed by a lawyer, and items marked `[OWNER INPUT REQUIRED: ...]` or `[LEGAL REVIEW RECOMMENDED]` still need the owner or a lawyer. It stays a draft until the contact e-mail is configured, every placeholder is resolved, the owner approves it and legal review has been completed or knowingly accepted.
 
-Last updated: [OWNER INPUT REQUIRED: date when finalised]
+Last updated: 2026-10-01 (draft version 2026-10-01-draft)
 
 ## 1. Who runs Stick-It
 
-Stick-It is operated by [OWNER INPUT REQUIRED: legal name of the person or company], [OWNER INPUT REQUIRED: postal address].
-Privacy contact: [OWNER INPUT REQUIRED: privacy e-mail address].
+Stick-It is operated by **Jonathan Zachevsky**, an individual in **Israel**. No company has been formed. Public postal address: [PUBLIC POSTAL ADDRESS NOT CONFIGURED]. Privacy contact: [OWNER INPUT REQUIRED: privacy e-mail].
 
 ## 2. The short version
 
 - **As a guest** you can use Stick-It without an account. Your boards stay in your browser on your device. We do not receive them.
 - **If you create an account**, we store your account details and the boards, notes, pictures, voice memos and videos you put in it, so they follow you between devices.
 - **Share links** show what you choose to share to anyone who has the link.
-- We do **not** run advertising, analytics or session recording, and we do not sell personal data.
-- Stick-It is not available to children under the age we ask about on the age screen (see section 10).
+- We run **no advertising, no analytics and no session recording**, and we do not sell personal data.
+- **Young people:** children under 13 may use Stick-It only as guests until verified parental consent exists. See section 14 and the [Young people and parents](young-people.html) page.
 
-## 3. What we collect, and why
+## 3. Data we collect, and why
 
 | What | Examples | Why |
 |---|---|---|
-| **Account sign-in details** (if you sign in with Google or GitHub) | Your e-mail address, name or username, profile picture address, and the provider's identifier for you | To create and secure your account |
-| **Age check** | Only the fact, and the time, that you passed the age screen. The month and year you enter are not sent to us and not stored | To keep Stick-It to eligible people |
-| **Profile** | Display name, optional username, optional short bio, profile picture (the one from your sign-in provider or one you upload), a fallback colour/emoji | To show who you are in the app and on links you share |
-| **Preferences** | How you want to appear on shared links, preferred handwriting font, default note colour, and whether you want product-update e-mails (**off unless you turn it on**; we record when you changed it) | To apply your choices |
-| **Your content** | Boards, notes (text, formatting, positions), pictures, voice memos, videos, board covers | To provide the service: store, sync and display it |
-| **Collaboration data** | Which boards you belong to and your role; invitations you create | To let people share boards. (Comments and reminders are not available yet.) |
+| **Account sign-in details** (Google or GitHub) | E-mail address, name or username, profile picture address, the provider's identifier for you | To create and secure your account |
+| **Age band** | Only the result of the age step: adult, teen or child, the time you confirmed it, and (for children) a parental-consent status. **Your date of birth, and the month and year you type, are not sent to us and not stored.** | To apply the right protections for your age |
+| **Document versions** | The version of the Terms and Privacy Policy you were shown | To record what you were told |
+| **Profile** | Display name, optional username, optional short bio, profile picture, a fallback colour/emoji | To show who you are in the app and on links you share |
+| **Preferences** | How you appear on shared links, handwriting font, default note colour, and whether you want product-update e-mails (**off unless you turn it on, and not available under 18**; we record when you changed it) | To apply your choices |
+| **Your content** | Boards, notes (text, formatting, positions), pictures, voice memos, videos, board covers | To provide the service |
+| **Collaboration data** | Boards you belong to and your role; invitations you create | To let people share boards |
 | **Share links** | A copy of what you shared, the name/picture/bio you chose to show, whether the link is active. The link's secret address is stored only as a one-way hash | To make links work and let you turn them off |
 | **Reports** | Content or copyright reports you send us | To handle abuse and copyright complaints |
-| **Technical and security data** | Standard request data (IP address, device/browser type, time) is processed by our hosting and database providers; our own functions record no content | To deliver and protect the service |
+| **Technical and security data** | Standard request data (IP address, device/browser type, time) is processed by our hosting and database providers | To deliver and protect the service |
 
-We do not ask for your phone number, postal address, payment details, contacts, location, or date of birth.
+We do not ask for your phone number, postal address, payment details, contacts, location or date of birth.
 
-## 4. Information stored on your device
+## 4. Whether you must give it
 
-Stick-It saves your guest boards, settings, and (when signed in) your session and a cached copy of your boards in your browser (local storage and IndexedDB). It sets **no cookies**. This storage is needed for the app to work. You can clear it in your browser settings; signing out removes the signed-in copy. See the list in our technical documentation. [OWNER INPUT REQUIRED: confirm whether to publish the table from `docs/legal/01-cookies-and-storage.md`.]
+You do not need an account to use Stick-It as a guest. Creating an account needs a Google or GitHub sign-in and the age step; without them we cannot offer an account. Everything else is optional.
 
-## 5. How we use information
+## 5. Notice at collection
 
-To provide, secure and maintain Stick-It; to sync your boards; to show your name/picture/bio on links **only if you chose that**; to answer reports and legal requests; to improve reliability (without reading your content). We do not use your content to train AI models and do not sell it. [OWNER INPUT REQUIRED: confirm this statement reflects intent.]
+When you sign in, Stick-It shows a short notice saying who runs it, what is collected, why, who receives it, that you choose whether to give it, and where to read more. The same information is in this policy.
 
-Legal bases for processing (where the law asks for them): [OWNER INPUT REQUIRED: to be set with legal advice, e.g. performance of the service, legitimate interests in security, consent for optional e-mail].
+## 6. How we use it
 
-## 6. Who we share it with
+To provide, secure and maintain Stick-It; sync your boards; show your name, picture and bio on links **only if you chose that**; apply age-based protections; answer reports and legal requests; and keep the service reliable (without reading your content). We do not use your content to train AI models, we do not sell it, and we do not use it for advertising. [OWNER INPUT REQUIRED: confirm this reflects intent]
 
-- **Service providers (processors)** that run Stick-It for us: **Supabase** (database, sign-in, file storage and server functions) and **GitHub** (website hosting via GitHub Pages). [OWNER INPUT REQUIRED: region where the Supabase project is hosted and any data-processing agreement in place.]
-- **Sign-in providers.** If you use Google or GitHub to sign in, they learn that you use Stick-It. If your profile picture comes from them, your browser loads it from their servers.
-- **Anyone with a link you create.** A share link shows what you shared (and your name, picture and bio only if you chose that) to **anyone who has the link**, without an account. Please treat it like handing over a paper note.
-- **Other members of boards you share.** They can see the content of that board and your display name.
-- **Authorities,** where we are legally required to, or to protect people's safety or rights. [OWNER INPUT REQUIRED: legal process policy.]
+## 7. Who receives it
+
+- **Service providers** that run Stick-It: **Supabase** (database, sign-in, file storage, server functions) and **GitHub** (website hosting through GitHub Pages).
+- **Sign-in providers.** If you use Google or GitHub, they learn that you use Stick-It. If your picture comes from them, your browser loads it from their servers.
+- **Anyone with a link you create.** A share link shows what you shared to anyone who has it, without an account.
+- **Other members of boards you share** can see that board's content and your display name.
+- **Authorities,** where we are legally required to, or to protect people's safety or rights. [OWNER INPUT REQUIRED: legal-process policy]
 
 We do not sell personal data and do not share it for advertising.
 
-## 7. International processing
+## 8. Marketing e-mail
 
-Our providers may process data in countries other than yours. [OWNER INPUT REQUIRED: where the Supabase project and GitHub Pages serve from, and the transfer mechanism if you are in or serve the EU/UK.]
+Product-update e-mail is **off by default**, only for adults who switch it on, and never sent to people under 18. Every message must carry a one-click unsubscribe link, the sender's identity and a valid contact. **No marketing e-mail is sent today.** It stays disabled until a public postal address and sender are configured. [LEGAL REVIEW RECOMMENDED: Israeli Communications Law section 30A]
 
-## 8. How long we keep it
+## 9. Browser storage
+
+Stick-It saves your guest boards, settings and (when signed in) your session and a cached copy of your boards in your browser (local storage and IndexedDB). It sets **no cookies**. This storage is needed for the app to work. Clearing browser data removes it; signing out removes the signed-in copy. See the [Storage notice](storage.html).
+
+## 10. International processing
+
+Our providers may process data outside Israel. [OWNER INPUT REQUIRED: the region of the Supabase project and where GitHub Pages serves from]. Israeli rules on transfers of data abroad apply. [LEGAL REVIEW RECOMMENDED: transfer basis]
+
+## 11. How long we keep it
 
 | Data | Kept |
 |---|---|
 | Account, profile, preferences, boards, files | Until you delete them or your account |
-| Notes you delete | Marked deleted so Undo works, then permanently removed by a clean-up job after 30 days. [OWNER INPUT REQUIRED: the clean-up job still has to be scheduled. Until it runs, deleted notes remain in the database.] |
-| Files no longer used by anything | Removed by the same clean-up job after a 14-day grace period |
+| Notes you delete | Marked deleted so Undo works, then **intended** to be removed by a clean-up job. **The job is not scheduled yet** (the owner must schedule it), so until it runs deleted notes remain in the database. No removal period is promised yet. |
+| Files no longer used by anything | Intended to be removed by the same job after a grace period; same caveat |
+| Abandoned sign-ups (an account that never finished the age step and owns nothing) | Intended to be removed by the same job after 7 days; same caveat |
 | Share links | Until you turn them off or delete your account |
-| Age-screen flag on your device | 1 hour (passed) or 24 hours (failed), then ignored |
+| Age result on your device | Kept in your browser until you clear it; never contains a birth date |
 | Reports | [OWNER INPUT REQUIRED: how long reports are kept] |
-| Provider logs and backups | Controlled by Supabase / GitHub. [OWNER INPUT REQUIRED: retention periods for the chosen plan] |
+| Provider logs and backups | Controlled by Supabase and GitHub. [OWNER INPUT REQUIRED: retention for the chosen plan] |
 
-## 9. Deleting your account and your data
+## 12. Deleting your account and getting a copy
 
-**In the app:** Account settings → Delete account (you must type DELETE). This removes your profile and settings, the boards you own with everything on them, your uploaded files and profile picture, your share links (they stop working immediately, including frozen snapshots), your invitations and your memberships, then your sign-in account. Files are removed from storage immediately, with a clean-up job as a safety net.
+**In the app:** Account settings, then Delete account (you type DELETE). This removes your profile and settings, the boards you own with everything on them, your uploaded files and picture, your share links (they stop working immediately, including snapshots), your invitations and memberships, then your sign-in account.
 
-What is **not** removed: notes you added to someone else's board stay on that board (they belong to the board, but no longer show your name); reports you sent us; data held in provider logs or backups until it expires; your Google or GitHub account and the permission you gave Stick-It (you can revoke that with them). We do not claim instant erasure of backups.
+**Not removed:** notes you added to someone else's board (they stay, without your name), reports you sent us, data in provider logs or backups until they expire, and your Google or GitHub account and the permission you gave Stick-It (revoke it with them). We do not claim instant erasure of backups.
 
-**Copy of your data:** Account settings → Data & privacy → Export my boards. It includes your account and profile information, preferences, boards and their items, pictures, and your share-link list. It does **not** yet include voice-memo and video files, or the secret address of each link. For anything else write to [OWNER INPUT REQUIRED: privacy e-mail].
-
-## 10. Children
-
-Stick-It is a general-audience service and is not directed to children. Before sign-in we ask for a birth month and year to check eligibility; we do not store it. If it shows someone is under the age Stick-It supports, we do not create an account, and if an account was created through another route it is deleted. [OWNER INPUT REQUIRED: the minimum age and the countries you serve, decided with legal advice. The age screen alone does not make a service compliant with children's privacy laws.]
-
-## 11. Cookies and tracking
-
-No advertising, analytics, social-media or session-recording tools. No cookies. Browser storage is used only to make the app work (section 4).
-
-## 12. Security
-
-Boards and files are stored in a private database and private file storage behind per-user access rules; media is delivered with short-lived links. Share links work for anyone who has them. No system is perfectly secure and we cannot guarantee it. Use the access controls (turn off links you no longer need). To report a security problem write to [OWNER INPUT REQUIRED: security contact].
+**Copy of your data:** Account settings, Data & privacy, Export my boards. It does not yet include voice-memo and video files or each link's secret address. For anything else write to [OWNER INPUT REQUIRED: privacy e-mail].
 
 ## 13. Your rights
 
-Depending on where you live you may have rights to access, correct, delete, export, restrict or object to processing, or to complain to a regulator. [OWNER INPUT REQUIRED: the rights and process you will honour, and the regulator details, after legal review.]
+Under Israeli privacy law you may have the right to see data we hold about you and to ask for it to be corrected or deleted. Write to [OWNER INPUT REQUIRED: privacy e-mail]; we will answer as the law requires. You may complain to the Israeli Privacy Protection Authority. [LEGAL REVIEW RECOMMENDED: exact rights and timelines after Amendment 13]
 
-## 14. Changes
+## 14. Children and teens
 
-We will post changes here and update the date. For material changes we will tell account holders in the app. [OWNER INPUT REQUIRED: confirm notice method.]
+Stick-It is a general-audience service. We do not market to anyone under 18.
 
-## 15. Contact
+- **Adults (18+):** full use.
+- **Teens (13-17):** accounts allowed with conservative defaults: no marketing e-mail, links show no profile details by default, no public profile.
+- **Children (under 13):** guest use on their own device only. A cloud account is not available until a parent or guardian has given verified consent. **That mechanism does not exist yet.** If a child's account exists (for example created by getting around the age step), we restrict cloud features and keep it pending; we do not delete it automatically.
 
-[OWNER INPUT REQUIRED: operator legal name, postal address, privacy e-mail]
+Parents and guardians: see [Young people and parents](young-people.html). [LEGAL REVIEW RECOMMENDED]
+
+## 15. Security
+
+Boards and files are stored in a private database and private file storage behind per-user access rules; media is delivered with short-lived links. Share links work for anyone who has them. No system is perfectly secure and we cannot guarantee it. To report a security problem write to [OWNER INPUT REQUIRED: security contact]. If a breach affects you we will tell you and, where the law requires, the authorities. See the internal breach plan in `docs/security/israel-data-breach-plan.md`.
+
+## 16. Automated decisions
+
+We do not make decisions about you by profiling or automated means that have legal or similarly significant effect.
+
+## 17. Registration with the Privacy Protection Authority
+
+Whether the database must be registered, and whether a data protection officer is required, depends on facts and thresholds that have not been confirmed. See `docs/legal/israel-compliance-audit.md`. [LEGAL REVIEW RECOMMENDED]
+
+## 18. Third-party sites
+
+Links to other websites are outside our control. Their privacy practices are their own.
+
+## 19. Changes
+
+We will post changes here with the date and tell account holders in the app about material changes.
+
+## 20. Language
+
+A Hebrew version of this policy is provided. [LEGAL REVIEW RECOMMENDED: which version governs]
+
+## 21. Contact
+
+Operator: Jonathan Zachevsky, Israel. Privacy: [OWNER INPUT REQUIRED: privacy e-mail]. Public postal address: [PUBLIC POSTAL ADDRESS NOT CONFIGURED].
