@@ -20,3 +20,6 @@ select parental_consent_set('<uuid>', 'approved', 'test', 'dev', null);
 ```
 
 Never use the service role from browser code. Automated coverage: `supabase/tests/billing.test.mjs` (host matrix, band boundaries), `client.test.mjs`, `run-tests.mjs` section K.
+
+## When the age step appears
+Opening Account shows the sign-in choices; no age form yet. The age step ("A quick check") appears only after choosing Google, GitHub or "Continue with email", and is skipped when this browser already knows a band: the 1-hour `stickit.age.ok` flag, or the 90-day `stickit.age.known` hint (band only, set once an account with a band has been loaded here). A brand-new account with no band is still asked right after sign-in, and the server blocks cloud writes until `set_age_band` has run. `Stick.dev.resetAgeGate()` clears both local keys. `Stick.dev.loader.show/done/fail/hide` previews the loader states on local hosts only.

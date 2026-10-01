@@ -1313,12 +1313,55 @@
   .syncPill.offline, .syncPill.problem{ cursor:pointer; }
   .syncPill.saved{ opacity:0.7; }
   @media (max-width:600px){ .syncPill{ margin-left:0; } }
+  /* the Stick-It loader: a red sticky note that wobbles, then turns into a green one that sticks (transform/opacity only) */
   .cloudOverlay{
-    position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
-    background:var(--paper); color:var(--ink); font:500 0.95rem 'Sora',sans-serif; text-align:center; padding:24px;
+    position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); z-index:10050;
+    display:flex; flex-direction:column; align-items:center; gap:10px; max-width:min(86vw, 340px);
+    padding:18px 26px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:16px;
+    box-shadow:0 14px 36px rgba(20,15,5,0.26); font:500 0.92rem 'Sora',sans-serif; text-align:center;
+    transition:opacity .22s ease;
   }
-  .cloudOverlay .spin{ width:26px; height:26px; border-radius:50%; border:3px solid var(--line); border-top-color:var(--accent); animation:cloudSpin .8s linear infinite; }
-  @keyframes cloudSpin{ to{ transform:rotate(360deg); } }
+  .cloudOverlay.cover{ inset:0; left:0; top:0; transform:none; max-width:none; border:0; border-radius:0; box-shadow:none; background:var(--paper); justify-content:center; padding:24px; }
+  .slNote{ position:relative; width:46px; height:46px; transform-origin:50% 62%; animation:slWobble 1.1s ease-in-out infinite; }
+  .slNote span{ position:absolute; inset:0; }
+  .slNote svg{ width:100%; height:100%; display:block; }
+  .slGreen{ opacity:0; }
+  @keyframes slWobble{ 0%,100%{ transform:rotate(-6deg); } 50%{ transform:rotate(6deg) scale(1.04); } }
+  .stickLoader.ok .slNote{ animation:slStick .46s cubic-bezier(.34,1.56,.64,1) both; }
+  .stickLoader.ok .slRed{ opacity:0; transition:opacity .18s ease; }
+  .stickLoader.ok .slGreen{ opacity:1; transition:opacity .18s ease; }
+  @keyframes slStick{ 0%{ transform:rotate(-6deg) scale(1); } 45%{ transform:rotate(0deg) scale(1.2) translateY(-3px); } 100%{ transform:rotate(0deg) scale(1) translateY(0); } }
+  .stickLoader.fail .slNote{ animation:slShake .42s ease both; }
+  @keyframes slShake{ 0%{ transform:rotate(-4deg); } 20%{ transform:translateX(-4px) rotate(-5deg); } 40%{ transform:translateX(4px) rotate(3deg); } 60%{ transform:translateX(-3px) rotate(-3deg); } 80%{ transform:translateX(2px) rotate(1deg); } 100%{ transform:rotate(-4deg); } }
+  .stickLoader.out{ opacity:0; }
+  .stickLoader .msg{ min-height:1.2em; }
+  .stickLoader .slRetry[hidden]{ display:none; }
+  .stickLoader.fail .msg{ max-width:300px; line-height:1.4; }
+  .slMini{ display:inline-block; width:18px; height:18px; vertical-align:-4px; margin-right:6px; animation:slWobble 1.1s ease-in-out infinite; }
+  .slMini svg{ width:100%; height:100%; display:block; }
+  @media (prefers-reduced-motion: reduce){
+    .slNote, .slMini, .stickLoader.ok .slNote, .stickLoader.fail .slNote{ animation:none !important; transform:none !important; }
+    .stickLoader.ok .slRed, .stickLoader.ok .slGreen{ transition:opacity .2s linear; }
+  }
+
+  /* sign-in dialog: three equal choices, then guest, one short line of fine print */
+  .authLead{ margin:0 0 18px !important; }
+  .authBtns{ display:flex; flex-direction:column; gap:10px; }
+  .authOr{ display:flex; align-items:center; gap:12px; margin:16px 0 4px; color:var(--ink-soft); font-size:0.78rem; }
+  .authOr::before, .authOr::after{ content:''; flex:1; height:1px; background:var(--line); }
+  .authGuest{ margin-top:6px; }
+  .authLabel{ display:block; margin:14px 0 6px; font-size:0.8rem; font-weight:600; color:var(--ink); }
+  .authInput{ box-sizing:border-box; width:100%; height:46px; padding:0 14px; border:1px solid var(--edge); border-radius:10px; background:var(--field); color:var(--ink); font:inherit; font-size:1rem; }
+  .otpInput{ text-align:center; letter-spacing:0.35em; font-size:1.3rem; font-weight:600; }
+  .authMsg{ min-height:1.3em; margin:8px 0 6px; text-align:left; }
+  .authMsg.ok{ color:var(--ink-soft); }
+  .authPrimary{ width:100%; height:46px; display:flex; align-items:center; justify-content:center; }
+  .authPrimary[aria-busy="true"]{ opacity:0.85; }
+  .authLinks{ display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:12px; }
+  .linkBtn{ all:unset; cursor:pointer; font-size:0.82rem; color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
+  .linkBtn:disabled{ cursor:default; color:var(--ink-soft); text-decoration:none; }
+  .authAddr{ word-break:break-all; color:var(--ink); }
+  .legalAck{ margin:16px 2px 0; }
   .pFrame.pending img, .noteImgWrap img.pending{ background:linear-gradient(135deg, rgba(0,0,0,0.05), rgba(0,0,0,0.11)); min-height:60px; }
   .planBadge{ display:inline-block; font:600 0.66rem 'Sora',sans-serif; letter-spacing:0.05em; text-transform:uppercase; padding:2px 8px; border-radius:999px; background:var(--accent-soft); color:var(--ink); margin-top:4px; }
   .migList{ display:flex; flex-direction:column; gap:6px; margin:10px 0 4px; }

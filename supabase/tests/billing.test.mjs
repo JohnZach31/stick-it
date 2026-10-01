@@ -141,7 +141,27 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const fam = [...idx.matchAll(/\{name:"([^"]+)", script:/g)].map(m => m[1]);
   ok(fam.every(f => manifest.some(m => m.family === f)), 'every font the app can pick is self-hosted');
   // the age gate is wired in front of the providers
-  ok(/function beginProviderSignIn\(provider\)\{\s*if\(!ageFlag\(\)\)/.test(idx) && /beginProviderSignIn\("github"\)/.test(idx) && /function beginGoogleSignIn\(\)\{ beginProviderSignIn\("google"\); \}/.test(idx), 'both Google and GitHub sign-in go through the age step first');
+  ok(/function beginProviderSignIn\(provider\)\{\s*if\(!ageFlag\(\) && !ageKnown\(\)\)\{ pendingAuth = provider; renderAccountModal\("age"\)/.test(idx) && /beginProviderSignIn\("github"\)/.test(idx) && /beginProviderSignIn\("google"\)/.test(idx) && /function beginEmailSignIn\(\)\{\s*if\(!ageFlag\(\) && !ageKnown\(\)\)/.test(idx), 'Google, GitHub and e-mail sign-in each go through the age step first (unless this browser already knows the band)');
+  ok(!/state === "choice" && !ageFlag\(\)\) state = "age"/.test(idx), 'opening Account no longer jumps straight to the age screen');
+  {
+    const a = idx.indexOf('if(CLOUD_OK){\n        card.innerHTML = closeBtnHtml +'), b = idx.indexOf('var closeBtn = card.querySelector("#acctCloseBtn");');
+    const choice = idx.slice(a, b);
+    ok(a > 0 && b > a, 'found the sign-in choice screen');
+    ok(/Continue with Google/.test(choice) && /Continue with GitHub/.test(choice) && /Continue with email/.test(choice) && /Continue as guest/.test(choice), 'the choice screen offers Google, GitHub, email and guest');
+    ok(!/acctWhy|operatorName|calendar|password|profile photo|collectionNotice/i.test(choice), 'the sign-in screen has no operator / permissions / privacy-mechanics text');
+    ok((choice.match(/<p /g) || []).length <= 3 && /LEGAL_ACK_HTML/.test(choice) && /Terms/.test(idx.slice(idx.indexOf('var LEGAL_ACK_HTML'), idx.indexOf('var LEGAL_ACK_HTML') + 300)), 'only one short lead line plus the Terms/Privacy line remain');
+  }
+  ok(!/must be 13|13\+|13 or older/i.test(idx.slice(idx.indexOf('function buildAgeForm'), idx.indexOf('function renderChildStep'))), 'the age screen never states a minimum age');
+  ok(/A quick check/.test(idx) && /Your birth date isn\\u2019t stored/.test(idx), 'age screen copy: "A quick check" / birth date is not stored');
+  {
+    const cc = read('js/cloud-client.js'), mail = cc.slice(cc.indexOf('sendEmailCode'), cc.indexOf('identities:'));
+    ok(/signInWithOtp/.test(mail) && /verifyOtp/.test(mail) && !/password/i.test(mail), 'e-mail sign-in uses Supabase one-time codes, no password and no custom tokens');
+  }
+  ok(/autocomplete="one-time-code"/.test(idx) && /Resend code/.test(idx) && /Use another email/.test(idx) && /If this address can receive a code/.test(idx), 'code screen: one-time-code field, resend with cooldown, use another email, neutral wording');
+  ok(!/split\("@"\)\[0\]/.test(idx), 'the e-mail address is never turned into a public display name');
+  ok(/AGE_KNOWN_KEY = "stickit.age.known"/.test(idx) && /age\.known/.test(read('js/dev.js')) && !/birth|year|month/i.test(idx.slice(idx.indexOf('function ageKnownSet'), idx.indexOf('function ageKnownSet') + 160)), 'the 90-day known-band hint stores a band only and is cleared by the dev reset');
+  ok(/SL_SHOW_AFTER = 180/.test(idx) && /SL_MIN_VISIBLE = 250/.test(idx) && /function stickLoaderDone/.test(idx) && /function stickLoaderFail/.test(idx), 'loader: 180 ms show delay, 250 ms minimum, success and failure states');
+  ok(/prefers-reduced-motion: reduce\)\{\s*\.slNote/.test(idx), 'loader has a reduced-motion rule');
   ok(!/Subscribe|Upgrade now|Start free trial|Buy Premium|Checkout/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'no subscribe / upgrade / checkout button exists in the app');
   ok(!/GDPR.compliant|COPPA.(compliant|certified)|ADA.compliant|DMCA.protected|100% (secure|private)|military.grade/i.test(idx + read('README.md')), 'no compliance badges or unsupported security claims');
 }

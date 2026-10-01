@@ -109,6 +109,29 @@ try {
   ok(tampered.status >= 400, 'a forged signed URL is rejected');
   ok(!(await alice.c.rpc('disable_share', { p_share: share.data.id })).error, 'share disabled');
   ok((await fetch(`${url}/functions/v1/resolve-share`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: share.data.token }) })).status === 410, 'disabled share -> 410');
+
+  // ---- passwordless e-mail code (same real client calls the app makes)
+  {
+    const fresh = () => createClient(url, anon, { auth: { flowType: 'pkce', persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    const code = async (email) => (await (await fetch(`${url}/__admin/otp?email=${encodeURIComponent(email)}`)).json()).code;
+    const c1 = fresh();
+    const a = await c1.auth.signInWithOtp({ email: 'newperson@example.com', options: { shouldCreateUser: true } });
+    const b = await fresh().auth.signInWithOtp({ email: 'alice@example.com', options: { shouldCreateUser: true } });
+    ok(!a.error && !b.error && JSON.stringify(a.data) === JSON.stringify(b.data), 'asking for a code gives the same answer for a new and an existing address (no enumeration)');
+    const good = await code('newperson@example.com');
+    ok(/^\d{6}$/.test(good), 'a six-digit code was issued by the auth server (the app generates and stores none)');
+    const wrong = await c1.auth.verifyOtp({ email: 'newperson@example.com', token: good === '000000' ? '111111' : '000000', type: 'email' });
+    ok(!!wrong.error && !wrong.data.session, 'a wrong code is refused');
+    const right = await c1.auth.verifyOtp({ email: 'newperson@example.com', token: good, type: 'email' });
+    ok(!right.error && right.data.session && right.data.user.email === 'newperson@example.com', 'the right code signs in');
+    const again = await fresh().auth.verifyOtp({ email: 'newperson@example.com', token: good, type: 'email' });
+    ok(!!again.error, 'a code works only once');
+    const band = await c1.from('profiles').select('age_band').eq('id', right.data.user.id).single();
+    ok(band.data && band.data.age_band === null, 'a brand-new e-mail account has no age band yet');
+    const blocked = await c1.rpc('create_board', { p_name: 'x' });
+    ok(!!blocked.error && /AGE_NOT_CONFIRMED/.test(blocked.error.message), 'and cannot create cloud content until the age step is done (server-enforced)');
+    ok(!(await c1.rpc('set_age_band', { p_band: 'adult' })).error, 'after the age step it can');
+  }
 } catch (e) { fail++; console.log('  EXCEPTION', e); }
 finally { srv.kill(); }
 console.log(`${pass} passed, ${fail} failed`);

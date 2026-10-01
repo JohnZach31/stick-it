@@ -24,7 +24,7 @@
 
   Stick.dev = {
     resetAgeGate: function () {
-      drop(["stickit.age.ok", "stickit.age.blocked"]);          // blocked = the retired 24-hour block, cleared if an old browser still has it
+      drop(["stickit.age.ok", "stickit.age.known", "stickit.age.blocked"]);          // blocked = the retired 24-hour block, cleared if an old browser still has it
       return "Local age state cleared. Open Sign in to see the age step again.";
     },
     resetConsent: function () {

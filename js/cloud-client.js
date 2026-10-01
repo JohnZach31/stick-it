@@ -10,7 +10,7 @@
   // ------------------------------------------------------------------ errors
   var KNOWN = ["BOARD_LIMIT_REACHED", "STORAGE_QUOTA_EXCEEDED", "FILE_TOO_LARGE", "MIME_NOT_ALLOWED", "NOT_AUTHENTICATED",
     "FORBIDDEN", "OBJECT_LIMIT_REACHED", "UNSAFE_HTML", "INVITE_NOT_FOUND", "INVITE_USED", "INVITE_EXPIRED",
-    "INVITE_EMAIL_MISMATCH", "AGE_NOT_CONFIRMED", "PARENT_CONSENT_REQUIRED", "MARKETING_NOT_ALLOWED", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
+    "INVITE_EMAIL_MISMATCH", "AGE_NOT_CONFIRMED", "PARENT_CONSENT_REQUIRED", "MARKETING_NOT_ALLOWED", "CODE_INVALID", "CODE_RATE_LIMIT", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
   Stick.errors = {
     // Turns whatever a Supabase call threw/returned into {code, message, offline, retryable}
     parse: function (e) {
@@ -41,6 +41,8 @@
       if (c === "MARKETING_NOT_ALLOWED") return "Promotional e-mail isn’t available for this account.";
       if (c === "HANDLE_TAKEN") return "That username is already taken.";
       if (c === "OFFLINE") return "You appear to be offline.";
+      if (c === "CODE_INVALID") return "That code didn’t work. Check it, or ask for a new one.";
+      if (c === "CODE_RATE_LIMIT") return "Please wait a little before asking for another code.";
       if (c === "FORBIDDEN") return "You don't have permission to do that here.";
       return err && err.message ? err.message : "Something went wrong.";
     }
@@ -131,6 +133,29 @@
       }).then(function (r) { if (r && r.error) throw r.error; return r; });
     },
     signInWithGoogle: function () { return Stick.auth.signInWithProvider("google"); },
+
+    // passwordless e-mail code (Supabase Auth one-time password). Nothing about the code is stored or generated here.
+    // The reply is the same whether or not the address already has an account (no account enumeration).
+    sendEmailCode: function (email) {
+      return Stick.cloud.load().then(function (c) {
+        return c.auth.signInWithOtp({ email: String(email || "").trim(), options: { shouldCreateUser: true } });
+      }).then(function (r) {
+        if (r && r.error) {
+          var m = String(r.error.message || ""), st = r.error.status;
+          if (st === 429 || /rate limit|too many|seconds/i.test(m)) throw new Error("CODE_RATE_LIMIT");
+          throw r.error;
+        }
+        return true;
+      });
+    },
+    verifyEmailCode: function (email, code) {
+      return Stick.cloud.load().then(function (c) {
+        return c.auth.verifyOtp({ email: String(email || "").trim(), token: String(code || "").replace(/\s+/g, ""), type: "email" });
+      }).then(function (r) {
+        if (r && r.error) throw new Error(r.error.status === 429 ? "CODE_RATE_LIMIT" : "CODE_INVALID");
+        return (r && r.data && r.data.session) || null;
+      });
+    },
 
     // sign-in methods attached to this account, and adding another (needs "manual linking" enabled in Supabase)
     identities: function () {

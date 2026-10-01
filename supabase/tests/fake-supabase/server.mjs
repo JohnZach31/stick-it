@@ -104,13 +104,14 @@ function bearer(req) {
 // ---------------------------------------------------------------- auth
 const codes = new Map();   // auth code -> {email, challenge}
 const sessions = new Map();   // refresh token -> user id
-async function findOrCreateUser(email) {
+const otps = new Map();   // email -> {code, sent, tries}
+async function findOrCreateUser(email, bare) {
   return asSuper(async (d) => {
     let r = await d.query('select id, email, raw_user_meta_data from auth.users where email = $1', [email]);
     if (!r.rows.length) {
       const name = email.split('@')[0].replace(/^./, c => c.toUpperCase());
       r = await d.query('insert into auth.users (email, raw_user_meta_data) values ($1, $2::jsonb) returning id, email, raw_user_meta_data',
-        [email, JSON.stringify({ full_name: `${name} Tester`, avatar_url: `https://img.example/${name}.png` })]);
+        [email, JSON.stringify(bare ? {} : { full_name: `${name} Tester`, avatar_url: `https://img.example/${name}.png` })]);
     }
     return r.rows[0];
   });
@@ -170,6 +171,27 @@ async function handleAuth(req, res, url, body) {
     if (!c || !c.sub) return send(req, res, 401, { message: 'invalid JWT' });
     const u = (await asSuper(d => d.query('select id, email, raw_user_meta_data from auth.users where id=$1', [c.sub]))).rows[0];
     return send(req, res, 200, { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.raw_user_meta_data, app_metadata: { provider: 'google', providers: ['google'] }, identities: [{ id: u.id, user_id: u.id, provider: 'google', identity_data: u.raw_user_meta_data }] });
+  }
+  if (p === '/otp') {                                   // passwordless e-mail code: always the same reply (no enumeration)
+    const j = JSON.parse(body.toString() || '{}');
+    const email = String(j.email || '').trim().toLowerCase();
+    if (email) {
+      const last = otps.get(email);
+      if (last && Date.now() - last.sent < 1000) return send(req, res, 429, { code: 429, error_code: 'over_email_send_rate_limit', msg: 'For security purposes, you can only request this after 1 seconds.' });
+      otps.set(email, { code: String(crypto.randomInt(0, 1000000)).padStart(6, '0'), sent: Date.now(), tries: 0 });
+    }
+    return send(req, res, 200, {});
+  }
+  if (p === '/verify') {
+    const j = JSON.parse(body.toString() || '{}');
+    const email = String(j.email || '').trim().toLowerCase(), o = otps.get(email);
+    if (!o || o.tries >= 5 || Date.now() - o.sent > 3600000 || String(j.token) !== o.code) {
+      if (o) o.tries++;
+      return send(req, res, 403, { code: 403, error_code: 'otp_expired', msg: 'Token has expired or is invalid' });
+    }
+    otps.delete(email);
+    const s = sessionFor(await findOrCreateUser(email, true)); s.user.app_metadata = { provider: 'email', providers: ['email'] };
+    return send(req, res, 200, s);
   }
   if (p === '/logout') return send(req, res, 204);
   if (p === '/settings') return send(req, res, 200, { external: { google: true }, disable_signup: false });
@@ -407,6 +429,7 @@ async function handleAdmin(req, res, url, body) {
     try { const r = await asSuper(d => d.query(j.sql, j.params || [])); return send(req, res, 200, { rows: r.rows }); }
     catch (e) { return send(req, res, 400, { error: e.message }); }
   }
+  if (url.pathname === '/__admin/otp') return send(req, res, 200, { code: (otps.get(String(url.searchParams.get('email') || '').toLowerCase()) || {}).code || null });
   if (url.pathname === '/__admin/blobs') return send(req, res, 200, { count: blobs.size, paths: [...blobs.keys()] });
   return send(req, res, 404, {});
 }

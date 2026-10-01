@@ -283,14 +283,8 @@
     });
     return d;
   }
-  // concise notice where information is requested (not the whole policy): what, why, whether it is required, who controls it
-  function collectionNoticeHtml(){
-    var op = (Stick.legal && Stick.legal.operatorName) || "the operator of Stick-It";
-    return 'Signing in sends your name, e-mail and profile photo from Google or GitHub to Stick-It, which is operated by ' + escapeHtml(op) +
-      ', to create and secure your account. Providing it is voluntary: without it you can still use Stick-It as a guest, with everything kept on your device. ' +
-      '<a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a>.';
-  }
-  var LEGAL_ACK_HTML = 'By creating an account, you agree to the <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> and acknowledge the <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.';
+  // The sign-in dialog carries one short line with two links. What is collected and why is in the Privacy Policy (sections 3-7).
+  var LEGAL_ACK_HTML = 'By continuing, you agree to the <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> and acknowledge the <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.';
 
   // ---------- age screen ----------
   // "How old are you?" comes BEFORE any sign-in provider is shown. The birth month and year are used once, in this browser,
@@ -311,6 +305,14 @@
     var f = safeGet(AGE_OK_KEY);
     return (f && typeof f === "object" && (f.band === "adult" || f.band === "teen") && Date.now() - f.t < 3600 * 1000) ? f.band : null;
   }
+  // Long-lived hint (90 days, band only) that a signed-in account on this browser already has its band, so returning people are not
+  // asked again before sign-in. It never lets anyone skip the SERVER check: a new account without a band is still asked after sign-in.
+  var AGE_KNOWN_KEY = "stickit.age.known";
+  function ageKnown(){
+    var f = safeGet(AGE_KNOWN_KEY);
+    return (f && typeof f === "object" && (f.band === "adult" || f.band === "teen") && Date.now() - f.t < 90 * 86400000) ? f.band : null;
+  }
+  function ageKnownSet(band){ if(band === "adult" || band === "teen") safeSet(AGE_KNOWN_KEY, {band: band, t: Date.now()}); }
   function ageRemember(band){
     if(band === "adult" || band === "teen") safeSet(AGE_OK_KEY, {band: band, t: Date.now()});
     else { try{ localStorage.removeItem(AGE_OK_KEY); }catch(e){} }
@@ -320,7 +322,7 @@
     var form = document.createElement("form");
     form.noValidate = true;
     var lead = document.createElement("p"); lead.className = "acctSub"; lead.style.cssText = "margin:0;text-align:left;";
-    lead.textContent = "Enter your birth month and year so we can show the right account options. We use it only for this check and don\u2019t store your birth date.";
+    lead.textContent = "Enter your birth month and year so we can set up the right account options. Your birth date isn\u2019t stored.";
     form.appendChild(lead);
     var row = makeDiv("ageRow");
     var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -416,6 +418,7 @@
         throw e;
       }
       ageRemember(null);                                        // the one-hour hand-over flag has done its job
+      ageKnownSet(band);
       if(band === "child") return childStop();
       return true;
     }
@@ -4750,11 +4753,104 @@
     if(!over.length) closeAccountModal();                // a dialog opened over it (cropper, confirm...) handles its own Esc first
   }
 
+  // ---------- sign in with an e-mail code (Supabase Auth one-time password; no passwords, nothing of the code is kept by Stick-It) ----------
+  var pendingAuth = null, pendingEmail = "", emailTimer = null;
+  var EMAIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M3.5 7.5 12 13.5l8.5-6"></path></svg>';
+  function miniLoaderHtml(){ return '<span class="slMini" aria-hidden="true">' + buildLogoSvg(LOGO_COLORS.loading.fill, LOGO_COLORS.loading.dark) + '</span>'; }
+  function setBusy(btn, busy, text){
+    if(!btn) return;
+    if(busy){ btn.dataset.label = btn.textContent; btn.disabled = true; btn.setAttribute("aria-busy", "true"); btn.innerHTML = miniLoaderHtml() + '<span>' + escapeHtml(text || btn.dataset.label) + '</span>'; }
+    else { btn.disabled = false; btn.removeAttribute("aria-busy"); btn.textContent = btn.dataset.label || btn.textContent; }
+  }
+  function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v) && v.length <= 254; }
+  function beginEmailSignIn(){
+    if(!ageFlag() && !ageKnown()){ pendingAuth = "email"; renderAccountModal("age"); return; }
+    renderAccountModal("emailEnter");
+  }
+  function renderEmailEnter(card, closeBtnHtml){
+    card.innerHTML = closeBtnHtml +
+      '<button type="button" class="acctBack" id="acctBackBtn">\u2190 Back</button>' +
+      '<h3>Sign in with email</h3>' +
+      '<form id="emailForm" novalidate>' +
+        '<label class="authLabel" for="authEmailInput">Email</label>' +
+        '<input class="authInput" id="authEmailInput" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="you@example.com" value="' + escapeAttr(pendingEmail) + '">' +
+        '<p class="asErr authMsg" id="authMsg" role="alert"></p>' +
+        '<button type="submit" class="pillBtn primary authPrimary" id="sendCodeBtn">Send code</button>' +
+      '</form>';
+    var input = card.querySelector("#authEmailInput"), msg = card.querySelector("#authMsg"), btn = card.querySelector("#sendCodeBtn");
+    card.querySelector("#acctBackBtn").addEventListener("click", function(){ renderAccountModal("choice"); });
+    card.querySelector("#emailForm").addEventListener("submit", function(e){
+      e.preventDefault();
+      var v = input.value.trim();
+      if(!validEmail(v)){ msg.textContent = "Please enter a valid e-mail address."; input.focus(); return; }
+      msg.textContent = "";
+      setBusy(btn, true, "Sending\u2026");
+      Stick.auth.sendEmailCode(v).then(function(){
+        pendingEmail = v; emailSentAt = Date.now(); renderAccountModal("emailCode");
+      }, function(err){
+        setBusy(btn, false);
+        var er = Stick.errors.parse(err);
+        msg.textContent = er.code === "CODE_RATE_LIMIT" || er.offline ? Stick.errors.friendly(er) : "Couldn\u2019t send a code. Check the address and try again.";
+      });
+    });
+    setTimeout(function(){ input.focus(); }, 30);
+  }
+  var emailSentAt = 0;
+  function renderEmailCode(card, closeBtnHtml){
+    card.innerHTML = closeBtnHtml +
+      '<h3>Check your inbox</h3>' +
+      '<p class="acctSub authLead">If this address can receive a code, we\u2019ve sent one to:<br><strong class="authAddr"></strong></p>' +
+      '<form id="codeForm" novalidate>' +
+        '<label class="authLabel" for="authCode">Code</label>' +
+        '<input class="authInput otpInput" id="authCode" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" maxlength="12" placeholder="\u2022 \u2022 \u2022 \u2022 \u2022 \u2022" spellcheck="false">' +
+        '<p class="asErr authMsg" id="authMsg" role="alert"></p>' +
+        '<button type="submit" class="pillBtn primary authPrimary" id="verifyBtn">Continue</button>' +
+        '<div class="authLinks"><button type="button" class="linkBtn" id="resendBtn"></button><button type="button" class="linkBtn" id="otherEmailBtn">Use another email</button></div>' +
+      '</form>';
+    card.querySelector(".authAddr").textContent = pendingEmail;
+    var input = card.querySelector("#authCode"), msg = card.querySelector("#authMsg"), btn = card.querySelector("#verifyBtn"), resend = card.querySelector("#resendBtn");
+    input.addEventListener("input", function(){ input.value = input.value.replace(/\D/g, "").slice(0, 12); });       // a pasted code with spaces or dashes still works
+    function tick(){
+      var left = Math.max(0, 30 - Math.floor((Date.now() - emailSentAt) / 1000));
+      resend.disabled = left > 0;
+      resend.textContent = left > 0 ? "Resend code in " + left + "s" : "Resend code";
+      if(!left) clearInterval(emailTimer);
+    }
+    clearInterval(emailTimer); tick(); emailTimer = setInterval(tick, 500);
+    resend.addEventListener("click", function(){
+      if(resend.disabled) return;
+      msg.textContent = ""; resend.disabled = true; resend.textContent = "Sending\u2026";
+      Stick.auth.sendEmailCode(pendingEmail).then(function(){ emailSentAt = Date.now(); msg.textContent = ""; msg.className = "asErr authMsg ok"; msg.textContent = "A new code is on its way."; clearInterval(emailTimer); emailTimer = setInterval(tick, 500); tick(); },
+        function(err){ var er = Stick.errors.parse(err); msg.className = "asErr authMsg"; msg.textContent = er.code === "CODE_RATE_LIMIT" || er.offline ? Stick.errors.friendly(er) : "Couldn\u2019t send a new code. Try again in a moment."; tick(); });
+    });
+    card.querySelector("#otherEmailBtn").addEventListener("click", function(){ renderAccountModal("emailEnter"); });
+    card.querySelector("#codeForm").addEventListener("submit", function(e){
+      e.preventDefault();
+      var code = input.value.trim();
+      msg.className = "asErr authMsg";
+      if(code.length < 6){ msg.textContent = "Enter the code from the e-mail."; input.focus(); return; }
+      msg.textContent = "";
+      setBusy(btn, true, "Checking\u2026");
+      Stick.auth.verifyEmailCode(pendingEmail, code).then(function(session){
+        if(!session){ setBusy(btn, false); msg.textContent = "Couldn\u2019t sign you in. Please try again."; return; }
+        clearInterval(emailTimer);
+        pendingEmail = "";
+        closeAccountModal();
+        stickLoaderDone("Signed in.", function(){ try{ history.replaceState(null, "", location.pathname); }catch(e){} location.reload(); });
+      }, function(err){
+        setBusy(btn, false);
+        msg.textContent = Stick.errors.friendly(Stick.errors.parse(err));
+        input.focus(); input.select();
+      });
+    });
+    setTimeout(function(){ input.focus(); }, 30);
+  }
+
   function renderAccountModal(state){
     if(!acctBackdrop) return;
     var card = acctBackdrop.querySelector(".acctCard");
     card.className = "acctCard";
-    if(CLOUD_OK && !settings.account && state === "choice" && !ageFlag()) state = "age";      // age first, then the providers
+    clearInterval(emailTimer);
     var closeBtnHtml = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>';
 
     if(state === "signedIn" && settings.account && CLOUD && window.Stick && Stick.account){
@@ -4783,14 +4879,21 @@
       if(imp) imp.addEventListener("click", function(){ closeAccountModal(); startManualImport(); });
 
     } else if(state === "age"){
-      card.innerHTML = closeBtnHtml + '<h3 id="ageTitle">How old are you?</h3><div id="ageHost"></div>';
+      card.innerHTML = closeBtnHtml + '<h3 id="ageTitle">A quick check</h3><div id="ageHost"></div>';
       card.querySelector("#ageHost").appendChild(buildAgeForm({
-        extra: [{label: "Continue as guest", fn: function(){ renderAccountModal("guestCompare"); }}],
+        extra: [{label: "Back", fn: function(){ renderAccountModal("choice"); }}],
         onBand: function(band){
           ageRemember(band);
-          if(band === "child"){ renderChildStep(card); return; }
-          renderAccountModal(settings.guestConfirmed ? "guestHome" : "choice");
+          if(band === "child"){ pendingAuth = null; renderChildStep(card); return; }
+          var next = pendingAuth; pendingAuth = null;
+          if(next === "email") renderAccountModal("emailEnter");
+          else if(next === "google" || next === "github") startProviderSignIn(next);
+          else renderAccountModal(settings.guestConfirmed ? "guestHome" : "choice");
         }}));
+    } else if(state === "emailEnter"){
+      renderEmailEnter(card, closeBtnHtml);
+    } else if(state === "emailCode"){
+      renderEmailCode(card, closeBtnHtml);
     } else if(state === "guestHome"){
       card.innerHTML = closeBtnHtml +
         '<h3 style="text-align:center;">Browsing as a guest</h3>' +
@@ -4799,14 +4902,14 @@
           '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex:none;">' + escapeHtml(getDisplayName().charAt(0).toUpperCase()) + '</div>' +
           '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" aria-label="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--edge);font-size:0.9rem;font-family:inherit;">' +
         '</div>' +
-        ((CLOUD_OK && !ageFlag())
+        (CLOUD_OK
           ? '<button type="button" class="guestBtn" id="signInStartBtn">Sign in or create an account</button>'
           : '<div class="googleBtn" id="googleBtnFallback"></div>' +
             '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
             '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
-            (CLOUD_OK ? '<p class="legalAck">' + collectionNoticeHtml() + '</p><p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : ''));
+            '');
       var startBtn = card.querySelector("#signInStartBtn");
-      if(startBtn) startBtn.addEventListener("click", function(){ renderAccountModal("age"); });
+      if(startBtn) startBtn.addEventListener("click", function(){ renderAccountModal("choice"); });
       else mountGoogleButton();
       card.querySelector("#guestNameInput").addEventListener("input", function(e){
         settings.displayName = e.target.value.trim();
@@ -4842,21 +4945,33 @@
       });
 
     } else {
-      card.innerHTML = closeBtnHtml +
-        '<h3>Sign in to Stick-It</h3>' +
-        '<p class="acctSub">Optional. Pick whichever fits.</p>' +
-        '<div class="googleBtn" id="googleBtnFallback"></div>' +
-        '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
-        '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
-        (CLOUD_OK ? '<p class="legalAck">' + collectionNoticeHtml() + '</p><p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '') +
-        '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
-        '<div class="acctWhy">' +
-          '<p>👤 Your real name &amp; photo on anything you share, instead of “Anon-4821.”</p>' +
-          '<p>🔓 Stick-It asks only for your name, e-mail &amp; profile photo. It never sees your password and asks for no access to your mail, calendar or files.</p>' +
-          '<p>' + (CLOUD_OK ? '☁️ Your boards, photos and recordings follow you to every device.' : 'Unlocks the features that need an account.') + '</p>' +
-        '</div>';
-      card.querySelector("#chooseGuestBtn").addEventListener("click", function(){ renderAccountModal("guestCompare"); });
-      mountGoogleButton();
+      if(CLOUD_OK){
+        card.innerHTML = closeBtnHtml +
+          '<h3>Sign in to Stick-It</h3>' +
+          '<p class="acctSub authLead">Sign in to sync your boards across devices.</p>' +
+          '<div class="authBtns">' +
+            '<button type="button" class="googleBtn" id="googleBtnFallback">' + GOOGLE_ICON + '<span>Continue with Google</span></button>' +
+            '<button type="button" class="googleBtn" id="githubBtn">' + GITHUB_ICON + '<span>Continue with GitHub</span></button>' +
+            '<button type="button" class="googleBtn" id="emailBtn">' + EMAIL_ICON + '<span>Continue with email</span></button>' +
+          '</div>' +
+          '<div class="authOr" role="separator"><span>or</span></div>' +
+          '<button type="button" class="guestBtn authGuest" id="chooseGuestBtn">Continue as guest</button>' +
+          '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>';
+        card.querySelector("#googleBtnFallback").addEventListener("click", function(){ beginProviderSignIn("google"); });
+        card.querySelector("#githubBtn").addEventListener("click", function(){ beginProviderSignIn("github"); });
+        card.querySelector("#emailBtn").addEventListener("click", beginEmailSignIn);
+      } else {
+        card.innerHTML = closeBtnHtml +
+          '<h3>Sign in to Stick-It</h3>' +
+          '<div class="googleBtn" id="googleBtnFallback"></div>' +
+          '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
+          '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
+          '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>';
+        mountGoogleButton();
+      }
+      card.querySelector("#chooseGuestBtn").addEventListener("click", function(){
+        settings.guestConfirmed = true; saveSettings(); closeAccountModal(); toast("You\u2019re browsing as a guest.");
+      });
     }
 
     var closeBtn = card.querySelector("#acctCloseBtn");
@@ -5038,7 +5153,9 @@
         var errEl = content.querySelector("#delErr");
         btn.disabled = true; btn.textContent = "Deleting\u2026"; errEl.textContent = "";
         var uid = Stick.mode.uid;
+        cloudOverlay("Deleting your account"+String.fromCharCode(8230));
         Stick.account.deleteAccount().then(async function(){
+          hideCloudOverlay();
           cloudSigningOut = true;
           try{ await Stick.auth.signOut("local"); }catch(e){}
           if(uid) wipeCloudCache(uid);
@@ -5050,6 +5167,7 @@
           ok.addEventListener("click", function(){ location.hash = ""; location.reload(); });
           content.appendChild(ok);
         }, function(e){
+          hideCloudOverlay();
           btn.textContent = "Delete forever"; btn.disabled = content.querySelector("#delConfirm").value !== "DELETE";
           errEl.textContent = (e && e.message) || "Couldn't delete the account.";
         });
@@ -5554,6 +5672,12 @@
   document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};
+    Stick.dev.loader = {         // local only: look at the loader states without needing a slow network
+      show: function(t, cover){ cloudOverlay(t || "Loading…", !!cover); },
+      done: function(t){ stickLoaderDone(t || "Done."); },
+      fail: function(t){ stickLoaderFail(t || "Couldn’t load this board.", function(){}); },
+      hide: hideCloudOverlay
+    };
     Stick.hooks.showAgeFlow = function(){ if(!settings.account){ openAccountModal(); renderAccountModal("age"); } };
     var devSec = document.createElement("section");
     devSec.className = "setSec";
@@ -6962,13 +7086,64 @@
   var syncPill = document.getElementById("syncPill");
   var authLost = false, cloudSigningOut = false, migratedCloudId = null;
 
-  function cloudOverlay(text){
-    var o = document.getElementById("cloudOverlay");
-    if(!o){ o = makeDiv("cloudOverlay"); o.id = "cloudOverlay"; o.innerHTML = '<div class="spin"></div><div class="msg"></div>'; document.body.appendChild(o); }
-    o.querySelector(".msg").textContent = text;
+  // ---- the Stick-It loader --------------------------------------------------------------------------------------------
+  // A red sticky note wobbles while something takes a moment; when it worked it turns into a green one that sticks and fades.
+  // Rules: nothing shows for the first ~180 ms (no flicker on fast operations); once shown it stays at least 250 ms; the success and
+  // failure moments are short. Cheap on purpose: only transform and opacity animate. Reduced motion: no wobble, a plain fade (see CSS).
+  var SL = {el: null, timer: null, shownAt: 0, hideTimer: null, pending: null, retry: null};
+  var SL_SHOW_AFTER = 180, SL_MIN_VISIBLE = 250;
+  function slBuild(cover){
+    var o = makeDiv("cloudOverlay stickLoader" + (cover ? " cover" : ""));
+    o.id = "cloudOverlay"; o.setAttribute("role", "status"); o.setAttribute("aria-live", "polite");
+    o.innerHTML = '<div class="slNote" aria-hidden="true"><span class="slRed">' + buildLogoSvg(LOGO_COLORS.loading.fill, LOGO_COLORS.loading.dark) + '</span>' +
+      '<span class="slGreen">' + buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark) + '</span></div>' +
+      '<div class="msg"></div><button type="button" class="pillBtn slRetry" hidden>Try again</button>';
+    document.body.appendChild(o);
+    SL.el = o; SL.shownAt = Date.now();
     return o;
   }
-  function hideCloudOverlay(){ var o = document.getElementById("cloudOverlay"); if(o) o.remove(); }
+  function slLive(){ if(SL.el && !SL.el.isConnected) SL.el = null; }          // something else removed it: forget it
+  function slReset(o, text){
+    o.classList.remove("ok", "fail", "out");
+    o.querySelector(".msg").textContent = text;
+    o.querySelector(".slRetry").hidden = true;
+  }
+  // text: what is happening ("Signing you in\u2026"). cover: true only when there is nothing else on screen yet (first load).
+  function cloudOverlay(text, cover){
+    clearTimeout(SL.hideTimer); SL.hideTimer = null; slLive();
+    if(SL.el){ slReset(SL.el, text); return SL.el; }
+    if(cover){ clearTimeout(SL.timer); SL.timer = null; var o = slBuild(true); slReset(o, text); return o; }
+    SL.pending = text;
+    if(!SL.timer) SL.timer = setTimeout(function(){ SL.timer = null; if(SL.pending !== null){ var o2 = slBuild(false); slReset(o2, SL.pending); } }, SL_SHOW_AFTER);
+    return null;
+  }
+  function slRemove(){ if(SL.el){ SL.el.remove(); SL.el = null; } }
+  function hideCloudOverlay(){
+    clearTimeout(SL.timer); SL.timer = null; SL.pending = null;
+    if(!SL.el) return;
+    clearTimeout(SL.hideTimer);
+    SL.hideTimer = setTimeout(slRemove, Math.max(0, SL_MIN_VISIBLE - (Date.now() - SL.shownAt)));
+  }
+  // it worked: the red note slows, turns green, pops, sticks, fades. `after` runs when it is done.
+  function stickLoaderDone(text, after){
+    clearTimeout(SL.timer); SL.timer = null; SL.pending = null; clearTimeout(SL.hideTimer); slLive();
+    var o = SL.el || slBuild(false);
+    slReset(o, text); void o.offsetWidth;
+    o.classList.add("ok");
+    setTimeout(function(){ o.classList.add("out"); }, 520);
+    setTimeout(function(){ if(SL.el === o) slRemove(); if(after) after(); }, 760);
+  }
+  // it did not: the note stops, shakes once, says what happened and offers another try (never a flashing alert)
+  function stickLoaderFail(text, retry){
+    clearTimeout(SL.timer); SL.timer = null; SL.pending = null; clearTimeout(SL.hideTimer); slLive();
+    var o = SL.el || slBuild(false);
+    slReset(o, text); void o.offsetWidth;
+    o.classList.add("fail");
+    var btn = o.querySelector(".slRetry");
+    btn.hidden = false; btn.onclick = function(){ slRemove(); if(retry) retry(); };
+    if(!retry){ btn.textContent = "OK"; btn.onclick = slRemove; } else btn.textContent = "Try again";
+    setTimeout(function(){ try{ btn.focus(); }catch(e){} }, 50);
+  }
 
   // one quiet word in the header; nothing on individual notes
   function updateSyncPill(state, note){
@@ -7047,10 +7222,11 @@
   }
 
   function rememberAccount(user, profile){
+    if(profile && profile.age_band) ageKnownSet(profile.age_band);
     var meta = (user && user.user_metadata) || {};
     var prev = settings.account || {};
     settings.account = {
-      name: (profile && profile.display_name) || meta.full_name || meta.name || meta.user_name || String(user.email || "").split("@")[0],
+      name: (profile && profile.display_name) || meta.full_name || meta.name || meta.user_name || getAnonName(),      // never the part of the e-mail before the @: it could be a real name and would end up on share links
       email: user.email, sub: user.id, cloud: true,
       picture: (profile && profile.avatar_url) || meta.avatar_url || meta.picture || "",
       providerUrl: (profile && profile.avatar_url) || meta.avatar_url || meta.picture || "",
@@ -7076,9 +7252,14 @@
   }
 
   function beginProviderSignIn(provider){
-    if(!ageFlag()){ renderAccountModal("age"); return; }          // never contact a provider before the age step is resolved
-    toast("Opening " + providerName(provider) + "\u2026");
-    Stick.auth.signInWithProvider(provider).catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+    if(!ageFlag() && !ageKnown()){ pendingAuth = provider; renderAccountModal("age"); return; }     // never contact a provider before the age step is resolved
+    startProviderSignIn(provider);
+  }
+  function startProviderSignIn(provider){
+    cloudOverlay("Opening " + providerName(provider) + "\u2026");
+    Stick.auth.signInWithProvider(provider).catch(function(e){
+      stickLoaderFail("Couldn\u2019t start sign-in with " + providerName(provider) + ". " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ startProviderSignIn(provider); });
+    });
   }
   function beginGoogleSignIn(){ beginProviderSignIn("google"); }
   function wipeCloudCache(uid){
@@ -7241,14 +7422,14 @@
 
   // ---- first time this account is opened on this device -------------------
   async function firstCloudLoad(user, profile){
-    cloudOverlay("Setting up your account\u2026");
+    cloudOverlay("Setting up your account\u2026", true);
     var existing = await Stick.repo.listBoards();
     var local = Stick.migrate.inspectLocal(localStorage);
     var declinedKey = "stickit.migration.declined." + user.id;
     if(local.length && !safeGet(declinedKey)){
       hideCloudOverlay();
       var ran = await offerMigration(local, existing, profile);
-      cloudOverlay("Setting up your account\u2026");
+      cloudOverlay("Setting up your account\u2026", true);
       if(!ran) safeSet(declinedKey, true);
       existing = await Stick.repo.listBoards();
     }
@@ -7297,7 +7478,7 @@
       authLost = !navigator.onLine ? false : true;
       if(activeBoardId && !needsCloudBootstrap && !needsBoardFill) cloudSync.attach(activeBoardId);
       updateSyncPill(authLost ? "problem" : "offline", authLost ? "Please sign in again." : "");
-      if(needsCloudBootstrap){ cloudOverlay("Please sign in again to load your boards."); }
+      if(needsCloudBootstrap){ cloudOverlay("Please sign in again to load your boards.", true); }
       return;
     }
     var profile = null;
@@ -7333,11 +7514,11 @@
 
   // ---- coming back from Google -------------------------------------------
   function finishSignIn(){
-    cloudOverlay("Signing you in\u2026");
+    cloudOverlay("Signing you in\u2026", true);
     Stick.auth.init().then(function(session){
       try{ history.replaceState(null, "", location.pathname); }catch(e){}
       if(!session){ hideCloudOverlay(); toast("Sign-in didn't complete. You're still browsing as a guest."); return; }
-      location.reload();                       // boots again as this account
+      stickLoaderDone("Signed in.", function(){ location.reload(); });          // boots again as this account
     }, function(){ hideCloudOverlay(); toast("Couldn't finish signing in."); });
   }
 

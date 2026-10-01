@@ -20,7 +20,7 @@ Stick-It is operated by **Jonathan Zachevsky**, an individual in **Israel**. No 
 
 | What | Examples | Why |
 |---|---|---|
-| **Account sign-in details** (Google or GitHub) | E-mail address, name or username, profile picture address, the provider's identifier for you | To create and secure your account |
+| **Account sign-in details** (Google, GitHub or an e-mail code) | E-mail address, name or username, profile picture address, the provider's identifier for you | To create and secure your account |
 | **Age band** | Only the result of the age step: adult, teen or child, the time you confirmed it, and (for children) a parental-consent status. **Your date of birth, and the month and year you type, are not sent to us and not stored.** | To apply the right protections for your age |
 | **Document versions** | The version of the Terms and Privacy Policy you were shown | To record what you were told |
 | **Profile** | Display name, optional username, optional short bio, profile picture, a fallback colour/emoji | To show who you are in the app and on links you share |
@@ -39,7 +39,7 @@ You do not need an account to use Stick-It as a guest. Creating an account needs
 
 ## 5. Notice at collection
 
-When you sign in, Stick-It shows a short notice saying who runs it, what is collected, why, who receives it, that you choose whether to give it, and where to read more. The same information is in this policy.
+This policy is the notice at collection: who runs Stick-It (section 1), what is collected and why (section 3), whether you must provide it (section 4) and who receives it (section 7). The sign-in screen links to it, and to the Terms, before you continue. You can also use Stick-It as a guest without signing in. If you sign in with e-mail, we receive your address and Supabase sends you a one-time code; Stick-It does not store the code or a password.
 
 ## 6. How we use it
 

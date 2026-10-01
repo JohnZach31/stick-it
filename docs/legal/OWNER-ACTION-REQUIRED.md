@@ -27,6 +27,15 @@ Known and already configured (public): operator name Jonathan Zachevsky (individ
 | Record a real-project network trace | Live site signed in; DevTools Network: only your Supabase project, provider avatars, your site |
 | Real-project smoke test | Age step (adult, teen, child), delete a throwaway account, unsubscribe link once a sender exists |
 
+## B2. Turn on e-mail sign-in in Supabase (the app code is ready; these are dashboard settings)
+1. **Authentication, Providers, Email:** make sure the Email provider is **enabled**. "Confirm email" can stay on. Leave **password** sign-in unused (the app never asks for one).
+2. **Authentication, Emails (templates):** edit the **Magic Link** template **and** the **Confirm signup** template so each shows the six-digit code. Put `{{ .Token }}` in the body, for example: `Your Stick-It code is {{ .Token }}`. With the default template Supabase sends a link instead of a code, and the code screen will have nothing to type.
+3. **Authentication, Providers, Email:** check **OTP length** (the app accepts 6 to 12 digits; 6 is the default) and **OTP expiry** (default one hour; shorter is fine).
+4. **SMTP:** the built-in Supabase mailer is rate limited to a handful of e-mails per hour and is for testing. For real use set **Custom SMTP** (Authentication, Emails, SMTP Settings) with a sender such as `support.stickit@gmail.com` or, better, an address on your own domain. A Gmail account needs an app password for SMTP; keep it in the Supabase dashboard only.
+5. **Authentication, Rate Limits:** keep e-mail sending limits low; the app also enforces a 30-second resend wait.
+6. Try it once with a throwaway address on the live site: Continue with email, age step, code from the e-mail, signed in.
+No code, password or token is stored by Stick-It; Supabase Auth issues and checks the code.
+
 ## C. DMCA designated agent (optional, government registration only you can do)
 Israel has no DMCA-style safe harbour; registering with the U.S. Copyright Office is optional and only useful if you want U.S. safe-harbour protection. Steps and the workflow: `dmca-readiness.md`. **Nothing has been submitted.** The agent address would be public, so use a business/PO address, not your home.
 
