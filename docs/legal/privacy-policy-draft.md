@@ -72,9 +72,9 @@ Our providers may process data outside Israel. [OWNER INPUT REQUIRED: the region
 | Data | Kept |
 |---|---|
 | Account, profile, preferences, boards, files | Until you delete them or your account |
-| Notes you delete | Marked deleted so Undo works, then **intended** to be removed by a clean-up job. **The job is not scheduled yet** (the owner must schedule it), so until it runs deleted notes remain in the database. No removal period is promised yet. |
-| Files no longer used by anything | Intended to be removed by the same job after a grace period; same caveat |
-| Abandoned sign-ups (an account that never finished the age step and owns nothing) | Intended to be removed by the same job after 7 days; same caveat |
+| Notes you delete | Marked deleted so Undo works, then permanently removed by a daily clean-up job once they have been deleted for more than 30 days |
+| Files no longer used by anything | Removed by the same daily job after a 14-day grace period |
+| Abandoned sign-ups (an account that never finished the age step and owns nothing) | Removed by the same daily job after 7 days |
 | Share links | Until you turn them off or delete your account |
 | Age result on your device | Kept in your browser until you clear it; never contains a birth date |
 | Reports | [OWNER INPUT REQUIRED: how long reports are kept] |

@@ -21,7 +21,7 @@ Known and already configured (public): operator name Jonathan Zachevsky (individ
 |---|---|
 | Apply database changes | `npx supabase db push` (includes `20260930160000_age_bands.sql`). Push the new frontend **first**, then run this |
 | Deploy changed functions | `npx supabase functions deploy gc-assets --no-verify-jwt` (adds abandoned-account cleanup); unsubscribe and report-copyright as before |
-| **Schedule the clean-up job** | Run `supabase/ops/schedule-gc.sql` after setting `GC_SECRET` and the Vault secrets (see the file). **Nothing is scheduled until you do this**; until then deleted notes, unused files and abandoned sign-ups are not purged |
+| ~~Schedule the clean-up job~~ | **Done and verified 2026-10-01** (daily 03:17 UTC; function deployed with `--no-verify-jwt`; Vault secret matches). If `GC_SECRET` is ever exposed, rotate it in the function secrets and in Vault together |
 | Marketing e-mail (only if you will ever send any) | `UNSUBSCRIBE_SECRET`, `LEGAL_SENDER_NAME`, `LEGAL_POSTAL_ADDRESS` (public address), `UNSUBSCRIBE_PAGE_URL`, `UNSUBSCRIBE_API_URL` |
 | Copyright intake (only after a real DMCA registration, if you choose one) | `COPYRIGHT_INTAKE_ENABLED=true`; `dmcaRegistered` and `copyrightFormEnabled` to `true` |
 | Record a real-project network trace | Live site signed in; DevTools Network: only your Supabase project, provider avatars, your site |

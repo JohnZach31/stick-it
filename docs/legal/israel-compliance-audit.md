@@ -40,15 +40,15 @@ gov.il and kolzchut pages returned HTTP 403 to automated fetches, so statute tex
 | Data | Retention | Mechanism | Status |
 |---|---|---|---|
 | Account, profile, boards, files | until user deletes or deletes account | in-app deletion (`delete-account`) | works |
-| Deleted notes | soft-deleted for Undo, then purged | `gc-assets` job | **job not scheduled**: owner runs `supabase/ops/schedule-gc.sql` |
-| Unused media | purged after grace period | same job | same |
-| Abandoned sign-ups (no age result, empty, 7+ days) | removed | same job via `abandoned_accounts()` | same |
+| Deleted notes | soft-deleted for Undo, then purged after 30 days | `gc-assets` job | scheduled daily 03:17 UTC (pg_cron), verified end to end 2026-10-01 |
+| Unused media | purged after a 14-day grace period | same job | scheduled |
+| Abandoned sign-ups (no age result, empty, 7+ days) | removed | same job via `abandoned_accounts()` | scheduled |
 | Share links | until turned off / account deletion | app | works |
 | Copyright/abuse reports | **owner to decide** | manual | open |
 | Parental-consent records | until consent withdrawn or account deleted | `parental_consents` table | no live approval mechanism yet |
 | Provider logs and backups | by Supabase/GitHub plan | n/a | owner to record |
 
-No fixed period such as "30 days" is promised publicly until the job is scheduled and verified.
+The periods (30, 14 and 7 days) are stated publicly because the job is scheduled and was verified end to end.
 
 ## Open questions for counsel
 

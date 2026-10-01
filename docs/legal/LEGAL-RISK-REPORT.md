@@ -57,3 +57,6 @@ Minimum age and the adequacy of the age screen for the regions served (COPPA, UK
 - **Israeli baseline:** `israel-compliance-audit.md`. Registration/DPO/security-level conclusions are provisional and marked UNVERIFIED where a source could not be read directly.
 - **Open risks:** the cleanup job is not scheduled (retention promises avoided in the policy); no verified consent process; teen consent under Israeli law unconfirmed; no DMCA agent (not claimed); marketing disabled and fails closed without a public address; accessibility not audited; CSP still allows `style="..."` attributes (`style-src-attr`).
 - **Not claimed anywhere:** full legal compliance, accessibility certification, DMCA registration, legal review.
+
+## Update 2026-10-01 (cleanup job)
+The clean-up job is now scheduled (pg_cron daily 03:17 UTC) and was verified end to end, so the retention periods in the Privacy Policy (30/14/7 days) are accurate. Earlier "not scheduled" notes above are superseded.

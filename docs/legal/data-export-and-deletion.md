@@ -28,6 +28,6 @@ Server function `delete-account` verifies the caller's session and the exact con
 Tests: `supabase/tests/run-tests.mjs` sections I and K (purge removes boards, shares, settings, invites; tombstones queued), `client.test.mjs` (account tests), browser run against the stand-in (data gone, session cleared).
 
 ## Still open
-- **The clean-up job is not scheduled.** `gc-assets` removes notes deleted > 30 days ago and unused files after a 14-day grace. It needs a cron call with `x-cron-secret`. Until then, soft-deleted notes and orphan files stay.
+- **The clean-up job runs daily** (03:17 UTC, scheduled and verified 2026-10-01): `gc-assets` removes notes deleted more than 30 days ago, unused files after 14 days and abandoned sign-ups after 7 days.
 - Backups / log retention: owner to read the Supabase plan.
 - A privacy contact address for requests that cannot be done in the app: `privacyEmail` in `js/legal-config.js` (empty today; the app says so instead of inventing one).
