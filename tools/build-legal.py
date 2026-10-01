@@ -33,6 +33,29 @@ FILES = {k: v[1] for k, v in ((p[4], p) for p in PAGES)}
 CSP = "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
 
 
+def _config_email(key):
+    t = open(os.path.join(ROOT, 'js', 'legal-config.js'), encoding='utf-8').read()
+    m = re.search(key + r':\s*"([^"]+@[^"]+)"', t)
+    return m.group(1) if m else None
+
+
+# contact placeholders are filled from js/legal-config.js (the single source); anything not configured stays a visible placeholder
+EMAIL_SUBS = []
+for key, names in (('supportEmail', ['support e-mail', 'דוא"ל תמיכה', 'דוא"ל נגישות / תמיכה', 'accessibility / support e-mail']),
+                   ('privacyEmail', ['privacy e-mail', 'security contact', 'דוא"ל פרטיות', 'איש קשר לאבטחה']),
+                   ('copyrightEmail', ['copyright e-mail', 'דוא"ל זכויות יוצרים'])):
+    addr = _config_email(key)
+    if addr:
+        for n in names:
+            EMAIL_SUBS.append((re.compile(r'\[(?:OWNER INPUT REQUIRED|נדרש מידע מהבעלים): ' + re.escape(n) + r'\]'), '[%s](mailto:%s)' % (addr, addr)))
+
+
+def fill_contacts(md):
+    for rx, rep in EMAIL_SUBS:
+        md = rx.sub(rep, md)
+    return md
+
+
 def inline(t):
     t = html.escape(t, quote=False)
     t = re.sub(r'\[((?:OWNER INPUT REQUIRED|LEGAL REVIEW|PUBLIC POSTAL ADDRESS|נדרש מידע מהבעלים|מומלץ סקירה משפטית|כתובת דואר ציבורית)[^\]]*)\]', lambda m: '<mark class="todo">[' + m.group(1) + ']</mark>', t)
@@ -143,7 +166,7 @@ FORM = '''<section id="copyrightForm" hidden aria-labelledby="cfH">
 for lang, L in LANGS.items():
     for src, dst, title_en, title_he, page in PAGES:
         md = open(os.path.join(ROOT, 'docs', 'legal', L['src'] + src), encoding='utf-8').read().replace('\r\n', '\n')
-        body = convert(md)
+        body = convert(fill_contacts(md))
         extra = FORM if (page == 'copyright' and lang == 'en') else ''
         nav = ' '.join('<a href="%s"%s>%s</a>' % (FILES[pid], ' aria-current="page"' if pid == page else '', label) for pid, label in L['nav'])
         out = TEMPLATE.format(csp=CSP, title=title_en if lang == 'en' else title_he, page=page, body=body, extra=extra, lang=lang, dir=L['dir'],

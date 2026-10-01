@@ -5,7 +5,7 @@ Only things the code and this assistant cannot truthfully decide or do. Nothing 
 Known and already configured (public): operator name Jonathan Zachevsky (individual, Israel), last-updated 2026-10-01, proposed governing law State of Israel, proposed venue Tel Aviv-Jaffa district courts (subject to mandatory consumer protections; legal review recommended). **Your residential address is not recorded anywhere in this repository and must never be added to any public page, config or e-mail.**
 
 ## A. The ten decisions only you can make
-1. **A dedicated Stick-It mailbox** for support, privacy requests and copyright notices (one mailbox may serve all three at first; do not use a personal inbox). Put it in `supportEmail`, `privacyEmail`, `copyrightEmail` in `js/legal-config.js`, then run `python tools/build-legal.py`.
+1. ~~Dedicated mailbox~~ **Done 2026-10-01:** `support.stickit@gmail.com` serves support, privacy and copyright (set in `js/legal-config.js`, built into the pages). Consider later moving to a custom domain address. It does **not** by itself remove DRAFT status (`draft: true`).
 2. **Whether to publish a public postal address.** Only a deliberately chosen business address or PO box (`publicPostalAddress`). Never your home. Until set, marketing e-mail cannot be sent.
 3. **Approve the legal text** (English and Hebrew Terms, Privacy, Copyright, Young people, Storage, Accessibility) and remove the DRAFT status by resolving every `[OWNER INPUT REQUIRED]` / `[LEGAL REVIEW RECOMMENDED]` marker.
 4. **Which language version governs** if they differ (Terms section 20).

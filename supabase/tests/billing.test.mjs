@@ -54,10 +54,21 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(L.operatorName === 'Jonathan Zachevsky' && L.operatorCountry === 'Israel' && L.lastUpdated === '2026-10-01', 'known public owner facts are set');
   ok(L.governingLaw === 'State of Israel' && /Tel Aviv/.test(L.proposedVenue), 'proposed governing law and venue are set (marked for legal review in the Terms)');
   ok(L.publicPostalAddress === null, 'no public postal address is configured (nothing invented, nothing private)');
-  ok(L.supportEmail === null && L.privacyEmail === null && L.copyrightEmail === null, 'no contact e-mail is invented');
-  ok(!L.isComplete() && L.missing().join() === 'supportEmail,privacyEmail,copyrightEmail', 'the draft status stays until the three contact fields exist');
+  const MB = 'support.stickit@gmail.com';
+  ok(L.supportEmail === MB && L.privacyEmail === MB && L.copyrightEmail === MB, 'the dedicated Stick-It mailbox serves support, privacy and copyright');
+  ok(L.missing().length === 0 && L.draft === true && !L.isComplete(), 'contact fields are filled but the DRAFT flag stays: e-mail alone does not finish the legal pages');
   ok(L.dmcaRegistered === false && L.copyrightFormEnabled === false && L.parentConsentEnabled === false, 'DMCA registration, the complaint form and parent consent are not claimed');
   ok(L.dmcaAgent.name === '' && L.dmcaAgent.email === '' && L.dmcaAgent.address === '', 'no agent details are pre-filled');
+  // the built pages carry the mailbox and still show the draft banner logic
+  {
+    const rd = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+    for (const f of ['privacy', 'terms', 'copyright', 'young-people', 'accessibility']) for (const d of ['legal/', 'legal/he/']) {
+      if (d === 'legal/he/' && f === 'copyright') { ok(/mailto:support\.stickit@gmail\.com/.test(rd(d + f + '.html')), `${d}${f}: copyright contact present`); continue; }
+      ok(/mailto:support\.stickit@gmail\.com/.test(rd(d + f + '.html')) && !/(OWNER INPUT REQUIRED|נדרש מידע מהבעלים): (privacy e-mail|support e-mail|copyright e-mail|דוא)/.test(rd(d + f + '.html')), `${d}${f}: contact filled, no e-mail placeholder left`);
+    }
+    ok(/L\.draft !== false/.test(rd('legal/legal.js')), 'legal.js keeps the DRAFT banner while draft is true');
+    ok(!/Maalot/.test(rd('js/legal-config.js')) && /publicPostalAddress: null/.test(rd('js/legal-config.js')), 'public postal address stays null');
+  }
   ok(!Object.keys(L).some(k => /home|residen|street/i.test(k)), 'the public config has no field for a private/residential address');
 }
 

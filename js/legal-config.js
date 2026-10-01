@@ -22,16 +22,19 @@
     // Not configured. Never the owner's home address.
     publicPostalAddress: null,
 
-    // one dedicated Stick-It mailbox may serve all three at first; not chosen yet, so nothing is invented
-    supportEmail: null,
-    privacyEmail: null,
-    copyrightEmail: null,
+    // one dedicated Stick-It mailbox serves all three for now (a public address by design; never a personal or home address)
+    supportEmail: "support.stickit@gmail.com",
+    privacyEmail: "support.stickit@gmail.com",
+    copyrightEmail: "support.stickit@gmail.com",
 
     dmcaAgent: { name: "", organization: "", address: "", phone: "", email: "" },   // as registered with the U.S. Copyright Office (not done)
     dmcaRegistered: false,        // true ONLY after the Copyright Office has accepted a designation
     copyrightFormEnabled: false,  // also needs COPYRIGHT_INTAKE_ENABLED on the server
 
     parentConsentEnabled: false,  // true ONLY when a legally adequate, verified parent/guardian approval mechanism is live
+    // stays true until the owner approves the text, every placeholder is resolved and legal review is done/accepted.
+    // Filling in the e-mail addresses does NOT clear it.
+    draft: true,
     termsVersion: "2026-10-01-draft",
     privacyVersion: "2026-10-01-draft"
   };
@@ -42,7 +45,8 @@
     ["supportEmail", "privacyEmail", "copyrightEmail"].forEach(function (k) { if (!String(legal[k] || "").trim()) m.push(k); });
     return m;
   };
-  legal.isComplete = function () { return legal.missing().length === 0; };
+  // contact fields filled AND the owner has taken the draft flag off
+  legal.isComplete = function () { return legal.draft === false && legal.missing().length === 0; };
 
   Stick.legal = legal;
 })(typeof window !== "undefined" ? window : globalThis);

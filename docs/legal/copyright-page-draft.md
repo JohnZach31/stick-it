@@ -6,6 +6,10 @@
 
 Stick-It lets people store and share their own content. If you are a copyright owner (or authorised to act for one) and you believe content on Stick-It infringes your copyright, please send a notice to our designated agent.
 
+### Where to send a copyright notice
+
+E-mail: [OWNER INPUT REQUIRED: copyright e-mail]. This is Stick-It's general copyright contact. It is **not** a registered DMCA designated agent (see below). Postal address: [PUBLIC POSTAL ADDRESS NOT CONFIGURED].
+
 ### DMCA Designated Agent
 
 | | |

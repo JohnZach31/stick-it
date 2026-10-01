@@ -6,7 +6,7 @@
   var missing = L.missing ? L.missing() : ["operatorName"];
   var he = document.body.getAttribute("data-lang") === "he";
   var banner = document.getElementById("draftBanner");
-  var notFinal = missing.length > 0 || (page === "copyright" && !L.dmcaRegistered);
+  var notFinal = L.draft !== false || missing.length > 0 || (page === "copyright" && !L.dmcaRegistered);
   if (banner && notFinal) {
     banner.hidden = false;
     banner.textContent = he
