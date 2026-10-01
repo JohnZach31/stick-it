@@ -158,6 +158,8 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
     ok(/signInWithOtp/.test(mail) && /verifyOtp/.test(mail) && !/password/i.test(mail), 'e-mail sign-in uses Supabase one-time codes, no password and no custom tokens');
   }
   ok(/autocomplete="one-time-code"/.test(idx) && /Resend code/.test(idx) && /Use another email/.test(idx) && /If this address can receive a code/.test(idx), 'code screen: one-time-code field, resend with cooldown, use another email, neutral wording');
+  ok(/EMAIL_AUTH: false/.test(read('js/config.js')) && /EMAIL_AUTH \? '<button type="button" class="googleBtn" id="emailBtn"/.test(idx) && /if\(EMAIL_AUTH\) card\.querySelector\("#emailBtn"\)/.test(idx), 'e-mail sign-in is off in production: no button is rendered unless EMAIL_AUTH is true');
+  ok(fs.existsSync(path.join(root, 'docs/auth/email-auth-deferred.md')), 'the deferral and re-enable steps are documented');
   ok(!/split\("@"\)\[0\]/.test(idx), 'the e-mail address is never turned into a public display name');
   ok(/AGE_KNOWN_KEY = "stickit.age.known"/.test(idx) && /age\.known/.test(read('js/dev.js')) && !/birth|year|month/i.test(idx.slice(idx.indexOf('function ageKnownSet'), idx.indexOf('function ageKnownSet') + 160)), 'the 90-day known-band hint stores a band only and is cleared by the dev reset');
   ok(/SL_SHOW_AFTER = 180/.test(idx) && /SL_MIN_VISIBLE = 250/.test(idx) && /function stickLoaderDone/.test(idx) && /function stickLoaderFail/.test(idx), 'loader: 180 ms show delay, 250 ms minimum, success and failure states');

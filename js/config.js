@@ -45,7 +45,11 @@
     REDIRECT_URL: "",
 
     // extra hostnames (besides localhost and 127.0.0.1) where the local development helpers in js/dev.js are allowed; empty in production
-    DEV_HOSTS: []
+    DEV_HOSTS: [],
+
+    // E-mail one-time-code sign-in. Built but switched off in production: it needs a verified sending domain first
+    // (see docs/auth/email-auth-deferred.md). Do not turn on until e-mails are actually delivered.
+    EMAIL_AUTH: false
   };
 
   // developer override, localhost only

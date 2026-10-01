@@ -4754,6 +4754,9 @@
   }
 
   // ---------- sign in with an e-mail code (Supabase Auth one-time password; no passwords, nothing of the code is kept by Stick-It) ----------
+  // E-mail one-time-code sign-in is built and tested but NOT offered: production delivery needs a verified sending domain.
+  // It stays off (no button, no 'coming soon') until Stick.config.EMAIL_AUTH is true. See docs/auth/email-auth-deferred.md.
+  var EMAIL_AUTH = !!(Stick.config && Stick.config.EMAIL_AUTH);
   var pendingAuth = null, pendingEmail = "", emailTimer = null;
   var EMAIL_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="M3.5 7.5 12 13.5l8.5-6"></path></svg>';
   function miniLoaderHtml(){ return '<span class="slMini" aria-hidden="true">' + buildLogoSvg(LOGO_COLORS.loading.fill, LOGO_COLORS.loading.dark) + '</span>'; }
@@ -4952,14 +4955,14 @@
           '<div class="authBtns">' +
             '<button type="button" class="googleBtn" id="googleBtnFallback">' + GOOGLE_ICON + '<span>Continue with Google</span></button>' +
             '<button type="button" class="googleBtn" id="githubBtn">' + GITHUB_ICON + '<span>Continue with GitHub</span></button>' +
-            '<button type="button" class="googleBtn" id="emailBtn">' + EMAIL_ICON + '<span>Continue with email</span></button>' +
+            (EMAIL_AUTH ? '<button type="button" class="googleBtn" id="emailBtn">' + EMAIL_ICON + '<span>Continue with email</span></button>' : '') +
           '</div>' +
           '<div class="authOr" role="separator"><span>or</span></div>' +
           '<button type="button" class="guestBtn authGuest" id="chooseGuestBtn">Continue as guest</button>' +
           '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>';
         card.querySelector("#googleBtnFallback").addEventListener("click", function(){ beginProviderSignIn("google"); });
         card.querySelector("#githubBtn").addEventListener("click", function(){ beginProviderSignIn("github"); });
-        card.querySelector("#emailBtn").addEventListener("click", beginEmailSignIn);
+        if(EMAIL_AUTH) card.querySelector("#emailBtn").addEventListener("click", beginEmailSignIn);
       } else {
         card.innerHTML = closeBtnHtml +
           '<h3>Sign in to Stick-It</h3>' +

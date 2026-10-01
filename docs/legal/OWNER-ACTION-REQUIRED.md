@@ -27,7 +27,8 @@ Known and already configured (public): operator name Jonathan Zachevsky (individ
 | Record a real-project network trace | Live site signed in; DevTools Network: only your Supabase project, provider avatars, your site |
 | Real-project smoke test | Age step (adult, teen, child), delete a throwaway account, unsubscribe link once a sender exists |
 
-## B2. Turn on e-mail sign-in in Supabase (the app code is ready; these are dashboard settings)
+## B2. E-mail sign-in is DEFERRED (not offered in production)
+See `docs/auth/email-auth-deferred.md` for what must happen first (own domain, verified sender, SMTP, templates). The steps below are the Supabase side, for later.
 1. **Authentication, Providers, Email:** make sure the Email provider is **enabled**. "Confirm email" can stay on. Leave **password** sign-in unused (the app never asks for one).
 2. **Authentication, Emails (templates):** edit the **Magic Link** template **and** the **Confirm signup** template so each shows the six-digit code. Put `{{ .Token }}` in the body, for example: `Your Stick-It code is {{ .Token }}`. With the default template Supabase sends a link instead of a code, and the code screen will have nothing to type.
 3. **Authentication, Providers, Email:** check **OTP length** (the app accepts 6 to 12 digits; 6 is the default) and **OTP expiry** (default one hour; shorter is fine).
