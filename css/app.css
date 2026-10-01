@@ -43,7 +43,7 @@
   /* dark board: the same coloured paper seen in dim lighting. The hue of each note is kept, the lightness is pulled down by mixing
      with a warm dark neutral (so colour families stay recognisable), the ink turns warm cream, and there is no glow or bloom:
      only an ordinary soft contact shadow. */
-  body.dark{ --dim-base:#0f0c16; --dim-amt:52%; --note-ink-dark:#f2eadb; }
+  body.dark{ --dim-base:#0f0c16; --dim-amt:36%; --note-ink-dark:#f2eadb; }
   body.dark .note{
     --paper-dim: color-mix(in oklab, var(--note-bg, #fff3a8) var(--dim-amt), var(--dim-base));
     background: var(--paper-dim);
@@ -1345,7 +1345,7 @@
   .legalAck{ margin:12px 2px 0; font-size:0.74rem; line-height:1.45; color:var(--ink-soft); text-align:center; }
   .legalAck a, .legalLinks a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
   .legalLinks{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:0.78rem; color:var(--ink-soft); }
-  .legalFoot{ display:flex; gap:14px; justify-content:center; padding:10px; font-size:0.74rem; color:var(--ink-soft); }
+  .legalFoot{ display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; padding:8px 12px; font-size:0.74rem; color:var(--ink-soft); }
   .legalFoot a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
   .legalFoot.fixed{ position:fixed; left:0; right:0; bottom:0; z-index:5; background:color-mix(in srgb, var(--paper) 88%, transparent); pointer-events:none; }
   .legalFoot.fixed a{ pointer-events:auto; }

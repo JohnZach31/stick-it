@@ -5852,7 +5852,7 @@
     var br = board.getBoundingClientRect(), ir = boardInner.getBoundingClientRect();
     return {x:(br.left - ir.left) / boardZoom, y:0, w:board.clientWidth / boardZoom, h:boardHeight()};
   }
-  // html2canvas cannot do color-mix(), so the snapshot computes the same dimmed paper the dark board shows (Oklab mix, 52% paper / 48% base)
+  // html2canvas cannot do color-mix(), so the snapshot computes the same dimmed paper the dark board shows (Oklab mix, 36% paper / 64% base)
   function dimPaperColor(bg){
     var d = document.createElement("div"); d.style.color = bg; document.body.appendChild(d);
     var m = getComputedStyle(d).color.match(/[\d.]+/g); d.remove();
@@ -5863,7 +5863,7 @@
       var l = Math.cbrt(0.4122214708*r + 0.5363325363*g + 0.0514459929*b), mm = Math.cbrt(0.2119034982*r + 0.6806995451*g + 0.1073969566*b), s2 = Math.cbrt(0.0883024619*r + 0.2817188376*g + 0.6299787005*b);
       return [0.2104542553*l + 0.793617785*mm - 0.0040720468*s2, 1.9779984951*l - 2.428592205*mm + 0.4505937099*s2, 0.0259040371*l + 0.7827717662*mm - 0.808675766*s2];
     }
-    var a = ok(+m[0], +m[1], +m[2]), b = ok(15, 12, 22), t = 0.52, mix = [0, 1, 2].map(function(i){ return a[i]*t + b[i]*(1 - t); });
+    var a = ok(+m[0], +m[1], +m[2]), b = ok(15, 12, 22), t = 0.36, mix = [0, 1, 2].map(function(i){ return a[i]*t + b[i]*(1 - t); });
     var l2 = mix[0] + 0.3963377774*mix[1] + 0.2158037573*mix[2], m2 = mix[0] - 0.1055613458*mix[1] - 0.0638541728*mix[2], s3 = mix[0] - 0.0894841775*mix[1] - 1.291485548*mix[2];
     l2 = l2*l2*l2; m2 = m2*m2*m2; s3 = s3*s3*s3;
     var rgb = [4.0767416621*l2 - 3.3077115913*m2 + 0.2309699292*s3, -1.2684380046*l2 + 2.6097574011*m2 - 0.3413193965*s3, -0.0041960863*l2 - 0.7034186147*m2 + 1.707614701*s3];
