@@ -19,6 +19,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { makeResolveHandler } from '../../functions/resolve-share/handler.ts';
 import { makeReportHandler } from '../../functions/report-share/handler.ts';
 import { makeDeleteHandler } from '../../functions/delete-account/handler.ts';
+import { makeUnsubscribeHandler } from '../../functions/unsubscribe/handler.ts';
 import { RateLimiter } from '../../functions/_shared/http.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -380,11 +381,18 @@ const deleteHandler = makeDeleteHandler({
   deleteAuthUser: async (uid) => { await asSuper(d => d.query('delete from auth.users where id=$1', [uid])); },
   removeFiles: async (paths) => { for (const p of paths) blobs.delete(p); },
 });
+export const UNSUB_SECRET = 'fake-supabase-unsubscribe-secret-0123456789';
+const unsubHandler = makeUnsubscribeHandler({
+  secret: UNSUB_SECRET,
+  allowedOrigins: ['http://127.0.0.1:8123', 'http://localhost:8123', 'https://johnzach31.github.io'],
+  limiter: new RateLimiter(50, 60000),
+  unsubscribe: async (uid) => { await asCaller({ role: 'service_role' }, d => d.query('select public.marketing_unsubscribe($1)', [uid])); },
+});
 async function handleFunction(req, res, url, body) {
   const name = url.pathname.replace('/functions/v1/', '');
-  const h = name === 'resolve-share' ? resolveHandler : name === 'report-share' ? reportHandler : name === 'delete-account' ? deleteHandler : null;
+  const h = name === 'resolve-share' ? resolveHandler : name === 'report-share' ? reportHandler : name === 'delete-account' ? deleteHandler : name === 'unsubscribe' ? unsubHandler : null;
   if (!h) return send(req, res, 404, { message: 'function not found' });
-  const r = await h(new Request(ORIGIN + url.pathname, { method: req.method, headers: req.headers, body: ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? undefined : body }));
+  const r = await h(new Request(ORIGIN + url.pathname + url.search, { method: req.method, headers: req.headers, body: ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ? undefined : body }));
   const out = Buffer.from(await r.arrayBuffer());
   const hdr = Object.fromEntries(r.headers.entries());
   res.writeHead(r.status, { ...hdr, 'access-control-allow-origin': req.headers.origin || hdr['access-control-allow-origin'] || '*' });

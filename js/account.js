@@ -9,7 +9,7 @@
     bio: "", handle: "",
     shareShowName: true, shareShowAvatar: false, shareShowBio: false,
     shareDefaultIdentity: "named", shareDefaultBoardMode: "view",
-    preferredFont: "", defaultNoteColor: ""
+    preferredFont: "", defaultNoteColor: "", marketingOptIn: false
   };
   var AVATAR_COLORS = ["#4a7c59", "#b5651d", "#8a5a83", "#3b6ea5", "#a34a4a", "#5f6b73", "#c9a227", "#2e7d6f"];
   var HANDLE_RE = /^[a-z0-9_]{3,20}$/;
@@ -28,6 +28,7 @@
     d.shareDefaultIdentity = r.share_default_identity || "named";
     d.shareDefaultBoardMode = r.share_default_board_mode || "view";
     d.preferredFont = r.preferred_font || ""; d.defaultNoteColor = r.default_note_color || "";
+    d.marketingOptIn = !!r.marketing_opt_in;
     return d;
   }
   function toSettingsRow(s) {
@@ -41,7 +42,8 @@
       share_default_identity: named ? "named" : "anonymous",
       share_default_board_mode: s.shareDefaultBoardMode === "ask" ? "ask" : "view",
       preferred_font: String(s.preferredFont || "").slice(0, 60) || null,
-      default_note_color: String(s.defaultNoteColor || "").slice(0, 40) || null
+      default_note_color: String(s.defaultNoteColor || "").slice(0, 40) || null,
+      marketing_opt_in: !!s.marketingOptIn      // off unless the person switched it on; the server stamps when
     };
   }
 
@@ -147,6 +149,9 @@
       if (!HANDLE_RE.test(h)) return Promise.resolve(false);
       return db().then(function (c) { return guard(c.rpc("handle_available", { p_handle: h })); }).then(function (v) { return v === true; });
     },
+
+    // "I passed the age screen": stores a timestamp on the account and nothing else (no birth date is ever sent)
+    attestAge: function () { return db().then(function (c) { return guard(c.rpc("attest_age")); }); },
 
     // numbers for the account page (own data only)
     usage: function () { return db().then(function (c) { return guard(c.rpc("my_usage")); }); },

@@ -5,6 +5,10 @@ import { makeResolveHandler } from '../functions/resolve-share/handler.ts';
 import { makeReportHandler } from '../functions/report-share/handler.ts';
 import { makeGcHandler } from '../functions/gc-assets/handler.ts';
 import { makeDeleteHandler } from '../functions/delete-account/handler.ts';
+import { makeUnsubscribeHandler } from '../functions/unsubscribe/handler.ts';
+import { makeCopyrightHandler } from '../functions/report-copyright/handler.ts';
+import { makeUnsubscribeToken, verifyUnsubscribeToken } from '../functions/_shared/unsubscribe-token.ts';
+import { buildMarketingEmail, marketingConfigProblems, MarketingConfigError } from '../functions/_shared/marketing-email.ts';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.log('  FAIL  ' + m); } };
@@ -150,6 +154,93 @@ const req = (body, { method = 'POST', origin = ORIGIN, ip = '1.1.1.1' } = {}) =>
   ok(b.by_avatar === null, 'an avatar that could not be signed is not advertised');
   b = await (await mk({ ...share, by_bio: undefined, by_avatar: null, by_name: null, assets: {} })(req({ token: TOKEN }))).json();
   ok(b.by_bio === null && b.by_avatar === null && b.by_name === null, 'anonymous shares carry no identity');
+}
+
+// ---------------------------------------------------------------- unsubscribe tokens + endpoint
+{
+  const SECRET = 'a-long-random-test-secret-0123456789';
+  const UID = '11111111-2222-3333-4444-555555555555', UID2 = '99999999-2222-3333-4444-555555555555';
+  const tok = await makeUnsubscribeToken(SECRET, UID);
+  ok(/^[0-9a-f-]{36}\.[0-9a-f]{64}$/.test(tok), 'token = user id + 256-bit signature');
+  ok((await verifyUnsubscribeToken(SECRET, tok)) === UID, 'a genuine token verifies');
+  ok((await verifyUnsubscribeToken('another-secret-another-secret', tok)) === null, 'a token signed with a different secret is rejected');
+  ok((await verifyUnsubscribeToken(SECRET, UID2 + '.' + tok.split('.')[1])) === null, 'swapping in another user id is rejected');
+  ok((await verifyUnsubscribeToken(SECRET, tok.slice(0, -1) + (tok.endsWith('0') ? '1' : '0'))) === null, 'a one-character change is rejected');
+  ok((await verifyUnsubscribeToken(SECRET, '')) === null && (await verifyUnsubscribeToken(SECRET, 'x.y.z')) === null && (await verifyUnsubscribeToken('', tok)) === null, 'garbage and empty secrets are rejected');
+  let err = null; try { await makeUnsubscribeToken('short', UID); } catch (e) { err = e; }
+  ok(!!err, 'refuses to sign with a weak secret');
+
+  const calls = [];
+  const mk = (over = {}) => makeUnsubscribeHandler({ secret: SECRET, allowedOrigins: [ORIGIN], limiter: new RateLimiter(5, 60000),
+    unsubscribe: async (u) => { calls.push(u); }, ...over });
+  const post = (t, o = {}) => new Request('https://x.test/unsubscribe' + (t ? '?t=' + t : ''), { method: o.method || 'POST', headers: { origin: ORIGIN, 'x-forwarded-for': o.ip || '2.2.2.2', 'content-type': 'application/x-www-form-urlencoded' }, body: (o.method || 'POST') === 'POST' ? (o.body ?? 'List-Unsubscribe=One-Click') : undefined });
+  let r = await mk()(post(tok));
+  let b = await r.json();
+  ok(r.status === 200 && b.ok === true && calls.join() === UID, 'one click (RFC 8058 POST) unsubscribes that person, with no login');
+  ok(JSON.stringify(b) === '{"ok":true}', 'and returns nothing about the account');
+  r = await mk()(post('', { body: 't=' + tok }));
+  ok(r.status === 200 && calls.length === 2, 'the token may also come in the POST body (the confirmation page)');
+  r = await mk()(post(tok, { method: 'GET' }));
+  ok(r.status === 405 && calls.length === 2, 'a GET (link prefetch / scanner) never unsubscribes anyone');
+  r = await mk()(post(UID + '.' + 'f'.repeat(64)));
+  b = await r.json();
+  ok(r.status === 400 && b.reason === 'invalid_link' && calls.length === 2, 'a forged token changes nothing');
+  r = await mk({ unsubscribe: async () => { throw new Error('db'); } })(post(tok));
+  ok(r.status === 502, 'a database failure is reported, not hidden as success');
+  const lim = mk({ limiter: new RateLimiter(2, 60000) });
+  await lim(post(tok, { ip: '3.3.3.3' })); await lim(post(tok, { ip: '3.3.3.3' }));
+  ok((await lim(post(tok, { ip: '3.3.3.3' }))).status === 429, 'rate limited');
+}
+
+// ---------------------------------------------------------------- marketing e-mail guard
+{
+  const GOOD = { LEGAL_POSTAL_ADDRESS: '1 Example Street\nSomewhere 12345', LEGAL_SENDER_NAME: 'Acme Notes Ltd', UNSUBSCRIBE_SECRET: 'a-long-random-test-secret-0123456789',
+    UNSUBSCRIBE_PAGE_URL: 'https://site.test/unsubscribe.html', UNSUBSCRIBE_API_URL: 'https://api.test/functions/v1/unsubscribe' };
+  const MSG = { userId: '11111111-2222-3333-4444-555555555555', to: 'person@mail.test', subject: 'What is new in Stick-It', text: 'Hello, here is what changed.' };
+  const e = await buildMarketingEmail(GOOD, MSG);
+  ok(e.text.includes('https://site.test/unsubscribe.html?t=') && e.html.includes('>Unsubscribe</a>'), 'every marketing e-mail has an unsubscribe link (text and html)');
+  ok(e.text.includes('1 Example Street, Somewhere 12345') && e.html.includes('1 Example Street, Somewhere 12345'), 'and the postal address from configuration');
+  ok(e.headers['List-Unsubscribe'].startsWith('<https://api.test/functions/v1/unsubscribe?t=') && e.headers['List-Unsubscribe-Post'] === 'List-Unsubscribe=One-Click', 'and the one-click unsubscribe headers');
+  ok(e.from === 'Acme Notes Ltd' && e.text.includes('Acme Notes Ltd'), 'sender is identified');
+  const refuses = async (env, msg = MSG) => { try { await buildMarketingEmail(env, msg); return null; } catch (x) { return x; } };
+  let x = await refuses({ ...GOOD, LEGAL_POSTAL_ADDRESS: '' });
+  ok(x instanceof MarketingConfigError && x.missing.includes('LEGAL_POSTAL_ADDRESS'), 'no postal address configured: it refuses to build the message');
+  x = await refuses({ ...GOOD, LEGAL_POSTAL_ADDRESS: '[OWNER INPUT REQUIRED: address]' });
+  ok(x instanceof MarketingConfigError, 'a placeholder address is not accepted either');
+  x = await refuses({ ...GOOD, UNSUBSCRIBE_PAGE_URL: '' });
+  ok(x instanceof MarketingConfigError && x.missing.includes('UNSUBSCRIBE_PAGE_URL'), 'no unsubscribe URL configured: it refuses');
+  x = await refuses({ ...GOOD, UNSUBSCRIBE_SECRET: 'short' });
+  ok(x instanceof MarketingConfigError, 'no signing secret: it refuses');
+  x = await refuses({ ...GOOD, LEGAL_SENDER_NAME: '' });
+  ok(x instanceof MarketingConfigError, 'no sender name: it refuses');
+  x = await refuses(GOOD, { ...MSG, subject: 'Re: your account' });
+  ok(!!x, 'a deceptive "Re:" subject is refused');
+  x = await refuses(GOOD, { ...MSG, subject: '  ' });
+  ok(!!x, 'an empty subject is refused');
+  ok(marketingConfigProblems({}).length === 5, 'an empty configuration reports every missing item');
+}
+
+// ---------------------------------------------------------------- copyright intake
+{
+  const saved = [];
+  const base = { name: 'R. Holder', email: 'rh@example.org', work: 'My photograph "Harbour"', url: 'https://site.test/#s=abc', goodFaith: true, accuracy: true, signature: 'R. Holder' };
+  const mk = (over = {}) => makeCopyrightHandler({ enabled: true, allowedOrigins: [ORIGIN], limiter: new RateLimiter(3, 60000), insert: async (row) => { saved.push(row); return true; }, ...over });
+  let r = await mk({ enabled: false })(req(base));
+  ok(r.status === 503 && saved.length === 0, 'intake is OFF until the owner enables it');
+  r = await mk()(req(base));
+  ok(r.status === 200 && saved.length === 1 && saved[0].reporter_email === 'rh@example.org' && saved[0].good_faith === true, 'a complete report is stored');
+  for (const [k, v] of [['name', ''], ['email', 'not-an-email'], ['work', ''], ['url', ''], ['signature', ''], ['goodFaith', false], ['accuracy', false]]) {
+    r = await mk()(req({ ...base, [k]: v }, { ip: '4.4.4.' + Math.floor(Math.random() * 200) }));
+    ok(r.status === 400, 'refused without ' + k);
+  }
+  ok(saved.length === 1, 'nothing incomplete was stored');
+  r = await mk({ insert: async () => false })(req(base, { ip: '5.5.5.5' }));
+  ok(r.status === 502, 'a failed write is reported');
+  const big = await mk()(req({ ...base, work: 'x'.repeat(20000) }, { ip: '6.6.6.6' }));
+  ok(big.status === 400, 'oversized bodies are refused');
+  const lim = mk({ limiter: new RateLimiter(1, 60000) });
+  await lim(req(base, { ip: '7.7.7.7' }));
+  ok((await lim(req(base, { ip: '7.7.7.7' }))).status === 429, 'rate limited');
 }
 
 console.log(`${pass} passed, ${fail} failed`);

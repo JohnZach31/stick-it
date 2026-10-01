@@ -25,7 +25,7 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // ------------------------------------------------------------------ a simulated device
 class FR { readAsDataURL(b) { b.arrayBuffer().then(ab => { this.result = `data:${b.type};base64,${Buffer.from(ab).toString('base64')}`; this.onload && this.onload(); }, e => { this.error = e; this.onerror && this.onerror(); }); } }
-async function device(email) {
+async function device(email, opts = {}) {
   const dev = { offline: false, store: new Map(), notes: [], toasts: [], mediaBlobs: new Map(), authLost: 0 };
   const ls = { getItem: k => dev.store.has(k) ? dev.store.get(k) : null, setItem: (k, v) => dev.store.set(k, String(v)), removeItem: k => dev.store.delete(k) };
   const client = createClient(url, anon, { auth: { flowType: 'pkce', persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -33,6 +33,7 @@ async function device(email) {
   const { data } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'http://127.0.0.1:8123/', skipBrowserRedirect: true, queryParams: { login_hint: email } } });
   const r = await fetch(data.url, { redirect: 'manual' });
   await client.auth.exchangeCodeForSession(new URL(r.headers.get('location')).searchParams.get('code'));
+  if (opts.attest !== false) await client.rpc('attest_age');     // what the age screen does for a real person
 
   const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, fetch, Blob, URL, TextEncoder, TextDecoder, atob, btoa, crypto: globalThis.crypto,
     Uint8Array, FileReader: FR, navigator: { onLine: true }, location: { origin: 'http://127.0.0.1:8123', pathname: '/', hostname: '127.0.0.1', search: '' }, localStorage: ls, decodeURIComponent, encodeURIComponent });
@@ -276,6 +277,23 @@ try {
     const Q = await device('acct.two@example.com');
     const acc = P.Stick.account;
     ok(!!acc && typeof acc.save === 'function', 'account module loads');
+
+    // age screen: nothing can be stored until it has been passed, and only a timestamp is kept
+    {
+      const K = await device('age.kid@example.com', { attest: false });
+      const early = await K.client.rpc('create_board', { p_name: 'x' });
+      ok(!!early.error && /AGE_NOT_CONFIRMED/.test(early.error.message), 'an account that skipped the age screen cannot create a board');
+      const savedEarly = await K.client.from('profile_settings').insert({ user_id: K.Stick.auth.user().id, bio: 'hi' });
+      ok(!!savedEarly.error, '...or save a bio');
+      ok(K.Stick.errors.parse(early.error).code === 'AGE_NOT_CONFIRMED', 'the client recognises the AGE_NOT_CONFIRMED code');
+      const at = await K.client.rpc('attest_age');
+      ok(!at.error && !!at.data, 'attesting stores a timestamp');
+      const prof = (await K.Stick.auth.profile(true));
+      ok(!!prof.age_attested_at, 'and the profile reflects it');
+      ok(!!(await K.client.rpc('create_board', { p_name: 'now allowed' })).data, 'afterwards the account works normally');
+      const row = (await admin("select * from public.profiles where id=$1", [K.Stick.auth.user().id])).rows[0];
+      ok(!Object.keys(row).some(k => /birth|dob/i.test(k)), 'no birth date is stored anywhere on the profile');
+    }
 
     // validation happens before any network call
     ok((acc.validate({ displayName: '   ' }) || {}).field === 'name', 'blank display name is rejected');

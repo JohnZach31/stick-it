@@ -3,22 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321 https://lh3.googleusercontent.com https://avatars.githubusercontent.com; media-src 'self' blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; connect-src 'self' blob: data: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Stick-It</title>
 <meta name="description" content="A playful sticky-note corkboard. Drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
 <link rel="icon" id="faviconLink" href="data:,">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Caveat:wght@500;700&family=Kalam:wght@400;700&family=Shadows+Into+Light&family=Indie+Flower&family=Patrick+Hand&family=Gochi+Hand&family=Architects+Daughter&family=Permanent+Marker&family=Reenie+Beanie&family=Homemade+Apple&family=Nanum+Pen+Script&family=Covered+By+Your+Grace&family=Schoolbell&family=Crafty+Girls&family=Neucha&family=Dancing+Script&family=Handlee&family=Caveat+Brush&family=Sriracha&family=Zeyada&family=Rock+Salt&family=Secular+One&family=Rubik:wght@500;700&family=Heebo:wght@500;700&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&family=Long+Cang&family=Liu+Jian+Mao+Cao&family=Klee+One:wght@600&family=Yomogi&family=Hachi+Maru+Pop&family=Gaegu:wght@700&family=Amatic+SC:wght@700&family=Karantina:wght@400;700&family=Solitreo&family=Playpen+Sans+Hebrew:wght@400;600&family=Varela+Round&family=Suez+One&family=Fredoka:wght@500&family=Gamja+Flower&family=Hi+Melody&family=Poor+Story&family=Zen+Kurenaido&family=Gloria+Hallelujah&family=Just+Another+Hand&family=Sue+Ellen+Francisco&family=Walter+Turncoat&family=Rancho&family=Nothing+You+Could+Do&family=Shadows+Into+Light+Two&family=Swanky+and+Moo+Moo&family=Mansalva&family=Delicious+Handrawn&family=Short+Stack&family=Loved+by+the+King&family=Give+You+Glory&family=Waiting+for+the+Sunrise&family=Over+the+Rainbow&family=Kristi&family=Gveret+Levin&family=Rubik+Scribble&family=Alef&family=Miriam+Libre&family=Frank+Ruhl+Libre&family=Bellefair&family=David+Libre&family=Marck+Script&family=Bad+Script&family=Pangolin&family=Comforter&family=Underdog&family=Ruslan+Display&family=Aref+Ruqaa&family=Katibeh&family=Marhey&family=Rakkas&family=Lalezar&family=Reem+Kufi&family=Mada&family=Lateef&family=Harmattan&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<script src="js/vendor/html2canvas.min.js"></script>
 <style>
   :root{
     color-scheme: light;
     --paper: #faf6e8;
     --paper-dot: rgba(60,50,20,0.05);
     --ink: #33301f;
-    --ink-soft: #6b6650;
+    --ink-soft: #625d49;
     --line: #e4dbb9;
     --panel: #fffdf5;
     --accent: #c98a2e;
+    --accent-strong: #9a5d12;     /* accent for TEXT and button fills that carry text: white on it is 5.3:1 */
+    --on-accent: #ffffff;
+    --edge: #8f896e;              /* boundary of text fields / switches (3.5:1 against the field), WCAG 1.4.11 */
+    --focus: #8f5710;             /* keyboard focus ring (5.8:1 against the panel) */
     --accent-soft: #f1dfb3;
     --danger: #b5482f;
     --shadow: rgba(60, 45, 10, 0.22);
@@ -40,6 +44,10 @@
     --line: #322c48;
     --panel: #1e1a30;
     --accent: #ffb454;
+    --accent-strong: #ffb454;
+    --on-accent: #1e1a30;         /* dark text on the light amber: 9.6:1 (white would be 1.8:1) */
+    --edge: #8379a3;
+    --focus: #ffb454;
     --accent-soft: #3a2f52;
     --danger: #ff5c72;
     --shadow: rgba(0,0,0,0.6);
@@ -170,7 +178,7 @@
     background:var(--line); border-radius:999px; cursor:pointer; border:none;
     transition:background .2s ease;
   }
-  .switch.on{ background:var(--accent); }
+  .switch.on{ background:var(--accent-strong); }
   .switch::after{
     content:''; position:absolute; top:2px; left:2px;
     width:18px;height:18px; border-radius:50%; background:#fff;
@@ -193,7 +201,7 @@
   .btn:hover{ border-color:var(--accent); }
   .btn.danger{ border-color:var(--danger); color:var(--danger); }
   .btn.danger.confirm{ background:var(--danger); color:#fff; }
-  .btn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .btn.primary{ background:var(--accent-strong); border-color:var(--accent-strong); color:var(--on-accent); }
   .count{ color:var(--ink-soft); font-size:0.8rem; margin-top:10px; text-align:center; }
   .copyRow{ display:flex; gap:6px; margin-top:8px; }
   .copyRow input{ flex:1; min-width:0; padding:6px 8px; border-radius:7px; border:1px solid var(--field-line); font-size:0.78rem; background:var(--field); color:var(--ink); }
@@ -710,7 +718,7 @@
   .kbdPop dd{ margin:0; font-size:0.78rem; color:var(--ink-soft); line-height:1.35; }
   .kbdGroupTitle{
     font-size:0.66rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em;
-    color:var(--accent); margin:0 0 8px;
+    color:var(--accent-strong); margin:0 0 8px;
   }
   .kbdSep{ height:1px; background:var(--line); margin:12px 0; }
   .floatPop.calPop{ padding:12px; width:250px; display:flex; flex-direction:column; gap:8px; }
@@ -740,7 +748,7 @@
   .dateCalGrid button.otherMonth{ color:var(--ink-soft); opacity:0.4; }
   .dateCalFoot{ display:flex; justify-content:space-between; margin-top:8px; }
   .dateCalFoot button{
-    all:unset; font-size:0.72rem; color:var(--accent); cursor:pointer; font-weight:600;
+    all:unset; font-size:0.72rem; color:var(--accent-strong); cursor:pointer; font-weight:600;
   }
   .dateCalFoot button:hover{ text-decoration:underline; }
   .dateTrigger{
@@ -774,7 +782,7 @@
     display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
     background:var(--accent-soft);
   }
-  .calBtn:hover{ background:var(--accent) !important; color:#fff; }
+  .calBtn:hover{ background:var(--accent-strong) !important; color:var(--on-accent); }
   .calBtn svg{ width:14px; height:14px; }
   .taskRow input[type=time]{
     all:revert;
@@ -808,7 +816,7 @@
   .noteImgWrap .rmImg svg{ width:10px; height:10px; }
 
   .toastAction{
-    background:var(--accent); color:#fff; border:none; border-radius:999px;
+    background:var(--accent-strong); color:var(--on-accent); border:none; border-radius:999px;
     padding:4px 12px; font-size:0.78rem; font-weight:600; cursor:pointer; flex:none;
   }
 
@@ -854,7 +862,7 @@
   }
   .addBoardRow input{ flex:1; border:none; outline:none; background:transparent; font-size:0.85rem; padding:7px 0; font-family:inherit; color:var(--ink); }
   .addBoardRow button{
-    all:unset; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff;
+    all:unset; width:28px; height:28px; border-radius:50%; background:var(--accent-strong); color:var(--on-accent);
     display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none;
     font-size:1.15rem; font-weight:700; line-height:1; transition:background .15s ease;
   }
@@ -960,7 +968,7 @@
   .tourBtns button{ white-space:nowrap; }
   .tourBtns button{ padding:6px 14px; border-radius:7px; border:1px solid var(--field-line); background:var(--field); color:var(--ink); cursor:pointer; font-size:0.82rem; font-weight:600; transition:background .15s ease, border-color .15s ease; }
   .tourBtns button:hover{ background:var(--accent-soft); border-color:var(--accent); }
-  .tourBtns button.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .tourBtns button.primary{ background:var(--accent-strong); border-color:var(--accent-strong); color:var(--on-accent); }
   .tourBtns button.primary:hover{ background:#b47a24; }
   .tourSkip{ background:none; border:none; color:var(--ink-soft); font-size:0.78rem; cursor:pointer; text-decoration:underline; padding:0; }
 
@@ -1022,7 +1030,7 @@
   .acctBack{ all:unset; color:var(--ink-soft); font-size:0.8rem; cursor:pointer; text-decoration:underline; display:inline-block; margin-bottom:14px; }
   .acctBack:hover{ color:var(--ink); }
   .acctFoot{ margin-top:8px; text-align:center; font-size:0.78rem; color:var(--ink-soft); }
-  .acctFoot button{ all:unset; color:var(--accent); cursor:pointer; font-weight:600; text-decoration:underline; }
+  .acctFoot button{ all:unset; color:var(--accent-strong); cursor:pointer; font-weight:600; text-decoration:underline; }
 
   /* ---------- editor content ---------- */
   .text b, .text strong{ font-weight:700; }
@@ -1137,7 +1145,7 @@
     text-align:center; white-space:nowrap;
   }
   .pillBtn:hover{ border-color:var(--accent); }
-  .pillBtn.primary{ background:var(--accent); border-color:var(--accent); color:#fff; }
+  .pillBtn.primary{ background:var(--accent-strong); border-color:var(--accent-strong); color:var(--on-accent); }
   .pillBtn.danger{ color:var(--danger); border-color:var(--danger); }
   .pillBtn.dangerFill{ background:var(--danger); border-color:var(--danger); color:#fff; }
   .pillBtn:disabled, .pillBtn[aria-disabled="true"]{ opacity:0.45; cursor:default; }
@@ -1155,7 +1163,7 @@
   .linkCard .meta{ min-width:0; }
   .linkCard .dom{ font-size:0.82rem; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .linkCard .url{ font-size:0.72rem; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px; }
-  .linkCard .how{ font-size:0.68rem; color:var(--accent); margin-top:5px; font-weight:600; }
+  .linkCard .how{ font-size:0.68rem; color:var(--accent-strong); margin-top:5px; font-weight:600; }
 
   .floatPop.datePop{ width:250px; padding:12px; display:flex; flex-direction:column; gap:6px; }
   .datePop .when{ font-size:0.92rem; font-weight:700; color:var(--ink); }
@@ -1179,7 +1187,7 @@
   .listHint button{
     all:unset; cursor:pointer; padding:4px 10px; border-radius:999px; font-weight:600;
   }
-  .listHint .go{ background:var(--accent); color:#fff; }
+  .listHint .go{ background:var(--accent-strong); color:var(--on-accent); }
   .listHint .no{ color:var(--ink-soft); padding:4px 7px; }
   .listHint .no:hover{ background:var(--accent-soft); color:var(--ink); }
 
@@ -1320,6 +1328,31 @@
   .migProgress{ height:8px; border-radius:999px; background:var(--line); overflow:hidden; margin:14px 0 8px; }
   .migProgress > i{ display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease; }
   /* account settings: a personal profile first, then quiet paper cards */
+  /* keyboard: every control shows where focus is (the buttons that reset their own style would otherwise lose it) */
+  a:focus-visible, button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible, summary:focus-visible{
+    outline:2px solid var(--focus); outline-offset:2px;
+  }
+  .note [contenteditable]:focus-visible{ outline:none; }
+  .skipLink{ position:fixed; left:12px; top:-60px; z-index:100000; padding:9px 14px; border-radius:10px; background:var(--panel); color:var(--ink); border:2px solid var(--focus); font-weight:600; text-decoration:none; }
+  .skipLink:focus{ top:12px; }
+  /* motion: the paper wobble, pops and fades are decoration; people who ask for less motion get none of it (state changes still show) */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; animation-delay:0s !important; transition-duration:0.001ms !important; transition-delay:0s !important; scroll-behavior:auto !important; }
+    .note.dragging, .photoObj.dragging, .boardObj.dragging, .note:hover, .note:focus-within{ animation:none !important; }
+  }
+  /* legal links and acknowledgements */
+  .legalAck{ margin:12px 2px 0; font-size:0.74rem; line-height:1.45; color:var(--ink-soft); text-align:center; }
+  .legalAck a, .legalLinks a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
+  .legalLinks{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:0.78rem; color:var(--ink-soft); }
+  .legalFoot{ display:flex; gap:14px; justify-content:center; padding:10px; font-size:0.74rem; color:var(--ink-soft); }
+  .legalFoot a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
+  .legalFoot.fixed{ position:fixed; left:0; right:0; bottom:0; z-index:5; background:color-mix(in srgb, var(--paper) 88%, transparent); pointer-events:none; }
+  .legalFoot.fixed a{ pointer-events:auto; }
+  .ageRow{ display:flex; gap:10px; margin-top:12px; }
+  .ageRow label{ flex:1; font-size:0.76rem; font-weight:600; color:var(--ink-soft); }
+  .ageRow select{ display:block; width:100%; margin-top:5px; padding:10px 10px; border-radius:10px; border:1px solid var(--edge); background:var(--field); color:var(--ink); font:inherit; font-size:0.92rem; }
+  .shareFine strong{ color:var(--ink); }
+  .shareFine.big{ font-size:0.82rem; }
   /* avatar circles (top bar, profile, share previews) */
   .acctAv{ display:flex; align-items:center; justify-content:center; border-radius:50%; overflow:hidden; flex:none; font-weight:700; color:#fff; user-select:none; width:100%; height:100%; line-height:1; }
   .acctAv img{ width:100%; height:100%; object-fit:cover; display:block; }
@@ -1372,7 +1405,7 @@
   .asField{ display:block; margin:12px 0 0; }
   .asField > .l{ display:flex; justify-content:space-between; margin-bottom:5px; font-size:0.76rem; font-weight:600; color:var(--ink-soft); }
   .asField > .l .cnt{ font-weight:400; }
-  .asIn, .asPfx{ box-sizing:border-box; width:100%; border:1px solid var(--field-line); border-radius:10px; background:var(--field); color:var(--ink); font:inherit; font-size:0.92rem; }
+  .asIn, .asPfx{ box-sizing:border-box; width:100%; border:1px solid var(--edge); border-radius:10px; background:var(--field); color:var(--ink); font:inherit; font-size:0.92rem; }
   .asIn{ padding:10px 12px; }
   textarea.asIn{ resize:none; min-height:64px; line-height:1.4; }
   .asPfx{ display:flex; align-items:center; padding:0 12px; }
@@ -1391,9 +1424,9 @@
   .asSelect{ appearance:none; -webkit-appearance:none; max-width:100%; border:0; background:transparent; color:var(--ink); font:inherit; font-size:0.88rem; padding:7px 26px 7px 10px; border-radius:8px; cursor:pointer; text-align:right; text-overflow:ellipsis; }
   .asSelect:hover{ background:color-mix(in srgb, var(--accent-soft) 50%, transparent); }
   .asSelect option, .asSelect optgroup{ background:var(--panel); color:var(--ink); }
-  input.asSw{ appearance:none; -webkit-appearance:none; flex:none; position:relative; width:36px; height:21px; margin:0; border-radius:999px; background:color-mix(in srgb, var(--ink-soft) 35%, var(--field)); cursor:pointer; transition:background .15s; }
+  input.asSw{ appearance:none; -webkit-appearance:none; flex:none; position:relative; width:36px; height:21px; margin:0; border-radius:999px; background:color-mix(in srgb, var(--ink-soft) 35%, var(--field)); box-shadow:inset 0 0 0 1px var(--edge); cursor:pointer; transition:background .15s; }
   input.asSw::after{ content:""; position:absolute; top:2.5px; left:2.5px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.3); transition:transform .15s; }
-  input.asSw:checked{ background:var(--accent); } input.asSw:checked::after{ transform:translateX(15px); }
+  input.asSw:checked{ background:var(--accent-strong); } input.asSw:checked::after{ transform:translateX(15px); }
   input.asSw:disabled{ opacity:0.4; cursor:default; }
   input.asSw:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
   .asItem.off .lbl{ opacity:0.5; }
@@ -1405,7 +1438,7 @@
   .asAction:hover .lbl{ text-decoration:underline; text-decoration-color:color-mix(in srgb, var(--ink) 30%, transparent); text-underline-offset:3px; }
   .asAction[disabled]{ opacity:0.5; cursor:default; }
   .asAction[hidden]{ display:none; }
-  .asLink{ all:unset; cursor:pointer; color:var(--accent); font-size:0.82rem; font-weight:600; padding:4px 2px; }
+  .asLink{ all:unset; cursor:pointer; color:var(--accent-strong); font-size:0.82rem; font-weight:600; padding:4px 2px; }
   .asLink:hover{ text-decoration:underline; } .asLink:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:2px; }
   .asChip{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:0.68rem; font-weight:600; background:var(--accent-soft); color:var(--ink); margin-left:6px; }
   /* fallback avatar (secondary) */
@@ -1485,6 +1518,7 @@
 </style>
 </head>
 <body>
+<a class="skipLink" href="#board" id="skipLink">Skip to the board</a>
 
 <div class="topbar">
   <div class="brand" id="brandBtn" role="button" tabindex="0" title="Switch board">
@@ -1495,7 +1529,7 @@
   </div>
   <div class="searchWrap">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
-    <input type="text" id="searchInput" placeholder="Search notes…" autocomplete="off">
+    <input type="text" id="searchInput" aria-label="Search notes" placeholder="Search notes…" autocomplete="off">
   </div>
   <div class="rightButtons">
     <button class="gearBtn" id="accountBtn" aria-label="Account" title="Account">
@@ -1565,6 +1599,11 @@
       </div>
     </section>
 
+    <section class="setSec">
+      <h4>Legal</h4>
+      <div class="legalLinks" id="settingsLegal"></div>
+    </section>
+
     <section class="setSec danger">
       <h4>Danger zone</h4>
       <div class="setRow">
@@ -1608,6 +1647,7 @@
 
 <!-- Public configuration and the (optional) cloud layer. With no SUPABASE_URL in js/config.js the app is guest-only, exactly as before. -->
 <script src="js/config.js"></script>
+<script src="js/legal-config.js"></script>
 <script src="js/cloud-client.js"></script>
 <script src="js/repo.js"></script>
 <script src="js/assets.js"></script>
@@ -1615,6 +1655,7 @@
 <script src="js/sharing.js"></script>
 <script src="js/migrate.js"></script>
 <script src="js/account.js"></script>
+<script src="js/billing.js"></script>
 <script>
 (function(){
   "use strict";
@@ -1889,6 +1930,127 @@
   function decodeState(str){
     try{ return JSON.parse(decodeURIComponent(atob(str))); }
     catch(e){ return null; }
+  }
+
+  // ---------- legal pages (kept out of the board UI: sign-in, Settings, Account settings and public views only) ----------
+  var LEGAL_LINKS = [["Privacy", "legal/privacy.html"], ["Terms", "legal/terms.html"], ["Copyright / DMCA", "legal/copyright.html"]];
+  function legalLinksEl(cls){
+    var d = document.createElement("div");
+    d.className = cls || "legalLinks";
+    LEGAL_LINKS.forEach(function(l){
+      var a = document.createElement("a"); a.href = l[1]; a.target = "_blank"; a.rel = "noopener"; a.textContent = l[0]; d.appendChild(a);
+    });
+    return d;
+  }
+  var LEGAL_ACK_HTML = 'By creating an account, you agree to the <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> and acknowledge the <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.';
+
+  // ---------- age screen ----------
+  // Neutral on purpose: it asks for a birth month and year, tells nobody the cut-off, and keeps nothing but the fact that
+  // it was passed (a timestamp on the account). Someone it turns away is not told how to get past it. This is ONE control;
+  // it does not, on its own, satisfy children's-privacy law (see docs/legal/age-gate.md).
+  var AGE_OK_KEY = "stickit.age.ok", AGE_BLOCK_KEY = "stickit.age.blocked", AGE_MIN_YEARS = 13;
+  function ageStamp(key){ var t = Number(safeGet(key)); return isFinite(t) && t > 0 ? t : 0; }
+  function ageBlocked(){ var t = ageStamp(AGE_BLOCK_KEY); return t > 0 && Date.now() - t < 24 * 3600 * 1000; }   // stops a quick "go back and retype" on this device; deliberately not tracking
+  function ageFresh(){ var t = ageStamp(AGE_OK_KEY); return t > 0 && Date.now() - t < 3600 * 1000; }
+  // strictly more than the minimum number of months after the birth month, so nobody is admitted a few days early
+  function ageEligible(year, month){ var n = new Date(); return (n.getFullYear() * 12 + n.getMonth() + 1) - (year * 12 + month) > AGE_MIN_YEARS * 12; }
+  function showAgeBlocked(){
+    var c = document.createElement("p"); c.className = "acctSub"; c.style.margin = "0";
+    c.textContent = "Stick-It isn\u2019t available to you right now.";
+    openModal({title: "Sorry", content: c, width: 340, actions: [{label: "OK", kind: "primary", value: true}]});
+  }
+  // opts: {blocking: bool (no Cancel; used after sign-in), onEligible(), onBlocked()}
+  function openAgeGate(opts){
+    opts = opts || {};
+    var content = document.createElement("div");
+    var lead = document.createElement("p"); lead.className = "acctSub"; lead.style.margin = "0";
+    lead.textContent = "Before you continue, please enter your birth month and year.";
+    var fine = document.createElement("p"); fine.className = "asHint"; fine.style.margin = "8px 0 0";
+    fine.textContent = "This is only used once, here, to check that Stick-It is available to you. Your birth date isn\u2019t stored.";
+    var row = makeDiv("ageRow");
+    var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+    var mLab = document.createElement("label"); mLab.textContent = "Month";
+    var mSel = document.createElement("select"); mSel.id = "ageMonth";
+    var mo = document.createElement("option"); mo.value = ""; mo.textContent = "Month"; mSel.appendChild(mo);
+    months.forEach(function(n, i){ var o = document.createElement("option"); o.value = String(i + 1); o.textContent = n; mSel.appendChild(o); });
+    mLab.appendChild(mSel);
+    var yLab = document.createElement("label"); yLab.textContent = "Year";
+    var ySel = document.createElement("select"); ySel.id = "ageYear";
+    var yo = document.createElement("option"); yo.value = ""; yo.textContent = "Year"; ySel.appendChild(yo);
+    var thisYear = new Date().getFullYear();
+    for(var y = thisYear; y >= thisYear - 110; y--){ var o2 = document.createElement("option"); o2.value = String(y); o2.textContent = String(y); ySel.appendChild(o2); }
+    yLab.appendChild(ySel);
+    row.appendChild(mLab); row.appendChild(yLab);
+    content.appendChild(lead); content.appendChild(row); content.appendChild(fine);
+    var done = false;
+    var actions = [];
+    if(!opts.blocking) actions.push({label: "Cancel", value: false});
+    else actions.push({label: "Sign out", value: "signout"});
+    actions.push({label: "Continue", kind: "primary", id: "ageGo", onClick: function(close){
+      var yr = parseInt(ySel.value, 10), mn = parseInt(mSel.value, 10);
+      if(!yr || !mn) return false;
+      if(yr * 12 + mn > new Date().getFullYear() * 12 + new Date().getMonth() + 1) return false;      // a date in the future is not an answer
+      done = true;
+      if(ageEligible(yr, mn)){
+        safeSet(AGE_OK_KEY, Date.now());
+        close(true);
+        if(opts.onEligible) opts.onEligible();
+      } else {
+        safeSet(AGE_BLOCK_KEY, Date.now());                    // only "a screen was failed", never the date
+        close("blocked");
+        if(opts.onBlocked) opts.onBlocked();
+        showAgeBlocked();
+      }
+      return false;
+    }});
+    var m = openModal({title: "Before you continue", content: content, width: 380, actions: actions,
+      onClose: function(v){ if(!done && v === "signout" && opts.onSignOut) opts.onSignOut(); }});
+    var go = m.card.querySelector("#ageGo"); go.setAttribute("aria-disabled", "true");
+    function sync(){ go.setAttribute("aria-disabled", String(!(ySel.value && mSel.value))); }
+    mSel.addEventListener("change", sync); ySel.addEventListener("change", sync);
+    return m;
+  }
+  // wraps "Continue with Google / GitHub": the screen comes BEFORE the provider is contacted
+  function requireAge(go){
+    if(ageBlocked()){ showAgeBlocked(); return; }
+    if(ageFresh()){ go(); return; }
+    openAgeGate({onEligible: go});
+  }
+  // After a provider brings someone back: an account that has not passed the screen (a route that skipped it, or an
+  // account from before the screen existed) is asked now, before anything else loads. Under the minimum: the account
+  // just created is deleted on the server and nothing is kept.
+  async function ensureAgeAttested(profile){
+    if(profile && !("age_attested_at" in profile)) return true;      // a project without the age-screen migration: there is nothing to check yet
+    if(profile && profile.age_attested_at) return true;
+    async function attest(){
+      try{ await Stick.account.attestAge(); }
+      catch(e){
+        // a project that has not had the age-screen migration yet simply has no such function: nothing to record, keep working
+        if(/attest_age|PGRST202|could not find the function/i.test(Stick.errors.parse(e).message)) return true;
+        throw e;
+      }
+      if(profile) profile.age_attested_at = new Date().toISOString();
+      return true;
+    }
+    async function reject(){
+      cloudSigningOut = true;
+      var uid = Stick.mode.uid;
+      try{ await Stick.account.deleteAccount(); }catch(e){}
+      try{ await Stick.auth.signOut("local"); }catch(e){}
+      if(uid) wipeCloudCache(uid);
+      try{ await Stick.assets.cacheClear(); }catch(e){}
+      settings.account = null; settings.accountPrefs = null; saveSettings();
+      return false;
+    }
+    if(ageBlocked()) return reject();
+    if(ageFresh()) return attest();
+    hideCloudOverlay();
+    return new Promise(function(resolve){
+      openAgeGate({blocking: true,
+        onEligible: function(){ attest().then(resolve, function(){ resolve(false); }); },
+        onBlocked: function(){ reject().then(function(){ setTimeout(function(){ location.hash = ""; location.reload(); }, 2500); resolve(false); }); },
+        onSignOut: function(){ cloudSignOut("local"); resolve(false); }});
+    });
   }
 
   function getAnonName(){
@@ -3587,7 +3749,7 @@
   function buildImageWrap(n, onRatio){
     var wrap = makeDiv("noteImgWrap");
     var img = document.createElement("img");
-    img.alt = "";
+    img.alt = "Picture attached to this note (no description added)";     // user content: never invent a description
     img.draggable = false;
     img.addEventListener("load", function(){
       if(!img.naturalWidth) return;
@@ -3838,7 +4000,7 @@
     if(isolated) frame.classList.add("isolated");
     else if(style !== "polaroid") frame.style.clipPath = cutPolygon(p.cut, 1.2);
     var img = document.createElement("img");
-    img.alt = item.caption || "";
+    img.alt = item.caption || "Picture (no description added)";
     img.draggable = false;
     img.style.aspectRatio = "1 / " + (item.imgRatio || 0.75);
     if(isolated ? item.cutout : item.image) img.src = isolated ? item.cutout : item.image; else frame.classList.add("pending");
@@ -3959,7 +4121,7 @@
       if(v === (n.caption || "")) return;
       n.caption = v;
       var alt = n.el && n.el.querySelector(".pFrame img");
-      if(alt) alt.alt = v;
+      if(alt) alt.alt = v || "Picture (no description added)";
       saveNotes();
       recordChange(v ? (before[n.id].caption ? "Edit caption" : "Add caption") : "Remove caption", before);
     }
@@ -5460,7 +5622,23 @@
   }
 
   // ---------- modals ----------
+  // ---- keyboard: dialogs keep Tab inside themselves, and give focus back to what opened them ----
+  var FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+  function focusablesIn(root){
+    return Array.prototype.slice.call(root.querySelectorAll(FOCUSABLE)).filter(function(el){ return !el.hidden && el.getAttribute("aria-disabled") !== "true" && (el.offsetWidth || el.offsetHeight || el === document.activeElement); });
+  }
+  function isTopBackdrop(b){ var all = document.querySelectorAll(".acctBackdrop"); return all.length && all[all.length - 1] === b; }
+  function trapTab(e, backdrop, card){
+    if(e.key !== "Tab" || !isTopBackdrop(backdrop)) return;
+    var f = focusablesIn(card);
+    if(!f.length){ e.preventDefault(); card.focus(); return; }
+    var first = f[0], last = f[f.length - 1], inside = card.contains(document.activeElement);
+    if(e.shiftKey && (!inside || document.activeElement === first)){ e.preventDefault(); last.focus(); }
+    else if(!e.shiftKey && (!inside || document.activeElement === last)){ e.preventDefault(); first.focus(); }
+  }
+  var dialogSeq = 0;
   function openModal(o){
+    var opener = document.activeElement;
     var backdrop = makeDiv("acctBackdrop");
     var card = makeDiv("acctCard modalCard");
     card.setAttribute("role", "dialog");
@@ -5470,7 +5648,8 @@
     var closeBtn = document.createElement("button");
     closeBtn.className = "acctClose"; closeBtn.innerHTML = ICONS.close; closeBtn.setAttribute("aria-label", "Close");
     card.appendChild(closeBtn);
-    var h = document.createElement("h3"); h.textContent = o.title; card.appendChild(h);
+    var h = document.createElement("h3"); h.textContent = o.title; h.id = "dlgTitle" + (++dialogSeq); card.appendChild(h);
+    card.setAttribute("aria-labelledby", h.id); card.setAttribute("tabindex", "-1");
     if(o.sub){ var sub = document.createElement("p"); sub.className = "acctSub"; sub.textContent = o.sub; card.appendChild(sub); }
     if(o.content) card.appendChild(o.content);
     var closed = false;
@@ -5479,10 +5658,12 @@
       closed = true;
       backdrop.remove();
       document.removeEventListener("keydown", onKey, true);
+      if(opener && opener.focus && document.contains(opener)){ try{ opener.focus(); }catch(e){} }
       if(o.onClose) o.onClose(result);
     }
     function onKey(e){
-      if(e.key === "Escape"){ e.stopPropagation(); close(false); }
+      if(e.key === "Escape" && isTopBackdrop(backdrop)){ e.stopPropagation(); close(false); }
+      else trapTab(e, backdrop, card);
     }
     if(o.actions && o.actions.length){
       var row = makeDiv("modalActions");
@@ -5503,6 +5684,7 @@
     backdrop.addEventListener("mousedown", function(e){ if(e.target === backdrop) close(false); });
     document.addEventListener("keydown", onKey, true);
     document.body.appendChild(backdrop);
+    setTimeout(function(){ if(!card.contains(document.activeElement)){ var f = focusablesIn(card).filter(function(el){ return el !== closeBtn; }); (f[0] || closeBtn).focus(); } }, 0);
     return {card:card, close:close, backdrop:backdrop};
   }
   function confirmDialog(o){
@@ -5628,7 +5810,7 @@
     content.appendChild(msgBox);
     var copyMsg = document.createElement("button");
     copyMsg.className = "guestBtn copyBtn";
-    copyMsg.style.cssText = "background:var(--accent);color:#fff;border-color:var(--accent);";
+    copyMsg.style.cssText = "background:var(--accent-strong);color:var(--on-accent);border-color:var(--accent-strong);";
     copyMsg.textContent = "Copy message";
     content.appendChild(copyMsg);
     var copyLink = document.createElement("button");
@@ -5638,13 +5820,16 @@
     content.appendChild(copyLink);
     var fine = document.createElement("p");
     fine.className = "shareFine";
-    fine.textContent = "Anyone with the link can view " + (isGroup ? "these items" : "this") +
-      ", no account needed. Shared links don't expire, so think of it like handing over a paper note: once it's sent, they can keep it." +
+    fine.className = "shareFine big";
+    var lead = document.createElement("strong");
+    lead.textContent = "Anyone with the link can view " + (isGroup ? "these items" : "this") + ", no account needed. ";
+    fine.appendChild(lead);
+    fine.appendChild(document.createTextNode("Shared links don't expire, so think of it like handing over a paper note: once it's sent, they can keep it." +
       (cloudShare ? " It's a frozen copy: changing the original later won't change what they see." : "") +
       (isGroup ? " Only the selected items are included, never the rest of your board." : "") +
       (skipped - avLeft > 0 ? " (" + (skipped - avLeft) + " empty note" + (skipped - avLeft > 1 ? "s were" : " was") + " left out.)" : "") +
       (avLeft ? (cloudShare ? " (" + avLeft + " recording" + (avLeft > 1 ? "s" : "") + " still uploading " + (avLeft > 1 ? "were" : "was") + " left out.)" : " Voice memos and videos stay on this device for now, so they aren't included.") : "") +
-      (!cloudShare && link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "");
+      (!cloudShare && link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "")));
     content.appendChild(fine);
     if(shareInfo){
       var off = document.createElement("button");
@@ -5688,6 +5873,8 @@
     var wrap = document.createElement("div");
     wrap.style.cssText = "min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px 20px;text-align:center;";
     document.body.appendChild(wrap);
+    document.body.appendChild(legalLinksEl("legalFoot fixed"));
+    var sk = document.getElementById("skipLink"); if(sk) sk.remove();     // there is no board to skip to on a public note page
     return wrap;
   }
   function publicOpenButton(wrap){
@@ -5803,6 +5990,7 @@
         renderPublicViewItems(objs, res.by_name, token, sharerOf(res));
         return;
       }
+      document.body.appendChild(legalLinksEl("legalFoot fixed"));
       shareBannerText.textContent = (res.board && res.board.name ? "\u201c" + res.board.name + "\u201d" : "A shared board") + " \u00b7 shared by " + (res.by_name || "someone") + " \u00b7 view only" + (res.by_bio ? " \u00b7 " + String(res.by_bio).slice(0, 120) : "");
       var sh = sharerOf(res);
       if(sh.avatarUrl){
@@ -6143,25 +6331,39 @@
   }
 
   var acctBackdrop = null;
+  var acctOpener = null, acctTrapKey = null;
   function closeAccountModal(){
     if(acctBackdrop){ acctBackdrop.remove(); acctBackdrop = null; }
+    document.removeEventListener("keydown", acctEscHandler);
+    if(acctTrapKey){ document.removeEventListener("keydown", acctTrapKey, true); acctTrapKey = null; }
+    if(acctOpener && acctOpener.focus && document.contains(acctOpener)){ try{ acctOpener.focus(); }catch(e){} }
+    acctOpener = null;
   }
   function openAccountModal(){
+    var opener = document.activeElement;
     closeOtherPanels(null);
     closeAccountModal();
+    acctOpener = opener;
     acctBackdrop = document.createElement("div");
     acctBackdrop.className = "acctBackdrop";
     acctBackdrop.addEventListener("click", function(e){ if(e.target === acctBackdrop) closeAccountModal(); });
     var card = document.createElement("div");
     card.className = "acctCard";
+    card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Account"); card.setAttribute("tabindex", "-1");
     acctBackdrop.appendChild(card);
     document.body.appendChild(acctBackdrop);
     document.addEventListener("keydown", acctEscHandler);
+    var myBackdrop = acctBackdrop;
+    acctTrapKey = function(e){ if(acctBackdrop === myBackdrop) trapTab(e, myBackdrop, card); };
+    document.addEventListener("keydown", acctTrapKey, true);
     var initial = settings.account ? "signedIn" : (settings.guestConfirmed ? "guestHome" : "choice");
     renderAccountModal(initial);
+    setTimeout(function(){ if(acctBackdrop && !card.contains(document.activeElement)){ var f = focusablesIn(card); (f[0] || card).focus(); } }, 80);
   }
   function acctEscHandler(e){
-    if(e.key === "Escape"){ closeAccountModal(); document.removeEventListener("keydown", acctEscHandler); }
+    if(e.key !== "Escape") return;
+    var over = Array.prototype.slice.call(document.querySelectorAll(".acctBackdrop:not(#settingsModal)")).filter(function(b){ return b !== acctBackdrop; });
+    if(!over.length) closeAccountModal();                // a dialog opened over it (cropper, confirm...) handles its own Esc first
   }
 
   function renderAccountModal(state){
@@ -6201,11 +6403,12 @@
         '<p class="acctSub">Notes you share will show this name:</p>' +
         '<div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:18px;">' +
           '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex:none;">' + escapeHtml(getDisplayName().charAt(0).toUpperCase()) + '</div>' +
-          '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--line);font-size:0.9rem;font-family:inherit;">' +
+          '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" aria-label="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--edge);font-size:0.9rem;font-family:inherit;">' +
         '</div>' +
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
         '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
-        '<div id="googleBtnHolder" style="margin-top:2px;"></div>';
+        '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
+        (CLOUD_OK ? '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '');
       mountGoogleButton();
       card.querySelector("#guestNameInput").addEventListener("input", function(e){
         settings.displayName = e.target.value.trim();
@@ -6222,13 +6425,13 @@
             '<li>No permissions asked</li>' +
             '<li>Shared notes show “Anon-XXXX”</li>' +
             '<li>' + (CLOUD_OK ? 'Boards stay on this device only' : 'Nothing leaves this browser') + '</li>' +
-            '<li>' + (CLOUD_OK ? 'Links to photos and recordings need an account' : 'Premium features (coming soon) won’t be available') + '</li>' +
+            '<li>' + (CLOUD_OK ? 'Links to photos and recordings need an account' : 'Features that need an account won’t be available') + '</li>' +
           '</ul></div>' +
           '<div><strong>Google</strong><ul>' +
-            '<li>Shares only name, email &amp; photo (Google or GitHub)</li>' +
+            '<li>Stick-It asks only for your name, e-mail &amp; profile photo (Google or GitHub)</li>' +
             '<li>Shared notes show your real name</li>' +
-            '<li>' + (CLOUD_OK ? 'Boards, photos and recordings sync across your devices' : 'Ready for premium &amp; multi-user features') + '</li>' +
-            '<li>Never your password, Gmail, Calendar, or Drive</li>' +
+            '<li>' + (CLOUD_OK ? 'Boards, photos and recordings sync across your devices' : 'Features that need an account become available') + '</li>' +
+            '<li>No access to your password, mail, calendar or files</li>' +
           '</ul></div>' +
         '</div>' +
         '<button class="guestBtn" id="confirmGuestBtn">Continue as guest</button>';
@@ -6247,11 +6450,12 @@
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
         '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
+        (CLOUD_OK ? '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '') +
         '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
         '<div class="acctWhy">' +
           '<p>👤 Your real name &amp; photo on anything you share, instead of “Anon-4821.”</p>' +
-          '<p>🔓 Only your name, email &amp; photo. Never your password, Gmail, Calendar, or Drive.</p>' +
-          '<p>' + (CLOUD_OK ? '☁️ Your boards, photos and recordings follow you to every device.' : '🚀 Sets you up for premium features and multi-user boards, coming soon.') + '</p>' +
+          '<p>🔓 Stick-It asks only for your name, e-mail &amp; profile photo. It never sees your password and asks for no access to your mail, calendar or files.</p>' +
+          '<p>' + (CLOUD_OK ? '☁️ Your boards, photos and recordings follow you to every device.' : 'Unlocks the features that need an account.') + '</p>' +
         '</div>';
       card.querySelector("#chooseGuestBtn").addEventListener("click", function(){ renderAccountModal("guestCompare"); });
       mountGoogleButton();
@@ -6356,8 +6560,29 @@
         total += objs.length;
         out.push({name: boards[i].name, subtitle: boards[i].subtitle || "", notes: objs});
       }
+      // the account itself: what is stored about the person, who they share with, and the links they made (never the links' secrets)
+      var me = (Stick.auth.user() || {}), acc = settings.account || {}, pf = acc.prof || {}, pr = settings.accountPrefs || {};
+      var shares = [];
+      try{
+        var names = {}; boards.forEach(function(b){ names[b.id] = b.name; });
+        shares = (await Stick.share.list()).map(function(x){
+          return {type: x.share_type, board: names[x.board_id] || null, createdAt: x.created_at, active: !!x.is_active, shownAs: x.by_name || null,
+                  withPhoto: !!x.by_avatar_asset_id, withBio: !!x.by_bio, turnedOffAt: x.disabled_at || null};
+        });
+      }catch(e){}
+      var account = {
+        displayName: acc.name || null, email: me.email || acc.email || null, plan: acc.plan || null,
+        profile: {username: pr.handle || null, bio: pr.bio || null, avatar: pf.avatarSource || null, fallbackStyle: pf.avatarStyle || null, fallbackColour: pf.avatarColor || null, fallbackEmoji: pf.avatarEmoji || null},
+        preferences: {shareAs: pr.shareDefaultIdentity || null, showPhotoOnShares: !!pr.shareShowAvatar, showBioOnShares: !!pr.shareShowBio, newBoardLinks: pr.shareDefaultBoardMode || null,
+                      preferredFont: pr.preferredFont || null, defaultNoteColour: pr.defaultNoteColor || null, productUpdateEmails: !!pr.marketingOptIn},
+        memberships: boards.map(function(b){ return {board: b.name, role: b.role || null, isOwner: b.owner_id === me.id}; }),
+        shareLinks: shares
+      };
       downloadText("stick-it-account-" + new Date().toISOString().slice(0, 10) + ".json",
-        JSON.stringify({app: "stick-it", version: 2, kind: "account-export", exportedAt: new Date().toISOString(), boards: out}, null, 2));
+        JSON.stringify({app: "stick-it", version: 2, kind: "account-export", exportedAt: new Date().toISOString(),
+          includes: ["account and profile", "preferences", "boards you can open and everything on them (text, layout, formatting)", "pictures (embedded)", "your share links (without their secret addresses)", "which boards you belong to and your role"],
+          notIncluded: ["voice memo and video files (the items are listed, the recordings are not)", "the secret address of each share link", "comments (the app has no comments yet)"],
+          account: account, boards: out}, null, 2));
       toast("Downloaded " + out.length + (out.length === 1 ? " board" : " boards") + " (" + total + " items)." +
         (avSkipped ? " " + avSkipped + " voice memo/video item" + (avSkipped === 1 ? "" : "s") + " kept their place but not their files." : "") +
         (imgMissing ? " " + imgMissing + " picture" + (imgMissing === 1 ? "" : "s") + " couldn't be fetched." : ""));
@@ -6550,10 +6775,13 @@
         // ---------- data & privacy
         '<section class="asCard" aria-labelledby="asH5">' +
           '<h4 id="asH5">Data &amp; privacy</h4>' +
+          '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by e-mail<small>Off unless you turn it on. Stick-It doesn\u2019t send any yet; this records your choice for when it does. Every such message will have an unsubscribe link. Security and account messages are separate and aren\u2019t affected.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
           '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
+          '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
+          '<div id="asLegal" style="padding-bottom:12px;"></div>' +
         '</section>' +
 
         // ---------- danger
@@ -6822,6 +7050,16 @@
     }
     loadProviders();
 
+    // ---------- e-mail preference (staged like the rest: Save writes it, Cancel drops it)
+    draft.marketingOptIn = !!pr.marketingOptIn;
+    $("asMarketing").checked = draft.marketingOptIn;
+    $("asMarketing").addEventListener("change", function(){ draft.marketingOptIn = $("asMarketing").checked; });
+    // ---------- privacy requests + legal links
+    var lg = Stick.legal || {};
+    $("asPrivacyHint").textContent = "To get a copy of your data or have it deleted, use Export and Delete account here: they work straight away. " +
+      (lg.privacyEmail ? "For anything else about your data, write to " + lg.privacyEmail + "." : "A contact address for privacy questions will be published before Stick-It launches publicly.");
+    $("asLegal").appendChild(legalLinksEl("legalLinks"));
+
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
     $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); });
@@ -6875,10 +7113,7 @@
     if(!gh) return;
     if(!CLOUD_OK){ gh.style.display = "none"; return; }       // needs the cloud backend
     gh.innerHTML = GITHUB_ICON + "<span>Continue with GitHub</span>";
-    gh.addEventListener("click", function(){
-      toast("Opening GitHub\u2026");
-      Stick.auth.signInWithProvider("github").catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
-    });
+    gh.addEventListener("click", function(){ beginProviderSignIn("github"); });
   }
   function mountGoogleButton(){
     mountGitHubButton();
@@ -6909,7 +7144,10 @@
     }
   }
 
+  (function(){ var b = document.getElementById("board"); if(b) b.setAttribute("tabindex", "-1"); })();
+  document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
   accountBtn.addEventListener("click", openAccountModal);
+  document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   document.getElementById("openAcctFromSettings").addEventListener("click", function(e){ e.preventDefault(); cancelSettings(); openAccountModal(); });
   updateAccountIcon();
 
@@ -7314,7 +7552,9 @@
     shareResult.innerHTML = "";
     var p = document.createElement("p");
     p.className = "muted";
-    p.textContent = "A live, read-only link: anyone who opens it always sees this board as it is now (no account needed). It doesn't expire, and you can turn it off at any time.";
+    var pl = document.createElement("strong"); pl.textContent = "Anyone with this link can see this whole board, now and as it changes (read only, no account needed). ";
+    p.appendChild(pl);
+    p.appendChild(document.createTextNode("It doesn't expire until you turn it off."));
     shareResult.appendChild(p);
     var row = document.createElement("div");
     row.className = "copyRow";
@@ -7564,7 +7804,8 @@
       ["Click a note", "Select it &middot; " + MOD + "+click adds or removes more"],
       ["Drag on empty board", "Select every note inside the box"],
       ["Arrow keys", "Nudge the selection &middot; hold Shift for bigger steps"],
-      ["Delete / Backspace", "Delete the selection (when you're not typing)"]
+      ["Delete / Backspace", "Delete the selection (when you're not typing)"],
+      ["N", "New note in the middle of the screen (no mouse needed)"]
     ]},
     { title: "Board actions", items: [
       [MOD + " + Z", "Undo &middot; " + MOD + "+Shift+Z to redo"],
@@ -7808,7 +8049,7 @@
     var isActive = b.id === activeBoardId;
     var content = document.createElement("div");
     var preview = document.createElement("img");
-    preview.className = "coverPreview"; preview.alt = "";
+    preview.className = "coverPreview"; preview.alt = "Preview of the board cover";
     var modes = makeDiv("coverModes");
     var hintEl = makeDiv("coverHint");
     function autoUrl(){ return thumbFor(b, function(rec){ if(!draft) preview.src = rec.url; }).url; }
@@ -8171,6 +8412,13 @@
         toast("Image removed.", "Undo", function(){ undoIfTop(act); });
         return;
       }
+      // keyboard-only people can start a note too: N puts a new one near the middle of what is on screen, ready to type in
+      if(!typing && !mod && !e.altKey && (key === "n" || key === "N") && !readOnly && !modalOpen()){
+        e.preventDefault();
+        var vr = board.getBoundingClientRect(), br = boardInner.getBoundingClientRect();
+        addNoteAt((vr.left + vr.width / 2 - br.left) / boardZoom, (vr.top + Math.min(vr.height / 2, 240) - br.top) / boardZoom, {focus:true});
+        return;
+      }
       if(typing || !selected.size) return;
       if(key === "Delete" || key === "Backspace"){
         // only when not editing text: Backspace inside a note always edits text
@@ -8387,10 +8635,13 @@
     return Stick.account.load().then(applyAccountData, function(){});
   }
 
-  function beginGoogleSignIn(){
-    toast("Opening Google\u2026");
-    Stick.auth.signInWithGoogle().catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+  function beginProviderSignIn(provider){
+    requireAge(function(){
+      toast("Opening " + providerName(provider) + "\u2026");
+      Stick.auth.signInWithProvider(provider).catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
+    });
   }
+  function beginGoogleSignIn(){ beginProviderSignIn("google"); }
   function wipeCloudCache(uid){
     var prefix = "stickyboard.cloud." + uid + ".";
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf(prefix) === 0) localStorage.removeItem(k); });
@@ -8612,6 +8863,7 @@
     }
     var profile = null;
     try{ profile = await Stick.auth.profile(); }catch(e){}
+    if(profile && !(await ensureAgeAttested(profile))) return;      // nothing else loads until the age screen has been passed
     rememberAccount(session.user, profile);
     refreshAccountData();                               // preferences + photo; the mirror in settings covers offline
     var lastAcctRefresh = Date.now();

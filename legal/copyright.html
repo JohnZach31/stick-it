@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="robots" content="noindex">
+<title>Copyright / DMCA (draft) · Stick-It</title>
+<link rel="stylesheet" href="../assets/fonts/fonts.css">
+<link rel="stylesheet" href="legal.css">
+</head>
+<body data-page="copyright">
+<a class="skip" href="#main">Skip to the text</a>
+<header class="top"><a href="../index.html" class="brand">Stick-It</a>
+<nav aria-label="Legal"><a href="privacy.html">Privacy</a> <a href="terms.html">Terms</a> <a href="copyright.html">Copyright / DMCA</a></nav></header>
+<div id="draftBanner" class="draftBanner" role="note" hidden></div>
+<main id="main">
+<article>
+<h1>Copyright / DMCA (DRAFT)</h1>
+<blockquote class="draftNote"><p><strong>Development-only page. Not final.</strong> Stick-It has <strong>not</strong> registered a DMCA designated agent. Nothing below is a registered designation until the owner completes the steps in <code>docs/legal/dmca-readiness.md</code> and sets <code>dmcaRegistered</code> to <code>true</code> in <code>js/legal-config.js</code>. The complaint form on this page stays hidden until then.</p></blockquote>
+<h2>Reporting copyright infringement</h2>
+<p>Stick-It lets people store and share their own content. If you are a copyright owner (or authorised to act for one) and you believe content on Stick-It infringes your copyright, please send a notice to our designated agent.</p>
+<h3>DMCA Designated Agent</h3>
+<div class="tableWrap"><table><tbody><tr><th scope="row">Service provider</th><td><mark class="todo">[OWNER INPUT REQUIRED: legal name of the service provider]</mark></td></tr><tr><th scope="row">Name / role</th><td><mark class="todo">[OWNER INPUT REQUIRED: agent name or role]</mark></td></tr><tr><th scope="row">Organization</th><td><mark class="todo">[OWNER INPUT REQUIRED]</mark></td></tr><tr><th scope="row">Mailing address</th><td><mark class="todo">[OWNER INPUT REQUIRED: street address, not a P.O. box unless permitted]</mark></td></tr><tr><th scope="row">Telephone</th><td><mark class="todo">[OWNER INPUT REQUIRED]</mark></td></tr><tr><th scope="row">E-mail</th><td><mark class="todo">[OWNER INPUT REQUIRED]</mark></td></tr></tbody></table></div>
+<h3>What your notice must include</h3>
+<p>A written notice should contain: (1) your physical or electronic signature; (2) identification of the copyrighted work you say was infringed; (3) identification of the material and <strong>where it is</strong> (for Stick-It, the share link or page address); (4) your contact details (address, telephone, e-mail); (5) a statement that you have a good-faith belief the use is not authorised by the copyright owner, its agent or the law; and (6) a statement, <strong>under penalty of perjury</strong>, that the information is accurate and that you are the owner or authorised to act for the owner.</p>
+<p>Please be accurate. Knowingly misrepresenting that material is infringing can carry legal consequences.</p>
+<h3>What happens next</h3>
+<p>We review notices. If a notice is complete and appears valid we may remove or disable the material and tell the person who uploaded or shared it. <mark class="todo">[OWNER INPUT REQUIRED / LEGAL REVIEW: exact process and timing]</mark></p>
+<h3>Counter-notice</h3>
+<p>If your content was removed and you believe that was a mistake or that you have the right to use it, you may send a counter-notice to the same agent. <mark class="todo">[OWNER INPUT REQUIRED / LEGAL REVIEW: counter-notice contents, 10 to 14 business-day restoration process]</mark></p>
+<h3>Repeat infringers</h3>
+<p><mark class="todo">[OWNER INPUT REQUIRED / LEGAL REVIEW: repeat-infringer policy. A written policy and its reasonable implementation are a condition of the DMCA safe harbour.]</mark></p>
+<h3>Other complaints</h3>
+<p>For privacy requests see the <a href="privacy.html">Privacy Policy</a>. For other abuse, use the <strong>Report</strong> link on any shared page.</p>
+</article>
+<section id="copyrightForm" hidden aria-labelledby="cfH">
+<h2 id="cfH">Submit a copyright notice</h2>
+<form id="cfForm" novalidate>
+<p><label for="cfName">Your full name</label><input id="cfName" name="name" autocomplete="name" required></p>
+<p><label for="cfEmail">E-mail</label><input id="cfEmail" name="email" type="email" autocomplete="email" required></p>
+<p><label for="cfAddr">Postal address (optional)</label><input id="cfAddr" name="address" autocomplete="street-address"></p>
+<p><label for="cfWork">The work you say was copied</label><textarea id="cfWork" name="work" rows="3" required></textarea></p>
+<p><label for="cfUrl">Where it is on Stick-It (the share link address)</label><input id="cfUrl" name="url" required></p>
+<p class="check"><input id="cfGood" type="checkbox"><label for="cfGood">I have a good-faith belief that this use is not authorised by the copyright owner, its agent, or the law.</label></p>
+<p class="check"><input id="cfAcc" type="checkbox"><label for="cfAcc">The information in this notice is accurate, and under penalty of perjury I am the owner of, or authorised to act for the owner of, the copyright.</label></p>
+<p><label for="cfSig">Signature (type your full name)</label><input id="cfSig" name="signature" required></p>
+<p><button type="submit" id="cfGo">Send notice</button></p>
+<p id="cfMsg" role="status"></p>
+</form>
+</section>
+</main>
+<footer class="foot"><a href="../index.html">Back to Stick-It</a></footer>
+<script src="../js/config.js"></script>
+<script src="../js/legal-config.js"></script>
+<script src="legal.js"></script>
+</body>
+</html>

@@ -10,7 +10,7 @@
   // ------------------------------------------------------------------ errors
   var KNOWN = ["BOARD_LIMIT_REACHED", "STORAGE_QUOTA_EXCEEDED", "FILE_TOO_LARGE", "MIME_NOT_ALLOWED", "NOT_AUTHENTICATED",
     "FORBIDDEN", "OBJECT_LIMIT_REACHED", "UNSAFE_HTML", "INVITE_NOT_FOUND", "INVITE_USED", "INVITE_EXPIRED",
-    "INVITE_EMAIL_MISMATCH", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
+    "INVITE_EMAIL_MISMATCH", "AGE_NOT_CONFIRMED", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
   Stick.errors = {
     // Turns whatever a Supabase call threw/returned into {code, message, offline, retryable}
     parse: function (e) {
@@ -36,6 +36,7 @@
       if (c === "FILE_TOO_LARGE") return "That file is too large to upload.";
       if (c === "MIME_NOT_ALLOWED") return "That file type isn't supported.";
       if (c === "OBJECT_LIMIT_REACHED") return "This board has reached its maximum number of items.";
+      if (c === "AGE_NOT_CONFIRMED") return "Please confirm your age first.";
       if (c === "HANDLE_TAKEN") return "That username is already taken.";
       if (c === "OFFLINE") return "You appear to be offline.";
       if (c === "FORBIDDEN") return "You don't have permission to do that here.";

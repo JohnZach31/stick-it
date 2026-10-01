@@ -50,12 +50,14 @@ const denied = (r) => !!r.error && /permission denied|row-level security|violate
 const errIs = (r, re) => !!r.error && re.test(r.error);
 
 // ---------------------------------------------------------------- users
+const attest = (id) => run('su', 'update public.profiles set age_attested_at = now() where id = $1', [id]);
 const mk = (name, plan = 'free') => ({ id: uuid(), email: `${name}@example.com`, name, plan });
 const alice = mk('alice'), bob = mk('bob'), carol = mk('carol'), dave = mk('dave'), erin = mk('erin', 'premium'), mallory = mk('mallory');
 for (const u of [alice, bob, carol, dave, erin, mallory]) {
   await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)',
     [u.id, u.email, JSON.stringify({ full_name: `${u.name} Example`, avatar_url: `https://img.example/${u.name}.png` })]);
   if (u.plan === 'premium') await run('su', "update public.profiles set plan='premium' where id=$1", [u.id]);
+  await attest(u.id);
 }
 
 const board = async (u, name, key = null) => {
@@ -454,6 +456,7 @@ group('H. comments, reminders, anonymous access, account deletion');
   const before = (await run('su', 'select count(*)::int c from public.storage_tombstones')).rows[0].c;
   const doomed = mk('doomed');
   await run('su', 'insert into auth.users (id,email) values ($1,$2)', [doomed.id, doomed.email]);
+  await attest(doomed.id);
   const DB = await board(doomed, 'Doomed');
   const da = (await run(doomed, 'select * from public.create_asset($1,$2,$3,$4)', [DB.id, 'image', 'image/png', 2000])).rows[0];
   const del = await run('su', 'delete from auth.users where id=$1', [doomed.id]);
@@ -469,6 +472,7 @@ group('I. account settings, avatars, frozen share identity, account deletion');
   const up = (u, path, size, mime) => run(u, "insert into storage.objects (bucket_id,name,owner,metadata) values ('media',$1,$2,$3::jsonb)", [path, u.id, meta2(size, mime)]);
   const u1 = mk('iris'), u2 = mk('jack'), u3 = mk('kate');
   for (const u of [u1, u2, u3]) await run('su', 'insert into auth.users (id,email,raw_user_meta_data) values ($1,$2,$3::jsonb)', [u.id, u.email, JSON.stringify({ full_name: u.name, avatar_url: 'https://img.example/' + u.name })]);
+  for (const u of [u1, u2, u3]) await attest(u.id);
 
   // --- profile columns
   ok(!(await run(u1, "update public.profiles set avatar_style='emoji', avatar_emoji='🎸', avatar_color='#4a7c59' where id=$1", [u1.id])).error, 'owner edits fallback avatar style');
@@ -576,7 +580,7 @@ group('I. account settings, avatars, frozen share identity, account deletion');
 group('J. username availability check');
 {
   const a = mk('jay1'), b = mk('jay2');
-  for (const u of [a, b]) await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]);
+  for (const u of [a, b]) { await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]); await attest(u.id); }
   await run(a, "insert into public.profile_settings (user_id, handle) values ($1,'taken_name')", [a.id]);
   const chk = async (u, h) => (await run(u, 'select public.handle_available($1) as r', [h])).rows[0]?.r;
   ok((await chk(b, 'free_name')) === true, 'an unused username is available');
@@ -587,6 +591,73 @@ group('J. username availability check');
   ok(denied(await run('anon', "select public.handle_available('x_y_z')")), 'anon cannot call it');
   ok(errIs(await run({ email: 'x@example.com' }, "select public.handle_available('abc')"), /NOT_AUTHENTICATED/), 'a role without a user id is rejected');
   ok(errIs(await run(b, "insert into public.profile_settings (user_id, handle) values ($1,'taken_name')", [b.id]), /duplicate key|unique/i), 'the unique index still refuses a taken username');
+}
+
+// ================================================================ K. legal: age attestation, marketing preference, copyright reports
+group('K. age attestation, marketing preference, copyright reports');
+{
+  const kid = mk('kid'), adult = mk('adult'), owner = mk('kowner');
+  for (const u of [kid, adult, owner]) await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]);
+  await attest(owner.id);
+  const B = await board(owner, 'Owner board');
+
+  // an account that skipped the age screen can hold no content (even if it talks to the API directly)
+  ok(errIs(await run(kid, "select * from public.create_board('x')"), /AGE_NOT_CONFIRMED/), 'no board before the age screen');
+  ok(errIs(await run(kid, "select * from public.create_asset(null,'avatar','image/jpeg',900)"), /AGE_NOT_CONFIRMED/), 'no upload before the age screen');
+  ok(errIs(await run(kid, "insert into public.profile_settings (user_id, bio) values ($1,'hi')", [kid.id]), /AGE_NOT_CONFIRMED/), 'no bio / personal settings before the age screen');
+  const inv = (await run(owner, 'select public.create_invite($1,$2,$3) as r', [B.id, kid.email, 'editor'])).rows[0].r;
+  ok(errIs(await run(kid, 'select public.accept_invite($1)', [inv.token]), /AGE_NOT_CONFIRMED/), 'cannot join someone else\'s board before the age screen');
+  ok((await run(kid, 'select 1 from public.board_members')).rows.length === 0, '...and was not added as a member');
+  ok(errIs(await run(kid, "select public.create_share('board_live',$1,null,'x')", [B.id]), /FORBIDDEN|AGE_NOT_CONFIRMED/), 'no share links before the age screen');
+
+  // the flag cannot be set from the browser
+  ok(denied(await run(kid, 'update public.profiles set age_attested_at = now() where id=$1', [kid.id])), 'a browser cannot write age_attested_at directly');
+  ok(denied(await run('anon', 'select public.attest_age()')), 'anon cannot attest');
+
+  // attesting stores a timestamp only (no birth date anywhere)
+  const t1 = (await run(adult, 'select public.attest_age() as t')).rows[0].t;
+  ok(!!t1, 'attest_age returns the timestamp');
+  const t2 = (await run(adult, 'select public.attest_age() as t')).rows[0].t;
+  ok(String(t1) === String(t2), 'attesting again does not move the timestamp');
+  const cols = (await run('su', "select column_name from information_schema.columns where table_schema='public' and table_name in ('profiles','profile_settings') and (column_name ilike '%birth%' or column_name ilike '%dob%' or column_name ilike '%age%')")).rows.map(r => r.column_name);
+  ok(cols.length === 1 && cols[0] === 'age_attested_at', 'the only age-related column is the attestation timestamp: ' + cols.join());
+  ok(!(await run(adult, "select * from public.create_board('Adult board')")).error, 'after attesting, content can be created');
+
+  // marketing preference: off by default, timestamped, set by the person, suppressed by unsubscribe
+  await run(adult, "insert into public.profile_settings (user_id) values ($1)", [adult.id]);
+  let ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_at, marketing_opt_in_source from public.profile_settings')).rows[0];
+  ok(ps.marketing_opt_in === false && ps.marketing_opt_in_at === null, 'marketing e-mail is OFF by default');
+  ok((await run('service', 'select count(*)::int c from public.marketing_audience()')).rows[0].c === 0, 'nobody is in the marketing audience by default');
+  await run(adult, 'update public.profile_settings set marketing_opt_in = true where user_id=$1', [adult.id]);
+  ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_at, marketing_opt_in_source from public.profile_settings')).rows[0];
+  ok(ps.marketing_opt_in === true && !!ps.marketing_opt_in_at && ps.marketing_opt_in_source === 'account_settings', 'opting in records when and where');
+  ok(denied(await run(adult, 'update public.profile_settings set marketing_opt_in_at = null where user_id=$1', [adult.id])), 'the record of consent cannot be edited by the user');
+  const aud = (await run('service', 'select * from public.marketing_audience()')).rows;
+  ok(aud.length === 1 && aud[0].email === adult.email, 'an opted-in person is in the audience');
+  ok(denied(await run(adult, 'select * from public.marketing_audience()')) && denied(await run('anon', 'select * from public.marketing_audience()')), 'only the service role can read the audience');
+  ok((await run('service', 'select public.marketing_unsubscribe($1) as r', [adult.id])).rows[0].r === true, 'unsubscribe works without a login (service role call)');
+  ok((await run('service', 'select count(*)::int c from public.marketing_audience()')).rows[0].c === 0, 'an unsubscribed person is suppressed');
+  ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_source from public.profile_settings')).rows[0];
+  ok(ps.marketing_opt_in === false && ps.marketing_opt_in_source === 'unsubscribe_link', 'and the source is recorded');
+  ok((await run('service', 'select public.marketing_unsubscribe($1) as r', [adult.id])).rows[0].r === false, 'unsubscribing twice is harmless');
+  ok(denied(await run(adult, 'select public.marketing_unsubscribe($1)', [adult.id])), 'a signed-in user cannot call the service-only unsubscribe function');
+  ok((await run(adult, 'select * from public.profile_settings where user_id <> $1', [adult.id])).rows.length === 0, 'others\' preferences are invisible');
+
+  // copyright reports: nobody but the service role
+  const rep = { n: 'Rights Holder', e: 'rh@example.org', d: 'My photograph', u: 'https://example.org/#s=x', s: 'R. Holder' };
+  const ins = (actor, over = {}) => run(actor, 'insert into public.copyright_reports (reporter_name, reporter_email, work_description, infringing_url, good_faith, accuracy_perjury, signature) values ($1,$2,$3,$4,$5,$6,$7)',
+    [rep.n, rep.e, rep.d, rep.u, over.gf ?? true, over.acc ?? true, rep.s]);
+  ok(denied(await ins('anon')) && denied(await ins(adult)), 'browsers cannot write or read copyright reports');
+  ok(!(await ins('service')).error, 'the service role can record a report');
+  ok(!!(await ins('service', { gf: false })).error && !!(await ins('service', { acc: false })).error, 'a report without the required statements is refused');
+  ok(denied(await run(adult, 'select * from public.copyright_reports')) && denied(await run('anon', 'select * from public.copyright_reports')), 'reports are unreadable to browsers');
+
+  // deleting an account removes personal settings + marketing preference + invites it made
+  await run(owner, 'select public.create_invite($1,$2,$3)', [B.id, 'x@example.com', 'viewer']);
+  await run('service', 'select public.purge_user_data($1)', [owner.id]);
+  ok((await run('su', 'select 1 from public.board_invites where inviter_id=$1', [owner.id])).rows.length === 0, 'invite links made by a deleted account are gone');
+  await run('service', 'select public.purge_user_data($1)', [adult.id]);
+  ok((await run('su', 'select 1 from public.profile_settings where user_id=$1', [adult.id])).rows.length === 0, 'marketing preference and settings are deleted with the account');
 }
 
 // ---------------------------------------------------------------- summary

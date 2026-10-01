@@ -57,3 +57,7 @@ verify_jwt = false
 verify_jwt = false                     # guarded by the GC_SECRET header instead
 [functions.delete-account]
 verify_jwt = false                     # the handler verifies the caller session itself
+[functions.unsubscribe]
+verify_jwt = false                     # opened from an e-mail link: the signed token is the credential
+[functions.report-copyright]
+verify_jwt = false                     # rights holders have no account; disabled until COPYRIGHT_INTAKE_ENABLED=true

@@ -23,7 +23,7 @@ Share a board with a link that just *works*.
 | 🎨 **A little chaos, on purpose** | Every note gets its own handwriting, colour, tape or pin, and a crease or two. Tap **Aa** to try another hand. Hebrew, Chinese, Japanese and Korean get fonts that actually have those letters. |
 | ✅ **Tasks & real reminders** | Write "Dentist Tuesday 17:30" and Stick-It spots the date; one click adds it to Google Calendar or downloads a reminder for Apple Calendar / Outlook. Tasks with due dates still work too. |
 | 🗂️ **Multiple boards** | Work, Personal, whatever. Switch boards from the header, each with a live little thumbnail of its own notes, or a cover and subtitle you choose. |
-| 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share. Stick-It only ever sees your name, email, and photo, never your password or your Gmail/Calendar/Drive. Or skip it entirely; guest mode asks for nothing. |
+| 👤 **Google Sign-In, or stay a guest** | Sign in to put your real name & photo on notes you share. Stick-It asks the provider only for your name, e-mail and profile photo; it never sees your password and asks for no access to your mail, calendar or files. Or skip it entirely: guest mode keeps everything on your device. |
 | 🔗 **Sharing that actually works** | Share a board, a single note, or just a few selected notes with a link that opens instantly for whoever you send it to, no login or setup on their end. |
 | 🖼️ **Photos that feel printed** | Drop or paste a photo onto the board and it becomes a Polaroid, a hand-cut print or a cut-out mounted on card, with an optional handwritten caption. |
 | 🔎 **Focus mode** | Double-click a note to pick it up and write comfortably; Esc puts it back exactly where it was. |
@@ -37,7 +37,7 @@ Share a board with a link that just *works*.
 
 ## 🙏 Credits
 
-Fonts from [Google Fonts](https://fonts.google.com) · snapshots via [html2canvas](https://html2canvas.hertzen.com/) · sign-in via [Google Identity Services](https://developers.google.com/identity/gsi/web)
+Open-source fonts (SIL OFL / Apache 2.0, originally from [Google Fonts](https://fonts.google.com), now self-hosted; see [docs/fonts-licenses.md](docs/fonts-licenses.md)) · snapshots via [html2canvas](https://html2canvas.hertzen.com/) · accounts via [Supabase](https://supabase.com) with Google or GitHub sign-in · full list: [docs/legal/third-party-licenses.md](docs/legal/third-party-licenses.md)
 
 ## 📄 License
 
@@ -49,3 +49,10 @@ Stick-It can run local-only (guest) or sync to a Supabase project. See `docs/bac
 `00-audit`, `01-database-and-security`, `02-architecture-and-auth`, `03-storage-migration-sharing`,
 `06-setup` (manual steps, which values are public vs secret), `07-security-csp-status` (what is and isn't done).
 Tests: `cd supabase/tests && npm ci && npm run test:all`.
+
+## Legal and privacy
+
+Drafts and audits live in `docs/legal/` (start with `OWNER-ACTION-REQUIRED.md` and `LEGAL-RISK-REPORT.md`).
+Nothing there is legal advice or a compliance claim; items marked `[OWNER INPUT REQUIRED]` are decisions only the
+owner can make. Public pages: `legal/privacy.html`, `legal/terms.html`, `legal/copyright.html` (draft banners until the
+business details in `js/legal-config.js` are filled in).

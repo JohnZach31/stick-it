@@ -83,3 +83,6 @@ Nothing else changes: the same redirect allow-list is used. Until GitHub is enab
 
 ### Linking a second sign-in to one account (optional)
 Authentication -> Sign In / Providers -> turn on **Allow manual linking**. Accounts with the same verified e-mail are already merged automatically by Supabase when they sign in with the second provider.
+
+## Legal / privacy hardening update
+New: migration `20260930150000_legal_compliance.sql`, functions `unsubscribe` and `report-copyright`. **Order:** push the new frontend first (it tolerates a project without the migration), then `npx supabase db push`, then deploy the two functions. Secrets and the steps for marketing e-mail, DMCA intake and the clean-up schedule are in `docs/legal/OWNER-ACTION-REQUIRED.md`.
