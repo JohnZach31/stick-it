@@ -190,5 +190,55 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(!/\[OWNER INPUT REQUIRED: postal address\]/.test(read('docs/legal/terms-draft.md') + read('docs/legal/privacy-policy-draft.md')), 'the policies no longer ask for the owner postal address');
 }
 
+// ---------------------------------------------------------------- v0.8.0: cutouts, scraps, collaboration, patch notes
+{
+  const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+  const exists = (f) => fs.existsSync(path.join(root, f));
+  const idx = read('index.html');
+  const app = read('js/app.js');
+  // scripts and CSP
+  for (const f of ['js/cutout.js', 'js/sticker.js', 'js/cutout-maker.js', 'js/objects.js', 'js/collab.js']) ok(exists(f) && idx.includes(`<script src="${f}"></script>`), `${f} exists and is loaded by index.html`);
+  const csp = idx.match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  ok(/script-src 'self' 'wasm-unsafe-eval';/.test(csp) && !/unsafe-eval'[^;]*'unsafe-eval'/.test(csp) && !/script-src[^;]*'unsafe-inline'/.test(csp), 'CSP allows WebAssembly compilation only (no JavaScript eval, no inline script)');
+  ok(!/https?:\/\/(?!localhost|127\.0\.0\.1)[^"'\s]*\.(onnx|wasm)/.test(read('js/cutout.js')), 'the model and runtime come from this site, not a third-party host');
+  ok(exists('assets/models/u2netp.onnx') && exists('assets/models/silueta.onnx') && exists('js/vendor/ort/ort-wasm-simd-threaded.wasm') && exists('js/vendor/ort/LICENSE'), 'model files, runtime and the runtime licence are bundled');
+  ok(/u2netp/.test(read('docs/legal/third-party-licenses.md')) && /Apache-2\.0/.test(read('docs/legal/third-party-licenses.md')) && /silueta/.test(read('docs/legal/third-party-licenses.md')), 'models are listed with their licences');
+  ok(exists('docs/cutout/provider-evaluation.md') && /RMBG-1\.4/.test(read('docs/cutout/provider-evaluation.md')) && /AGPL/.test(read('docs/cutout/provider-evaluation.md')), 'the model choice and the rejected licences are documented');
+  // no secret or provider call in the browser for cutouts
+  const cutSrc = read('js/cutout.js') + read('js/cutout-maker.js') + read('js/sticker.js');
+  ok(!/api[_-]?key|secret|service_role|remove\.bg|photoroom|replicate\.com|huggingface/i.test(cutSrc), 'no provider, key or secret appears in the cutout code');
+  ok(!/fetch\([^)]*(upload|api)/i.test(read('js/cutout.js')), 'the engine never uploads the photo anywhere');
+  // the original is never modified by the maker
+  ok(!/\.image\s*=/.test(read('js/cutout-maker.js')) && /startCutout/.test(app) && /cutoutKey/.test(app), 'the maker only reads the source; the app stores the result as a separate cutout');
+  // insertion menu
+  ok(/addEventListener\("contextmenu"/.test(app) && /openInsertMenu/.test(app) && /e\.shiftKey\) return/.test(app), 'right-click opens the insertion menu on empty board; Shift+right-click keeps the browser menu');
+  ok(/contenteditable=true\], input, textarea/.test(app), 'text being edited keeps the native context menu');
+  ok(['Note', 'Photo', 'Cutout Photo', 'Receipt', 'Ticket', 'Postcard', 'Photo Strip', 'Record', 'Video', 'Alphabet Soup'].every((l) => app.includes(`label: "${l}"`)), 'every planned item is in the insertion menu');
+  ok(/More\\u2026/.test(app) && /touch: "more"/.test(app), 'touch keeps the quick menu and puts the new objects under More');
+  // text safety of the new scraps
+  const objs = read('js/objects.js');
+  ok(!/innerHTML/.test(objs) && /CONTROL/.test(objs), 'the object rules never produce HTML and strip control characters and bidi overrides');
+  const paper = app.slice(app.indexOf('// ---------- physical scraps'), app.indexOf('// ---------- Alphabet Soup'));
+  ok(!/\.innerHTML\s*=\s*[^;]*(item|n)\.(title|date|body|amount|details|place|message|location|caption|recipient)/.test(paper), 'user text in the scraps is never put into innerHTML');
+  ok(/dir = "auto"/.test(paper) && /textContent = n\[field\]|textContent = item\[field\]|d\.textContent = n\[field\]/.test(paper), 'fields are written with textContent and auto text direction (Hebrew and Arabic work)');
+  // Alphabet Soup rules
+  ok(/SOUP_MAX = 100/.test(app) && /aria-hidden", "true"/.test(app.slice(app.indexOf('function buildSoupLayer'), app.indexOf('function soupDecorate'))) && /prefers-reduced-motion: reduce\)\{ \.soupLayer/.test(read('css/app.css')), 'soup: at most 100 pieces, decorative layer hidden from assistive technology, reduced motion respected');
+  ok(!/isPremium\(\)/.test(app.slice(app.indexOf('function soupDecorate'), app.indexOf('function applySoup'))), 'drawing a soup note never checks Premium (viewers never need it)');
+  ok(/PREMIUM_REQUIRED/.test(read('supabase/migrations/20261001130000_premium_cosmetics.sql')), 'the Premium cosmetic is enforced in the database');
+  // collaboration
+  const col = read('js/collab.js');
+  ok(/private: true/.test(col) && /channel\("board:"/.test(col), 'presence uses a private board channel');
+  ok(/board_channel_read/.test(read('supabase/migrations/20261001140000_collab.sql')) && /can_read_board\(substr\(realtime\.topic\(\), 7\)::uuid\)/.test(read('supabase/migrations/20261001140000_collab.sql')), 'only board members can join the channel (database policy)');
+  ok(/object_id uuid not null|object_id/.test(read('supabase/migrations/20260930120000_core_schema.sql').slice(read('supabase/migrations/20260930120000_core_schema.sql').indexOf('create table public.comments'))) && !/free.?floating/i.test(col.replace(/free.?floating[^\n]*\n/gi, '')), 'comments always belong to an object');
+  // patch notes
+  const pn = JSON.parse(read('docs/patch-notes/index.json'));
+  ok(Array.isArray(pn) && pn[0].version === '0.8.0' && pn[0].codename === 'Cut It Out' && pn[0].status === 'development' && pn[0].date === null && pn[0].title === 'Stick-It v0.8.0 — Cut It Out' && exists('docs/patch-notes/' + pn[0].file), 'patch-note index: v0.8.0 "Cut It Out", status development, no release date, file exists');
+  ok(exists('docs/patch-notes/HISTORY-TODO.md') && !/20\d\d-\d\d-\d\d/.test(read('docs/patch-notes/HISTORY-TODO.md')), 'the history TODO exists and invents no dates');
+  const notes = read('docs/patch-notes/0.8.0.md');
+  ok(['## TL;DR', '## Highlights', '## Added', '## Improved', '## Changed', '## Fixed', '## Privacy & Security', '## Under the Hood', '## Known Limitations', '## Deferred', '## Development References'].every((h) => notes.includes(h)) && /status: \*\*development\*\*/.test(notes), 'the patch note has every planned section and says development');
+  // e-mail sign-in stays out of production
+  ok(/EMAIL_AUTH: false/.test(read('js/config.js')) && !/Continue with email'/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'e-mail sign-in is not offered');
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -104,7 +104,7 @@
         var c = vctx;
         c.clearRect(0, 0, state.W, state.H);
         if (state.compare) { c.drawImage(srcCanvas, 0, 0); return; }
-        if (state.tool === "erase" || state.tool === "restore") { c.globalAlpha = 0.22; c.drawImage(srcCanvas, 0, 0); c.globalAlpha = 1; }     // ghost of what was removed
+        if (state.tool === "restore") { c.globalAlpha = 0.3; c.drawImage(srcCanvas, 0, 0); c.globalAlpha = 1; }     // Restore only: a faint ghost of what was removed, so you can see what to bring back
         var t = tmp || (tmp = CUT.makeCanvas(state.W, state.H)), tc = t.getContext("2d");
         tc.globalCompositeOperation = "source-over"; tc.clearRect(0, 0, state.W, state.H); tc.drawImage(srcCanvas, 0, 0);
         tc.globalCompositeOperation = "destination-in"; tc.drawImage(maskC, 0, 0); tc.globalCompositeOperation = "source-over";

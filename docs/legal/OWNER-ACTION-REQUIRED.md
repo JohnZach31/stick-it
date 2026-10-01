@@ -45,3 +45,12 @@ Lawyer review; `israel-payments-checklist.md` before charging money; a screen-re
 
 ## E. Git history
 If the owner address was ever committed to this repository's history it is not rewritten automatically. The audit found no occurrence in the tracked files; if you find one elsewhere, tell me and I will propose a history-rewrite plan for you to approve first.
+
+## F. v0.8.0 "Cut It Out": before it goes live
+1. **Apply the three new migrations** (after the frontend is pushed): `npx supabase db push`. They are `20261001120000_paper_objects.sql` (strip pictures count as an object's assets), `20261001130000_premium_cosmetics.sql` (Alphabet Soup is Premium-only, checked by the database) and `20261001140000_collab.sql` (private presence channels, review states, comment summary). No function needs redeploying.
+2. **Check Realtime Authorization** in the Supabase dashboard (Realtime, then Policies): `realtime.messages` should list `board_channel_read` and `board_channel_write`. Then open one shared board in two browsers signed in as two different accounts and confirm that the initials appear and that a note one person is editing is blocked for the other. This path (Supabase Realtime) was tested locally only with a stand-in transport.
+3. **Decide on the "Finer edges" model** (`assets/models/silueta.onnx`, 44 MB): its weights come from a reduced U²-Net distributed by the `rembg` project and the provenance is less explicit than the official u2netp. Keep it only if you and counsel are comfortable; deleting the file and the `fine` entry in `js/cutout.js` leaves a working one-model feature. See `docs/cutout/provider-evaluation.md`.
+4. **Premium has no payment path.** To try Alphabet Soup on a real account, set the plan in the SQL editor: `update public.profiles set plan = 'premium' where id = '<user id>';` (only the service role / SQL editor can). Do not do this for real users until billing exists.
+5. **Privacy Policy and storage notice** now mention comments, review, presence and on-device cutouts (English and Hebrew). They remain DRAFT: re-read the new rows.
+6. **Real phone test**: make a cutout with a finger, two-finger pan and pinch. It is the one touch path not yet tried on a physical device.
+7. Patch notes: `docs/patch-notes/0.8.0.md` stays "development" until you decide to release.

@@ -2740,6 +2740,7 @@
       }));
     });
     pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.postcard, "Make postcard", function(){ closeFloatingPopovers(); makePostcardFromPhoto(n); }));
     pop.appendChild(menuItem(ICONS.scissors, hasRealCutout(n) ? "Redo cutout\u2026" : "Make cutout\u2026", function(){ closeFloatingPopovers(); startCutout(n, n.photoStyle); }));
     if(hasRealCutout(n)) pop.appendChild(menuItem(ICONS.close, "Remove cutout", function(){ closeFloatingPopovers(); removeCutout(n); }));
     if(hasRealCutout(n) && n.photoStyle === "mounted"){
@@ -3340,6 +3341,26 @@
     recoverVertical([n]); dismissHint();
     if(kind === "receipt" || kind === "ticket"){ setTimeout(function(){ var t = n.el && n.el.querySelector(".poF"); if(t) editPaperField(n, t); }, 60); }
     return n;
+  }
+  // Photo -> postcard: a new postcard beside the photo (the photo stays). Note -> postcard: only when the words map safely
+  // (plain text, short, no formatting that would be lost); otherwise the menu item is not offered.
+  function makePostcardFromPhoto(p){
+    if(!p.image && !p.assetId){ toast("This photo is still loading. Try again in a moment."); return; }
+    var n = createPaper("postcard", p.x + 60, p.y + 80, {image: p.image, assetId: p.assetId, imgRatio: clampNum(p.imgRatio, 0.4, 2.5, 0.667), location: p.caption || "", font: p.font});
+    toast("Made a postcard from this photo.");
+    return n;
+  }
+  function noteIsPlainShort(n){
+    var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
+    if(!html || /<(ul|ol|li|h[1-6]|mark|b|strong|i|em|a|img|font|span)[\s>]/i.test(html)) return false;
+    if(n.image || n.isTask) return false;
+    var t = htmlToText(html).trim();
+    return t.length > 0 && t.length <= 300;
+  }
+  function makePostcardFromNote(n){
+    var t = n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "");
+    createPaper("postcard", n.x + 80, n.y + 80, {message: String(t || "").trim(), font: n.font});
+    toast("Made a postcard from this note.");
   }
   function createPostcardFromFile(bx, by){
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
@@ -4721,6 +4742,7 @@
     if(n.image && n.imgW){
       pop.appendChild(menuItem(ICONS.image, "Reset image size", function(){ closeFloatingPopovers(); resetImageSize(n); }));
     }
+    if(noteIsPlainShort(n)) pop.appendChild(menuItem(ICONS.postcard, "Make postcard", function(){ closeFloatingPopovers(); makePostcardFromNote(n); }));
     pop.appendChild(menuItem(ICONS.sticky, n.cosmetic === "soup" ? "Remove Alphabet Soup" : isPremium() ? "Alphabet Soup" : "Alphabet Soup (Premium)", function(){
       closeFloatingPopovers(); setNoteCosmetic(n, n.cosmetic === "soup" ? null : "soup");
     }));
