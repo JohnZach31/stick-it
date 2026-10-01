@@ -6,16 +6,23 @@
 --    anywhere it does not exist.)
 -- 2. object_reviews: the lightweight review state of one object. none (no row) -> changes_requested -> ready_for_review -> none.
 --    Written only through set_review_state(), which knows who is allowed to do which step. Nothing else (no priority, assignee, due date).
+-- The migration role of a hosted project does not own realtime.messages, so creating the policies here can fail with
+-- "must be owner of table messages". When that happens this step is skipped with a notice and the same policies are applied once,
+-- from the dashboard SQL editor, using supabase/ops/realtime-policies.sql (see docs/legal/OWNER-ACTION-REQUIRED.md, section F).
 do $$
 begin
   if to_regclass('realtime.messages') is not null then
-    execute 'alter table realtime.messages enable row level security';
-    execute $p$create policy board_channel_read on realtime.messages for select to authenticated
-      using (case when realtime.topic() ~ '^board:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                  then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;
-    execute $p$create policy board_channel_write on realtime.messages for insert to authenticated
-      with check (case when realtime.topic() ~ '^board:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-                  then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;
+    begin
+      execute 'alter table realtime.messages enable row level security';
+      execute $p$create policy board_channel_read on realtime.messages for select to authenticated
+        using (case when realtime.topic() ~ '^board:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                    then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;
+      execute $p$create policy board_channel_write on realtime.messages for insert to authenticated
+        with check (case when realtime.topic() ~ '^board:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                    then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;
+    exception when insufficient_privilege then
+      raise notice 'realtime.messages policies not created (not the table owner): run supabase/ops/realtime-policies.sql in the SQL editor';
+    end;
   end if;
 end $$;
 
