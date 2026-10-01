@@ -91,10 +91,12 @@
 
     // ------------------------------------------------------------ diff
     function needsUpload(o) {
-      if (o.type === "photo") return isDataUrl(o.image) && !o.assetId;
+      if (o.type === "photo") return (isDataUrl(o.image) && !o.assetId) || needsCutoutUpload(o);
       if (o.type === "audio" || o.type === "video") return !!o.mediaId && !o.assetId && o.mediaState !== "failed";
       return isDataUrl(o.image) && !o.attachedAssetId;             // sticky note with an attached photo
     }
+    // a finished cutout made on this device (blob under cutoutKey) that has no asset yet
+    function needsCutoutUpload(o) { return o.type === "photo" && !!o.cutoutKey && !o.cutoutAssetId && o.mediaState !== "failed"; }
     function rowFor(o) {
       var row = toRow(o);
       if (needsUpload(o)) row.data.mediaState = "uploading";     // other devices see "uploading" instead of a broken photo
@@ -241,7 +243,8 @@
     function scanMedia(snap) {
       snap.forEach(function (o) {
         if (!needsUpload(o)) return;
-        var field = o.type === "photo" ? "image" : (o.type === "audio" || o.type === "video") ? "media" : "attached";
+        var field = o.type === "photo" ? ((isDataUrl(o.image) && !o.assetId) ? "image" : "cutout") : (o.type === "audio" || o.type === "video") ? "media" : "attached";
+        if (field === "cutout" && isDataUrl(o.image) && !o.assetId) return;                // the original goes up first, so the cutout can point at it
         var key = o.id + ":" + field;
         if (jobs[key]) return;
         jobs[key] = "running";
@@ -256,17 +259,21 @@
           if (!blob) throw { code: "MISSING_LOCAL_MEDIA", message: "local media is gone", offline: false, retryable: false };
           kind = o.type; meta.duration = o.duration || null;
           meta.filename = (o.type === "audio" ? "recording" : "video") + "." + (assets.normMime(blob.type).split("/")[1] || "bin").replace(/[^a-z0-9]/g, "");
+        } else if (field === "cutout") {
+          blob = await host.mediaBlob(o.cutoutKey);
+          if (!blob) throw { code: "MISSING_LOCAL_MEDIA", message: "local cutout is gone", offline: false, retryable: false };
+          kind = "cutout"; meta.filename = "cutout.png"; if (o.assetId) meta.sourceId = o.assetId;
         } else {
           blob = assets.dataUrlToBlob(o.image); kind = "image"; meta.filename = "image." + (assets.normMime(blob.type).split("/")[1] || "jpg");
         }
         // content-addressed id: a retry (or a second tab) resumes the same asset instead of making another
-        var digest = repo.hashStr(field === "media" ? o.mediaId : o.image);
+        var digest = repo.hashStr(field === "media" ? o.mediaId : field === "cutout" ? o.cutoutKey : o.image);
         meta.assetId = await util.uuidFrom(boardId + "|" + o.id + "|" + field + "|" + digest);
         var asset = await assets.upload(boardId, kind, blob, meta);
         assets.rememberBlob(asset.id, blob);
         var live = host.getObject(o.id);
         if (!live) return;                                             // deleted while uploading: the asset is garbage-collected later
-        host.patch(o.id, field === "attached" ? { attachedAssetId: asset.id, mediaState: "ready" } : { assetId: asset.id, mediaState: "ready" });
+        host.patch(o.id, field === "attached" ? { attachedAssetId: asset.id, mediaState: "ready" } : field === "cutout" ? { cutoutAssetId: asset.id, mediaState: "ready" } : { assetId: asset.id, mediaState: "ready" });
       } catch (e) {
         var err = e && e.code ? e : Stick.errors.parse(e);
         if (err.offline || err.retryable) { jobs[key] = "failed"; setStatus("offline"); scheduleRetry(); delete jobs[key]; return; }

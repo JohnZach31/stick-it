@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321 https://lh3.googleusercontent.com https://avatars.githubusercontent.com; media-src 'self' blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; connect-src 'self' blob: data: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321 https://lh3.googleusercontent.com https://avatars.githubusercontent.com; media-src 'self' blob: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; connect-src 'self' blob: data: https://*.supabase.co http://127.0.0.1:54321 http://localhost:54321; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <title>Stick-It</title>
 <meta name="description" content="A playful sticky-note corkboard. Drag, format, and organize notes with tasks, calendar reminders, and shareable links.">
 <link rel="icon" id="faviconLink" href="data:,">
@@ -151,6 +151,9 @@
 <script src="js/migrate.js"></script>
 <script src="js/account.js"></script>
 <script src="js/billing.js"></script>
+<script src="js/cutout.js"></script>
+<script src="js/sticker.js"></script>
+<script src="js/cutout-maker.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

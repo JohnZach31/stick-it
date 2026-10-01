@@ -141,6 +141,7 @@
   var PIN_COLORS = ["#cf3f36","#cf3f36","#cf3f36","#b8332c","#3f74c4","#d9a93a","#3f9467","#e8e4dc"];
 
   var ICONS = {
+    scissors: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"></circle><circle cx="6" cy="18" r="2.6"></circle><path d="M8.2 7.6 20 17M8.2 16.4 20 7"></path></svg>',
     ul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4" cy="6" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="6" x2="20" y2="6"></line><circle cx="4" cy="12" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="12" x2="20" y2="12"></line><circle cx="4" cy="18" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="18" x2="20" y2="18"></line></svg>',
     task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"></path></svg>',
     cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"></rect><line x1="16" y1="3" x2="16" y2="7"></line><line x1="8" y1="3" x2="8" y2="7"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="12" y1="14" x2="12" y2="18"></line><line x1="10" y1="16" x2="14" y2="16"></line></svg>',
@@ -749,6 +750,7 @@
   var PHOTO_STYLES = ["polaroid", "cutout", "mounted"];
   var PHOTO_STYLE_NAMES = {polaroid:"Polaroid", cutout:"Cut-out", mounted:"Mounted cut-out"};
   var PHOTO_MIN_W = 80, PHOTO_MAX_W = 900;
+  var BACKINGS = ["cardboard", "kraft", "paper", "notebook", "graph"];      // mounted-cutout materials (all free)
   function isPhoto(n){ return !!n && n.type === "photo"; }
   // Voice memos and videos: the board keeps metadata (and a small poster frame);
   // the media file itself lives in this device's IndexedDB under `mediaId`.
@@ -765,6 +767,13 @@
       if(a) o.assetId = a;
       if(b) o.attachedAssetId = b;
       if(a || b) o.mediaState = item.mediaState === "failed" || item.mediaState === "uploading" ? item.mediaState : "ready";
+      if(item.type === "photo"){
+        var ca = uuidOrNull(item.cutoutAssetId);
+        if(ca) o.cutoutAssetId = ca;
+        if(/^[\w-]{1,64}$/.test(String(item.cutoutKey || ""))) o.cutoutKey = String(item.cutoutKey);
+        if(ca || o.cutoutKey){ o.cutoutRatio = clampNum(item.cutoutRatio, 0.05, 20, 1); }
+        if(BACKINGS.indexOf(item.backing) !== -1) o.backing = item.backing;
+      }
       return o;
     }
     if(item.type === "audio" || item.type === "video"){
@@ -821,7 +830,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutout","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -859,7 +868,10 @@
       var clean = sanitizeHtml(c.html || "");
       if(clean !== (c.html || "")) c.html = clean;
     }
-    ["assetId", "attachedAssetId"].forEach(function(k){ if(c[k] !== undefined && !uuidOrNull(c[k])) delete c[k]; });
+    ["assetId", "attachedAssetId", "cutoutAssetId"].forEach(function(k){ if(c[k] !== undefined && !uuidOrNull(c[k])) delete c[k]; });
+    if(c.cutoutKey !== undefined && !/^[\w-]{1,64}$/.test(String(c.cutoutKey))) delete c.cutoutKey;
+    if(c.cutoutRatio !== undefined) c.cutoutRatio = clampNum(c.cutoutRatio, 0.05, 20, 1);
+    if(c.backing !== undefined && BACKINGS.indexOf(c.backing) === -1) delete c.backing;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
     delete c.image; delete c.cutout;                     // media only ever arrives through assets
     return c;
@@ -1585,7 +1597,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2359,14 +2371,70 @@
     for(i = 0; i < steps; i++) pts.push(j() + "% " + (100 - i / steps * 100).toFixed(2) + "%");
     return "polygon(" + pts.join(", ") + ")";
   }
-  // Subject isolation hook. Reliable segmentation for arbitrary photos needs a model
-  // far too heavy for this page (tens of MB, plus licensing), so it's deferred to the
-  // image-processing pass. When that exists it resolves {ok:true, cutout:"data:image/png..."}
-  // and the photo keeps both the original and the cut-out version.
-  var PhotoCutout = {
-    available: false,
-    segment: function(photo){ return Promise.resolve({ok:false, reason:"Automatic subject cut-out needs the upcoming image-processing step."}); }
+  // ---- real cutouts -------------------------------------------------------------------------------------------------
+  // The original photo (item.image) is never modified. A cutout is a second, transparent PNG:
+  //   guests: a Blob in this device's IndexedDB under item.cutoutKey     cloud: an asset, item.cutoutAssetId (source = the photo's asset)
+  // `finished` pictures (white scissor contour, or the cutout glued on card) are drawn from it at runtime and cached per session.
+  var CutoutRT = (function(){
+    var urls = {}, loading = {}, comps = {};
+    function keyOf(n){ return n.cutoutKey ? n.cutoutKey : (n.cutoutAssetId ? "a:" + n.cutoutAssetId : null); }
+    function hasCutout(n){ return !!(n && n.type === "photo" && (n.cutoutKey || n.cutoutAssetId || (typeof n.cutout === "string" && /^(https?|blob):/.test(n.cutout)))); }
+    function raw(n){
+      var k = keyOf(n);
+      if(k && urls[k]) return urls[k];
+      if(typeof n.cutout === "string" && /^(https?|blob):/.test(n.cutout)) return n.cutout;     // a shared view: signed URL from the resolver
+      if(k) load(n, k);
+      return null;
+    }
+    function load(n, k){
+      if(loading[k] || readOnlyView()) return;
+      loading[k] = true;
+      var p = n.cutoutKey ? MediaStore.url(n.cutoutKey) : Promise.resolve(null);
+      p.then(function(u){
+        if(u) return u;
+        if(n.cutoutAssetId && CLOUD && window.Stick && Stick.assets) return Stick.assets.blobUrl(n.cutoutAssetId);
+        return null;
+      }).then(function(u){
+        delete loading[k];
+        if(!u) return;
+        urls[k] = u;
+        var live = findNote(n.id);
+        if(live && live.el) rerenderNote(live);
+      }, function(){ delete loading[k]; });
+    }
+    function readOnlyView(){ return false; }
+    function remember(key, blob){ var u = MediaStore.remember(key, blob); urls[key] = u; return u; }
+    // finished picture for a style, or null while it is being drawn (the caller then shows the plain cutout)
+    function finished(n, style){
+      var src = raw(n);
+      if(!src || !window.Stick || !Stick.sticker) return null;
+      var mode = style === "mounted" ? "mounted" : "sticker", backing = mode === "mounted" ? (n.backing || "cardboard") : "";
+      var ck = src + "|" + mode + "|" + backing, hit = comps[ck];
+      if(hit && hit.url) return hit;
+      if(hit === "fail") return null;
+      if(!hit){
+        comps[ck] = "pending";
+        Stick.sticker.compose(src, {mode: mode, material: backing, seed: hashStr(String(n.id) + (n.cutoutKey || n.cutoutAssetId || ""))}).then(function(r){
+          comps[ck] = r;
+          var live = findNote(n.id);
+          if(live && live.el) rerenderNote(live);
+          else notes.forEach(function(x){ if(x.el && x.type === "photo" && raw(x) === src) rerenderNote(x); });         // shared views use their own ids
+        }, function(){ comps[ck] = "fail"; });
+      }
+      return null;
+    }
+    return {hasCutout: hasCutout, raw: raw, remember: remember, finished: finished, keyOf: keyOf};
+  })();
+  function hasRealCutout(n){ return CutoutRT.hasCutout(n); }
+  // helpers the Cutout Maker (js/cutout-maker.js) needs from the app
+  window.Stick = window.Stick || {};
+  Stick.ui = {
+    ICONS: ICONS, toast: function(m){ toast(m); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
+    loader: {show: function(t){ cloudOverlay(t); }, hide: function(){ hideCloudOverlay(); }, done: function(t, after){ stickLoaderDone(t, after); }, fail: function(t, retry){ stickLoaderFail(t, retry); }}
   };
+  async function copyCutoutBlob(fromKey, toKey){
+    try{ var b = await MediaStore.blob(fromKey); if(b){ await MediaStore.put(toKey, b); } }catch(e){}
+  }
   function buildPhotoEl(item){
     var style = PHOTO_STYLES.indexOf(item.photoStyle) !== -1 ? item.photoStyle : "polaroid";
     var p = ensurePhys(item);
@@ -2377,16 +2445,20 @@
     el.style.setProperty("--by", p.by + "px");
     el.style.setProperty("--br", p.br + "deg");
     el.style.setProperty("--lr", p.lr + "deg");
-    if(style === "mounted") el.appendChild(makeDiv("pBack"));
+    var rawCut = style !== "polaroid" && hasRealCutout(item) ? CutoutRT.raw(item) : null;
+    var finishedPic = rawCut ? CutoutRT.finished(item, style) : null;
+    if(style === "mounted" && !finishedPic && !rawCut) el.appendChild(makeDiv("pBack"));
     var body = makeDiv("pBody"), frame = makeDiv("pFrame");
-    var isolated = style !== "polaroid" && !!item.cutout;
+    var isolated = !!rawCut;
     if(isolated) frame.classList.add("isolated");
     else if(style !== "polaroid") frame.style.clipPath = cutPolygon(p.cut, 1.2);
+    if(finishedPic){ frame.classList.add("finished"); el.classList.add("finished"); }
     var img = document.createElement("img");
     img.alt = item.caption || "Picture (no description added)";
     img.draggable = false;
-    img.style.aspectRatio = "1 / " + (item.imgRatio || 0.75);
-    if(isolated ? item.cutout : item.image) img.src = isolated ? item.cutout : item.image; else frame.classList.add("pending");
+    img.style.aspectRatio = "1 / " + (finishedPic ? finishedPic.ratio : isolated ? (item.cutoutRatio || item.imgRatio || 0.75) : (item.imgRatio || 0.75));
+    var shownSrc = finishedPic ? finishedPic.url : isolated ? rawCut : item.image;
+    if(shownSrc) img.src = shownSrc; else frame.classList.add("pending");
     frame.appendChild(img);
     var cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
     cap.dir = "auto";
@@ -2520,23 +2592,56 @@
     var r = document.createRange(); r.selectNodeContents(cap); r.collapse(false);
     var s2 = window.getSelection(); s2.removeAllRanges(); s2.addRange(r);
   }
-  var cutoutNoticeShown = false;
   function setPhotoStyle(n, style){
     if(style === n.photoStyle) return;
+    if(style !== "polaroid" && !hasRealCutout(n)){ startCutout(n, style); return; }      // no cutout yet: make one first (cancel = nothing changes)
     var before = captureState([n.id]);
     n.photoStyle = style;
     saveNotes();
     rerenderNote(n);
     recordChange("Change photo style", before);
-    if(style !== "polaroid" && !n.cutout){
-      PhotoCutout.segment(n).then(function(res){
-        if(res && res.ok && res.cutout){ n.cutout = res.cutout; saveNotes(); rerenderNote(n); return; }
-        if(!cutoutNoticeShown){
-          cutoutNoticeShown = true;
-          toast("Shown as a hand-cut print for now: " + (res && res.reason || "automatic cut-out isn't available yet.") + " Your original photo is untouched.");
-        }
-      });
-    }
+  }
+  function setBacking(n, backing){
+    if(BACKINGS.indexOf(backing) === -1 || n.backing === backing) return;
+    var before = captureState([n.id]);
+    n.backing = backing;
+    if(n.photoStyle !== "mounted") n.photoStyle = "mounted";
+    saveNotes(); rerenderNote(n);
+    recordChange("Change backing", before);
+  }
+  var cutoutBusy = false;
+  // photo -> Cutout Maker -> applied to the photo as one undoable step
+  function startCutout(n, style){
+    if(readOnly || cutoutBusy) return;
+    if(!n.image){ toast("This photo is still loading. Try again in a moment."); return; }
+    if(!(window.Stick && Stick.cutout && Stick.cutout.available() && Stick.cutoutMaker)){ toast("Cutouts aren't available in this browser."); return; }
+    cutoutBusy = true;
+    endEditing(); closeFloatingPopovers();
+    Stick.cutoutMaker.open({source: n.image}).then(function(res){
+      cutoutBusy = false;
+      var live = findNote(n.id);
+      if(!res || !live) return;
+      if(res.useOriginal){ toast("Kept your original photo."); return; }
+      applyCutout(live, res, style && style !== "polaroid" ? style : "cutout");
+    }, function(){ cutoutBusy = false; toast("Couldn't make a clean cutout. Your original photo is unchanged."); });
+  }
+  function applyCutout(n, res, style){
+    var before = captureState([n.id]);
+    var key = "co-" + newId();
+    MediaStore.put(key, res.blob).catch(function(){ toast("Couldn't keep the cutout on this device, so it lasts only until you close the page."); });
+    CutoutRT.remember(key, res.blob);
+    n.cutoutKey = key; n.cutoutRatio = +res.ratio.toFixed(4); delete n.cutoutAssetId; delete n.cutout;
+    n.photoStyle = style;
+    saveNotes(); rerenderNote(n);
+    recordChange("Cut out photo", before);
+    if(cloudSync) cloudSync.notesChanged();
+  }
+  function removeCutout(n){
+    var before = captureState([n.id]);
+    delete n.cutoutKey; delete n.cutoutAssetId; delete n.cutoutRatio; delete n.cutout;
+    n.photoStyle = "polaroid";
+    saveNotes(); rerenderNote(n);
+    recordChange("Remove cutout", before);
   }
   function cyclePhotoStyle(n){
     var i = PHOTO_STYLES.indexOf(n.photoStyle || "polaroid");
@@ -2583,6 +2688,15 @@
         closeFloatingPopovers(); setPhotoStyle(n, st);
       }));
     });
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.scissors, hasRealCutout(n) ? "Redo cutout\u2026" : "Make cutout\u2026", function(){ closeFloatingPopovers(); startCutout(n, n.photoStyle); }));
+    if(hasRealCutout(n)) pop.appendChild(menuItem(ICONS.close, "Remove cutout", function(){ closeFloatingPopovers(); removeCutout(n); }));
+    if(hasRealCutout(n) && n.photoStyle === "mounted"){
+      var bh = makeDiv("menuHint"); bh.textContent = "Backing"; pop.appendChild(bh);
+      BACKINGS.forEach(function(bk){
+        pop.appendChild(menuItem(bk === (n.backing || "cardboard") ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.sticker.materialName(bk), function(){ closeFloatingPopovers(); setBacking(n, bk); }));
+      });
+    }
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Edit caption" : "Add caption", function(){ closeFloatingPopovers(); editCaption(n); }));
     if(n.caption) pop.appendChild(menuItem(ICONS.close, "Remove caption", function(){
@@ -3718,6 +3832,7 @@
     c.phys = isPhoto(c) ? makePhotoPhys() : isAV(c) ? {} : makePhys();
     c.rot = isPhoto(c) ? rand(-5, 5) : rand(-6, 6);
     c.fontManual = !!src.fontManual;
+    if(c.cutoutKey && src.cutoutKey){ c.cutoutKey = "co-" + newId(); copyCutoutBlob(src.cutoutKey, c.cutoutKey); }     // a copy never shares the device blob
     return c;
   }
   function insertNotes(list, label){
@@ -4329,9 +4444,10 @@
 
   // ---- new short links (#s=<token>): resolved by the server, no account needed ----
   function cloudShareObject(o){
-    var img = o.image, mu = o.mediaUrl;
+    var img = o.image, mu = o.mediaUrl, cu = o.cutout;
     var c = cloudSanitize(o);
     if(!c) return null;
+    if(typeof cu === "string" && /^https?:\/\//.test(cu)) c.cutout = cu;
     if(typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;       // signed URLs from the resolver only
     if(typeof mu === "string" && /^https?:\/\//.test(mu)) c.mediaUrl = mu;
     delete c.mediaId;                                                              // a device-local key means nothing here

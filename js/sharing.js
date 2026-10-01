@@ -73,6 +73,8 @@
         var o = Stick.repo.fromRow({ id: "s" + i, type: ro.type, x: ro.x, y: ro.y, width: ro.width, height: ro.height, rotation: ro.rotation, z_index: ro.z_index, data: ro.data });
         var main = o.assetId && assets[o.assetId], att = o.attachedAssetId && assets[o.attachedAssetId];
         if (o.type === "photo" && main) o.image = main.url;
+        var cut = o.type === "photo" && o.cutoutAssetId && assets[o.cutoutAssetId];
+        if (cut) o.cutout = cut.url;
         else if (!o.type && att) o.image = att.url;
         else if ((o.type === "audio" || o.type === "video") && main) o.mediaUrl = main.url;
         return o;

@@ -20,6 +20,7 @@
       var v = o[k];
       if (v === undefined || typeof v === "function") return;
       if (k === "image" || k === "cutout") return;                       // -> assets
+      if (k === "cutoutKey") return;                                     // this device's copy of a cutout blob: meaningless elsewhere
       if (k === "poster") { if (typeof v === "string" && v.length <= POSTER_MAX) data.poster = v; return; }
       data[k] = v;
     });

@@ -1559,3 +1559,49 @@
     .fmtGrid button{ height:36px; }
     .menuItem{ padding:10px 8px; }
   }
+
+  /* ---------- Cutout Maker ---------- */
+  .stickLoader:not(.fail):not(.cover){ pointer-events:none; }
+  .cmkBackdrop{ position:fixed; inset:0; z-index:10030; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:16px; animation:acctFade .15s ease both; }
+  .cmkCard{ position:relative; display:flex; flex-direction:column; gap:10px; width:min(920px, 100%); height:min(760px, 100%); background:var(--panel); color:var(--ink); border-radius:18px; padding:18px 18px 14px; box-shadow:0 24px 60px rgba(20,15,5,0.35); }
+  .cmkHead{ display:flex; align-items:center; justify-content:center; position:relative; }
+  .cmkHead h3{ margin:0; font-size:1.1rem; }
+  .cmkClose{ top:-4px; right:-4px; }
+  .cmkHint{ margin:0; padding:8px 12px; border-radius:10px; background:var(--accent-soft); color:var(--ink); font-size:0.8rem; line-height:1.4; }
+  .cmkBody{ position:relative; flex:1; min-height:0; display:flex; gap:12px; }
+  .cmkBody.dim{ opacity:0.35; pointer-events:none; }
+  .cmkStage{ position:relative; flex:1; min-width:0; overflow:hidden; border-radius:12px; touch-action:none; outline-offset:2px;
+    background-color:#e9e5d8; background-image:linear-gradient(45deg,#d8d3c3 25%,transparent 25%,transparent 75%,#d8d3c3 75%),linear-gradient(45deg,#d8d3c3 25%,transparent 25%,transparent 75%,#d8d3c3 75%); background-size:20px 20px; background-position:0 0,10px 10px; border:1px solid var(--line); }
+  body.dark .cmkStage{ background-color:#2a2538; background-image:linear-gradient(45deg,#352f46 25%,transparent 25%,transparent 75%,#352f46 75%),linear-gradient(45deg,#352f46 25%,transparent 25%,transparent 75%,#352f46 75%); }
+  .cmkView{ position:absolute; left:0; top:0; transform-origin:0 0; will-change:transform; }
+  .cmkCanvas{ display:block; width:100%; height:100%; user-select:none; -webkit-user-select:none; }
+  .cmkRing{ position:absolute; pointer-events:none; border:2px solid #fff; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 0 0 1px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(0,0,0,0.35); z-index:2; }
+  .cmkOrig{ width:150px; flex:none; display:flex; flex-direction:column; gap:6px; font-size:0.74rem; color:var(--ink-soft); }
+  .cmkOrig img{ width:100%; border-radius:8px; border:1px solid var(--line); background:#fff; object-fit:contain; max-height:200px; }
+  .cmkStatus{ margin:0; min-height:1.2em; font-size:0.8rem; color:var(--ink-soft); }
+  .cmkTools{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .cmkTool.on, .cmkSmall.on{ background:var(--accent-soft); border-color:var(--accent); }
+  .cmkSize{ display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--ink-soft); }
+  .cmkSize input{ width:110px; }
+  .cmkSmall{ padding:6px 10px; font-size:0.78rem; }
+  .cmkSq{ min-width:34px; }
+  .cmkEdges{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; padding:10px 12px; border:1px solid var(--line); border-radius:12px; background:var(--field); }
+  .cmkEdges label{ display:flex; flex-direction:column; gap:4px; font-size:0.76rem; color:var(--ink-soft); }
+  .cmkEdges[hidden], .cmkFail[hidden], .cmkFoot[hidden], .cmkTools[hidden], .cmkHint[hidden]{ display:none; }
+  .cmkEdgeBtns{ display:flex; gap:6px; margin-left:auto; }
+  .cmkFoot{ display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+  .cmkFail{ text-align:center; padding:14px; border:1px solid var(--edge); border-radius:12px; background:var(--field); }
+  .cmkFail p{ margin:0 0 10px; }
+  .cmkFailBtns{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .cmkCard.busy .cmkStage{ cursor:progress; }
+  @media (max-width:720px){
+    .cmkBackdrop{ padding:0; }
+    .cmkCard{ width:100%; height:100%; border-radius:0; padding:12px 12px calc(10px + env(safe-area-inset-bottom)); }
+    .cmkOrig{ display:none; }
+    .cmkFoot .pillBtn{ flex:1 1 auto; }
+  }
+  @media (prefers-reduced-motion: reduce){ .cmkBackdrop{ animation:none; } }
+
+  /* a finished cutout (white scissor line, or glued on card) is already drawn into the picture */
+  .ps-cutout .pFrame.finished img, .ps-mounted .pFrame.finished img{ filter:none; }
+  .ps-mounted.finished{ padding:0; }

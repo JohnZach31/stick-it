@@ -158,6 +158,22 @@ try {
   ok((await admin("select count(*)::int c from public.assets where status='ready'")).rows[0].c >= 3, 'assets are verified and ready');
   ok((await admin('select count(*)::int c from public.object_assets')).rows[0].c >= 3, 'object -> asset references recorded');
 
+  // ---- a real cutout: a PNG blob under cutoutKey on this device becomes a 'cutout' asset that points at the photo's asset
+  const cut = { id: crypto.randomUUID(), type: 'photo', x: 40, y: 40, w: 220, rot: 1, z: 8, imgRatio: 0.7, image: tinyJpeg(11), photoStyle: 'cutout', cutoutKey: 'co-test-1', cutoutRatio: 1.31, backing: 'kraft', font: 'Caveat', phys: { cut: 2 } };
+  A.mediaBlobs.set('co-test-1', new Blob([Buffer.alloc(700, 5)], { type: 'image/png' }));
+  A.notes.push(cut); A.sync.notesChanged();
+  await sleep(200); await A.sync.flush();
+  for (let i = 0; i < 60 && !(A.notes.find(o => o.id === cut.id).cutoutAssetId); i++) await sleep(100);
+  await A.sync.flush();
+  const cRow = (await admin('select data from public.board_objects where id=$1', [cut.id])).rows[0].data;
+  ok(cRow.cutoutAssetId && cRow.assetId && cRow.photoStyle === 'cutout' && cRow.backing === 'kraft' && cRow.cutoutRatio === 1.31, 'a cutout is saved as its own asset next to the original photo asset');
+  ok(!('cutoutKey' in cRow) && !JSON.stringify(cRow).includes('base64'), 'the device-local cutout key never reaches the server and no picture data is in the row');
+  const cAsset = (await admin('select kind, source_asset_id, mime_type, status from public.assets where id=$1', [cRow.cutoutAssetId])).rows[0];
+  ok(cAsset.kind === 'cutout' && cAsset.mime_type === 'image/png' && cAsset.status === 'ready' && cAsset.source_asset_id === cRow.assetId, 'the cutout asset is a verified PNG whose source is the original photo');
+  ok((await admin("select count(*)::int c from public.object_assets where object_id=$1 and role='cutout'", [cut.id])).rows[0].c === 1, 'the object references the cutout with the cutout role (so shares include it)');
+  const assetCountBefore = (await admin('select count(*)::int c from public.assets')).rows[0].c;
+  await A.sync.flush(); await sleep(150);
+  ok((await admin('select count(*)::int c from public.assets')).rows[0].c === assetCountBefore, 'the cutout is not uploaded again');
   await B.sync.pull(false);
   const bPhoto = B.notes.find(o => o.id === photo.id);
   ok(bPhoto && bPhoto.assetId && !bPhoto.image, 'B receives the photo object with only its reference');
@@ -167,6 +183,11 @@ try {
   const signed = await B.Stick.assets.signedUrl(bAudio.assetId);
   ok(signed && (await (await fetch(signed)).arrayBuffer()).byteLength === 900, 'B can stream the recording from a signed URL');
   ok(!(B.notes.some(o => o.mediaState === 'uploading')), 'no object is left "uploading"');
+  const bCut = B.notes.find(o => o.id === cut.id);
+  ok(bCut && bCut.cutoutAssetId === cRow.cutoutAssetId && !bCut.cutoutKey, 'the other device receives the cutout by reference only');
+  const cutBlobUrl = await B.Stick.assets.blobUrl(cRow.cutoutAssetId);
+  ok(typeof cutBlobUrl === 'string' && cutBlobUrl.length > 0, 'and can download the cutout asset');
+  await B.sync.pull(false);
   const beforeAssets = (await admin('select count(*)::int c from public.assets')).rows[0].c;
   await A.sync.flush(); await sleep(100);
   ok((await admin('select count(*)::int c from public.assets')).rows[0].c === beforeAssets, 'syncing again uploads nothing twice');
