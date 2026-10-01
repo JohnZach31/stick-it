@@ -40,6 +40,8 @@ const mutations = [
   ['viewers may publish shares',            '20260930130000_account_settings.sql',  "if v_role is null or v_role not in ('owner', 'editor') then", "if v_role is null then"],
   ['strip pictures are not registered',     '20261001120000_paper_objects.sql', "from jsonb_array_elements(d -> 'frames') as f limit 6 loop", "from jsonb_array_elements(d -> 'frames') as f limit 0 loop"],
   ['strip pictures lose their order',       '20261001120000_paper_objects.sql', "values (oid, ref::uuid, 'attached', i)", "values (oid, ref::uuid, 'attached', 0)"],
+  ['free accounts can make Alphabet Soup',  '20261001130000_premium_cosmetics.sql', "if coalesce(p, 'free') <> 'premium' then", "if false then"],
+  ['premium check skipped on update',       '20261001130000_premium_cosmetics.sql', "and (tg_op = 'INSERT' or (old.data ->> 'cosmetic') is distinct from (new.data ->> 'cosmetic')) then", "and tg_op = 'INSERT' then"],
 ];
 
 let missed = 0;

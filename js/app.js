@@ -141,6 +141,7 @@
   var PIN_COLORS = ["#cf3f36","#cf3f36","#cf3f36","#b8332c","#3f74c4","#d9a93a","#3f9467","#e8e4dc"];
 
   var ICONS = {
+    soup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8z"></path><path d="M9 7c0-1.2 1-1.2 1-2.4M13 7c0-1.2 1-1.2 1-2.4"></path></svg>',
     receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4L14 21l-2-1.4L10 21l-2-1.4L6 21z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>',
     ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 0 0 8v2h18v-2a2 2 0 0 1 0-8V6H3z"></path><path d="M14 6v12" stroke-dasharray="2 2"></path></svg>',
     postcard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"></rect><path d="M14 9h4M14 12h4M6 15l3-3 3 3"></path></svg>',
@@ -837,6 +838,7 @@
       rot: clampNum(item.rot, -12, 12, 0),
       z: 1, categoryIndex: 0,
       isTask: !!item.isTask, done: !!item.done,
+      cosmetic: item.cosmetic === "soup" ? "soup" : undefined,
       due: /^\d{4}-\d{2}-\d{2}$/.test(item.due || "") ? item.due : "",
       dueTime: /^\d{2}:\d{2}$/.test(item.dueTime || "") ? item.dueTime : "09:00",
       image: safeImage(item.image),
@@ -848,7 +850,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -904,6 +906,7 @@
     if(c.cutoutKey !== undefined && !/^[\w-]{1,64}$/.test(String(c.cutoutKey))) delete c.cutoutKey;
     if(c.cutoutRatio !== undefined) c.cutoutRatio = clampNum(c.cutoutRatio, 0.05, 20, 1);
     if(c.backing !== undefined && BACKINGS.indexOf(c.backing) === -1) delete c.backing;
+    if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
     delete c.image; delete c.cutout;                     // media only ever arrives through assets
     return c;
@@ -969,7 +972,7 @@
       };
       return {
         x:n.x, y:n.y, w:n.w || NOTE_W, html:n.html || "", bg:n.bg, font:n.font, rot:n.rot,
-        isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "",
+        isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "", cosmetic:n.cosmetic === "soup" ? "soup" : undefined,
         image:n.image || null, imgW:n.imgW || null, imgRatio:n.imgRatio || null, phys:ensurePhys(n)
       };
     },
@@ -1636,7 +1639,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -3430,6 +3433,81 @@
     g.restore();
   }
 
+  // ---------- Alphabet Soup (Premium cosmetic) ----------
+  // A cosmetic on an ordinary note (note.cosmetic = "soup"): when nobody is typing, the words are shown as pasta letters
+  // floating in a bowl. The words themselves never change: the real text stays in the note (read once by a screen reader),
+  // the letter pieces are decorative (aria-hidden), at most SOUP_MAX of them exist, and only a few notes ever animate.
+  // Seeing a soup note never needs Premium; making one does (the server checks that too).
+  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3;
+  function isPremium(){
+    if(window.Stick && Stick.dev){ try{ var o = localStorage.getItem("stickit.dev.premium"); if(o === "1") return true; if(o === "0") return false; }catch(e){} }
+    return !!(settings.account && settings.account.plan === "premium");
+  }
+  function openPremiumInfo(what){
+    var c = document.createElement("div"); c.className = "acctSub"; c.style.textAlign = "left";
+    c.innerHTML = '<p style="margin:0 0 8px;"></p><p style="margin:0;">Premium isn’t available yet, so there is nothing to buy today. Everyone can still see Alphabet Soup notes that someone else made.</p>';
+    c.firstChild.textContent = what + " is a Premium extra.";
+    openModal({title: what, content: c, width: 380, actions: [{label: "OK", kind: "primary", value: true}]});
+  }
+  function graphemes(text){
+    try{ if(window.Intl && Intl.Segmenter) return Array.from(new Intl.Segmenter(undefined, {granularity: "grapheme"}).segment(text), function(x){ return x.segment; }); }catch(e){}
+    return Array.from(text);
+  }
+  function soupSourceText(n, textEl){
+    var t = textEl ? getPlainText(textEl) : htmlToText(n.html || "");
+    return String(t || "").replace(/\s+/g, " ").trim();
+  }
+  function buildSoupLayer(n, text){
+    var layer = makeDiv("soupLayer"); layer.setAttribute("aria-hidden", "true"); layer.dir = "auto";
+    var rng = seededRng(hashStr(String(n.id || "soup"))), budget = SOUP_MAX, words = text.split(" ").filter(Boolean), cut = false;
+    for(var w = 0; w < words.length && budget > 0; w++){
+      var word = makeDiv("soupWord");
+      var chars = graphemes(words[w]);
+      for(var i = 0; i < chars.length; i++){
+        if(budget <= 0){ cut = true; break; }
+        var t = document.createElement("span"); t.className = "soupTile"; t.textContent = chars[i];
+        t.style.setProperty("--r", Math.round((rng() - 0.5) * 44) + "deg");
+        t.style.setProperty("--dx", Math.round((rng() - 0.5) * 6) + "px");
+        t.style.setProperty("--dy", Math.round((rng() - 0.5) * 7) + "px");
+        t.style.setProperty("--d", (-rng() * 5).toFixed(2) + "s");
+        word.appendChild(t); budget--;
+      }
+      layer.appendChild(word);
+      if(cut) break;
+    }
+    if(!cut && words.length && budget <= 0 && w < words.length) cut = true;
+    if(cut){ var more = makeDiv("soupWord"); var dots = document.createElement("span"); dots.className = "soupTile soupMore"; dots.textContent = "…"; more.appendChild(dots); layer.appendChild(more); }
+    return layer;
+  }
+  function soupDecorate(el, n, textEl){
+    var old = el.querySelector(".soupLayer"); if(old) old.remove();
+    el.classList.remove("soup");
+    if(n.cosmetic !== "soup") return;
+    el.classList.add("soup");
+    var layer = buildSoupLayer(n, soupSourceText(n, textEl));
+    layer.style.fontSize = Math.max(17, Math.min(28, Math.round((n.w || NOTE_W) * 0.085))) + "px";
+    el.appendChild(layer);
+    soupBalance();
+  }
+  function applySoup(n){ if(n.el) soupDecorate(n.el, n, n.textEl); }
+  // only a few soup notes move at once; the rest are still pasta (nothing runs for notes nobody can see)
+  function soupBalance(){
+    var layers = Array.prototype.slice.call(document.querySelectorAll(".note.soup:not(.editing) .soupLayer"));
+    layers.forEach(function(l, i){ l.classList.toggle("live", i < SOUP_LIVE_MAX); });
+  }
+  function setNoteCosmetic(n, value){
+    if(value === "soup" && !isPremium()){ openPremiumInfo("Alphabet Soup"); return; }
+    if((n.cosmetic || "") === (value || "")) return;
+    var before = captureState([n.id]);
+    if(value) n.cosmetic = value; else delete n.cosmetic;
+    saveNotes(); applySoup(n); if(n.el) n.el.classList.toggle("soup", !!value);
+    recordChange(value ? "Alphabet Soup" : "Remove Alphabet Soup", before);
+  }
+  function createSoup(bx, by){
+    if(!isPremium()){ openPremiumInfo("Alphabet Soup"); return; }
+    addNoteAt(bx, by, {html: "Hello soup", focus: false, cosmetic: "soup", label: "Add Alphabet Soup"});
+  }
+
   // ---------- mobile quick capture: tap the desk, choose what to put down ----------
   var captureMenuEl = null, captureDotEl = null, captureClosedAt = 0;
   function closeCaptureMenu(){
@@ -3504,7 +3582,8 @@
     {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
     {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
     {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
-    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"}
+    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"},
+    {id: "soup", group: "Premium", label: "Alphabet Soup", icon: ICONS.soup, touch: "more", run: function(bx, by){ createSoup(bx, by); }}
   ];
   function insertItems(){ return INSERT_ITEMS.filter(function(it){ return !it.ready || it.ready(); }); }
   // a one-pixel anchor the existing popovers can hang from when a menu opens at the pointer instead of at a button
@@ -3804,6 +3883,7 @@
       if(a){ e.preventDefault(); openLink(a.getAttribute("href")); }
     });
     el.appendChild(t);
+    if(item.cosmetic === "soup") soupDecorate(el, item, t);
     return el;
   }
 
@@ -3969,6 +4049,7 @@
     }
 
     boardInner.appendChild(el);
+    if(n.cosmetic === "soup") soupDecorate(el, n, text);
 
     // links work everywhere; in an editable note they need Ctrl/Cmd so plain clicks can place the caret
     text.addEventListener("click", function(e){
@@ -4059,9 +4140,11 @@
       });
       text.addEventListener("focus", function(){
         clearTimeout(n._cleanT);
+        el.classList.add("editing"); if(n.cosmetic === "soup") soupBalance();
         setTimeout(function(){ adjustForKeyboard(text); }, 250);
       });
       text.addEventListener("blur", function(){
+        el.classList.remove("editing"); if(n.cosmetic === "soup") applySoup(n);
         resetKeyboardShift();
         // tidy leftovers from editing (empty spans and the like) once the caret has left
         var clean = sanitizeHtml(text.innerHTML);
@@ -4215,6 +4298,7 @@
       isTask:false, done:false, due:"", dueTime:"09:00", image:null,
       phys: makePhys()
     };
+    if(opts.cosmetic) n.cosmetic = opts.cosmetic;
     notes.push(n);
     ensureWidth();
     renderNote(n, true, {focus:opts.focus});
@@ -4224,7 +4308,8 @@
     updateCount();
     updateMinimap();
     dismissHint();
-    recordChange(opts.html ? "Paste as note" : "Create note", {}, {newIds:[n.id]});
+    recordChange(opts.label || (opts.html ? "Paste as note" : "Create note"), {}, {newIds:[n.id]});
+    return n;
   }
 
   // opts.silent: tidy-up removal, no toast and no undo step
@@ -4606,6 +4691,9 @@
     if(n.image && n.imgW){
       pop.appendChild(menuItem(ICONS.image, "Reset image size", function(){ closeFloatingPopovers(); resetImageSize(n); }));
     }
+    pop.appendChild(menuItem(ICONS.sticky, n.cosmetic === "soup" ? "Remove Alphabet Soup" : isPremium() ? "Alphabet Soup" : "Alphabet Soup (Premium)", function(){
+      closeFloatingPopovers(); setNoteCosmetic(n, n.cosmetic === "soup" ? null : "soup");
+    }));
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -6370,6 +6458,7 @@
   document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};
+    Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
     Stick.dev.loader = {         // local only: look at the loader states without needing a slow network
       show: function(t, cover){ cloudOverlay(t || "Loading…", !!cover); },
       done: function(t){ stickLoaderDone(t || "Done."); },

@@ -762,6 +762,34 @@ group('L. photo strips and cutouts: asset references, sharing, garbage collectio
   await run(u, "insert into public.board_members (board_id, user_id, role) values ($1,$2,'viewer')", [B.id, v.id]).catch(() => {});
   const vr = await run(v, 'select public.sync_objects($1,$2::jsonb,$3::jsonb) as r', [B.id, JSON.stringify([{ ...stripRow, id: uuid() }]), '[]']);
   ok(vr.error || vr.rows[0].r.results.every((r) => r.status !== 'ok'), 'a viewer cannot add or change strips');
+
+  // ---- Alphabet Soup is a Premium cosmetic: setting it needs the premium plan, seeing it never does
+  const pia = mk('pia', 'premium');
+  await run('su', 'insert into auth.users (id,email) values ($1,$2)', [pia.id, pia.email]); await attest(pia.id); await run('su', "update public.profiles set plan='premium' where id=$1", [pia.id]);
+  const EB = await board(pia, 'Soup kitchen');
+  await run('su', "insert into public.board_members (board_id, user_id, role) values ($1,$2,'editor') on conflict do nothing", [EB.id, u.id]);
+  const soupId = uuid(), plainId = uuid();
+  const note = (id, data) => ({ id, type: 'note', x: 5, y: 5, width: 250, rotation: 0, z_index: 1, data: { html: 'hello', bg: 'hsl(40,90%,80%)', ...data } });
+  const putAs = (who, list, b) => run(who, 'select public.sync_objects($1,$2::jsonb,$3::jsonb) as r', [b.id, JSON.stringify(list), '[]']);
+  const freeTry = await putAs(u, [note(plainId, { cosmetic: 'soup' })], EB);
+  ok(freeTry.rows[0].r.results[0].status === 'invalid' && /PREMIUM_REQUIRED/.test(freeTry.rows[0].r.results[0].error), 'a free account cannot make an Alphabet Soup note (the server refuses, whatever the browser says)');
+  ok((await run('su', 'select 1 from public.board_objects where id=$1', [plainId])).rows.length === 0, 'and nothing was stored');
+  const premTry = await putAs(pia, [note(soupId, { cosmetic: 'soup' })], EB);
+  ok(premTry.rows[0].r.results[0].status === 'ok', 'a Premium account can');
+  const seen = await run(u, "select data ->> 'cosmetic' as c from public.board_objects where id=$1", [soupId]);
+  ok(seen.rows[0]?.c === 'soup', 'a free collaborator can SEE the soup note (viewing never needs Premium)');
+  const ver = (await run('su', 'select version from public.board_objects where id=$1', [soupId])).rows[0].version;
+  const edit = await putAs(u, [{ ...note(soupId, { cosmetic: 'soup', html: 'edited by a free editor' }), base_version: ver }], EB);
+  ok(edit.rows[0].r.results[0].status === 'ok', 'a free editor can still edit the words of an existing soup note');
+  const ver2 = (await run('su', 'select version from public.board_objects where id=$1', [soupId])).rows[0].version;
+  const off = await putAs(u, [{ ...note(soupId, { html: 'plain again' }), base_version: ver2 }], EB);
+  ok(off.rows[0].r.results[0].status === 'ok', 'anyone can switch the cosmetic off');
+  const ver3 = (await run('su', 'select version from public.board_objects where id=$1', [soupId])).rows[0].version;
+  const on = await putAs(u, [{ ...note(soupId, { cosmetic: 'soup' }), base_version: ver3 }], EB);
+  ok(on.rows[0].r.results[0].status === 'invalid', 'but a free account cannot switch it back on');
+  ok(denied(await run(u, "update public.profiles set plan='premium' where id=$1", [u.id])), 'the plan cannot be self-granted');
+  const direct = await run(u, "insert into public.board_objects (board_id, type, x, y, data) values ($1,'note',1,1,'{\"cosmetic\":\"soup\"}'::jsonb)", [EB.id]);
+  ok(!!direct.error, 'a direct table write cannot bypass the Premium check either');
 }
 
 // ---------------------------------------------------------------- summary
