@@ -900,5 +900,38 @@
   "designer": "SIL International",
   "source": "https://fonts.google.com/specimen/Harmattan",
   "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/harmattan/"
+ },
+ {
+  "family": "Cutive Mono",
+  "weights": "400",
+  "files": 2,
+  "bytes": 38908,
+  "license": "OFL",
+  "licenseFile": "OFL.txt",
+  "designer": "Vernon Adams",
+  "source": "https://fonts.google.com/specimen/Cutive+Mono",
+  "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/cutivemono/"
+ },
+ {
+  "family": "Special Elite",
+  "weights": "400",
+  "files": 2,
+  "bytes": 78492,
+  "license": "APACHE2",
+  "licenseFile": "LICENSE.txt",
+  "designer": "Astigmatic",
+  "source": "https://fonts.google.com/specimen/Special+Elite",
+  "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/apache/specialelite/"
+ },
+ {
+  "family": "Courier Prime",
+  "weights": "400;700",
+  "files": 4,
+  "bytes": 63652,
+  "license": "OFL",
+  "licenseFile": "OFL.txt",
+  "designer": "Alan Dague-Greene",
+  "source": "https://fonts.google.com/specimen/Courier+Prime",
+  "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/courierprime/"
  }
 ]

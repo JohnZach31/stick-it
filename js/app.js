@@ -141,6 +141,10 @@
   var PIN_COLORS = ["#cf3f36","#cf3f36","#cf3f36","#b8332c","#3f74c4","#d9a93a","#3f9467","#e8e4dc"];
 
   var ICONS = {
+    receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4L14 21l-2-1.4L10 21l-2-1.4L6 21z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>',
+    ticket: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8a2 2 0 0 0 0 8v2h18v-2a2 2 0 0 1 0-8V6H3z"></path><path d="M14 6v12" stroke-dasharray="2 2"></path></svg>',
+    postcard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="1.5"></rect><path d="M14 9h4M14 12h4M6 15l3-3 3 3"></path></svg>',
+    strip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="1.5"></rect><path d="M9 6h6M9 11h6M9 16h6"></path></svg>',
     scissors: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"></circle><circle cx="6" cy="18" r="2.6"></circle><path d="M8.2 7.6 20 17M8.2 16.4 20 7"></path></svg>',
     ul: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="4" cy="6" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="6" x2="20" y2="6"></line><circle cx="4" cy="12" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="12" x2="20" y2="12"></line><circle cx="4" cy="18" r="1.3" fill="currentColor" stroke="none"></circle><line x1="9" y1="18" x2="20" y2="18"></line></svg>',
     task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v17l-7-4-7 4V4a1 1 0 0 1 1-1z"></path></svg>',
@@ -629,7 +633,7 @@
   }
   // Notes from before this existed get stable values derived from their id.
   function ensurePhys(n){
-    if(isAV(n)){ if(!n.phys || typeof n.phys !== "object") n.phys = {}; return n.phys; }
+    if(isAV(n) || isPaper(n)){ if(!n.phys || typeof n.phys !== "object") n.phys = {}; return n.phys; }
     if(isPhoto(n)){
       if(!n.phys || typeof n.phys !== "object" || n.phys.cut == null) n.phys = makePhotoPhys(seededRng(hashStr(String(n.id || n.image.length))));
       return n.phys;
@@ -755,7 +759,7 @@
   // Voice memos and videos: the board keeps metadata (and a small poster frame);
   // the media file itself lives in this device's IndexedDB under `mediaId`.
   function isAV(n){ return !!n && (n.type === "audio" || n.type === "video"); }
-  function isObj(n){ return isPhoto(n) || isAV(n); }
+  function isObj(n){ return isPhoto(n) || isAV(n) || isPaper(n); }
   // opts.allowAssets: the item comes from this account's own board (duplicate / paste), so its asset ids may be kept.
   // Anything from a file or a link is untrusted and never gets to reference stored media.
   function normalizeIncoming(item, opts){
@@ -775,6 +779,20 @@
         if(BACKINGS.indexOf(item.backing) !== -1) o.backing = item.backing;
       }
       return o;
+    }
+    if(window.Stick && Stick.objects && Stick.objects.isKind(item.type)){
+      var pc = Stick.objects.normalize(item, paperHelpers());
+      if(!pc) return null;
+      if(!opts.allowAssets){                                   // from a file or a link: never a reference to stored media
+        delete pc.assetId;
+        if(pc.frames) pc.frames = pc.frames.filter(function(f){ return !!f.image; }).map(function(f){ delete f.assetId; return f; });
+        if(pc.type === "photo_strip" && pc.frames.length < Stick.objects.STRIP_MIN) return null;
+      }
+      pc.id = newId(); pc.x = clampNum(item.x, 0, 1e6, 0); pc.y = clampNum(item.y, 0, 5000, 0);
+      pc.rot = clampNum(item.rot, -12, 12, 0); pc.z = 1; pc.phys = {};
+      pc.createdAt = clampNum(item.createdAt, 0, 1e14, Date.now());
+      if(opts.allowAssets && uuidOrNull(item.assetId) && pc.type === "postcard") pc.mediaState = item.mediaState === "failed" || item.mediaState === "uploading" ? item.mediaState : "ready";
+      return pc;
     }
     if(item.type === "audio" || item.type === "video"){
       var mid = /^[\w-]{1,64}$/.test(String(item.mediaId || "")) ? String(item.mediaId) : null;
@@ -830,7 +848,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -843,6 +861,12 @@
     if(o.image && !/^data:/.test(o.image)) delete o.image;
     if(o.cutout && !/^data:/.test(o.cutout)) delete o.cutout;
     if(CLOUD && (o.assetId || o.attachedAssetId) && o.image) delete o.image;
+    if(Array.isArray(o.frames)) o.frames = o.frames.map(function(f){
+      var c = Object.assign({}, f);
+      if(c.image && !/^data:/.test(c.image)) delete c.image;
+      if(CLOUD && c.assetId && c.image) delete c.image;
+      return c;
+    });
     return o;
   }
   // Objects that arrive from the server (or the cache filled from it) came from other devices and other people:
@@ -859,6 +883,14 @@
     c.z = Math.round(clampNum(c.z, 0, 1e9, 1));
     if(c.font !== undefined && !FONT_BY_NAME[c.font]) c.font = pickFont();
     if(c.bg !== undefined && !safeColor(c.bg)) c.bg = randomColor();
+    if(window.Stick && Stick.objects && Stick.objects.isKind(c.type)){
+      var sp = Stick.objects.sanitize(c, paperHelpers());
+      if(!sp) return null;
+      sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
+      if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
+      if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) !== -1) sp.mediaState = c.mediaState;
+      return sp;
+    }
     if(c.type === "audio" || c.type === "video" || c.type === "photo"){
       if(c.caption !== undefined) c.caption = String(c.caption).replace(/\s+/g, " ").trim().slice(0, 120);
       if(c.mediaId !== undefined && !/^[\w-]{1,64}$/.test(String(c.mediaId))) delete c.mediaId;
@@ -925,6 +957,12 @@
         type:"photo", x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, image:n.image,
         photoStyle:n.photoStyle, caption:n.caption || "", font:n.font, phys:ensurePhys(n)
       };
+      if(isPaper(n)){
+        var pn = Object.assign({}, n); delete pn.el; delete pn.textEl; delete pn.captionEl; delete pn.id; delete pn.assetId; delete pn.mediaState;
+        if(pn.frames) pn.frames = pn.frames.map(function(f){ return {image: f.image, ratio: f.ratio, cap: f.cap}; });
+        pn.phys = {};
+        return pn;
+      }
       if(isAV(n)) return {   // (previews only: legacy links never carry recordings or videos)
         type:n.type, x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, caption:n.caption || "", font:n.font,
         duration:n.duration, poster:n.poster, mediaId:n.mediaId, assetId:n.assetId, phys:{}
@@ -939,6 +977,7 @@
     prepare: async function(items){
       await Promise.all(items.map(async function(it){
         if(it.image) it.image = await shrinkDataUrl(it.image, it.type === "photo" ? 640 : 360, it.type === "photo" ? 0.78 : 0.72);
+        if(Array.isArray(it.frames)) await Promise.all(it.frames.map(async function(f){ if(f.image) f.image = await shrinkDataUrl(f.image, 300, 0.72); }));
       }));
       return items;
     },
@@ -958,7 +997,7 @@
   // Desktop: double-click makes a note (single clicks stay free for selecting).
   // Touch screens keep one-tap notes until mobile capture gets its own design.
   var COARSE = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-  var CREATE_HINT = COARSE ? "Tap anywhere to add something" : "Double-click anywhere to stick a note";
+  var CREATE_HINT = COARSE ? "Tap anywhere to add something" : "Right-click anywhere to add something";
   var singleNoteMode = /^#s[ng]=/.test(location.hash); // a public note or group of notes
   if(readOnly) document.body.classList.add("read-only");
 
@@ -1597,7 +1636,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -1736,16 +1775,18 @@
   // ---------- note content helpers ----------
   // the words someone can see on an item (a note's writing, a photo's caption)
   function itemText(n){
+    if(isPaper(n)) return Stick.objects.text(n);
     if(isObj(n)) return n.caption || "";
     return n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "").trim();
   }
   function itemWord(list){
-    function kind(n){ return n.type === "audio" ? "recording" : n.type === "video" ? "video" : isPhoto(n) ? "photo" : "note"; }
+    function kind(n){ return n.type === "audio" ? "recording" : n.type === "video" ? "video" : isPhoto(n) ? "photo" : isPaper(n) ? Stick.objects.LABELS[n.type] : "note"; }
     var kinds = list.map(kind);
     if(list.length === 1) return kinds[0];
     return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
+    if(isPaper(n)) return Stick.objects.hasContent(n);
     if(isObj(n) || n.image) return true;
     if(n.isTask && n.due) return true;
     var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
@@ -2750,7 +2791,8 @@
     });
   }
   // x, y: where the photo's centre should land (board coordinates)
-  function dropPhotoFiles(files, x, y){
+  function dropPhotoFiles(files, x, y, opts){
+    opts = opts || {};
     Promise.all(files.map(loadPhotoFile)).then(function(loaded){
       var made = loaded.map(function(l, i){
         var n = {id:newId(), type:"photo", x:0, y:0, w:0, imgRatio:l.ratio, rot:rand(-5, 5), image:l.src, cutout:null,
@@ -2764,6 +2806,7 @@
       var act = insertNotes(made, made.length > 1 ? "Add " + made.length + " photos" : "Add photo");
       recoverVertical(made);
       dismissHint();
+      if(opts.afterAdd) opts.afterAdd(made);
     }).catch(function(){ toast("That image couldn't be read."); });
   }
 
@@ -2812,6 +2855,7 @@
   }
   function objSize(n){
     if(isPhoto(n)) return photoFrameSize(n);
+    if(isPaper(n)) return paperSize(n);
     if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
     if(n.type === "audio") return {w:236, h:66};
     var w = n.w || 200;
@@ -2995,6 +3039,397 @@
     g.restore();
   }
 
+  // ---------- physical scraps: receipt, ticket, postcard, photo strip ----------
+  // Pure rules (fields, cleaning, sizes) live in js/objects.js. Here they get drawn, edited, moved and shared like every other
+  // board object. Every field is plain text, always written with textContent. Decorative numbers are never scannable codes.
+  var OBJECT_MENUS = {};                                         // object types register their own context/options menu here
+  var PAPER_MONO = "'Cutive Mono','Courier Prime','Courier New',monospace";
+  var PAPER_TYPE = "'Special Elite','Courier Prime','Courier New',monospace";
+  function isPaper(n){ return !!n && !!window.Stick && Stick.objects && Stick.objects.isKind(n.type); }
+  function paperHelpers(){ return {safeImage: safeImage, fontOk: function(f){ return !!FONT_BY_NAME[f]; }}; }
+  function todayShort(){ try{ return new Date().toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"}); }catch(e){ return isoDate(new Date()); } }
+  function paperLabel(n){ return Stick.objects.label(n); }
+  function paperSize(n){
+    if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
+    return Stick.objects.sizeEstimate(n);
+  }
+  function paperWidthRange(n){ var r = Stick.objects.WIDTH[n.type]; return {min:r[0], max:r[1]}; }
+
+  // which text fields each kind lets you edit in place
+  var PAPER_FIELDS = {
+    receipt: {title:{max:60, ph:"Add a title"}, date:{max:24, ph:"Add a date"}, body:{max:600, multi:true, ph:"Add details"}, amount:{max:16, ph:"Add an amount"}},
+    ticket: {title:{max:60, ph:"Add a title"}, dateTime:{max:40, ph:"Add date and time"}, place:{max:60, ph:"Add a place"}, details:{max:160, multi:true, ph:"Add details"}},
+    postcard: {location:{max:40, ph:"Where?"}, message:{max:300, multi:true, ph:"Write a message"}, recipient:{max:40, ph:"To:"}},
+    photo_strip: {caption:{max:80, ph:"Add a caption"}}
+  };
+  function paperField(cls, field, n, extra){
+    var d = makeDiv(cls + " poF"); d.dataset.f = field; d.dataset.ph = PAPER_FIELDS[n.type][field].ph;
+    d.textContent = n[field] || ""; if(extra) d.dir = "auto";
+    return d;
+  }
+  function stripFrameSrc(f){ return f && f.image ? f.image : ""; }
+
+  // ---- building the element
+  function buildPaperEl(item){
+    var t = item.type, v = item.variant || Stick.objects.VARIANTS[t][0];
+    var el = makeDiv("boardObj paperObj po-" + t.replace("_", "-") + " v-" + v + (t === "ticket" ? " o-" + (item.orient || "landscape") : ""));
+    el.style.setProperty("--pw", (item.w || Stick.objects.defaultW(item)) + "px");
+    el.style.setProperty("--rot", (item.rot || 0) + "deg");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", paperLabel(item)); el.tabIndex = 0;
+    var sheet = makeDiv("poSheet"), api = {el: el, sheet: sheet};
+    el.appendChild(sheet);
+    if(t === "receipt"){
+      sheet.appendChild(paperField("poTitle", "title", item, true));
+      sheet.appendChild(paperField("poMeta", "date", item, true));
+      sheet.appendChild(makeDiv("poRule"));
+      var body = paperField("poBody", "body", item, true); sheet.appendChild(body);
+      var amt = makeDiv("poTotal poF"); amt.dataset.f = "amount"; amt.dataset.ph = PAPER_FIELDS.receipt.amount.ph;
+      amt.innerHTML = '<span class="poTotalLab" aria-hidden="true">TOTAL</span><b class="poTotalVal"></b>'; amt.querySelector("b").textContent = item.amount || "";
+      amt.classList.toggle("empty", !item.amount); sheet.appendChild(amt);
+      var bar = makeDiv("poBar"); bar.setAttribute("aria-hidden", "true"); bar.textContent = Stick.objects.serial(item.id, 12).replace(/(\d{4})(?=\d)/g, "$1 "); sheet.appendChild(bar);
+    } else if(t === "ticket"){
+      var main = makeDiv("poMain"), stub = makeDiv("poStub");
+      main.appendChild(paperField("poTitle", "title", item, true));
+      main.appendChild(paperField("poMeta", "dateTime", item, true));
+      main.appendChild(paperField("poPlace", "place", item, true));
+      main.appendChild(paperField("poDetails", "details", item, true));
+      stub.setAttribute("aria-hidden", "true");
+      var sn = makeDiv("poSerial"); sn.textContent = Stick.objects.serial(item.id, 8); stub.appendChild(sn);
+      sheet.appendChild(main); sheet.appendChild(stub);
+    } else if(t === "postcard"){
+      var card = makeDiv("poCard"), front = makeDiv("poFace poFront"), back = makeDiv("poFace poBack");
+      var pic = makeDiv("poPic"); pic.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
+      if(item.image){ var im = document.createElement("img"); im.src = item.image; im.alt = item.location ? "Postcard picture: " + item.location : "Postcard picture"; im.draggable = false; pic.appendChild(im); }
+      else { var add = document.createElement("button"); add.type = "button"; add.className = "poAddPic"; add.textContent = "Add a photo"; pic.appendChild(add); api.addPic = add; }
+      front.appendChild(pic); front.appendChild(paperField("poLocation", "location", item, true));
+      var left = makeDiv("poMsgCol"); left.appendChild(paperField("poMessage", "message", item, true));
+      var right = makeDiv("poAddrCol"); var stamp = makeDiv("poStamp"); stamp.setAttribute("aria-hidden", "true"); right.appendChild(stamp);
+      var pm = makeDiv("poPostmark"); pm.setAttribute("aria-hidden", "true"); right.appendChild(pm);
+      right.appendChild(paperField("poRecipient", "recipient", item, true));
+      for(var li = 0; li < 3; li++){ var ln = makeDiv("poAddrLine"); ln.setAttribute("aria-hidden", "true"); right.appendChild(ln); }
+      back.appendChild(left); back.appendChild(makeDiv("poDivide")); back.appendChild(right);
+      card.appendChild(front); card.appendChild(back); sheet.appendChild(card);
+      back.setAttribute("aria-hidden", "true");
+    } else if(t === "photo_strip"){
+      var frames = makeDiv("poFrames");
+      (item.frames || []).forEach(function(f, i){
+        var fr = makeDiv("poFrame"); fr.style.aspectRatio = "1 / " + (f.ratio || 0.75);
+        var src = stripFrameSrc(f);
+        if(src){ var im2 = document.createElement("img"); im2.src = src; im2.alt = f.cap || "Strip picture " + (i + 1) + " of " + item.frames.length; im2.draggable = false; fr.appendChild(im2); }
+        else fr.classList.add("pending");
+        frames.appendChild(fr);
+      });
+      sheet.appendChild(frames);
+      sheet.appendChild(paperField("poCaption", "caption", item, true));
+    }
+    return api;
+  }
+  function buildStaticPaper(item){ var b = buildPaperEl(item); b.el.classList.add("static"); b.el.removeAttribute("tabindex"); return b.el; }
+
+  // ---- placing it on the board, with the same drag / select / group behaviour as every other object
+  function renderPaper(n, isNew){
+    var b = buildPaperEl(n), el = b.el;
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = null;
+    if(!readOnly){
+      function ctl(cls, html, title, onDown){
+        var c = document.createElement("button");
+        c.className = "pCtl " + cls; c.innerHTML = html; c.title = title; c.setAttribute("aria-label", title); c.type = "button";
+        c.addEventListener("pointerdown", function(e){ e.stopPropagation(); if(onDown) onDown(e, c); });
+        c.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        el.appendChild(c); return c;
+      }
+      var more = ctl("pMore", ICONS.more, "Options for this " + Stick.objects.LABELS[n.type]);
+      more.addEventListener("click", function(e){ e.stopPropagation(); openObjectMenu(n, more); });
+      ctl("pHandle", "", "Drag to resize", function(e){ startPaperResize(e, n); });
+      if(n.type === "postcard"){
+        var flip = ctl("pFlip", "⇄", "Flip the postcard", null);
+        flip.addEventListener("click", function(e){ e.stopPropagation(); flipPostcard(n); });
+      }
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(e.target.closest && e.target.closest(".poF.editing")) return;                // typing in a field
+        if(e.target.closest && e.target.closest(".poAddPic")) return;
+        e.preventDefault();
+        endEditing(); closeCaptureMenu();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);
+      });
+      el.addEventListener("dblclick", function(e){
+        e.preventDefault(); e.stopPropagation();
+        var f = e.target.closest && e.target.closest(".poF");
+        if(n.type === "photo_strip" && !f){ openStripEditor(n); return; }
+        if(f) editPaperField(n, f); else { var first = el.querySelector(".poF"); if(first) editPaperField(n, first); }
+      });
+      el.addEventListener("keydown", function(e){
+        if(e.target !== el) return;
+        if(e.key === "Enter"){ e.preventDefault(); if(n.type === "photo_strip") openStripEditor(n); else { var f1 = el.querySelector(".poF"); if(f1) editPaperField(n, f1); } }
+        else if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
+        else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteNotes([n.id]); }
+      });
+      el.addEventListener("focus", function(){ if(!selected.has(n.id)) setSelection([n.id]); });
+      if(b.addPic) b.addPic.addEventListener("click", function(e){ e.stopPropagation(); pickPostcardPhoto(n); });
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once:true});
+    }
+    boardInner.appendChild(el);
+    return el;
+  }
+
+  // ---- editing a text field in place (plain text only; Enter finishes a one-line field; Esc cancels)
+  var activePaperEdit = null;
+  function editPaperField(n, fieldEl){
+    if(readOnly) return;
+    var f = fieldEl.dataset.f, spec = PAPER_FIELDS[n.type][f];
+    if(!spec) return;
+    if(activePaperEdit) activePaperEdit();
+    setSelection([n.id]);
+    var host = fieldEl.classList.contains("poTotal") ? fieldEl.querySelector("b") : fieldEl, before = captureState([n.id]), start = n[f] || "", done = false;
+    host.contentEditable = "true"; fieldEl.classList.add("editing"); host.focus();
+    var rg = document.createRange(); rg.selectNodeContents(host); rg.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+    function value(){ return spec.multi ? Stick.objects.clean.lines(host.innerText, spec.max, 14) : Stick.objects.clean.one(host.textContent, spec.max); }
+    function key(e){
+      if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); host.textContent = start; finish(false); }
+      else if(e.key === "Enter"){ e.preventDefault(); if(spec.multi && !e.ctrlKey && !e.metaKey){ document.execCommand("insertLineBreak"); } else finish(true); }
+    }
+    function paste(e){ e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
+    function finish(commit){
+      if(done) return; done = true; activePaperEdit = null;
+      host.removeEventListener("keydown", key); host.removeEventListener("blur", onBlur); host.removeEventListener("paste", paste);
+      host.contentEditable = "false"; fieldEl.classList.remove("editing");
+      var v = commit ? value() : start;
+      host.textContent = v;
+      if(fieldEl.classList.contains("poTotal")) fieldEl.classList.toggle("empty", !v);
+      if(v === start) return;
+      n[f] = v; if(n.el) n.el.setAttribute("aria-label", paperLabel(n));
+      saveNotes(); recordChange("Edit " + Stick.objects.LABELS[n.type], before);
+    }
+    function onBlur(){ finish(true); }
+    host.addEventListener("keydown", key); host.addEventListener("blur", onBlur); host.addEventListener("paste", paste);
+    activePaperEdit = function(){ finish(true); };
+  }
+  document.addEventListener("pointerdown", function(e){
+    if(activePaperEdit && !(e.target.closest && e.target.closest(".poF.editing"))) activePaperEdit();
+  }, true);
+
+  function startPaperResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el, before = captureState([n.id]), startX = e.clientX, startW = n.w || Stick.objects.defaultW(n), rg = paperWidthRange(n), w = startW;
+    document.body.style.cursor = "nwse-resize";
+    function move(ev){ w = Math.round(Math.min(rg.max, Math.max(rg.min, startW + (ev.clientX - startX) / boardZoom))); el.style.setProperty("--pw", w + "px"); }
+    function up(){
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = "";
+      if(w === startW) return;
+      n.w = w; recoverVertical([n]); ensureWidth(); saveNotes(); updateMinimap(); recordChange("Resize " + Stick.objects.LABELS[n.type], before);
+    }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  }
+
+  // ---- variants, orientation, flipping
+  function setPaperProp(n, prop, val, label){
+    if(n[prop] === val) return;
+    var before = captureState([n.id]);
+    n[prop] = val;
+    if(prop === "orient"){ n.w = val === "portrait" ? 200 : 330; }
+    saveNotes(); rerenderNote(n); recordChange(label, before);
+  }
+  function flipPostcard(n){
+    if(!n.el) return;
+    var back = !n.el.classList.contains("flipped");
+    n.el.classList.toggle("flipped", back);
+    var f = n.el.querySelector(".poFront"), b2 = n.el.querySelector(".poBack");
+    if(f) f.setAttribute("aria-hidden", String(back)); if(b2) b2.setAttribute("aria-hidden", String(!back));
+  }
+  function pickPostcardPhoto(n){
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0]; if(!f) return;
+      if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a photo."); return; }
+      loadPhotoFile(f).then(function(l){
+        var before = captureState([n.id]);
+        n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState;
+        saveNotes(); rerenderNote(n); recordChange("Add postcard photo", before);
+        if(cloudSync) cloudSync.notesChanged();
+      }, function(){ toast("That image couldn't be read."); });
+    };
+    inp.click();
+  }
+
+  // ---- the menu for every paper object
+  function openObjectMenu(n, anchor){
+    if(n.type && OBJECT_MENUS[n.type]) OBJECT_MENUS[n.type](n, anchor);
+  }
+  function paperMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu");
+    if(!pop) return;
+    var kind = Stick.objects.LABELS[n.type], first = n.el && n.el.querySelector(".poF");
+    if(first) pop.appendChild(menuItem(ICONS.pencil, "Edit text", function(){ closeFloatingPopovers(); editPaperField(n, first); }));
+    var fields = PAPER_FIELDS[n.type];
+    Object.keys(fields).forEach(function(f){
+      if(f === "title" || f === "caption" || f === "location" || f === "message") return;
+      if(n[f]) return;
+      var fe = n.el && n.el.querySelector('.poF[data-f="' + f + '"]'); if(!fe) return;
+      pop.appendChild(menuItem(ICONS.pencil, fields[f].ph, function(){ closeFloatingPopovers(); editPaperField(n, fe); }));
+    });
+    var vh = makeDiv("menuHint"); vh.textContent = "Style"; pop.appendChild(vh);
+    Stick.objects.VARIANTS[n.type].forEach(function(v){
+      pop.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }));
+    });
+    if(n.type === "ticket") pop.appendChild(menuItem(ICONS.move, n.orient === "portrait" ? "Make it landscape" : "Make it portrait", function(){ closeFloatingPopovers(); setPaperProp(n, "orient", n.orient === "portrait" ? "landscape" : "portrait", "Turn ticket"); }));
+    if(n.type === "postcard"){
+      pop.appendChild(menuItem(ICONS.image, n.image || n.assetId ? "Change photo" : "Add a photo", function(){ closeFloatingPopovers(); pickPostcardPhoto(n); }));
+      pop.appendChild(menuItem(ICONS.move, "Flip", function(){ closeFloatingPopovers(); flipPostcard(n); }));
+    }
+    if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
+    var moveItem = menuItem(ICONS.move, "Move to board", function(){
+      var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
+      if(open){ moveItem.nextSibling.remove(); return; }
+      moveItem.parentNode.insertBefore(boardPicker(document.createDocumentFragment(), [n.id]), moveItem.nextSibling);
+    }, {kbd:"›"});
+    pop.appendChild(moveItem);
+    pop.appendChild(menuItem(ICONS.share, "Share " + kind + "…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
+  }
+  Stick.objects.KINDS.forEach(function(k){ OBJECT_MENUS[k] = paperMenu; });
+
+  // ---- creating one
+  function newPaper(kind, bx, by, extra){
+    var d = Object.assign({type: kind, id: newId(), x: 0, y: 0, rot: rand(-3, 3), z: 1, createdAt: Date.now()}, extra || {});
+    var base = Stick.objects.normalize(d, paperHelpers()) || {};
+    var n = Object.assign({}, base, {id: d.id, x: 0, y: 0, rot: d.rot, z: 1, createdAt: d.createdAt, type: kind});
+    if(kind === "receipt" && !n.title) n.title = "Receipt";
+    if(kind === "receipt" && !n.date) n.date = todayShort();
+    if(kind === "ticket" && !n.title) n.title = "Ticket";
+    n.phys = {};
+    var sz = Stick.objects.sizeEstimate(n);
+    n.x = Math.max(0, bx - sz.w / 2); n.y = Math.max(0, Math.min(boardHeight() - sz.h - 8, by - sz.h / 2));
+    return n;
+  }
+  function createPaper(kind, bx, by, extra){
+    var n = newPaper(kind, bx, by, extra);
+    insertNotes([n], "Add " + Stick.objects.LABELS[kind]);
+    recoverVertical([n]); dismissHint();
+    if(kind === "receipt" || kind === "ticket"){ setTimeout(function(){ var t = n.el && n.el.querySelector(".poF"); if(t) editPaperField(n, t); }, 60); }
+    return n;
+  }
+  function createPostcardFromFile(bx, by){
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0];
+      if(!f){ return; }
+      if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a photo."); return; }
+      loadPhotoFile(f).then(function(l){ var n = createPaper("postcard", bx, by, {image: l.src, imgRatio: clampNum(l.ratio, 0.4, 2.5, 0.667)}); setTimeout(function(){ var m = n.el && n.el.querySelector('.poF[data-f="location"]'); if(m) editPaperField(n, m); }, 80); },
+        function(){ toast("That image couldn't be read."); });
+    };
+    inp.click();
+  }
+
+  // ---- photo strips: from photos already on the board, or from files
+  function stripFramesFromPhotos(list){
+    return list.map(function(p){ var f = {ratio: clampNum(p.imgRatio, 0.3, 3, 0.75)}; if(p.image) f.image = p.image; if(p.assetId) f.assetId = p.assetId; return f; });
+  }
+  function makeStripFromPhotos(ids){
+    var photos = ids.map(findNote).filter(function(n){ return isPhoto(n); });
+    if(photos.length < Stick.objects.STRIP_MIN || photos.length > Stick.objects.STRIP_MAX){ toast("Choose between " + Stick.objects.STRIP_MIN + " and " + Stick.objects.STRIP_MAX + " photos."); return; }
+    photos.sort(function(a, b){ return (a.x - b.x) || (a.y - b.y); });          // left to right, then top to bottom
+    var cx = photos.reduce(function(s, p){ return s + p.x; }, 0) / photos.length, cy = photos.reduce(function(s, p){ return s + p.y; }, 0) / photos.length;
+    var strip = newPaper("photo_strip", cx + 90, cy + 140, {variant: "vertical", frames: stripFramesFromPhotos(photos), font: pickFont()});
+    var snapshots = photos.map(snapNote), strip0 = strip;
+    var removed = photos.map(function(p){ return p.id; });
+    removed.forEach(function(id){ var n = findNote(id); if(n){ removeNoteEl(n, false); notes.splice(notes.indexOf(n), 1); selected.delete(id); clearDecorations(id); } });
+    zCounter += 1; strip.z = zCounter; notes.push(strip); renderNote(strip, true, {focus:false});
+    ensureWidth(); saveNotes(); updateCount(); updateMinimap(); setSelection([strip.id]);
+    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); }, 0);
+    var action = pushHistory({label:"Make photo strip", custom:true, t:Date.now(),
+      undo:function(){
+        var cur = findNote(strip.id); if(cur){ removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(cur.id); clearDecorations(cur.id); }
+        snapshots.forEach(function(s){ var c = Object.assign({}, s); if(c.phys) c.phys = Object.assign({}, c.phys); notes.push(c); renderNote(c, false, {focus:false}); });
+        return true;
+      },
+      redo:function(){
+        snapshots.forEach(function(s){ var n = findNote(s.id); if(n){ removeNoteEl(n, false); notes.splice(notes.indexOf(n), 1); selected.delete(n.id); clearDecorations(n.id); } });
+        notes.push(strip); renderNote(strip, false, {focus:false});
+        return true;
+      }});
+    toast("Made a photo strip.", "Undo", function(){ undoIfTop(action); });
+    return strip;
+  }
+  function createStripFromFiles(bx, by){
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+    inp.onchange = function(){
+      var files = Array.prototype.filter.call(inp.files || [], function(f){ return f.type.indexOf("image/") === 0; }).slice(0, Stick.objects.STRIP_MAX);
+      if(files.length < Stick.objects.STRIP_MIN){ toast("Choose at least " + Stick.objects.STRIP_MIN + " photos for a strip."); return; }
+      Promise.all(files.map(loadPhotoFile)).then(function(loaded){
+        createPaper("photo_strip", bx, by, {variant: "vertical", font: pickFont(), frames: loaded.map(function(l){ return {image: l.src, ratio: clampNum(l.ratio, 0.3, 3, 0.75)}; })});
+      }, function(){ toast("An image couldn't be read."); });
+    };
+    inp.click();
+  }
+  // the small strip editor: reorder, caption, remove, add
+  function openStripEditor(n){
+    if(readOnly) return;
+    var work = (n.frames || []).map(function(f){ return Object.assign({}, f); }), content = document.createElement("div"), list = makeDiv("stripEd");
+    var capIn = document.createElement("input"); capIn.type = "text"; capIn.maxLength = 80; capIn.value = n.caption || ""; capIn.setAttribute("aria-label", "Strip caption"); capIn.placeholder = "Caption (optional)"; capIn.className = "stripCap";
+    function paint(){
+      list.innerHTML = "";
+      work.forEach(function(f, i){
+        var row = makeDiv("stripRow"), th = document.createElement("img"); th.alt = "Picture " + (i + 1); th.src = stripFrameSrc(f) || ""; th.draggable = false;
+        var up = document.createElement("button"); up.type = "button"; up.textContent = "←"; up.setAttribute("aria-label", "Move picture " + (i + 1) + " earlier"); up.disabled = i === 0;
+        var dn = document.createElement("button"); dn.type = "button"; dn.textContent = "→"; dn.setAttribute("aria-label", "Move picture " + (i + 1) + " later"); dn.disabled = i === work.length - 1;
+        var rm = document.createElement("button"); rm.type = "button"; rm.textContent = "✕"; rm.setAttribute("aria-label", "Remove picture " + (i + 1)); rm.disabled = work.length <= Stick.objects.STRIP_MIN;
+        up.addEventListener("click", function(){ var t = work[i - 1]; work[i - 1] = work[i]; work[i] = t; paint(); });
+        dn.addEventListener("click", function(){ var t = work[i + 1]; work[i + 1] = work[i]; work[i] = t; paint(); });
+        rm.addEventListener("click", function(){ work.splice(i, 1); paint(); });
+        row.appendChild(th); row.appendChild(up); row.appendChild(dn); row.appendChild(rm); list.appendChild(row);
+      });
+      add.disabled = work.length >= Stick.objects.STRIP_MAX;
+    }
+    var add = document.createElement("button"); add.type = "button"; add.className = "pillBtn"; add.textContent = "Add photos";
+    add.addEventListener("click", function(){
+      var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+      inp.onchange = function(){
+        var files = Array.prototype.filter.call(inp.files || [], function(f){ return f.type.indexOf("image/") === 0; }).slice(0, Stick.objects.STRIP_MAX - work.length);
+        Promise.all(files.map(loadPhotoFile)).then(function(loaded){ loaded.forEach(function(l){ work.push({image: l.src, ratio: clampNum(l.ratio, 0.3, 3, 0.75)}); }); paint(); }, function(){ toast("An image couldn't be read."); });
+      };
+      inp.click();
+    });
+    content.appendChild(list); content.appendChild(add); content.appendChild(capIn); paint();
+    openModal({title: "Photo strip", content: content, width: 380, actions: [{label: "Cancel", value: false}, {label: "Done", kind: "primary", value: true}],
+      onClose: function(ok){
+        if(!ok) return;
+        var cur = findNote(n.id); if(!cur) return;
+        var before = captureState([n.id]);
+        cur.frames = work; cur.caption = Stick.objects.clean.one(capIn.value, 80);
+        saveNotes(); rerenderNote(cur); recordChange("Edit photo strip", before);
+        if(cloudSync){ cloudSync.notesChanged(); cloudSync.hydrateAll(); }
+      }});
+  }
+
+  // ---- thumbnail card for the board list
+  function drawThumbPaper(g, n, it, sc, ox, oy, dark){
+    var w = it.w * sc, h = it.h * sc;
+    g.save();
+    g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
+    g.rotate((n.rot || 0) * Math.PI / 180);
+    g.shadowColor = dark ? "rgba(0,0,0,0.6)" : "rgba(60,45,10,0.28)"; g.shadowBlur = 3; g.shadowOffsetY = 1.2;
+    g.fillStyle = n.type === "photo_strip" ? (n.variant === "film" ? "#1d1b1a" : "#fbfaf4") : n.type === "ticket" ? "#f2e6c9" : n.type === "postcard" ? "#f7f2e4" : "#faf8f0";
+    g.fillRect(-w/2, -h/2, w, h);
+    g.shadowColor = "transparent";
+    g.fillStyle = "rgba(58,53,40,0.42)";
+    var rows = Math.max(2, Math.min(6, Math.floor(h / (7 * Math.max(sc, 0.3)))));
+    for(var i = 0; i < rows; i++) g.fillRect(-w/2 + w * 0.12, -h/2 + h * (0.14 + i * 0.8 / rows), w * (i % 2 ? 0.5 : 0.7), Math.max(0.6, 2.2 * sc));
+    g.restore();
+  }
+
   // ---------- mobile quick capture: tap the desk, choose what to put down ----------
   var captureMenuEl = null, captureDotEl = null, captureClosedAt = 0;
   function closeCaptureMenu(){
@@ -3005,6 +3440,7 @@
     if(captureMenuEl && !captureMenuEl.contains(e.target)){ closeCaptureMenu(); captureClosedAt = Date.now(); }
   }, true);
   window.addEventListener("resize", closeCaptureMenu);
+  document.addEventListener("contextmenu", function(e){ if(openPopover && !openPopover.contains(e.target)) closeFloatingPopovers(); }, true);
   var captureInputs = {};
   function captureInput(kind){
     if(captureInputs[kind]) return captureInputs[kind];
@@ -3020,14 +3456,28 @@
     closeFloatingPopovers();
     var m = makeDiv("captureMenu");
     m.setAttribute("role", "menu");
-    [["sticky", "Sticky", ICONS.sticky], ["photo", "Photo", ICONS.camera], ["record", "Record", ICONS.mic], ["video", "Video", ICONS.film]].forEach(function(o){
-      var b = document.createElement("button");
-      b.setAttribute("role", "menuitem");
-      b.innerHTML = o[2] + "<span></span>";
-      b.querySelector("span").textContent = o[1];
-      b.addEventListener("click", function(e){ e.stopPropagation(); closeCaptureMenu(); captureAction(o[0], bx, by); });
-      m.appendChild(b);
-    });
+    function fill(list, withBack){
+      m.innerHTML = "";
+      list.forEach(function(o){
+        var b = document.createElement("button");
+        b.setAttribute("role", "menuitem");
+        b.innerHTML = o[2] + "<span></span>";
+        b.querySelector("span").textContent = o[1];
+        b.addEventListener("click", function(e){ e.stopPropagation(); if(o[0] === "__more"){ fill(moreList(), true); return; } if(o[0] === "__back"){ fill(mainList(), false); return; } closeCaptureMenu(); insertAction(o[0], bx, by); });
+        m.appendChild(b);
+      });
+    }
+    function mainList(){
+      var l = [["sticky", "Sticky", ICONS.sticky], ["photo", "Photo", ICONS.camera], ["record", "Record", ICONS.mic], ["video", "Video", ICONS.film]];
+      if(insertItems().some(function(it){ return it.touch === "more"; })) l.push(["__more", "More\u2026", ICONS.more]);
+      return l;
+    }
+    function moreList(){
+      var l = insertItems().filter(function(it){ return it.touch === "more"; }).map(function(it){ return [it.id, it.label, it.icon]; });
+      l.push(["__back", "Back", ICONS.close]);
+      return l;
+    }
+    fill(mainList(), false);
     document.body.appendChild(m);
     // keep it on screen and above the phone's bottom bars
     var vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
@@ -3043,9 +3493,107 @@
     document.body.appendChild(dot);
     captureMenuEl = m; captureDotEl = dot;
   }
+  // Everything that can be put on the board from an empty spot. `touch: "main"` items are in the first touch menu; the rest sit under More.
+  // New physical objects register themselves here (see the object packs) so the two menus never drift apart.
+  var INSERT_ITEMS = [
+    {id: "sticky", group: "Add", label: "Note", icon: ICONS.sticky, touch: "main"},
+    {id: "photo", group: "Add", label: "Photo", icon: ICONS.camera, touch: "main"},
+    {id: "cutout", group: "Add", label: "Cutout Photo", icon: ICONS.scissors, touch: "more", ready: function(){ return !!(window.Stick && Stick.cutout && Stick.cutout.available()); }},
+    {id: "receipt", group: "Add", label: "Receipt", icon: ICONS.receipt, touch: "more", run: function(bx, by){ createPaper("receipt", bx, by); }},
+    {id: "ticket", group: "Add", label: "Ticket", icon: ICONS.ticket, touch: "more", run: function(bx, by){ createPaper("ticket", bx, by); }},
+    {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
+    {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
+    {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
+    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"}
+  ];
+  function insertItems(){ return INSERT_ITEMS.filter(function(it){ return !it.ready || it.ready(); }); }
+  // a one-pixel anchor the existing popovers can hang from when a menu opens at the pointer instead of at a button
+  var ctxAnchor = null;
+  function pointAnchor(x, y){
+    if(!ctxAnchor){ ctxAnchor = document.createElement("div"); ctxAnchor.setAttribute("aria-hidden", "true"); ctxAnchor.style.cssText = "position:fixed;width:1px;height:1px;pointer-events:none;opacity:0;"; document.body.appendChild(ctxAnchor); }
+    ctxAnchor.style.left = x + "px"; ctxAnchor.style.top = y + "px";
+    return ctxAnchor;
+  }
+  // put a popover's corner at the pointer, keep it fully on screen and clear of the header
+  function placeAtPointer(pop, x, y){
+    if(!pop) return;
+    var vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
+    var headerBottom = document.querySelector(".topbar").getBoundingClientRect().bottom;
+    pop.style.bottom = "auto"; pop.style.maxHeight = Math.max(160, vh - headerBottom - 16) + "px"; pop.style.overflowY = "auto";
+    var w = pop.offsetWidth, h = pop.offsetHeight;
+    var left = Math.max(8, Math.min(x, vw - w - 8)), top = y;
+    if(top + h > vh - 8) top = y - h;                          // no room below: open upwards
+    top = Math.max(headerBottom + 8, Math.min(top, vh - h - 8));
+    pop.style.left = left + "px"; pop.style.top = top + "px";
+  }
+  function menuNav(pop){                                        // keyboard: arrows move, Home/End jump, Esc closes (the global handler)
+    pop.setAttribute("role", "menu");
+    Array.prototype.forEach.call(pop.querySelectorAll("button.menuItem"), function(b){ b.setAttribute("role", "menuitem"); });
+    pop.addEventListener("keydown", function(e){
+      var items = Array.prototype.slice.call(pop.querySelectorAll("button.menuItem")), i = items.indexOf(document.activeElement);
+      if(e.key === "ArrowDown"){ e.preventDefault(); items[(i + 1) % items.length].focus(); }
+      else if(e.key === "ArrowUp"){ e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+      else if(e.key === "Home"){ e.preventDefault(); items[0].focus(); }
+      else if(e.key === "End"){ e.preventDefault(); items[items.length - 1].focus(); }
+    });
+  }
+  function openInsertMenu(x, y, bx, by){
+    closeFloatingPopovers(); closeCaptureMenu();
+    var pop = openFloatingPopoverAt({left: x, right: x, top: y, bottom: y, width: 0, height: 0}, "noteMenu", null);
+    pop.classList.add("insMenu"); pop.setAttribute("aria-label", "Add to the board");
+    var group = "";
+    insertItems().forEach(function(it){
+      if(it.group !== group){ group = it.group; var h = makeDiv("menuHint"); h.textContent = group.toUpperCase(); pop.appendChild(h); }
+      pop.appendChild(menuItem(it.icon, it.label, function(){ closeFloatingPopovers(); safeSet("stickit.rcUsed", true); insertAction(it.id, bx, by); }));
+    });
+    menuNav(pop);
+    placeAtPointer(pop, x, y);
+    var first = pop.querySelector("button.menuItem"); if(first) try{ first.focus({preventScroll: true}); }catch(e){}
+  }
+  function insertAction(id, bx, by){
+    var it = INSERT_ITEMS.filter(function(x){ return x.id === id; })[0];
+    if(it && it.run){ it.run(bx, by); return; }
+    captureAction(id, bx, by);
+  }
+  function openObjectContextMenu(n, x, y){
+    if(!selected.has(n.id) || selected.size < 2) setSelection([n.id]);
+    closeFloatingPopovers(); closeCaptureMenu();
+    var a = pointAnchor(x, y);
+    if(selected.size > 1){ openGroupMenu(a, x, y); return; }
+    if(isPhoto(n)) openPhotoMenu(n, a);
+    else if(isAV(n)) openAVMenu(n, a);
+    else if(n.type && OBJECT_MENUS[n.type]) OBJECT_MENUS[n.type](n, a);
+    else openNoteMenu(n, a);
+    if(openPopover){ menuNav(openPopover); placeAtPointer(openPopover, x, y); }
+  }
+  function openGroupMenu(anchor, x, y){
+    var ids = Array.from(selected), pop = openFloatingPopoverAt({left: x, right: x, top: y, bottom: y, width: 0, height: 0}, "noteMenu", null);
+    var h = makeDiv("menuHint"); h.textContent = ids.length + " selected"; pop.appendChild(h);
+    var onlyPhotos = ids.length >= Stick.objects.STRIP_MIN && ids.length <= Stick.objects.STRIP_MAX && ids.every(function(id){ return isPhoto(findNote(id)); });
+    if(onlyPhotos) pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos(ids); }));
+    pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
+    var moveItem = menuItem(ICONS.move, "Move to board", function(){
+      var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
+      if(open){ moveItem.nextSibling.remove(); return; }
+      moveItem.parentNode.insertBefore(boardPicker(document.createDocumentFragment(), ids), moveItem.nextSibling);
+    }, {kbd: "\u203A"});
+    pop.appendChild(moveItem);
+    pop.appendChild(menuItem(ICONS.share, "Share selection\u2026", function(){ closeFloatingPopovers(); openShareModal(selectedNotes()); }));
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes(ids); }, {cls: "danger"}));
+  }
   function captureAction(kind, bx, by){
     if(kind === "sticky"){ addNoteAt(bx, by); return; }
     if(kind === "record"){ startRecording(bx, by); return; }
+    if(kind === "cutout"){
+      var cin = captureInput("photo"); cin.value = "";
+      cin.onchange = function(){
+        var cf = cin.files && cin.files[0]; if(!cf) return;
+        if(cf.type.indexOf("image/") !== 0){ toast("That doesn't look like a photo."); return; }
+        dropPhotoFiles([cf], bx, by, {afterAdd: function(made){ if(made[0]) startCutout(made[0], "cutout"); }});
+      };
+      cin.click();
+      return;
+    }
     var inp = captureInput(kind);
     inp.value = "";
     inp.onchange = function(){
@@ -3233,6 +3781,7 @@
   // Read-only note for share previews and public pages: same paper, tape, font and formatting.
   function buildStaticNote(item){
     if(isPhoto(item)) return buildStaticPhoto(item);
+    if(isPaper(item)) return buildStaticPaper(item);
     if(isAV(item)){
       var sb = buildAVEl(item); sb.el.classList.add("static");
       item.el = sb.el;
@@ -3260,6 +3809,7 @@
 
   function renderNote(n, isNew, opts){
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
+    if(isPaper(n)) return renderPaper(n, isNew, opts);
     if(isAV(n)) return renderAV(n, isNew, opts);
     opts = opts || {};
     var el = document.createElement("div");
@@ -3829,8 +4379,8 @@
   function paperCopy(src){
     var c = normalizeIncoming(src, {allowAssets:true});
     if(!c) return null;
-    c.phys = isPhoto(c) ? makePhotoPhys() : isAV(c) ? {} : makePhys();
-    c.rot = isPhoto(c) ? rand(-5, 5) : rand(-6, 6);
+    c.phys = isPhoto(c) ? makePhotoPhys() : (isAV(c) || isPaper(c)) ? {} : makePhys();
+    c.rot = isPhoto(c) ? rand(-5, 5) : isPaper(c) ? rand(-3, 3) : rand(-6, 6);
     c.fontManual = !!src.fontManual;
     if(c.cutoutKey && src.cutoutKey){ c.cutoutKey = "co-" + newId(); copyCutoutBlob(src.cutoutKey, c.cutoutKey); }     // a copy never shares the device blob
     return c;
@@ -4558,7 +5108,32 @@
       if(pressT && pressStart && Math.abs(e.clientX - pressStart.x) + Math.abs(e.clientY - pressStart.y) > 10){ clearTimeout(pressT); pressT = null; }
     });
     ["pointerup", "pointercancel"].forEach(function(t){ boardInner.addEventListener(t, function(){ clearTimeout(pressT); pressT = null; }); });
-    boardInner.addEventListener("contextmenu", function(e){ if(e.target === boardInner && COARSE) e.preventDefault(); });
+    // Desktop: right-click on empty board = insertion menu; on an object = that object's own menu. Text being edited keeps the
+    // browser's native menu (spelling, paste), and touch devices keep their tap menu.
+    boardInner.addEventListener("contextmenu", function(e){
+      if(COARSE && (e.pointerType === "touch" || lastBoardPointer === "touch")){ if(e.target === boardInner) e.preventDefault(); return; }
+      if(e.shiftKey) return;                                                // Shift+right-click: the browser's own menu, always available
+      if(e.target.closest && e.target.closest("[contenteditable=true], input, textarea, a[href]")) return;
+      if(e.target === boardInner){
+        e.preventDefault(); endEditing(); clearSelection();
+        var r = boardInner.getBoundingClientRect();
+        openInsertMenu(e.clientX, e.clientY, (e.clientX - r.left) / boardZoom, (e.clientY - r.top) / boardZoom);
+        return;
+      }
+      var host = e.target.closest ? e.target.closest(".note, .photoObj, .boardObj") : null;
+      var n = host && host.dataset.id ? findNote(host.dataset.id) : null;
+      if(!n) return;
+      e.preventDefault(); endEditing();
+      openObjectContextMenu(n, e.clientX, e.clientY);
+    });
+    // keyboard access to the same menu: Shift+F10 / the Menu key on the board
+    boardInner.addEventListener("keydown", function(e){
+      if(!(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) return;
+      if(e.target !== boardInner) return;
+      e.preventDefault();
+      var r = boardInner.getBoundingClientRect(), vc = viewCenter();
+      openInsertMenu(r.left + r.width / 2, r.top + r.height / 3, vc.x, vc.y);
+    });
     boardInner.addEventListener("dragover", function(e){
       if(e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], "Files") !== -1){ e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }
     });
@@ -6037,7 +6612,7 @@
       m.className = "miniNote";
       m.style.left = ((n.x/boardWidth)*trackWidth) + "px";
       m.style.width = Math.max(3, (NOTE_W/boardWidth)*trackWidth) + "px";
-      m.style.background = isObj(n) ? (n.type === "video" ? "#4a433c" : "#cfc6b0") : n.bg;
+      m.style.background = isObj(n) ? (n.type === "video" ? "#4a433c" : isPaper(n) ? "#e6dcc4" : "#cfc6b0") : n.bg;
       minimapTrack.appendChild(m);
     });
     var view = document.createElement("div");
@@ -6592,6 +7167,7 @@
       var n = it.n, w = it.w * sc, h = it.h * sc, p = ensurePhys(n);
       if(isPhoto(n)){ if(drawThumbPhoto(g, n, it, sc, ox, oy, dark)) pending = true; return; }
       if(isAV(n)){ drawThumbAV(g, n, it, sc, ox, oy, dark); return; }
+      if(isPaper(n)){ drawThumbPaper(g, n, it, sc, ox, oy, dark); return; }
       g.save();
       g.translate(ox + (n.x + it.w/2) * sc, oy + (n.y + it.h/2) * sc);
       g.rotate((n.rot || 0) * Math.PI / 180);
@@ -7659,7 +8235,7 @@
     syncHighlight("date");
 
     // a quiet cue while the board is nearly empty
-    if(!readOnly && notes.length < 5){
+    if(!readOnly && notes.length < 5 && !(!COARSE && safeGet("stickit.rcUsed"))){
       hint.textContent = CREATE_HINT;
       hint.classList.remove("hidden");
       setTimeout(dismissHint, 7000);

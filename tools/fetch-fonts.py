@@ -36,6 +36,8 @@ FAMILIES = {
     'Alef': None, 'Miriam Libre': None, 'Frank Ruhl Libre': None, 'Bellefair': None, 'David Libre': None, 'Marck Script': None,
     'Bad Script': None, 'Pangolin': None, 'Comforter': None, 'Underdog': None, 'Ruslan Display': None, 'Aref Ruqaa': None,
     'Katibeh': None, 'Marhey': None, 'Rakkas': None, 'Lalezar': None, 'Reem Kufi': None, 'Mada': None, 'Lateef': None, 'Harmattan': None,
+    # typewriter / thermal-print faces for receipts and tickets (not offered in the handwriting picker)
+    'Cutive Mono': None, 'Special Elite': None, 'Courier Prime': '400;700',
 }
 # scripts the app supports today. Numbered subsets are the Chinese/Japanese/Korean slices.
 KEEP = {'latin', 'latin-ext', 'vietnamese', 'cyrillic', 'cyrillic-ext', 'hebrew', 'arabic'}
