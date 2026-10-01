@@ -1745,3 +1745,46 @@
     box-shadow:inset 0 0 0 8px #d9ccae, inset 0 0 0 10px rgba(60,35,10,0.4), inset 0 10px 24px rgba(40,20,5,0.4), 2px 5px 12px rgba(0,0,0,0.55); }
   body.dark .note.soup.editing .text{ background:rgba(40,28,14,0.92); color:#f2eadb; }
   @media (prefers-reduced-motion: reduce){ .soupLayer.live .soupTile{ animation:none; } }
+
+  /* ---------- collaboration: who is here, who is editing, comments ---------- */
+  .presenceBar{ display:inline-flex; align-items:center; margin-left:8px; }
+  .presenceBar[hidden]{ display:none; }
+  .presAv{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-left:-5px; border-radius:50%; border:2px solid var(--panel);
+    background:hsl(var(--h, 200) 42% 44%); color:#fff; font:700 0.68rem 'Sora',sans-serif; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
+  .presAv:first-child{ margin-left:0; }
+  .presMore{ background:var(--accent-soft); color:var(--ink); }
+  /* an object someone else is working on: a quiet outline and a small initial, no glow, nothing that keeps moving */
+  .peerActive, .peerEditing{ outline:1.5px solid color-mix(in srgb, var(--accent-strong) 70%, transparent); outline-offset:5px; }
+  .peerBadge{ position:absolute; top:-12px; left:50%; transform:translateX(-50%); z-index:4; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    background:hsl(var(--h, 200) 42% 44%); color:#fff; font:700 0.64rem 'Sora',sans-serif; border:2px solid var(--panel); pointer-events:none; }
+  .peerEditing .peerBadge::after{ content:'\270E'; position:absolute; right:-9px; bottom:-6px; font-size:0.7rem; color:var(--ink); }
+  .cmtTab{ all:unset; box-sizing:border-box; position:absolute; top:-9px; left:-9px; z-index:4; min-width:22px; height:22px; padding:0 5px; border-radius:6px 6px 6px 2px;
+    display:none; align-items:center; justify-content:center; cursor:pointer; background:#fff7d6; color:#5a4a1c; border:1px solid rgba(90,74,28,0.35); box-shadow:0 1px 3px rgba(0,0,0,0.25);
+    font:700 0.68rem 'Sora',sans-serif; transform:rotate(-4deg); }
+  .cmtTab.has, .selected > .cmtTab, :hover > .cmtTab, .cmtTab:focus-visible{ display:inline-flex; }
+  .cmtTab:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+  .cmtTab.rv-changes_requested{ background:#ffe3c2; border-color:#b8741a; color:#6e3d00; }
+  .cmtTab.rv-ready_for_review{ background:#dff1de; border-color:#4b8a4b; color:#1f4a22; }
+  body.dark .cmtTab{ background:#4a4228; color:#f2eadb; border-color:rgba(242,234,219,0.35); }
+  body.dark .cmtTab.rv-changes_requested{ background:#5a3a14; }
+  body.dark .cmtTab.rv-ready_for_review{ background:#23402a; }
+  body.read-only .cmtTab:not(.has){ display:none !important; }
+  .floatPop.cmtPop{ width:300px; padding:12px; background:#fffbe8; color:#3a3528; border:1px solid rgba(90,74,28,0.3); border-radius:4px 14px 14px 14px; box-shadow:0 10px 26px var(--shadow); }
+  body.dark .floatPop.cmtPop{ background:#322d1f; color:#f2eadb; }
+  .cmtHead{ font:700 0.8rem 'Sora',sans-serif; letter-spacing:0.04em; text-transform:uppercase; margin-bottom:6px; opacity:0.8; }
+  .cmtReview{ margin-bottom:6px; }
+  .cmtRvLine{ margin:0 0 6px; font:600 0.8rem 'Sora',sans-serif; }
+  .cmtRvActs{ display:flex; gap:6px; flex-wrap:wrap; }
+  .cmtSmall{ padding:5px 10px; font-size:0.76rem; }
+  .cmtList{ max-height:200px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-bottom:8px; }
+  .cmtItem{ position:relative; padding-bottom:6px; border-bottom:1px dashed rgba(90,74,28,0.25); }
+  .cmtItem b{ font-size:0.8rem; }
+  .cmtWhen{ margin-left:6px; font-size:0.68rem; opacity:0.6; }
+  .cmtBody{ margin:2px 0 0; font-size:0.86rem; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .cmtDel{ all:unset; position:absolute; top:0; right:0; cursor:pointer; font-size:0.68rem; text-decoration:underline; opacity:0.6; }
+  .cmtDel:focus-visible{ outline:2px solid var(--focus); }
+  .cmtEmpty{ margin:0; font-size:0.8rem; opacity:0.6; }
+  .cmtForm{ display:flex; gap:6px; align-items:flex-end; }
+  .cmtInput{ flex:1; box-sizing:border-box; resize:none; padding:7px 9px; border:1px solid rgba(90,74,28,0.35); border-radius:8px; background:#fff; color:#3a3528; font:inherit; font-size:0.86rem; }
+  body.dark .cmtInput{ background:#241f14; color:#f2eadb; }
+  .cmtMsg{ min-height:1.1em; margin:6px 0 0; font-size:0.74rem; opacity:0.75; }

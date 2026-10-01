@@ -13,7 +13,7 @@
     "fake-supabase": "node --experimental-strip-types fake-supabase/server.mjs",
     "test:billing": "node billing.test.mjs",
     "test:cutout": "node cutout.test.mjs",
-    "test:objects": "node objects.test.mjs"
+    "test:objects": "node objects.test.mjs && node collab.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0",

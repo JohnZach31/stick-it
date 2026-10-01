@@ -1171,7 +1171,7 @@
     if(openPopoverTrigger === triggerBtn){ closeFloatingPopovers(); return null; }
     return openFloatingPopoverAt(rect, className, triggerBtn);
   }
-  var POP_WIDTHS = {notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
+  var POP_WIDTHS = {cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
   function openFloatingPopoverAt(r, className, triggerBtn){
     closeFloatingPopovers();
     var pop = document.createElement("div");
@@ -1765,6 +1765,7 @@
     var prev = Array.from(selected);
     selected = new Set(ids.filter(function(id){ return !!findNote(id); }));
     applySelection();
+    if(window.Stick && Stick.collab) Stick.collab.setActive(selected.size === 1 ? Array.from(selected)[0] : null);
     prev.forEach(function(id){ if(!selected.has(id)){ var p = findNote(id); if(p) scheduleCleanup(p); } });
   }
   function toggleSelected(id){
@@ -3191,8 +3192,11 @@
     if(readOnly) return;
     var f = fieldEl.dataset.f, spec = PAPER_FIELDS[n.type][f];
     if(!spec) return;
+    var holder = window.Stick && Stick.collab && Stick.collab.blockedBy(n.id);
+    if(holder){ toast(holder + " is editing this " + Stick.objects.LABELS[n.type] + "."); return; }
     if(activePaperEdit) activePaperEdit();
     setSelection([n.id]);
+    if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
     var host = fieldEl.classList.contains("poTotal") ? fieldEl.querySelector("b") : fieldEl, before = captureState([n.id]), start = n[f] || "", done = false;
     host.contentEditable = "true"; fieldEl.classList.add("editing"); host.focus();
     var rg = document.createRange(); rg.selectNodeContents(host); rg.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
@@ -3204,6 +3208,7 @@
     function paste(e){ e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
     function finish(commit){
       if(done) return; done = true; activePaperEdit = null;
+      if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
       host.removeEventListener("keydown", key); host.removeEventListener("blur", onBlur); host.removeEventListener("paste", paste);
       host.contentEditable = "false"; fieldEl.classList.remove("editing");
       var v = commit ? value() : start;
@@ -3888,6 +3893,11 @@
   }
 
   function renderNote(n, isNew, opts){
+    var made = renderNoteCore(n, isNew, opts);
+    if(window.Stick && Stick.collab && Stick.collab.active()) Stick.collab.decorate(n, n.el || made);
+    return made;
+  }
+  function renderNoteCore(n, isNew, opts){
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
     if(isPaper(n)) return renderPaper(n, isNew, opts);
     if(isAV(n)) return renderAV(n, isNew, opts);
@@ -4139,11 +4149,15 @@
         document.execCommand("insertHTML", false, insert);
       });
       text.addEventListener("focus", function(){
+        var holder = window.Stick && Stick.collab && Stick.collab.blockedBy(n.id);
+        if(holder){ setTimeout(function(){ text.blur(); }, 0); toast(holder + " is editing this note."); return; }          // one person at a time per note
+        if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
         clearTimeout(n._cleanT);
         el.classList.add("editing"); if(n.cosmetic === "soup") soupBalance();
         setTimeout(function(){ adjustForKeyboard(text); }, 250);
       });
       text.addEventListener("blur", function(){
+        if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
         el.classList.remove("editing"); if(n.cosmetic === "soup") applySoup(n);
         resetKeyboardShift();
         // tidy leftovers from editing (empty spans and the like) once the caret has left
@@ -4544,7 +4558,7 @@
     return true;
   }
 
-  function canEditBoard(b){ return !!b && !b.readOnly && (!b.access || b.access === "owner" || b.access === "edit"); }
+  function canEditBoard(b){ return !!b && !b.readOnly && (!b.access || b.access === "owner" || b.access === "editor" || b.access === "edit"); }
   function moveTargets(){
     return boards.filter(function(b){ return b.id !== activeBoardId && canEditBoard(b); });
   }
@@ -6458,6 +6472,13 @@
   document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};
+    Stick.dev.presenceDemo = function(on){ try{ if(on) localStorage.setItem("stickit.dev.presence", "bc"); else localStorage.removeItem("stickit.dev.presence"); }catch(e){} return on ? "Presence demo on: reload two tabs" : "Presence demo off"; };
+    Stick.dev.startPresence = function(name){                       // starts the broadcast transport on the current board even in guest mode
+      Stick.collab.start({boardId: activeBoardId, role: "owner", comments: false, canComment: false, transport: "broadcast",
+        me: {uid: "dev-" + (name || getDisplayName()), name: name || getDisplayName()},
+        host: {refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); }, openPopover: function(){ return null; }}});
+      return "presence on";
+    };
     Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
     Stick.dev.loader = {         // local only: look at the loader states without needing a slow network
       show: function(t, cover){ cloudOverlay(t || "Loading…", !!cover); },
@@ -8252,6 +8273,21 @@
     }catch(e){ /* offline: the cached list stays */ }
   }
 
+  // ---- collaboration (presence, comments, review): only for a cloud board, never for guests
+  function startCollab(){
+    if(!(window.Stick && Stick.collab) || !CLOUD || !activeBoardId || singleNoteMode) return;
+    var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {}, role = meta.access || "owner";
+    var user = Stick.auth.user() || {}, dev = window.Stick && Stick.dev && localStorage.getItem("stickit.dev.presence") === "bc";
+    Stick.collab.start({
+      boardId: activeBoardId, role: role, canComment: role === "owner" || role === "editor", transport: dev ? "broadcast" : undefined,
+      me: {uid: user.id || "", name: (settings.account && settings.account.name) || getDisplayName()},
+      host: {
+        refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
+        openPopover: function(anchor){ closeFloatingPopovers(); var pop = openFloatingPopoverAt(anchor.getBoundingClientRect(), "cmtPop", anchor); return pop; }
+      }
+    });
+    document.getElementById("presenceBar").setAttribute("aria-label", "People on this board");
+  }
   async function startCloud(){
     setupCloudSync();
     if(viewerMode) cloudSync.setReadOnly(true);
@@ -8290,6 +8326,7 @@
     cloudSync.attach(activeBoardId);
     updateSyncPill("saved");
     await cloudSync.start();
+    startCollab();
     refreshBoardsQuietly();
     // Boards made as a guest on this device that were never imported (signed in again later, or the first offer
     // was skipped by a reload): ask once, and always keep the manual route in Account settings.

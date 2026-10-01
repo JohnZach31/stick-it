@@ -792,6 +792,70 @@ group('L. photo strips and cutouts: asset references, sharing, garbage collectio
   ok(!!direct.error, 'a direct table write cannot bypass the Premium check either');
 }
 
+// ================================================================ M. collaboration: channel authorization, review, summary
+group('M. collaboration: private presence channels, review states, comment summary');
+{
+  const o = mk('maya'), e = mk('milo'), vi = mk('mara'), out = mk('mort');
+  for (const p of [o, e, vi, out]) { await run('su', 'insert into auth.users (id,email) values ($1,$2)', [p.id, p.email]); await attest(p.id); }
+  const B = await board(o, 'Review board');
+  for (const [p, role] of [[e, 'editor'], [vi, 'viewer']]) await run('su', 'insert into public.board_members (board_id, user_id, role) values ($1,$2,$3)', [B.id, p.id, role]);
+  const objId = uuid(), otherId = uuid();
+  await run(o, 'select public.sync_objects($1,$2::jsonb,$3::jsonb)', [B.id, JSON.stringify([
+    { id: objId, type: 'note', x: 1, y: 1, width: 250, rotation: 0, z_index: 1, data: { html: 'please check', bg: 'hsl(40,90%,80%)' } },
+    { id: otherId, type: 'note', x: 300, y: 1, width: 250, rotation: 0, z_index: 2, data: { html: 'other', bg: 'hsl(40,90%,80%)' } }]), '[]']);
+
+  // ---- realtime channel authorization (the stand-in realtime.messages table exercises the real policy text)
+  const topic = `board:${B.id}`;
+  const asChan = async (actor, t, sql) => {
+    await db.query('begin');
+    try {
+      await db.query('set local role authenticated');
+      await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: actor.id, role: 'authenticated', email: actor.email })]);
+      await db.query("select set_config('realtime.topic', $1, true)", [t]);
+      const r = await db.query(sql); await db.query('commit'); return { rows: r.rows };
+    } catch (x) { await db.query('rollback'); return { error: String(x.message), rows: [] }; }
+  };
+  ok(!(await asChan(e, topic, "insert into realtime.messages (topic, payload) values ('" + topic + "', '{}')")).error, 'a board member can send on the board\'s channel');
+  ok(!!(await asChan(out, topic, "insert into realtime.messages (topic, payload) values ('" + topic + "', '{}')")).error, 'a stranger cannot send on it');
+  ok((await asChan(vi, topic, 'select id from realtime.messages')).rows.length >= 1, 'a viewer can listen (they see who is present)');
+  ok((await asChan(out, topic, 'select id from realtime.messages')).rows.length === 0, 'a stranger can not listen');
+  ok(!!(await asChan(e, 'board:not-a-uuid', "insert into realtime.messages (topic, payload) values ('board:not-a-uuid', '{}')")).error, 'a malformed channel name is refused, not an error that leaks');
+  ok(!!(await asChan(e, 'room:' + B.id, "insert into realtime.messages (topic, payload) values ('room:x', '{}')")).error, 'only board: channels are open to boards');
+
+  // ---- the review state machine
+  const rv = (who, st, why) => run(who, 'select public.set_review_state($1,$2,$3) as r', [objId, st, why ?? null]);
+  ok(!(await rv(o, 'changes_requested', 'Tighten the caption')).error, 'the owner can request changes');
+  ok((await run('su', 'select state, reason from public.object_reviews where object_id=$1', [objId])).rows[0].reason === 'Tighten the caption', 'with an optional reason');
+  ok(errIs(await rv(e, 'changes_requested'), /FORBIDDEN/), 'an editor cannot request changes');
+  ok(errIs(await rv(vi, 'ready_for_review'), /FORBIDDEN/), 'a viewer cannot mark anything ready');
+  ok(errIs(await rv(out, 'ready_for_review'), /FORBIDDEN/), 'a stranger cannot touch review state');
+  ok(!(await rv(e, 'ready_for_review')).error && (await run('su', 'select state, reason from public.object_reviews where object_id=$1', [objId])).rows[0].state === 'ready_for_review', 'an editor can mark it ready for review');
+  ok((await run('su', 'select reason from public.object_reviews where object_id=$1', [objId])).rows[0].reason === null, 'the old request reason is cleared once it is marked ready');
+  ok(errIs(await rv(e, 'none'), /FORBIDDEN/), 'an editor cannot resolve');
+  ok((await run(vi, 'select state from public.object_reviews')).rows.length === 1, 'a viewer can see the state');
+  ok((await run(out, 'select state from public.object_reviews')).rows.length === 0, 'a stranger cannot');
+  ok(!(await rv(o, 'none')).error && (await run('su', 'select 1 from public.object_reviews where object_id=$1', [objId])).rows.length === 0, 'resolving returns the object to no state');
+  ok(!!(await rv(o, 'urgent')).error, 'there are only the three states (no priorities)');
+  ok(denied(await run(o, "insert into public.object_reviews (object_id, board_id, state) values ($1,$2,'changes_requested')", [otherId, B.id])), 'the table cannot be written directly');
+  ok(denied(await run(o, "update public.object_reviews set state='ready_for_review'")), 'nor updated directly');
+  ok(!!(await run(o, 'select public.set_review_state($1,$2,$3)', [uuid(), 'changes_requested', null])).error, 'an unknown object is refused');
+  await run('su', "update public.boards set locked_at = now() where id=$1", [B.id]);
+  ok(errIs(await rv(e, 'ready_for_review'), /FORBIDDEN/), 'on a locked board an editor cannot change review state');
+  await run('su', "update public.boards set locked_at = null where id=$1", [B.id]);
+  // deleting the object removes its review
+  await rv(o, 'changes_requested', 'x');
+  await run('su', 'delete from public.board_objects where id=$1', [objId]);
+  ok((await run('su', 'select 1 from public.object_reviews where object_id=$1', [objId])).rows.length === 0, 'a review never outlives its object');
+
+  // ---- comments are attached to objects only, and the summary counts them
+  ok(!(await run(e, 'insert into public.comments (board_id, object_id, author_id, body) values ($1,$2,$3,$4)', [B.id, otherId, e.id, 'looks good'])).error, 'an editor can comment on an object');
+  ok(denied(await run(vi, 'insert into public.comments (board_id, object_id, author_id, body) values ($1,$2,$3,$4)', [B.id, otherId, vi.id, 'hi'])), 'a viewer cannot comment');
+  ok(!!(await run(e, 'insert into public.comments (board_id, object_id, author_id, body) values ($1,null,$2,$3)', [B.id, e.id, 'free floating'])).error, 'there are no free-floating comments (an object is required)');
+  const sum = await run(vi, 'select public.board_collab_summary($1) as s', [B.id]);
+  ok(sum.rows[0].s.comments.some((c) => c.object_id === otherId && c.count === 1), 'the summary gives a viewer the comment count per object');
+  ok((await run(out, 'select public.board_collab_summary($1) as s', [B.id])).rows[0].s.comments.length === 0, 'and tells a stranger nothing');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

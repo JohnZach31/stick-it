@@ -49,3 +49,11 @@ create table storage.objects (
 alter table storage.objects enable row level security;
 grant usage on schema storage to anon, authenticated, service_role;
 grant all on storage.objects, storage.buckets to anon, authenticated, service_role;
+
+-- realtime: just enough of Supabase's realtime.messages for the channel-authorization policies to be tested
+create schema realtime;
+create table realtime.messages (id bigserial primary key, topic text not null, extension text not null default 'presence', payload jsonb);
+create function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
+grant usage on schema realtime to authenticated, anon, service_role;
+grant select, insert on realtime.messages to authenticated;
+grant usage on sequence realtime.messages_id_seq to authenticated;

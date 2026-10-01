@@ -42,6 +42,10 @@ const mutations = [
   ['strip pictures lose their order',       '20261001120000_paper_objects.sql', "values (oid, ref::uuid, 'attached', i)", "values (oid, ref::uuid, 'attached', 0)"],
   ['free accounts can make Alphabet Soup',  '20261001130000_premium_cosmetics.sql', "if coalesce(p, 'free') <> 'premium' then", "if false then"],
   ['premium check skipped on update',       '20261001130000_premium_cosmetics.sql', "and (tg_op = 'INSERT' or (old.data ->> 'cosmetic') is distinct from (new.data ->> 'cosmetic')) then", "and tg_op = 'INSERT' then"],
+  ['any user can join any board channel',   '20261001140000_collab.sql', "then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;"+'\n'+"    execute $p$create policy board_channel_write", "then true else false end)$p$;"+'\n'+"    execute $p$create policy board_channel_write"],
+  ['editors can request changes',           '20261001140000_collab.sql', "if role <> 'owner' then raise exception 'FORBIDDEN' using errcode = '42501'; end if;", "if role not in ('owner','editor') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;"],
+  ['viewers can mark ready for review',     '20261001140000_collab.sql', "if role not in ('owner', 'editor') or not public.can_edit_board(o.board_id) then", "if role is null then"],
+  ['review table writable by browsers',     '20261001140000_collab.sql', "grant select on public.object_reviews to authenticated;", "grant all on public.object_reviews to authenticated;"],
 ];
 
 let missed = 0;
