@@ -31,6 +31,7 @@
   function loadImage(url) {
     return new Promise(function (resolve, reject) {
       var img = new root.Image();
+      if (/^https?:/i.test(url)) img.crossOrigin = "anonymous";       // a signed storage URL: needs CORS so the canvas can be read (storage sends it); otherwise the plain cutout is shown
       img.onload = function () { resolve(img); };
       img.onerror = function () { reject(new Error("IMAGE_DECODE_FAILED")); };
       img.src = url;

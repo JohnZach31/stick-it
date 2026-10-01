@@ -1788,3 +1788,17 @@
   .cmtInput{ flex:1; box-sizing:border-box; resize:none; padding:7px 9px; border:1px solid rgba(90,74,28,0.35); border-radius:8px; background:#fff; color:#3a3528; font:inherit; font-size:0.86rem; }
   body.dark .cmtInput{ background:#241f14; color:#f2eadb; }
   .cmtMsg{ min-height:1.1em; margin:6px 0 0; font-size:0.74rem; opacity:0.75; }
+
+  /* snapshot export (html2canvas): no 3D, so a postcard is drawn as its front; masks and animations are left out */
+  #snapStage .po-postcard .poCard{ transform:none !important; transition:none; }
+  #snapStage .po-postcard .poBack{ display:none; }
+  #snapStage .paperObj{ filter:none; }
+  #snapStage .soupLayer .soupTile{ animation:none !important; }
+  /* a shared postcard can be turned over by tapping it */
+  .paperObj.static.po-postcard{ cursor:pointer; }
+  #snapStage .po-ticket .poSheet{ -webkit-mask:none; mask:none; }
+  #snapStage .po-ticket, #snapStage .po-receipt, #snapStage .po-photo-strip{ filter:none; }
+  #snapStage .ps-cutout .pBody, #snapStage .ps-mounted .pBody, body.dark #snapStage .ps-cutout .pBody, body.dark #snapStage .ps-mounted .pBody{ filter:none; }
+  #snapStage .po-postcard .poSheet{ perspective:none; }
+  #snapStage .po-postcard .poCard{ transform-style:flat; }
+  #snapStage .po-postcard .poFace{ backface-visibility:visible; -webkit-backface-visibility:visible; box-shadow:none; border:1px solid rgba(0,0,0,0.12); }

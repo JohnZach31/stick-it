@@ -3128,7 +3128,13 @@
     }
     return api;
   }
-  function buildStaticPaper(item){ var b = buildPaperEl(item); b.el.classList.add("static"); b.el.removeAttribute("tabindex"); return b.el; }
+  function buildStaticPaper(item){
+    var b = buildPaperEl(item); b.el.classList.add("static"); b.el.removeAttribute("tabindex");
+    if(item.type === "postcard"){                              // shared or exported views: tap to turn it over
+      b.el.addEventListener("click", function(){ var back = !b.el.classList.contains("flipped"); b.el.classList.toggle("flipped", back); });
+    }
+    return b.el;
+  }
 
   // ---- placing it on the board, with the same drag / select / group behaviour as every other object
   function renderPaper(n, isNew){
