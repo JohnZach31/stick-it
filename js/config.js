@@ -42,7 +42,10 @@
 
     // Where a signed-in user is sent back to after Google. Must be in Supabase's redirect allow-list.
     // Left empty = the page's own URL without hash/query (works for GitHub Pages and localhost).
-    REDIRECT_URL: ""
+    REDIRECT_URL: "",
+
+    // extra hostnames (besides localhost and 127.0.0.1) where the local development helpers in js/dev.js are allowed; empty in production
+    DEV_HOSTS: []
   };
 
   // developer override, localhost only

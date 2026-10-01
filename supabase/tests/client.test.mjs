@@ -33,14 +33,14 @@ async function device(email, opts = {}) {
   const { data } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'http://127.0.0.1:8123/', skipBrowserRedirect: true, queryParams: { login_hint: email } } });
   const r = await fetch(data.url, { redirect: 'manual' });
   await client.auth.exchangeCodeForSession(new URL(r.headers.get('location')).searchParams.get('code'));
-  if (opts.attest !== false) await client.rpc('attest_age');     // what the age screen does for a real person
+  if (opts.attest !== false) await client.rpc('set_age_band', { p_band: 'adult' });     // what the age screen does for a real adult
 
   const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, fetch, Blob, URL, TextEncoder, TextDecoder, atob, btoa, crypto: globalThis.crypto,
     Uint8Array, FileReader: FR, navigator: { onLine: true }, location: { origin: 'http://127.0.0.1:8123', pathname: '/', hostname: '127.0.0.1', search: '' }, localStorage: ls, decodeURIComponent, encodeURIComponent });
   const load = (f) => vm.runInContext(fs.readFileSync(path.join(JS, f), 'utf8'), ctx, { filename: f });
   load('config.js');
   Object.assign(ctx.Stick.config, { SUPABASE_URL: url, SUPABASE_ANON_KEY: anon, CLOUD_CONFIGURED: true });
-  ['cloud-client.js', 'repo.js', 'assets.js', 'sync.js', 'sharing.js', 'migrate.js', 'account.js'].forEach(load);
+  ['legal-config.js', 'cloud-client.js', 'repo.js', 'assets.js', 'sync.js', 'sharing.js', 'migrate.js', 'account.js'].forEach(load);
   ctx.Stick.cloud.useClient(client);
   await ctx.Stick.auth.init();
   dev.Stick = ctx.Stick; dev.client = client; dev.ctx = ctx; dev.ls = ls;
@@ -278,21 +278,34 @@ try {
     const acc = P.Stick.account;
     ok(!!acc && typeof acc.save === 'function', 'account module loads');
 
-    // age screen: nothing can be stored until it has been passed, and only a timestamp is kept
+    // age bands: the server decides what each band may do; only the band + timestamp + versions are kept
     {
-      const K = await device('age.kid@example.com', { attest: false });
+      const K = await device('age.new@example.com', { attest: false });
       const early = await K.client.rpc('create_board', { p_name: 'x' });
-      ok(!!early.error && /AGE_NOT_CONFIRMED/.test(early.error.message), 'an account that skipped the age screen cannot create a board');
-      const savedEarly = await K.client.from('profile_settings').insert({ user_id: K.Stick.auth.user().id, bio: 'hi' });
-      ok(!!savedEarly.error, '...or save a bio');
-      ok(K.Stick.errors.parse(early.error).code === 'AGE_NOT_CONFIRMED', 'the client recognises the AGE_NOT_CONFIRMED code');
-      const at = await K.client.rpc('attest_age');
-      ok(!at.error && !!at.data, 'attesting stores a timestamp');
-      const prof = (await K.Stick.auth.profile(true));
-      ok(!!prof.age_attested_at, 'and the profile reflects it');
-      ok(!!(await K.client.rpc('create_board', { p_name: 'now allowed' })).data, 'afterwards the account works normally');
-      const row = (await admin("select * from public.profiles where id=$1", [K.Stick.auth.user().id])).rows[0];
-      ok(!Object.keys(row).some(k => /birth|dob/i.test(k)), 'no birth date is stored anywhere on the profile');
+      ok(!!early.error && K.Stick.errors.parse(early.error).code === 'AGE_NOT_CONFIRMED', 'an account that has not passed the age screen cannot create a board (client sees AGE_NOT_CONFIRMED)');
+      ok(!!(await K.client.from('profile_settings').insert({ user_id: K.Stick.auth.user().id, bio: 'hi' })).error, '...or save a bio');
+      const sneaky = await K.client.from('profiles').update({ age_band: 'adult' }).eq('id', K.Stick.auth.user().id);
+      ok(!!sneaky.error, 'a browser cannot write its own age band');
+      const prof = await K.Stick.account.setAgeBand('teen');
+      ok(prof.age_band === 'teen' && !!prof.age_attested_at && prof.parental_consent_status === 'not_required', 'a teen is recorded (band + timestamp), no parent step');
+      ok(prof.terms_version === K.Stick.legal.termsVersion && prof.privacy_version === K.Stick.legal.privacyVersion, 'with the policy versions that were shown');
+      const again = await K.Stick.account.setAgeBand('adult');
+      ok(again.age_band === 'teen', 'a second call cannot change the band');
+      ok(!!(await K.client.rpc('create_board', { p_name: 'teen board' })).data, 'afterwards the account works normally');
+      const row = (await admin('select * from public.profiles where id=$1', [K.Stick.auth.user().id])).rows[0];
+      ok(!Object.keys(row).some(k => /birth|dob|born/i.test(k)), 'no birth date column exists on the profile');
+      ok((await K.Stick.account.load()).settings.shareDefaultIdentity === 'anonymous', 'teen accounts start by sharing anonymously');
+
+      const C = await device('age.child@example.com', { attest: false });
+      const cp = await C.Stick.account.setAgeBand('child');
+      ok(cp.age_band === 'child' && cp.parental_consent_status === 'pending_parent_consent', 'a child is recorded as pending parent consent (the account is NOT deleted)');
+      const blocked = await C.client.rpc('create_board', { p_name: 'x' });
+      ok(!!blocked.error && C.Stick.errors.parse(blocked.error).code === 'PARENT_CONSENT_REQUIRED', 'cloud use is refused until a parent approves (PARENT_CONSENT_REQUIRED)');
+      ok(/parent or guardian/i.test(C.Stick.errors.friendly({ code: 'PARENT_CONSENT_REQUIRED' })), 'with a plain explanation');
+      ok(!!(await C.client.rpc('parental_consent_set', { p_child: C.Stick.auth.user().id, p_status: 'approved', p_method: 'x' })).error, 'the child cannot approve themself');
+      ok((await admin('select 1 from auth.users where id=$1', [C.Stick.auth.user().id])).rows.length === 1, 'the child’s sign-in account still exists (cleanup is a separate process)');
+      let mk_err = null; try { await C.Stick.account.save({ displayName: 'Kid', marketingOptIn: true }, { action: 'keep' }); } catch (e) { mk_err = e; }
+      ok(!!mk_err, 'nothing can be saved to the cloud for a pending child');
     }
 
     // validation happens before any network call

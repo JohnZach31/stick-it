@@ -27,7 +27,7 @@ async function login(email) {
   const code = new URL(r.headers.get('location')).searchParams.get('code');
   const { data: s, error: e2 } = await c.auth.exchangeCodeForSession(code);
   if (e2) throw e2;
-  await c.rpc('attest_age');          // the age screen
+  await c.rpc('set_age_band', { p_band: 'adult' });          // the age screen
   return { c, user: s.user };
 }
 

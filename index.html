@@ -52,14 +52,27 @@
     --danger: #ff5c72;
     --shadow: rgba(0,0,0,0.6);
   }
-  /* dark board: coloured paper under low light, a soft halo rather than an RGB glow */
+  /* dark board: the same coloured paper seen in dim lighting. The hue of each note is kept, the lightness is pulled down by mixing
+     with a warm dark neutral (so colour families stay recognisable), the ink turns warm cream, and there is no glow or bloom:
+     only an ordinary soft contact shadow. */
+  body.dark{ --dim-base:#0f0c16; --dim-amt:52%; --note-ink-dark:#f2eadb; }
   body.dark .note{
-    filter: saturate(1.28) brightness(0.9);
-    box-shadow: 0 0 14px -3px color-mix(in srgb, var(--note-bg, transparent) 45%, transparent), 3px 6px 14px var(--shadow), 0 1px 0 rgba(255,255,255,0.12) inset;
+    --paper-dim: color-mix(in oklab, var(--note-bg, #fff3a8) var(--dim-amt), var(--dim-base));
+    background: var(--paper-dim);
+    color: var(--note-ink-dark);
+    filter:none;
+    box-shadow: 2px 5px 12px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.07) inset;
   }
   body.dark .note:hover, body.dark .note:focus-within{
-    box-shadow: 0 0 18px -3px color-mix(in srgb, var(--note-bg, transparent) 55%, transparent), 5px 12px 22px var(--shadow), 0 1px 0 rgba(255,255,255,0.12) inset;
+    box-shadow: 4px 11px 20px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset;
   }
+  body.dark .note .paperFx{ opacity:0.45; }
+  body.dark .note .del{ background:rgba(255,255,255,0.1); }
+  body.dark .note .del:hover{ background:rgba(255,255,255,0.2); }
+  body.dark .note .badge{ background:rgba(0,0,0,0.35); color:var(--note-ink-dark); }
+  body.dark .note .moreBtn{ background:rgba(20,16,30,0.7); color:var(--note-ink-dark); }
+  body.dark .note .moreBtn:hover{ background:rgba(20,16,30,0.95); }
+  body.dark .note .tab{ filter:brightness(0.82); }
   body.dark .topbar{
     background:linear-gradient(to bottom, rgba(30,26,48,0.97), rgba(30,26,48,0.85));
   }
@@ -1647,6 +1660,7 @@
 
 <!-- Public configuration and the (optional) cloud layer. With no SUPABASE_URL in js/config.js the app is guest-only, exactly as before. -->
 <script src="js/config.js"></script>
+<script src="js/dev.js"></script>
 <script src="js/legal-config.js"></script>
 <script src="js/cloud-client.js"></script>
 <script src="js/repo.js"></script>
@@ -1933,7 +1947,7 @@
   }
 
   // ---------- legal pages (kept out of the board UI: sign-in, Settings, Account settings and public views only) ----------
-  var LEGAL_LINKS = [["Privacy", "legal/privacy.html"], ["Terms", "legal/terms.html"], ["Copyright / DMCA", "legal/copyright.html"]];
+  var LEGAL_LINKS = [["Privacy", "legal/privacy.html"], ["Terms", "legal/terms.html"], ["Young people & parents", "legal/young-people.html"], ["Accessibility", "legal/accessibility.html"], ["Copyright / DMCA", "legal/copyright.html"]];
   function legalLinksEl(cls){
     var d = document.createElement("div");
     d.className = cls || "legalLinks";
@@ -1942,31 +1956,45 @@
     });
     return d;
   }
+  // concise notice where information is requested (not the whole policy): what, why, whether it is required, who controls it
+  function collectionNoticeHtml(){
+    var op = (Stick.legal && Stick.legal.operatorName) || "the operator of Stick-It";
+    return 'Signing in sends your name, e-mail and profile photo from Google or GitHub to Stick-It, which is operated by ' + escapeHtml(op) +
+      ', to create and secure your account. Providing it is voluntary: without it you can still use Stick-It as a guest, with everything kept on your device. ' +
+      '<a href="legal/privacy.html" target="_blank" rel="noopener">Privacy notice</a>.';
+  }
   var LEGAL_ACK_HTML = 'By creating an account, you agree to the <a href="legal/terms.html" target="_blank" rel="noopener">Terms</a> and acknowledge the <a href="legal/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>.';
 
   // ---------- age screen ----------
-  // Neutral on purpose: it asks for a birth month and year, tells nobody the cut-off, and keeps nothing but the fact that
-  // it was passed (a timestamp on the account). Someone it turns away is not told how to get past it. This is ONE control;
-  // it does not, on its own, satisfy children's-privacy law (see docs/legal/age-gate.md).
-  var AGE_OK_KEY = "stickit.age.ok", AGE_BLOCK_KEY = "stickit.age.blocked", AGE_MIN_YEARS = 13;
-  function ageStamp(key){ var t = Number(safeGet(key)); return isFinite(t) && t > 0 ? t : 0; }
-  function ageBlocked(){ var t = ageStamp(AGE_BLOCK_KEY); return t > 0 && Date.now() - t < 24 * 3600 * 1000; }   // stops a quick "go back and retype" on this device; deliberately not tracking
-  function ageFresh(){ var t = ageStamp(AGE_OK_KEY); return t > 0 && Date.now() - t < 3600 * 1000; }
-  // strictly more than the minimum number of months after the birth month, so nobody is admitted a few days early
-  function ageEligible(year, month){ var n = new Date(); return (n.getFullYear() * 12 + n.getMonth() + 1) - (year * 12 + month) > AGE_MIN_YEARS * 12; }
-  function showAgeBlocked(){
-    var c = document.createElement("p"); c.className = "acctSub"; c.style.margin = "0";
-    c.textContent = "Stick-It isn\u2019t available to you right now.";
-    openModal({title: "Sorry", content: c, width: 340, actions: [{label: "OK", kind: "primary", value: true}]});
+  // "How old are you?" comes BEFORE any sign-in provider is shown. The birth month and year are used once, in this browser,
+  // to pick a band (adult 18+, teen 13-17, child under 13) and are then discarded: they are never stored or sent. What is
+  // remembered: the band for one hour on this device (so the provider round-trip can finish) and, on the account, the band,
+  // a timestamp and the policy versions. Under 13 is NOT refused: a child can use Stick-It as a guest (everything stays on
+  // the device); cloud features wait for a parent or guardian (the server enforces this). This is one control, not legal
+  // compliance on its own (docs/legal/children-and-parental-consent.md).
+  var AGE_OK_KEY = "stickit.age.ok", AGE_ADULT_YEARS = 18, AGE_TEEN_YEARS = 13;
+  // strictly more than N years after the end of the birth month, so nobody is placed in a band a few days early
+  function ageBandFor(year, month){
+    var n = new Date(), months = (n.getFullYear() * 12 + n.getMonth() + 1) - (year * 12 + month);
+    if(months > AGE_ADULT_YEARS * 12) return "adult";
+    if(months > AGE_TEEN_YEARS * 12) return "teen";
+    return "child";
   }
-  // opts: {blocking: bool (no Cancel; used after sign-in), onEligible(), onBlocked()}
-  function openAgeGate(opts){
-    opts = opts || {};
-    var content = document.createElement("div");
-    var lead = document.createElement("p"); lead.className = "acctSub"; lead.style.margin = "0";
-    lead.textContent = "Before you continue, please enter your birth month and year.";
-    var fine = document.createElement("p"); fine.className = "asHint"; fine.style.margin = "8px 0 0";
-    fine.textContent = "This is only used once, here, to check that Stick-It is available to you. Your birth date isn\u2019t stored.";
+  function ageFlag(){                       // the band chosen in the last hour on this device (adult/teen only), else null
+    var f = safeGet(AGE_OK_KEY);
+    return (f && typeof f === "object" && (f.band === "adult" || f.band === "teen") && Date.now() - f.t < 3600 * 1000) ? f.band : null;
+  }
+  function ageRemember(band){
+    if(band === "adult" || band === "teen") safeSet(AGE_OK_KEY, {band: band, t: Date.now()});
+    else { try{ localStorage.removeItem(AGE_OK_KEY); }catch(e){} }
+  }
+  // the form itself: opts = {onBand(band), extra: [{label, fn}]}
+  function buildAgeForm(opts){
+    var form = document.createElement("form");
+    form.noValidate = true;
+    var lead = document.createElement("p"); lead.className = "acctSub"; lead.style.cssText = "margin:0;text-align:left;";
+    lead.textContent = "Enter your birth month and year so we can show the right account options. We use it only for this check and don\u2019t store your birth date.";
+    form.appendChild(lead);
     var row = makeDiv("ageRow");
     var months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
     var mLab = document.createElement("label"); mLab.textContent = "Month";
@@ -1981,74 +2009,99 @@
     for(var y = thisYear; y >= thisYear - 110; y--){ var o2 = document.createElement("option"); o2.value = String(y); o2.textContent = String(y); ySel.appendChild(o2); }
     yLab.appendChild(ySel);
     row.appendChild(mLab); row.appendChild(yLab);
-    content.appendChild(lead); content.appendChild(row); content.appendChild(fine);
-    var done = false;
-    var actions = [];
-    if(!opts.blocking) actions.push({label: "Cancel", value: false});
-    else actions.push({label: "Sign out", value: "signout"});
-    actions.push({label: "Continue", kind: "primary", id: "ageGo", onClick: function(close){
+    form.appendChild(row);
+    var err = document.createElement("p"); err.className = "asErr"; err.setAttribute("role", "alert"); err.style.minHeight = "1em";
+    form.appendChild(err);
+    var acts = makeDiv("modalActions"); acts.style.marginTop = "6px";
+    (opts.extra || []).forEach(function(x){
+      var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn"; b.textContent = x.label; b.addEventListener("click", x.fn); acts.appendChild(b);
+    });
+    var go = document.createElement("button"); go.type = "submit"; go.className = "pillBtn primary"; go.id = "ageGo"; go.textContent = "Continue";
+    acts.appendChild(go);
+    form.appendChild(acts);
+    form.addEventListener("submit", function(e){
+      e.preventDefault();
       var yr = parseInt(ySel.value, 10), mn = parseInt(mSel.value, 10);
-      if(!yr || !mn) return false;
-      if(yr * 12 + mn > new Date().getFullYear() * 12 + new Date().getMonth() + 1) return false;      // a date in the future is not an answer
-      done = true;
-      if(ageEligible(yr, mn)){
-        safeSet(AGE_OK_KEY, Date.now());
-        close(true);
-        if(opts.onEligible) opts.onEligible();
-      } else {
-        safeSet(AGE_BLOCK_KEY, Date.now());                    // only "a screen was failed", never the date
-        close("blocked");
-        if(opts.onBlocked) opts.onBlocked();
-        showAgeBlocked();
-      }
-      return false;
-    }});
-    var m = openModal({title: "Before you continue", content: content, width: 380, actions: actions,
-      onClose: function(v){ if(!done && v === "signout" && opts.onSignOut) opts.onSignOut(); }});
-    var go = m.card.querySelector("#ageGo"); go.setAttribute("aria-disabled", "true");
-    function sync(){ go.setAttribute("aria-disabled", String(!(ySel.value && mSel.value))); }
-    mSel.addEventListener("change", sync); ySel.addEventListener("change", sync);
+      if(!yr || !mn){ err.textContent = "Please choose a month and a year."; return; }
+      if(yr * 12 + mn > new Date().getFullYear() * 12 + new Date().getMonth() + 1){ err.textContent = "That date is in the future."; return; }
+      var band = ageBandFor(yr, mn);       // the numbers stop mattering here: only the band leaves this function
+      ySel.value = ""; mSel.value = "";
+      opts.onBand(band);
+    });
+    return form;
+  }
+  // under 13: not a refusal, a different path
+  function renderChildStep(card, back){
+    card.className = "acctCard";
+    card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>' +
+      '<h3>One more step</h3>' +
+      '<p class="acctSub" style="text-align:left;">A parent or guardian needs to approve this account before cloud features can be used.</p>' +
+      '<p class="acctSub" style="text-align:left;">Parent approval isn\u2019t open yet, so for now you can use Stick-It as a guest: your boards stay on this device and nothing is sent to us.</p>' +
+      '<div class="modalActions" style="margin-top:8px;"><button type="button" class="pillBtn" id="askParentBtn">Ask a parent or guardian</button><button type="button" class="pillBtn primary" id="childGuestBtn">Continue as guest</button></div>';
+    card.querySelector("#acctCloseBtn").addEventListener("click", closeAccountModal);
+    card.querySelector("#askParentBtn").addEventListener("click", openParentNotice);
+    card.querySelector("#childGuestBtn").addEventListener("click", function(){
+      settings.guestConfirmed = true; saveSettings(); closeAccountModal(); toast("You\u2019re using Stick-It as a guest.");
+    });
+  }
+  function openParentNotice(){
+    var c = document.createElement("div"); c.className = "acctSub"; c.style.textAlign = "left";
+    c.innerHTML = '<p style="margin:0 0 8px;">Someone in your care would like to use Stick-It\u2019s cloud features (saving boards to an account and syncing them between devices). Because they are under 13, a parent or guardian has to approve first.</p>' +
+      '<p style="margin:0 0 8px;"><b>Approval is not open yet.</b> We haven\u2019t launched a way to verify it, and we won\u2019t accept a tick-box or an e-mail from the child as approval. Until then they can use Stick-It as a guest, with everything staying on their device.</p>' +
+      '<p style="margin:0;"><a href="legal/young-people.html" target="_blank" rel="noopener">What we collect, and what parents can expect</a></p>';
+    openModal({title: "For a parent or guardian", content: c, width: 400, actions: [{label: "OK", kind: "primary", value: true}]});
+  }
+  // the screen as a dialog: for an account that reached the app without a recorded band
+  function openAgeGateModal(opts){
+    var done = false;
+    var m = openModal({title: "How old are you?", content: document.createElement("div"), width: 380, actions: [{label: "Sign out", value: "signout"}],
+      onClose: function(v){ if(!done && opts.onSignOut) opts.onSignOut(); }});
+    var holder = m.card.querySelector("div:not(.modalActions)");
+    var content = m.card.children[2]; content.innerHTML = "";
+    content.appendChild(buildAgeForm({onBand: function(band){ done = true; m.close(true); opts.onBand(band); }}));
     return m;
   }
-  // wraps "Continue with Google / GitHub": the screen comes BEFORE the provider is contacted
-  function requireAge(go){
-    if(ageBlocked()){ showAgeBlocked(); return; }
-    if(ageFresh()){ go(); return; }
-    openAgeGate({onEligible: go});
-  }
-  // After a provider brings someone back: an account that has not passed the screen (a route that skipped it, or an
-  // account from before the screen existed) is asked now, before anything else loads. Under the minimum: the account
-  // just created is deleted on the server and nothing is kept.
+  function ageOkNotice(msg){ toast(msg); }
+  // After a provider brings someone back, or when a cached account is opened. Returns true when the app may carry on.
+  //  - no band recorded: use the one just chosen on this device (<1 h), otherwise ask now, before anything else loads
+  //  - child without parent approval: nothing is deleted; the account stays but cloud use stops, and the person is signed out here
   async function ensureAgeAttested(profile){
-    if(profile && !("age_attested_at" in profile)) return true;      // a project without the age-screen migration: there is nothing to check yet
-    if(profile && profile.age_attested_at) return true;
-    async function attest(){
-      try{ await Stick.account.attestAge(); }
-      catch(e){
-        // a project that has not had the age-screen migration yet simply has no such function: nothing to record, keep working
-        if(/attest_age|PGRST202|could not find the function/i.test(Stick.errors.parse(e).message)) return true;
-        throw e;
-      }
-      if(profile) profile.age_attested_at = new Date().toISOString();
-      return true;
-    }
-    async function reject(){
+    if(profile && !("age_band" in profile)) return true;            // a project without the age-band migration: nothing to check yet
+    async function childStop(){
       cloudSigningOut = true;
       var uid = Stick.mode.uid;
-      try{ await Stick.account.deleteAccount(); }catch(e){}
       try{ await Stick.auth.signOut("local"); }catch(e){}
       if(uid) wipeCloudCache(uid);
       try{ await Stick.assets.cacheClear(); }catch(e){}
       settings.account = null; settings.accountPrefs = null; saveSettings();
+      hideCloudOverlay();
+      var m = document.createElement("div"); m.className = "acctSub"; m.style.textAlign = "left";
+      m.textContent = "A parent or guardian needs to approve this account before cloud features can be used. You\u2019ve been signed out on this device, and you can keep using Stick-It as a guest.";
+      openModal({title: "One more step", content: m, width: 380,
+        actions: [{label: "Ask a parent or guardian", value: "ask", onClick: function(close){ close(false); openParentNotice(); return false; }}, {label: "Continue as guest", kind: "primary", value: true}],
+        onClose: function(){ location.hash = ""; location.reload(); }});
       return false;
     }
-    if(ageBlocked()) return reject();
-    if(ageFresh()) return attest();
+    async function record(band){
+      try{ await Stick.account.setAgeBand(band); }
+      catch(e){
+        if(/set_age_band|PGRST202|could not find the function/i.test(Stick.errors.parse(e).message)) return true;
+        throw e;
+      }
+      ageRemember(null);                                        // the one-hour hand-over flag has done its job
+      if(band === "child") return childStop();
+      return true;
+    }
+    if(profile && profile.age_band){
+      if(profile.age_band === "child" && profile.parental_consent_status !== "approved") return childStop();
+      return true;
+    }
+    var flag = ageFlag();
+    if(flag) return record(flag);
     hideCloudOverlay();
     return new Promise(function(resolve){
-      openAgeGate({blocking: true,
-        onEligible: function(){ attest().then(resolve, function(){ resolve(false); }); },
-        onBlocked: function(){ reject().then(function(){ setTimeout(function(){ location.hash = ""; location.reload(); }, 2500); resolve(false); }); },
+      openAgeGateModal({
+        onBand: function(band){ ageRemember(band); record(band).then(resolve, function(){ resolve(false); }); },
         onSignOut: function(){ cloudSignOut("local"); resolve(false); }});
     });
   }
@@ -5767,6 +5820,10 @@
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
       return;
     }
+    if(cloudShare && settings.account && settings.account.prof && settings.account.prof.ageBand === "child"){
+      var okChild = await confirmDialog({title: "Anyone with the link can see this", body: "Only share what you are happy for anyone to see, and check with a parent or guardian first.", confirm: "Make the link"});
+      if(!okChild) return;
+    }
     var ident = cloudShare ? shareIdentity() : {name:getDisplayName(), avatar:false, bio:false};
     var name = ident.name;
     var isGroup = shareable.length > 1;
@@ -6370,6 +6427,7 @@
     if(!acctBackdrop) return;
     var card = acctBackdrop.querySelector(".acctCard");
     card.className = "acctCard";
+    if(CLOUD_OK && !settings.account && state === "choice" && !ageFlag()) state = "age";      // age first, then the providers
     var closeBtnHtml = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>';
 
     if(state === "signedIn" && settings.account && CLOUD && window.Stick && Stick.account){
@@ -6397,6 +6455,15 @@
       var imp = card.querySelector("#importLocalBtn");
       if(imp) imp.addEventListener("click", function(){ closeAccountModal(); startManualImport(); });
 
+    } else if(state === "age"){
+      card.innerHTML = closeBtnHtml + '<h3 id="ageTitle">How old are you?</h3><div id="ageHost"></div>';
+      card.querySelector("#ageHost").appendChild(buildAgeForm({
+        extra: [{label: "Continue as guest", fn: function(){ renderAccountModal("guestCompare"); }}],
+        onBand: function(band){
+          ageRemember(band);
+          if(band === "child"){ renderChildStep(card); return; }
+          renderAccountModal(settings.guestConfirmed ? "guestHome" : "choice");
+        }}));
     } else if(state === "guestHome"){
       card.innerHTML = closeBtnHtml +
         '<h3 style="text-align:center;">Browsing as a guest</h3>' +
@@ -6405,11 +6472,15 @@
           '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--accent);flex:none;">' + escapeHtml(getDisplayName().charAt(0).toUpperCase()) + '</div>' +
           '<input id="guestNameInput" type="text" value="' + escapeHtml(getDisplayName()) + '" placeholder="Nickname" aria-label="Nickname" style="flex:1;padding:9px 12px;border-radius:10px;border:1px solid var(--edge);font-size:0.9rem;font-family:inherit;">' +
         '</div>' +
-        '<div class="googleBtn" id="googleBtnFallback"></div>' +
-        '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
-        '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
-        (CLOUD_OK ? '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '');
-      mountGoogleButton();
+        ((CLOUD_OK && !ageFlag())
+          ? '<button type="button" class="guestBtn" id="signInStartBtn">Sign in or create an account</button>'
+          : '<div class="googleBtn" id="googleBtnFallback"></div>' +
+            '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
+            '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
+            (CLOUD_OK ? '<p class="legalAck">' + collectionNoticeHtml() + '</p><p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : ''));
+      var startBtn = card.querySelector("#signInStartBtn");
+      if(startBtn) startBtn.addEventListener("click", function(){ renderAccountModal("age"); });
+      else mountGoogleButton();
       card.querySelector("#guestNameInput").addEventListener("input", function(e){
         settings.displayName = e.target.value.trim();
         saveSettings();
@@ -6450,7 +6521,7 @@
         '<div class="googleBtn" id="googleBtnFallback"></div>' +
         '<div class="googleBtn" id="githubBtn" style="margin-top:8px;"></div>' +
         '<div id="googleBtnHolder" style="margin-top:2px;"></div>' +
-        (CLOUD_OK ? '<p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '') +
+        (CLOUD_OK ? '<p class="legalAck">' + collectionNoticeHtml() + '</p><p class="legalAck">' + LEGAL_ACK_HTML + '</p>' : '') +
         '<button class="guestBtn" id="chooseGuestBtn">Continue as guest</button>' +
         '<div class="acctWhy">' +
           '<p>👤 Your real name &amp; photo on anything you share, instead of “Anon-4821.”</p>' +
@@ -6779,6 +6850,7 @@
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
           '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
+          '<button type="button" class="asAction" id="asCorrect"><span class="lbl">Correct my profile details<small>Change your name, username or bio at the top of this page, then Save.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
           '<div id="asLegal" style="padding-bottom:12px;"></div>' +
@@ -7054,10 +7126,14 @@
     draft.marketingOptIn = !!pr.marketingOptIn;
     $("asMarketing").checked = draft.marketingOptIn;
     $("asMarketing").addEventListener("change", function(){ draft.marketingOptIn = $("asMarketing").checked; });
+    if((pf.ageBand || "adult") !== "adult"){      // promotional e-mail is only for adult accounts (policy choice, flagged for legal review)
+      draft.marketingOptIn = false; $("asMarketing").checked = false; $("asMarketing").disabled = true; $("asMktRow").classList.add("off");
+      $("asMktRow").querySelector("small").textContent = "Promotional e-mail isn\u2019t available for this account. Security and account messages are separate.";
+    }
     // ---------- privacy requests + legal links
     var lg = Stick.legal || {};
-    $("asPrivacyHint").textContent = "To get a copy of your data or have it deleted, use Export and Delete account here: they work straight away. " +
-      (lg.privacyEmail ? "For anything else about your data, write to " + lg.privacyEmail + "." : "A contact address for privacy questions will be published before Stick-It launches publicly.");
+    $("asPrivacyHint").textContent = "To see, correct or delete your data, use Export, Correct and Delete account here: they work straight away. The export doesn\u2019t yet include voice-memo and video files. " +
+      (lg.privacyEmail ? "For anything else, or to ask for something this page can\u2019t do, write to " + lg.privacyEmail + "." : "A contact address for privacy requests hasn\u2019t been published yet.");
     $("asLegal").appendChild(legalLinksEl("legalLinks"));
 
     // ---------- immediate actions (never staged)
@@ -7077,6 +7153,7 @@
       if(go) cloudSignOut("global");
     });
     $("asSignOut").addEventListener("click", function(){ cloudSignOut("local"); });
+    $("asCorrect").addEventListener("click", function(){ var sc = $("asScroll"); if(sc) sc.scrollTop = 0; $("asName").focus(); });
     $("asDelete").addEventListener("click", openDeleteAccount);
 
     // ---------- Cancel discards (nothing was uploaded); Save validates and persists everything staged
@@ -7148,6 +7225,18 @@
   document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
   accountBtn.addEventListener("click", openAccountModal);
   document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
+  if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
+    Stick.hooks = Stick.hooks || {};
+    Stick.hooks.showAgeFlow = function(){ if(!settings.account){ openAccountModal(); renderAccountModal("age"); } };
+    var devSec = document.createElement("section");
+    devSec.className = "setSec";
+    devSec.innerHTML = '<h4>Developer (local only)</h4><div class="setBtns"><button class="pillBtn" id="devResetAge">Reset age/consent test state</button><button class="pillBtn" id="devShowAge">Show age flow</button></div>' +
+      '<p class="setHelp">Clears only this browser\u2019s local state. Server records are not changed.</p>';
+    var legalSec = document.querySelector("#settingsModal .setSec:has(.legalLinks)") || document.querySelector(".legalLinks").closest("section");
+    legalSec.insertAdjacentElement("afterend", devSec);
+    devSec.querySelector("#devResetAge").addEventListener("click", function(){ Stick.dev.resetAgeGate(); Stick.dev.resetConsent(); toast("Age and consent test state cleared."); });
+    devSec.querySelector("#devShowAge").addEventListener("click", function(){ cancelSettings(); Stick.dev.showAgeFlow(); });
+  }
   document.getElementById("openAcctFromSettings").addEventListener("click", function(e){ e.preventDefault(); cancelSettings(); openAccountModal(); });
   updateAccountIcon();
 
@@ -7436,6 +7525,24 @@
     var br = board.getBoundingClientRect(), ir = boardInner.getBoundingClientRect();
     return {x:(br.left - ir.left) / boardZoom, y:0, w:board.clientWidth / boardZoom, h:boardHeight()};
   }
+  // html2canvas cannot do color-mix(), so the snapshot computes the same dimmed paper the dark board shows (Oklab mix, 52% paper / 48% base)
+  function dimPaperColor(bg){
+    var d = document.createElement("div"); d.style.color = bg; document.body.appendChild(d);
+    var m = getComputedStyle(d).color.match(/[\d.]+/g); d.remove();
+    if(!m) return bg;
+    function lin(c){ c /= 255; return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+    function ok(r, g, b){
+      r = lin(r); g = lin(g); b = lin(b);
+      var l = Math.cbrt(0.4122214708*r + 0.5363325363*g + 0.0514459929*b), mm = Math.cbrt(0.2119034982*r + 0.6806995451*g + 0.1073969566*b), s2 = Math.cbrt(0.0883024619*r + 0.2817188376*g + 0.6299787005*b);
+      return [0.2104542553*l + 0.793617785*mm - 0.0040720468*s2, 1.9779984951*l - 2.428592205*mm + 0.4505937099*s2, 0.0259040371*l + 0.7827717662*mm - 0.808675766*s2];
+    }
+    var a = ok(+m[0], +m[1], +m[2]), b = ok(15, 12, 22), t = 0.52, mix = [0, 1, 2].map(function(i){ return a[i]*t + b[i]*(1 - t); });
+    var l2 = mix[0] + 0.3963377774*mix[1] + 0.2158037573*mix[2], m2 = mix[0] - 0.1055613458*mix[1] - 0.0638541728*mix[2], s3 = mix[0] - 0.0894841775*mix[1] - 1.291485548*mix[2];
+    l2 = l2*l2*l2; m2 = m2*m2*m2; s3 = s3*s3*s3;
+    var rgb = [4.0767416621*l2 - 3.3077115913*m2 + 0.2309699292*s3, -1.2684380046*l2 + 2.6097574011*m2 - 0.3413193965*s3, -0.0041960863*l2 - 0.7034186147*m2 + 1.707614701*s3];
+    return "rgb(" + rgb.map(function(c){ c = Math.max(0, Math.min(1, c)); c = c <= 0.0031308 ? 12.92*c : 1.055*Math.pow(c, 1/2.4) - 0.055; return Math.round(c*255); }).join(",") + ")";
+  }
+  function inkSwap(svg){ return document.body.classList.contains("dark") ? svg.split("#33301f").join("#f2eadb") : svg; }
   function buildSnapshotStage(region){
     var old = document.getElementById("snapStage");
     if(old) old.remove();
@@ -7451,15 +7558,16 @@
       var wReach = isObj(n) ? objSize(n).w : (n.w || NOTE_W);
       if(n.x + wReach < region.x - 40 || n.x > region.x + region.w + 40) return;
       var el = buildStaticNote(n);
+      if(document.body.classList.contains("dark") && !isObj(n) && n.bg){ el.style.background = dimPaperColor(n.bg); el.style.color = "#f2eadb"; }
       el.style.left = (n.x - region.x) + "px";
       el.style.top = (n.y - region.y) + "px";
       if(!isObj(n)) el.style.minHeight = h + "px";
       stage.appendChild(el);
     });
     document.body.appendChild(stage);
-    var BOX = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/></svg>');
-    var TICK = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 28 28" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="1.6" d="M5.2 7.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/><path stroke-width="2.6" d="M8.4 14.6c1.4 1.2 2.6 2.7 3.6 4.4 2.9-5.6 6.6-10.4 11.6-14.6"/></svg>');
-    var STRIKE = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9" fill="none" stroke="#33301f" stroke-opacity="0.85" stroke-width="1.7" stroke-linecap="round"/></svg>');
+    var BOX = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/></svg>'));
+    var TICK = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 28 28" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="1.6" d="M5.2 7.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/><path stroke-width="2.6" d="M8.4 14.6c1.4 1.2 2.6 2.7 3.6 4.4 2.9-5.6 6.6-10.4 11.6-14.6"/></svg>'));
+    var STRIKE = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9" fill="none" stroke="#33301f" stroke-opacity="0.85" stroke-width="1.7" stroke-linecap="round"/></svg>'));
     Array.prototype.forEach.call(stage.querySelectorAll("ul.checklist > li"), function(li){
       var fs = parseFloat(getComputedStyle(li).fontSize) || 18;
       var rtl = getComputedStyle(li).direction === "rtl";
@@ -7597,6 +7705,10 @@
   publishBtn.addEventListener("click", async function(){
     if(CLOUD && cloudSync && !viewerMode){
       var pr = settings.accountPrefs;
+      if(settings.account && settings.account.prof && settings.account.prof.ageBand === "child"){
+        var okC = await confirmDialog({title: "Anyone with the link can see this whole board", body: "Only share what you are happy for anyone to see, and check with a parent or guardian first.", confirm: "Create link"});
+        if(!okC){ shareResult.innerHTML = ""; return; }
+      }
       if(pr && pr.shareDefaultBoardMode === "ask"){       // account default: ask before every live link
         var yes = await confirmDialog({title:"Create a live link to this board?", body:"Anyone with the link will be able to see this board (read only) and follow your changes until you turn the link off.", confirm:"Create link"});
         if(!yes){ shareResult.innerHTML = ""; return; }
@@ -8617,7 +8729,8 @@
       providerUrl: (profile && profile.avatar_url) || meta.avatar_url || meta.picture || "",
       plan: (profile && profile.plan) || "free",
       prof: profile ? {avatarSource: profile.avatar_source, avatarAssetId: profile.avatar_asset_id, avatarStyle: profile.avatar_style,
-                       avatarColor: profile.avatar_color, avatarEmoji: profile.avatar_emoji} : prev.prof
+                       avatarColor: profile.avatar_color, avatarEmoji: profile.avatar_emoji,
+                       ageBand: profile.age_band || null, consent: profile.parental_consent_status || null} : prev.prof
     };
     settings.guestConfirmed = false;
     saveSettings();
@@ -8636,10 +8749,9 @@
   }
 
   function beginProviderSignIn(provider){
-    requireAge(function(){
-      toast("Opening " + providerName(provider) + "\u2026");
-      Stick.auth.signInWithProvider(provider).catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
-    });
+    if(!ageFlag()){ renderAccountModal("age"); return; }          // never contact a provider before the age step is resolved
+    toast("Opening " + providerName(provider) + "\u2026");
+    Stick.auth.signInWithProvider(provider).catch(function(e){ toast("Couldn't start sign-in: " + Stick.errors.friendly(Stick.errors.parse(e))); });
   }
   function beginGoogleSignIn(){ beginProviderSignIn("google"); }
   function wipeCloudCache(uid){

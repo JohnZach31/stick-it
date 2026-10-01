@@ -51,10 +51,58 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const ctx = vm.createContext({ console, Object, String });
   load('js/legal-config.js', ctx);
   const L = ctx.Stick.legal;
-  ok(!L.isComplete() && L.missing().length === 5, 'with nothing filled in, the config reports every required field as missing');
-  ok(L.operatorName === '' && L.postalAddress === '' && L.privacyEmail === '' && L.supportEmail === '' && L.copyrightEmail === '', 'no business details are pre-filled (nothing invented)');
-  ok(L.dmcaRegistered === false && L.copyrightFormEnabled === false, 'DMCA registration is not claimed and the complaint form is off');
+  ok(L.operatorName === 'Jonathan Zachevsky' && L.operatorCountry === 'Israel' && L.lastUpdated === '2026-10-01', 'known public owner facts are set');
+  ok(L.governingLaw === 'State of Israel' && /Tel Aviv/.test(L.proposedVenue), 'proposed governing law and venue are set (marked for legal review in the Terms)');
+  ok(L.publicPostalAddress === null, 'no public postal address is configured (nothing invented, nothing private)');
+  ok(L.supportEmail === null && L.privacyEmail === null && L.copyrightEmail === null, 'no contact e-mail is invented');
+  ok(!L.isComplete() && L.missing().join() === 'supportEmail,privacyEmail,copyrightEmail', 'the draft status stays until the three contact fields exist');
+  ok(L.dmcaRegistered === false && L.copyrightFormEnabled === false && L.parentConsentEnabled === false, 'DMCA registration, the complaint form and parent consent are not claimed');
   ok(L.dmcaAgent.name === '' && L.dmcaAgent.email === '' && L.dmcaAgent.address === '', 'no agent details are pre-filled');
+  ok(!Object.keys(L).some(k => /home|residen|street/i.test(k)), 'the public config has no field for a private/residential address');
+}
+
+// ---------------------------------------------------------------- the dev helpers exist only on a local host
+{
+  const run = (hostname, config = {}) => {
+    const ctx = vm.createContext({ console, Object, String, Array, localStorage: { getItem() { return null; }, removeItem() {} }, location: { hostname } });
+    vm.runInContext('globalThis.window = globalThis; Stick = {config: ' + JSON.stringify(config) + '};', ctx);
+    vm.runInContext(fs.readFileSync(path.join(root, 'js/dev.js'), 'utf8'), ctx);
+    return ctx.Stick;
+  };
+  for (const h of ['johnzach31.github.io', 'stick-it.example.com', 'localhost.evil.com', '192.168.1.5', '']) ok(run(h).dev === undefined, `Stick.dev does not exist on "${h}"`);
+  for (const h of ['localhost', '127.0.0.1']) {
+    const S = run(h);
+    ok(S.dev && ['resetAgeGate', 'resetConsent', 'showAgeFlow'].every(f => typeof S.dev[f] === 'function'), `Stick.dev has the three helpers on ${h}`);
+  }
+  ok(run('dev.stick-it.test', { DEV_HOSTS: ['dev.stick-it.test'] }).dev !== undefined, 'a host the owner lists explicitly in DEV_HOSTS also works');
+  ok(run('johnzach31.github.io', { DEV_HOSTS: [] }).dev === undefined, 'with an empty DEV_HOSTS (production) nothing is exposed');
+  const cfg = fs.readFileSync(path.join(root, 'js/config.js'), 'utf8');
+  ok(/DEV_HOSTS:\s*\[\s*\]/.test(cfg), 'production config has an empty DEV_HOSTS list');
+  const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  ok(!/URLSearchParams\([^)]*\)[^;]{0,120}(resetAge|ageOk|age\.ok|bypass)/i.test(idx), 'no query-string switch can bypass the age step');
+  ok(!/ipify|ip-api|ipinfo|x-forwarded-for/i.test(idx), 'nothing in the app relies on an IP address');
+  ok(!/Stick\.dev\s*=/.test(idx), 'index.html never assigns Stick.dev itself (only js/dev.js does, and only locally)');
+}
+
+// ---------------------------------------------------------------- the age bands (the real function, from index.html)
+{
+  const idx = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const start = idx.indexOf('var AGE_OK_KEY');
+  const end = idx.indexOf('function ageFlag()');
+  ok(start > 0 && end > start, 'found ageBandFor in the app');
+  const NOW = new Date(2026, 9, 1);           // 1 Oct 2026 (month index 9)
+  class FakeDate extends Date { constructor(...a) { if (a.length) super(...a); else super(NOW.getTime()); } }
+  const ctx = vm.createContext({ Date: FakeDate });
+  vm.runInContext(idx.slice(start, end), ctx);
+  const band = (age) => ctx.ageBandFor(2026 - age, 9);      // born in the PREVIOUS calendar month of that year: past the birth month
+  const want = { 8: 'child', 12: 'child', 13: 'teen', 16: 'teen', 17: 'teen', 18: 'adult', 25: 'adult' };
+  for (const [age, b] of Object.entries(want)) ok(band(Number(age)) === b, `age ${age} -> ${b} (got ${band(Number(age))})`);
+  ok(ctx.ageBandFor(2013, 10) === 'child', 'born 13 years ago THIS month: still "child" (the birth month has not passed)');
+  ok(ctx.ageBandFor(2013, 9) === 'teen', 'born in the previous month 13 years ago: teen');
+  ok(ctx.ageBandFor(2008, 10) === 'teen' && ctx.ageBandFor(2008, 9) === 'adult', 'the same rule at 18');
+  ok(!/safeSet\(AGE_OK_KEY, \{[^}]*(year|month|birth)/i.test(idx), 'the stored age flag never contains a year, month or birth date');
+  ok(!/Stick-It isn.{1,8}t available to you/i.test(idx), 'the old "Stick-It isn\'t available to you" refusal is gone');
+  ok(!/AGE_BLOCK_KEY|ageBlocked/.test(idx), 'the old 24-hour under-age block is gone');
 }
 
 // ---------------------------------------------------------------- repository guarantees
@@ -82,7 +130,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const fam = [...idx.matchAll(/\{name:"([^"]+)", script:/g)].map(m => m[1]);
   ok(fam.every(f => manifest.some(m => m.family === f)), 'every font the app can pick is self-hosted');
   // the age gate is wired in front of the providers
-  ok(/function requireAge\(go\)/.test(idx) && /beginProviderSignIn\("github"\)/.test(idx) && /function beginProviderSignIn[\s\S]{0,120}requireAge/.test(idx), 'both Google and GitHub sign-in go through the age screen');
+  ok(/function beginProviderSignIn\(provider\)\{\s*if\(!ageFlag\(\)\)/.test(idx) && /beginProviderSignIn\("github"\)/.test(idx) && /function beginGoogleSignIn\(\)\{ beginProviderSignIn\("google"\); \}/.test(idx), 'both Google and GitHub sign-in go through the age step first');
   ok(!/Subscribe|Upgrade now|Start free trial|Buy Premium|Checkout/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'no subscribe / upgrade / checkout button exists in the app');
   ok(!/GDPR.compliant|COPPA.(compliant|certified)|ADA.compliant|DMCA.protected|100% (secure|private)|military.grade/i.test(idx + read('README.md')), 'no compliance badges or unsupported security claims');
 }

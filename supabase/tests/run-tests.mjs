@@ -50,7 +50,7 @@ const denied = (r) => !!r.error && /permission denied|row-level security|violate
 const errIs = (r, re) => !!r.error && re.test(r.error);
 
 // ---------------------------------------------------------------- users
-const attest = (id) => run('su', 'update public.profiles set age_attested_at = now() where id = $1', [id]);
+const attest = (id) => run('su', "update public.profiles set age_band = 'adult', age_attested_at = now() where id = $1", [id]);
 const mk = (name, plan = 'free') => ({ id: uuid(), email: `${name}@example.com`, name, plan });
 const alice = mk('alice'), bob = mk('bob'), carol = mk('carol'), dave = mk('dave'), erin = mk('erin', 'premium'), mallory = mk('mallory');
 for (const u of [alice, bob, carol, dave, erin, mallory]) {
@@ -593,57 +593,101 @@ group('J. username availability check');
   ok(errIs(await run(b, "insert into public.profile_settings (user_id, handle) values ($1,'taken_name')", [b.id]), /duplicate key|unique/i), 'the unique index still refuses a taken username');
 }
 
-// ================================================================ K. legal: age attestation, marketing preference, copyright reports
-group('K. age attestation, marketing preference, copyright reports');
+// ================================================================ K. legal: age bands, parental consent, marketing preference, copyright reports
+group('K. age bands, parental consent, marketing preference, copyright reports');
 {
-  const kid = mk('kid'), adult = mk('adult'), owner = mk('kowner');
-  for (const u of [kid, adult, owner]) await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]);
+  const fresh = mk('fresh'), kid = mk('kidacct'), teen = mk('teenacct'), adult = mk('adult'), owner = mk('kowner');
+  for (const u of [fresh, kid, teen, adult, owner]) await run('su', 'insert into auth.users (id,email) values ($1,$2)', [u.id, u.email]);
   await attest(owner.id);
   const B = await board(owner, 'Owner board');
+  const inv = (await run(owner, 'select public.create_invite($1,$2,$3) as r', [B.id, fresh.email, 'editor'])).rows[0].r;
 
-  // an account that skipped the age screen can hold no content (even if it talks to the API directly)
-  ok(errIs(await run(kid, "select * from public.create_board('x')"), /AGE_NOT_CONFIRMED/), 'no board before the age screen');
-  ok(errIs(await run(kid, "select * from public.create_asset(null,'avatar','image/jpeg',900)"), /AGE_NOT_CONFIRMED/), 'no upload before the age screen');
-  ok(errIs(await run(kid, "insert into public.profile_settings (user_id, bio) values ($1,'hi')", [kid.id]), /AGE_NOT_CONFIRMED/), 'no bio / personal settings before the age screen');
-  const inv = (await run(owner, 'select public.create_invite($1,$2,$3) as r', [B.id, kid.email, 'editor'])).rows[0].r;
-  ok(errIs(await run(kid, 'select public.accept_invite($1)', [inv.token]), /AGE_NOT_CONFIRMED/), 'cannot join someone else\'s board before the age screen');
-  ok((await run(kid, 'select 1 from public.board_members')).rows.length === 0, '...and was not added as a member');
-  ok(errIs(await run(kid, "select public.create_share('board_live',$1,null,'x')", [B.id]), /FORBIDDEN|AGE_NOT_CONFIRMED/), 'no share links before the age screen');
+  // --- a signed-in account with NO band yet can hold no content, even through the API
+  ok(errIs(await run(fresh, "select * from public.create_board('x')"), /AGE_NOT_CONFIRMED/), 'no band: no board');
+  ok(errIs(await run(fresh, "select * from public.create_asset(null,'avatar','image/jpeg',900)"), /AGE_NOT_CONFIRMED/), 'no band: no upload');
+  ok(errIs(await run(fresh, "insert into public.profile_settings (user_id, bio) values ($1,'hi')", [fresh.id]), /AGE_NOT_CONFIRMED/), 'no band: no bio or settings');
+  ok(errIs(await run(fresh, 'select public.accept_invite($1)', [inv.token]), /AGE_NOT_CONFIRMED/), 'no band: cannot join a board');
+  ok(errIs(await run(fresh, "select public.create_share('board_live',$1,null,'x')", [B.id]), /FORBIDDEN|AGE_NOT_CONFIRMED/), 'no band: no share links');
 
-  // the flag cannot be set from the browser
-  ok(denied(await run(kid, 'update public.profiles set age_attested_at = now() where id=$1', [kid.id])), 'a browser cannot write age_attested_at directly');
-  ok(denied(await run('anon', 'select public.attest_age()')), 'anon cannot attest');
+  // --- nothing about age can be written by a browser
+  for (const col of ["age_band='adult'", 'age_attested_at = now()', "parental_consent_status='approved'", "terms_version='x'", "privacy_version='x'"]) {
+    ok(denied(await run(fresh, `update public.profiles set ${col} where id=$1`, [fresh.id])), `a browser cannot write ${col.split('=')[0].trim()}`);
+  }
+  ok(denied(await run('anon', "select public.set_age_band('adult')")), 'anon cannot set a band');
+  ok(!!(await run(fresh, "select public.set_age_band('senior')")).error, 'unknown bands are refused');
 
-  // attesting stores a timestamp only (no birth date anywhere)
-  const t1 = (await run(adult, 'select public.attest_age() as t')).rows[0].t;
-  ok(!!t1, 'attest_age returns the timestamp');
-  const t2 = (await run(adult, 'select public.attest_age() as t')).rows[0].t;
-  ok(String(t1) === String(t2), 'attesting again does not move the timestamp');
-  const cols = (await run('su', "select column_name from information_schema.columns where table_schema='public' and table_name in ('profiles','profile_settings') and (column_name ilike '%birth%' or column_name ilike '%dob%' or column_name ilike '%age%')")).rows.map(r => r.column_name);
-  ok(cols.length === 1 && cols[0] === 'age_attested_at', 'the only age-related column is the attestation timestamp: ' + cols.join());
-  ok(!(await run(adult, "select * from public.create_board('Adult board')")).error, 'after attesting, content can be created');
+  // --- the band is recorded once, and only the band + timestamp + versions are stored
+  const a1 = (await run(adult, "select * from public.set_age_band('adult','terms-1','privacy-1')")).rows[0];
+  ok(a1.age_band === 'adult' && !!a1.age_attested_at && a1.parental_consent_status === 'not_required' && a1.terms_version === 'terms-1' && a1.privacy_version === 'privacy-1', 'adult: band, timestamp, versions; no consent needed');
+  const a2 = (await run(adult, "select * from public.set_age_band('child')")).rows[0];
+  ok(a2.age_band === 'adult' && String(a2.age_attested_at) === String(a1.age_attested_at), 'a second call cannot lower the band or move the timestamp');
+  const cols = (await run('su', "select column_name from information_schema.columns where table_schema='public' and table_name in ('profiles','profile_settings','parental_consents') and (column_name ilike '%birth%' or column_name ilike '%dob%' or column_name ilike '%born%' or column_name ilike '%age%year%')")).rows;
+  ok(cols.length === 0, 'no birth date, birth year or birthday column exists anywhere');
+  ok(!(await run(adult, "select * from public.create_board('Adult board')")).error, 'adult: boards work');
 
-  // marketing preference: off by default, timestamped, set by the person, suppressed by unsubscribe
-  await run(adult, "insert into public.profile_settings (user_id) values ($1)", [adult.id]);
+  // --- teen: normal account, conservative defaults
+  const t1 = (await run(teen, "select * from public.set_age_band('teen','terms-1','privacy-1')")).rows[0];
+  ok(t1.age_band === 'teen' && t1.parental_consent_status === 'not_required', 'teen: no parental consent state');
+  const ts = (await run(teen, 'select share_default_identity, share_show_avatar, share_show_bio, marketing_opt_in from public.profile_settings')).rows[0];
+  ok(ts.share_default_identity === 'anonymous' && !ts.share_show_avatar && !ts.share_show_bio && !ts.marketing_opt_in, 'teen: shares anonymously, no photo/bio, no marketing by default');
+  ok(!(await run(teen, "select * from public.create_board('Teen board')")).error, 'teen: boards work');
+  ok(errIs(await run(teen, 'update public.profile_settings set marketing_opt_in = true'), /MARKETING_NOT_ALLOWED/), 'teen: cannot opt in to promotional e-mail');
+
+  // --- child: no cloud use until a parent/guardian approves; nobody but the service role can approve
+  const c1 = (await run(kid, "select * from public.set_age_band('child','terms-1','privacy-1')")).rows[0];
+  ok(c1.age_band === 'child' && c1.parental_consent_status === 'pending_parent_consent', 'child: pending parent consent');
+  ok(errIs(await run(kid, "select * from public.create_board('x')"), /PARENT_CONSENT_REQUIRED/), 'child: no board while pending');
+  ok(errIs(await run(kid, "select * from public.create_asset(null,'avatar','image/jpeg',900)"), /PARENT_CONSENT_REQUIRED/), 'child: no upload while pending');
+  ok(errIs(await run(kid, "insert into public.profile_settings (user_id, bio) values ($1,'hi')", [kid.id]), /PARENT_CONSENT_REQUIRED/), 'child: no bio/username while pending');
+  const invK = (await run(owner, 'select public.create_invite($1,$2,$3) as r', [B.id, kid.email, 'viewer'])).rows[0].r;
+  ok(errIs(await run(kid, 'select public.accept_invite($1)', [invK.token]), /PARENT_CONSENT_REQUIRED/), 'child: cannot join a board while pending');
+  ok(denied(await run(kid, "select public.parental_consent_set($1,'approved','self')", [kid.id])), 'the child cannot approve themself');
+  ok(denied(await run(adult, "select public.parental_consent_set($1,'approved','x')", [kid.id])), 'nor can any other signed-in user');
+  ok(denied(await run('anon', "select public.parental_consent_set($1,'approved','x')", [kid.id])), 'nor anon');
+  ok(denied(await run(kid, 'select * from public.parental_consents')) && denied(await run('anon', 'select * from public.parental_consents')), 'consent records are unreadable to browsers (parent details stay private)');
+  ok(errIs(await run('service', "select public.parental_consent_set($1,'approved')", [kid.id]), /VERIFICATION_METHOD_REQUIRED/), 'approval needs a named verification method');
+  ok(errIs(await run('service', "select public.parental_consent_set($1,'approved','x')", [adult.id]), /NOT_A_CHILD_ACCOUNT/), 'consent can only be recorded for a child account');
+  const ap = (await run('service', "select * from public.parental_consent_set($1,'approved','manual_review_by_owner','privacy-1','parent@example.org')", [kid.id])).rows[0];
+  ok(ap.parental_consent_status === 'approved', 'the service role can approve (after a verification the owner has chosen)');
+  ok(!(await run(kid, "select * from public.create_board('Kid board')")).error, 'child: after approval the account works');
+  ok(!(await run(kid, "select public.create_share('board_live', (select id from public.boards where owner_id=$1 limit 1), null, 'x')", [kid.id])).error, '...including links the child chooses to make');
+  const cr = (await run('service', "select parent_contact, verification_method, approved_at is not null a from public.parental_consents where child_id=$1 order by requested_at desc limit 1", [kid.id])).rows[0];
+  ok(cr && cr.verification_method === 'manual_review_by_owner' && cr.a === true && cr.parent_contact === 'parent@example.org', 'the consent record keeps method, time and (only if needed) the contact');
+  ok(!JSON.stringify((await run(kid, 'select * from public.profiles')).rows).includes('parent@example.org'), 'parent contact never appears in the child profile');
+  ok(errIs(await run(kid, 'insert into public.profile_settings (user_id, marketing_opt_in) values ($1, true)', [kid.id]), /MARKETING_NOT_ALLOWED/), 'child: never promotional e-mail, even after approval');
+  const rv = (await run('service', "select * from public.parental_consent_set($1,'revoked','manual_review_by_owner')", [kid.id])).rows[0];
+  ok(rv.parental_consent_status === 'revoked', 'consent can be revoked');
+  ok(errIs(await run(kid, "select * from public.create_board('after revoke')"), /PARENT_CONSENT_REQUIRED/), 'after revocation the account stops working again');
+
+  // --- marketing preference: adults only, off by default, timestamped, suppressed by unsubscribe
+  await run(adult, 'insert into public.profile_settings (user_id) values ($1)', [adult.id]);
   let ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_at, marketing_opt_in_source from public.profile_settings')).rows[0];
   ok(ps.marketing_opt_in === false && ps.marketing_opt_in_at === null, 'marketing e-mail is OFF by default');
   ok((await run('service', 'select count(*)::int c from public.marketing_audience()')).rows[0].c === 0, 'nobody is in the marketing audience by default');
   await run(adult, 'update public.profile_settings set marketing_opt_in = true where user_id=$1', [adult.id]);
   ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_at, marketing_opt_in_source from public.profile_settings')).rows[0];
-  ok(ps.marketing_opt_in === true && !!ps.marketing_opt_in_at && ps.marketing_opt_in_source === 'account_settings', 'opting in records when and where');
+  ok(ps.marketing_opt_in === true && !!ps.marketing_opt_in_at && ps.marketing_opt_in_source === 'account_settings', 'an adult opting in records when and where');
   ok(denied(await run(adult, 'update public.profile_settings set marketing_opt_in_at = null where user_id=$1', [adult.id])), 'the record of consent cannot be edited by the user');
   const aud = (await run('service', 'select * from public.marketing_audience()')).rows;
-  ok(aud.length === 1 && aud[0].email === adult.email, 'an opted-in person is in the audience');
+  ok(aud.length === 1 && aud[0].email === adult.email, 'only the opted-in adult is in the audience (not the teen, not the child)');
   ok(denied(await run(adult, 'select * from public.marketing_audience()')) && denied(await run('anon', 'select * from public.marketing_audience()')), 'only the service role can read the audience');
-  ok((await run('service', 'select public.marketing_unsubscribe($1) as r', [adult.id])).rows[0].r === true, 'unsubscribe works without a login (service role call)');
+  await run('su', 'alter table public.profile_settings disable trigger profile_settings_marketing');      // simulate bad data written around the trigger
+  await run('su', "update public.profile_settings set marketing_opt_in = true where user_id=$1", [teen.id]);
+  await run('su', 'alter table public.profile_settings enable trigger profile_settings_marketing');
+  ok((await run('service', 'select count(*)::int c from public.marketing_audience()')).rows[0].c === 1, 'even a teen row flagged opted-in would not reach the audience');
+  ok((await run('service', 'select public.marketing_unsubscribe($1) as r', [adult.id])).rows[0].r === true, 'unsubscribe works without a login');
   ok((await run('service', 'select count(*)::int c from public.marketing_audience()')).rows[0].c === 0, 'an unsubscribed person is suppressed');
   ps = (await run(adult, 'select marketing_opt_in, marketing_opt_in_source from public.profile_settings')).rows[0];
-  ok(ps.marketing_opt_in === false && ps.marketing_opt_in_source === 'unsubscribe_link', 'and the source is recorded');
-  ok((await run('service', 'select public.marketing_unsubscribe($1) as r', [adult.id])).rows[0].r === false, 'unsubscribing twice is harmless');
+  ok(ps.marketing_opt_in === false && ps.marketing_opt_in_source === 'unsubscribe_link', 'withdrawal is recorded with its source');
   ok(denied(await run(adult, 'select public.marketing_unsubscribe($1)', [adult.id])), 'a signed-in user cannot call the service-only unsubscribe function');
-  ok((await run(adult, 'select * from public.profile_settings where user_id <> $1', [adult.id])).rows.length === 0, 'others\' preferences are invisible');
 
-  // copyright reports: nobody but the service role
+  // --- abandoned accounts (never finished the age screen, never made anything)
+  await run('su', "update public.profiles set created_at = now() - interval '30 days' where id = $1", [fresh.id]);
+  const ab = (await run('service', 'select user_id from public.abandoned_accounts()')).rows.map(r => r.user_id);
+  ok(ab.includes(fresh.id) && !ab.includes(adult.id) && !ab.includes(kid.id), 'the clean-up list holds only old, band-less, empty accounts');
+  ok(denied(await run(adult, 'select * from public.abandoned_accounts()')), 'and only the service role can read it');
+
+  // --- copyright reports: nobody but the service role
   const rep = { n: 'Rights Holder', e: 'rh@example.org', d: 'My photograph', u: 'https://example.org/#s=x', s: 'R. Holder' };
   const ins = (actor, over = {}) => run(actor, 'insert into public.copyright_reports (reporter_name, reporter_email, work_description, infringing_url, good_faith, accuracy_perjury, signature) values ($1,$2,$3,$4,$5,$6,$7)',
     [rep.n, rep.e, rep.d, rep.u, over.gf ?? true, over.acc ?? true, rep.s]);
@@ -652,12 +696,14 @@ group('K. age attestation, marketing preference, copyright reports');
   ok(!!(await ins('service', { gf: false })).error && !!(await ins('service', { acc: false })).error, 'a report without the required statements is refused');
   ok(denied(await run(adult, 'select * from public.copyright_reports')) && denied(await run('anon', 'select * from public.copyright_reports')), 'reports are unreadable to browsers');
 
-  // deleting an account removes personal settings + marketing preference + invites it made
+  // --- deleting an account removes preferences, parental-consent records and invites
   await run(owner, 'select public.create_invite($1,$2,$3)', [B.id, 'x@example.com', 'viewer']);
   await run('service', 'select public.purge_user_data($1)', [owner.id]);
   ok((await run('su', 'select 1 from public.board_invites where inviter_id=$1', [owner.id])).rows.length === 0, 'invite links made by a deleted account are gone');
   await run('service', 'select public.purge_user_data($1)', [adult.id]);
-  ok((await run('su', 'select 1 from public.profile_settings where user_id=$1', [adult.id])).rows.length === 0, 'marketing preference and settings are deleted with the account');
+  ok((await run('su', 'select 1 from public.profile_settings where user_id=$1', [adult.id])).rows.length === 0, 'preferences are deleted with the account');
+  await run('su', 'delete from auth.users where id=$1', [kid.id]);
+  ok((await run('su', 'select 1 from public.parental_consents where child_id=$1', [kid.id])).rows.length === 0, 'parental-consent records (and the parent contact) are deleted with the child account');
 }
 
 // ---------------------------------------------------------------- summary

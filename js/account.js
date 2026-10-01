@@ -150,8 +150,14 @@
       return db().then(function (c) { return guard(c.rpc("handle_available", { p_handle: h })); }).then(function (v) { return v === true; });
     },
 
-    // "I passed the age screen": stores a timestamp on the account and nothing else (no birth date is ever sent)
-    attestAge: function () { return db().then(function (c) { return guard(c.rpc("attest_age")); }); },
+    // The age screen's RESULT (never the birth date, which the browser has already discarded): "adult" | "teen" | "child".
+    // Recorded once. Only the band, a timestamp and the policy versions are kept. A child account stays unusable in the cloud
+    // until a parent or guardian has been verified (server-enforced).
+    setAgeBand: function (band) {
+      var L = Stick.legal || {};
+      return db().then(function (c) { return guard(c.rpc("set_age_band", { p_band: band, p_terms_version: L.termsVersion || null, p_privacy_version: L.privacyVersion || null })); })
+        .then(function (profile) { return Stick.auth.profile(true).then(function () { return profile; }); });
+    },
 
     // numbers for the account page (own data only)
     usage: function () { return db().then(function (c) { return guard(c.rpc("my_usage")); }); },
