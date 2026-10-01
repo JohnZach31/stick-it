@@ -75,6 +75,12 @@
         if (o.type === "photo" && main) o.image = main.url;
         var cut = o.type === "photo" && o.cutoutAssetId && assets[o.cutoutAssetId];
         if (cut) o.cutout = cut.url;
+        if (o.type === "postcard" && main) o.image = main.url;                       // the picture on a postcard
+        if (o.type === "photo_strip" && Array.isArray(o.frames)) o.frames = o.frames.map(function (f) {   // every picture in a strip
+          var a = f && f.assetId && assets[f.assetId], c = Object.assign({}, f);
+          if (a) c.image = a.url;
+          return c;
+        });
         else if (!o.type && att) o.image = att.url;
         else if ((o.type === "audio" || o.type === "video") && main) o.mediaUrl = main.url;
         return o;

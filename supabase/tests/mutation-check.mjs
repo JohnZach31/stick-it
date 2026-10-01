@@ -38,6 +38,8 @@ const mutations = [
   ['resolve_share callable by clients',     '20260930120200_functions.sql',  '  public.accept_invite(text)\n  to authenticated;', '  public.accept_invite(text), public.resolve_share(text)\n  to authenticated;'],
   ['board limit off by one',                '20260930120200_functions.sql',  'if have >= lim then', 'if have > lim then'],
   ['viewers may publish shares',            '20260930130000_account_settings.sql',  "if v_role is null or v_role not in ('owner', 'editor') then", "if v_role is null then"],
+  ['strip pictures are not registered',     '20261001120000_paper_objects.sql', "from jsonb_array_elements(d -> 'frames') as f limit 6 loop", "from jsonb_array_elements(d -> 'frames') as f limit 0 loop"],
+  ['strip pictures lose their order',       '20261001120000_paper_objects.sql', "values (oid, ref::uuid, 'attached', i)", "values (oid, ref::uuid, 'attached', 0)"],
 ];
 
 let missed = 0;

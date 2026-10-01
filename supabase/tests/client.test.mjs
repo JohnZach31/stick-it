@@ -174,6 +174,22 @@ try {
   const assetCountBefore = (await admin('select count(*)::int c from public.assets')).rows[0].c;
   await A.sync.flush(); await sleep(150);
   ok((await admin('select count(*)::int c from public.assets')).rows[0].c === assetCountBefore, 'the cutout is not uploaded again');
+  // ---- postcard picture and photo strip frames: uploaded as assets; the rows hold references only
+  const card = { id: crypto.randomUUID(), type: 'postcard', x: 5, y: 5, w: 320, rot: 0, z: 9, image: tinyJpeg(21), imgRatio: 0.66, location: 'Lisbon', message: 'Hi', variant: 'classic', phys: {} };
+  const strip = { id: crypto.randomUUID(), type: 'photo_strip', x: 9, y: 9, w: 140, rot: 0, z: 10, variant: 'vertical', caption: 'Trip', font: 'Caveat', phys: {}, frames: [{ image: tinyJpeg(31), ratio: 0.75 }, { image: tinyJpeg(32), ratio: 0.7 }, { image: tinyJpeg(33), ratio: 0.8 }] };
+  A.notes.push(card, strip); A.sync.notesChanged();
+  await sleep(250); await A.sync.flush();
+  for (let i = 0; i < 80 && !(A.notes.find(o => o.id === card.id).assetId && A.notes.find(o => o.id === strip.id).frames.every(f => f.assetId)); i++) await sleep(100);
+  await A.sync.flush();
+  const cardRow = (await admin('select data from public.board_objects where id=$1', [card.id])).rows[0].data;
+  ok(cardRow.assetId && cardRow.location === 'Lisbon' && !JSON.stringify(cardRow).includes('base64'), 'a postcard\'s picture is an asset; the row keeps the words and a reference');
+  const stripRowData = (await admin('select data from public.board_objects where id=$1', [strip.id])).rows[0].data;
+  ok(Array.isArray(stripRowData.frames) && stripRowData.frames.length === 3 && stripRowData.frames.every(f => f.assetId && !f.image && !f.pending), 'every strip frame is uploaded and the row holds references only');
+  ok(!JSON.stringify(stripRowData).includes('base64') && stripRowData.caption === 'Trip', 'no picture bytes in the strip row');
+  ok((await admin("select count(*)::int c from public.object_assets where object_id=$1 and role='attached'", [strip.id])).rows[0].c === 3, 'the server registered the three pictures as the strip\'s assets');
+  const stripAssets = (await admin('select count(*)::int c from public.assets')).rows[0].c;
+  await A.sync.flush(); await sleep(150);
+  ok((await admin('select count(*)::int c from public.assets')).rows[0].c === stripAssets, 'strip pictures are not uploaded twice');
   await B.sync.pull(false);
   const bPhoto = B.notes.find(o => o.id === photo.id);
   ok(bPhoto && bPhoto.assetId && !bPhoto.image, 'B receives the photo object with only its reference');
@@ -187,6 +203,10 @@ try {
   ok(bCut && bCut.cutoutAssetId === cRow.cutoutAssetId && !bCut.cutoutKey, 'the other device receives the cutout by reference only');
   const cutBlobUrl = await B.Stick.assets.blobUrl(cRow.cutoutAssetId);
   ok(typeof cutBlobUrl === 'string' && cutBlobUrl.length > 0, 'and can download the cutout asset');
+  const bStrip = B.notes.find(o => o.id === strip.id), bCard = B.notes.find(o => o.id === card.id);
+  ok(bStrip && bStrip.frames.length === 3 && bStrip.frames.every(f => f.assetId) && bCard && bCard.assetId, 'the other device receives the strip and the postcard by reference');
+  for (let i = 0; i < 40 && !(B.notes.find(o => o.id === strip.id).frames.every(f => f.image) && B.notes.find(o => o.id === card.id).image); i++) await sleep(100);
+  ok(B.notes.find(o => o.id === strip.id).frames.every(f => /^blob:/.test(f.image || '')) && /^blob:/.test(B.notes.find(o => o.id === card.id).image || ''), 'and downloads every strip frame and the postcard picture');
   await B.sync.pull(false);
   const beforeAssets = (await admin('select count(*)::int c from public.assets')).rows[0].c;
   await A.sync.flush(); await sleep(100);

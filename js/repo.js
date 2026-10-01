@@ -20,6 +20,7 @@
       var v = o[k];
       if (v === undefined || typeof v === "function") return;
       if (k === "image" || k === "cutout") return;                       // -> assets
+      if (k === "frames") { data.frames = (Array.isArray(v) ? v : []).map(function (f) { var o2 = {}; if (f.assetId) o2.assetId = f.assetId; if (f.ratio != null) o2.ratio = f.ratio; if (f.cap) o2.cap = f.cap; if (!f.assetId && f.image) o2.pending = true; return o2; }); return; }   // strip pictures live in assets, never in the row
       if (k === "cutoutKey") return;                                     // this device's copy of a cutout blob: meaningless elsewhere
       if (k === "poster") { if (typeof v === "string" && v.length <= POSTER_MAX) data.poster = v; return; }
       data[k] = v;

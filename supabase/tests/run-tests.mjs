@@ -706,6 +706,64 @@ group('K. age bands, parental consent, marketing preference, copyright reports')
   ok((await run('su', 'select 1 from public.parental_consents where child_id=$1', [kid.id])).rows.length === 0, 'parental-consent records (and the parent contact) are deleted with the child account');
 }
 
+// ================================================================ L. paper objects (photo strips, postcards, real cutouts)
+group('L. photo strips and cutouts: asset references, sharing, garbage collection');
+{
+  const u = mk('lena'), v = mk('liam'), x = mk('lars');
+  for (const p of [u, v, x]) { await run('su', 'insert into auth.users (id,email) values ($1,$2)', [p.id, p.email]); await attest(p.id); }
+  const B = await board(u, 'Scraps');
+  const asset = async (owner, board_id, kind = 'image', mime = 'image/jpeg', size = 4000, source = null) => {
+    const id = uuid();
+    await run('su', "insert into public.assets (id, owner_id, board_id, kind, storage_path, mime_type, byte_size, status, source_asset_id) values ($1,$2,$3,$4,$5,$6,$7,'ready',$8)",
+      [id, owner.id, board_id, kind, `a/${id}/f`, mime, size, source]);
+    return id;
+  };
+  const p1 = await asset(u, B.id), p2 = await asset(u, B.id), p3 = await asset(u, B.id), cut = await asset(u, B.id, 'cutout', 'image/png', 3000, p1);
+  const objs = [uuid(), uuid(), uuid(), uuid()];                                // photo, strip, postcard, cutout-photo
+  const up = (list) => run(u, 'select public.sync_objects($1,$2::jsonb,$3::jsonb) as r', [B.id, JSON.stringify(list), '[]']);
+  const photoRow = (id, assetId, extra = {}) => ({ id, type: 'photo', x: 10, y: 10, width: 220, rotation: 0, z_index: 1, data: { assetId, photoStyle: 'polaroid', ...extra } });
+  const stripRow = { id: objs[1], type: 'photo_strip', x: 300, y: 10, width: 140, rotation: 1, z_index: 2, data: { variant: 'vertical', caption: 'Trip', frames: [{ assetId: p1, ratio: 0.75 }, { assetId: p2, ratio: 0.66 }, { assetId: p3 }] } };
+  const postRow = { id: objs[2], type: 'postcard', x: 20, y: 300, width: 320, rotation: -2, z_index: 3, data: { assetId: p3, location: 'Lisbon', message: 'Hello', variant: 'classic' } };
+  const cutRow = photoRow(objs[3], p1, { photoStyle: 'cutout', cutoutAssetId: cut, cutoutRatio: 1.3 });
+  const r1 = await up([photoRow(objs[0], p1), stripRow, postRow, cutRow]);
+  ok(!r1.error && r1.rows[0].r.results.every((x) => x.status === 'ok'), 'strip, postcard and cutout objects are accepted like any other object type (no schema change per type)');
+  const refs = (id) => run('su', 'select asset_id, role, sort_order from public.object_assets where object_id=$1 order by role, sort_order', [id]);
+  const sr = (await refs(objs[1])).rows;
+  ok(sr.length === 3 && sr.every((x) => x.role === 'attached') && sr.map((x) => x.sort_order).join() === '1,2,3', 'each picture in a strip is an "attached" asset reference, in strip order');
+  ok((await refs(objs[2])).rows.some((x) => x.role === 'primary' && x.asset_id === p3), 'a postcard keeps its picture as the primary asset');
+  const cr = (await refs(objs[3])).rows;
+  ok(cr.some((x) => x.role === 'cutout' && x.asset_id === cut) && cr.some((x) => x.role === 'primary' && x.asset_id === p1), 'a cutout photo references both its original and its cutout');
+  ok((await run('su', "select source_asset_id from public.assets where id=$1", [cut])).rows[0].source_asset_id === p1, 'the cutout asset records which original it came from');
+  // reordering/removing frames updates the references
+  const stripRow2 = { ...stripRow, data: { ...stripRow.data, frames: [{ assetId: p3 }, { assetId: p1 }] } };
+  const base = (await run('su', 'select version from public.board_objects where id=$1', [objs[1]])).rows[0].version;
+  const r2 = await up([{ ...stripRow2, base_version: base }]);
+  ok(r2.rows[0].r.results[0].status === 'ok' && (await refs(objs[1])).rows.map((x) => x.asset_id).join() === [p3, p1].join(), 'editing a strip re-registers its pictures (the removed one is no longer referenced)');
+  // a picture that is not yours and not on this board cannot be added to a strip
+  const xb = await board(x, 'Lars board');
+  const foreign = await asset(x, xb.id);
+  const r3 = await up([{ ...stripRow2, base_version: base + 1, data: { ...stripRow.data, frames: [{ assetId: p1 }, { assetId: foreign }] } }]);
+  ok(r3.rows[0].r.results[0].status === 'denied' || r3.rows[0].r.results[0].status === 'invalid', 'a strip cannot point at someone else\'s picture');
+  ok((await run('su', 'select 1 from public.object_assets where object_id=$1 and asset_id=$2', [objs[1], foreign])).rows.length === 0, 'and nothing was linked');
+  const bad = await up([{ ...stripRow, id: uuid(), data: { frames: [{ assetId: 'not-a-uuid' }] } }]);
+  ok(bad.rows[0].r.results[0].status === 'invalid', 'a malformed picture id is rejected, not stored');
+  // sharing includes every picture the shared objects use
+  const sh = await run(u, "select public.create_share('group_snapshot', $1, $2::uuid[], 'Lena', false, false) as r", [B.id, `{${objs[1]},${objs[2]},${objs[3]}}`]);
+  ok(!sh.error, 'a strip, a postcard and a cutout photo can be shared together');
+  const sid = sh.rows[0]?.r?.id;
+  const sa = (await run('su', 'select asset_id from public.share_assets where share_id=$1', [sid])).rows.map((r) => r.asset_id);
+  ok([p1, p2, p3, cut].every((a) => sa.includes(a)) || ([p3, p1, cut].every((a) => sa.includes(a))), 'the snapshot keeps every picture alive, including the cutout (strip frames, postcard picture, cutout)');
+  // deleting the standalone photo does not orphan what a strip still uses
+  await run(u, "update public.board_objects set deleted_at = now() where id=$1", [objs[0]]);
+  await run('su', "update public.assets set created_at = now() - interval '40 days'");
+  const claimed = (await run('service', "select id from public.gc_claim_orphan_assets(interval '0 seconds')")).rows.map((r) => r.id);
+  ok(!claimed.includes(p3) && !claimed.includes(p1) && !claimed.includes(cut), 'a picture still used by a strip, a postcard or a cutout is never garbage-collected');
+  // a viewer cannot write strips
+  await run(u, "insert into public.board_members (board_id, user_id, role) values ($1,$2,'viewer')", [B.id, v.id]).catch(() => {});
+  const vr = await run(v, 'select public.sync_objects($1,$2::jsonb,$3::jsonb) as r', [B.id, JSON.stringify([{ ...stripRow, id: uuid() }]), '[]']);
+  ok(vr.error || vr.rows[0].r.results.every((r) => r.status !== 'ok'), 'a viewer cannot add or change strips');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

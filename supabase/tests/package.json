@@ -12,7 +12,8 @@
     "test:all": "node run-tests.mjs && node mutation-check.mjs && node --experimental-strip-types functions.test.mjs && node --experimental-strip-types fake-supabase.test.mjs && node --experimental-strip-types client.test.mjs && node billing.test.mjs && node cutout.test.mjs",
     "fake-supabase": "node --experimental-strip-types fake-supabase/server.mjs",
     "test:billing": "node billing.test.mjs",
-    "test:cutout": "node cutout.test.mjs"
+    "test:cutout": "node cutout.test.mjs",
+    "test:objects": "node objects.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0",

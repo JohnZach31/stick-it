@@ -4998,6 +4998,10 @@
     var c = cloudSanitize(o);
     if(!c) return null;
     if(typeof cu === "string" && /^https?:\/\//.test(cu)) c.cutout = cu;
+    if(c.type === "postcard" && typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;
+    if(c.type === "photo_strip" && Array.isArray(o.frames) && Array.isArray(c.frames)){
+      c.frames = c.frames.map(function(f){ var of = o.frames.filter(function(x){ return x && x.assetId === f.assetId; })[0], src = of && of.image; if(typeof src === "string" && /^https?:\/\//.test(src)) f.image = src; return f; });
+    }
     if(typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;       // signed URLs from the resolver only
     if(typeof mu === "string" && /^https?:\/\//.test(mu)) c.mediaUrl = mu;
     delete c.mediaId;                                                              // a device-local key means nothing here
