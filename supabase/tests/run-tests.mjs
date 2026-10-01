@@ -856,6 +856,25 @@ group('M. collaboration: private presence channels, review states, comment summa
   ok((await run(out, 'select public.board_collab_summary($1) as s', [B.id])).rows[0].s.comments.length === 0, 'and tells a stranger nothing');
 }
 
+// ================================================================ N. owner allowlist
+group('N. owner allowlist: verified e-mail always gets premium');
+{
+  const ow = mk('owner'), fake = mk('fake'), late = mk('late');
+  ow.email = 'JohnZachWS@Gmail.com'; fake.email = 'johnzachws@gmail.com'; late.email = 'johnzachws@gmail.com';
+  await run('su', 'insert into auth.users (id,email,email_confirmed_at) values ($1,$2,now())', [ow.id, ow.email]);
+  ok((await run('su', 'select plan from public.profiles where id=$1', [ow.id])).rows[0].plan === 'premium', 'a verified allowlisted e-mail (any letter case) gets premium at sign-up');
+  await run('su', "update public.profiles set plan='free' where id=$1", [ow.id]);
+  ok((await run('su', 'select plan from public.profiles where id=$1', [ow.id])).rows[0].plan === 'premium', 'a downgrade does not stick');
+  await run('su', 'insert into auth.users (id,email) values ($1,$2)', [fake.id, fake.email.replace('johnzach', 'johnzach')]);
+  ok((await run('su', 'select plan from public.profiles where id=$1', [fake.id])).rows[0].plan === 'free', 'an UNVERIFIED sign-up with the address gets nothing');
+  await run('su', 'update auth.users set email_confirmed_at = now() where id=$1', [fake.id]);
+  ok((await run('su', 'select plan from public.profiles where id=$1', [fake.id])).rows[0].plan === 'premium', 'it upgrades once the e-mail is verified');
+  ok(denied(await run(ow, 'select email from public.premium_allowlist')), 'clients cannot read the allowlist');
+  ok(denied(await run(ow, "insert into public.premium_allowlist (email) values ('x@y.z')")), 'clients cannot add to it');
+  const other = mk('plain'); await run('su', 'insert into auth.users (id,email,email_confirmed_at) values ($1,$2,now())', [other.id, 'someone.else@gmail.com']);
+  ok((await run('su', 'select plan from public.profiles where id=$1', [other.id])).rows[0].plan === 'free', 'any other verified account stays on the free plan');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

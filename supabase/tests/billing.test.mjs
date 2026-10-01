@@ -130,7 +130,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const css = read('assets/fonts/fonts.css');
   ok(!/https?:\/\//.test(css), 'fonts.css only references local files');
   ok((css.match(/@font-face/g) || []).length > 1000, 'fonts.css declares the self-hosted faces');
-  const idx = ['index.html', 'js/app.js', 'css/app.css'].map(read).join('\n');
+  const idx = ['index.html', 'js/app.js', 'css/app.css'].map(read).join('\n').replace(/\r\n/g, '\n');
   ok(!/document\.cookie/.test(idx) && !/document\.cookie/.test(read('js/account.js')), 'no code sets or reads cookies');
   const bad = /fullstory|hotjar|clarity\.ms|posthog|sentry|logrocket|smartlook|google-analytics|googletagmanager|mixpanel|amplitude|segment\.com|plausible|matomo|datadog|newrelic|bugsnag|fbq\(|connect\.facebook/i;
   const files = ['index.html', '404.html', 'unsubscribe.html', ...fs.readdirSync(path.join(root, 'js')).filter(f => f.endsWith('.js')).map(f => 'js/' + f)];
@@ -236,6 +236,8 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(exists('docs/patch-notes/HISTORY-TODO.md') && !/20\d\d-\d\d-\d\d/.test(read('docs/patch-notes/HISTORY-TODO.md')), 'the history TODO exists and invents no dates');
   const notes = read('docs/patch-notes/0.8.0.md');
   ok(['## TL;DR', '## Highlights', '## Added', '## Improved', '## Changed', '## Fixed', '## Privacy & Security', '## Under the Hood', '## Known Limitations', '## Deferred', '## Development References'].every((h) => notes.includes(h)) && /status: \*\*development\*\*/.test(notes), 'the patch note has every planned section and says development');
+  const op = read('supabase/migrations/20261001150000_owner_premium.sql');
+  ok(/email_confirmed_at is not null/.test(op) && /lower\(u\.email\)/.test(op) && /enable row level security/.test(op) && !/johnzachws/.test(app + read('js/config.js') + idx), 'owner premium: matched on the verified e-mail in the database, allowlist unreadable to clients, address never shipped to the browser');
   // e-mail sign-in stays out of production
   ok(/EMAIL_AUTH: false/.test(read('js/config.js')) && !/Continue with email'/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'e-mail sign-in is not offered');
 }
