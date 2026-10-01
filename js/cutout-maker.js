@@ -20,7 +20,7 @@
     opts = opts || {};
     var UI = Stick.ui, CUT = Stick.cutout;
     return new Promise(function (resolve) {
-      var state = { prep: null, W: 0, H: 0, engine: "quick", runs: 0, edited: false, tool: "erase", brush: 56, zoom: 1, tx: 0, ty: 0, busy: false, undo: [], redo: [], closed: false, compare: false };
+      var state = { prep: null, W: 0, H: 0, engine: "quick", runs: 0, edited: false, tool: "erase", brush: 56, zoom: 1, tx: 0, ty: 0, busy: false, hasMask: false, undo: [], redo: [], closed: false, compare: false };
       var maskC = null, srcCanvas = null, view = null, vctx = null, base = null;     // base: mask kept while previewing Edges
 
       // ---------------------------------------------------------------- DOM
@@ -242,13 +242,13 @@
           } else { pushUndo(); }                                  // Retry replaces the mask, so it is undoable
           var area = 0; for (var i = 0; i < res.alpha.length; i += 7) if (res.alpha[i] > 127) area++;
           if (area * 7 < res.alpha.length * 0.004) throw new Error("NO_SUBJECT");
-          setMask(res.alpha); layout(); redraw(); updateButtons();
+          setMask(res.alpha); state.hasMask = true; layout(); redraw(); updateButtons();
           setBusyUI(false); updateButtons(); UI.loader.done("Cutout ready."); say("Cutout ready. Use Erase and Restore to tidy it, or choose Use cutout.");
           try { stage.focus(); } catch (e) {}
           if (!hintSeen) { hintSeen = true; try { root.localStorage.setItem(HINT_KEY, "1"); } catch (e) {} setTimeout(function () { hint.hidden = true; }, 12000); }
         }).catch(function (err) {
           UI.loader.hide(); setBusyUI(false);
-          if (!state.prep || !maskC) { showFail(true); say("Couldn’t make a clean cutout. Your original photo is unchanged."); }
+          if (!state.hasMask) { showFail(true); say("Couldn’t make a clean cutout. Your original photo is unchanged."); }
           else { say("Couldn’t make a clean cutout this time. The previous cutout is still here."); UI.toast("Couldn’t make a clean cutout. Your original photo is unchanged."); }
           updateButtons();
         });

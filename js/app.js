@@ -2478,7 +2478,13 @@
     loader: {show: function(t){ cloudOverlay(t); }, hide: function(){ hideCloudOverlay(); }, done: function(t, after){ stickLoaderDone(t, after); }, fail: function(t, retry){ stickLoaderFail(t, retry); }}
   };
   async function copyCutoutBlob(fromKey, toKey){
-    try{ var b = await MediaStore.blob(fromKey); if(b){ await MediaStore.put(toKey, b); } }catch(e){}
+    try{
+      var b = await MediaStore.blob(fromKey);
+      if(!b) return;
+      await MediaStore.put(toKey, b);
+      CutoutRT.remember(toKey, b);
+      notes.forEach(function(n){ if(n.cutoutKey === toKey && n.el) rerenderNote(n); });          // the copy was drawn before its picture existed: draw it again
+    }catch(e){}
   }
   function buildPhotoEl(item){
     var style = PHOTO_STYLES.indexOf(item.photoStyle) !== -1 ? item.photoStyle : "polaroid";
@@ -3654,6 +3660,10 @@
     else if(isAV(n)) openAVMenu(n, a);
     else if(n.type && OBJECT_MENUS[n.type]) OBJECT_MENUS[n.type](n, a);
     else openNoteMenu(n, a);
+    if(openPopover && window.Stick && Stick.collab && Stick.collab.active() && Stick.collab.canComment()){
+      var cm = menuItem(ICONS.pencil, "Comment…", function(){ closeFloatingPopovers(); setTimeout(function(){ Stick.collab.openSlip(n, pointAnchor(x, y)); }, 0); });
+      openPopover.insertBefore(cm, openPopover.lastChild);
+    }
     if(openPopover){ menuNav(openPopover); placeAtPointer(openPopover, x, y); }
   }
   function openGroupMenu(anchor, x, y){
@@ -7340,6 +7350,11 @@
     g.rotate((n.rot || 0) * Math.PI / 180);
     g.shadowColor = dark ? "rgba(0,0,0,0.6)" : "rgba(60,45,10,0.3)";
     g.shadowBlur = 3; g.shadowOffsetY = 1.2;
+    if(n.el && n.el.classList.contains("finished") && im.complete && im.naturalWidth){      // a real cutout: its own outline, no rectangle
+      var cw = pw, ch = pw * im.naturalHeight / im.naturalWidth;
+      g.drawImage(im, -cw/2, -ch/2, cw, ch); g.restore();
+      return false;
+    }
     var fw, fh, ix, iy;
     if(style === "polaroid"){
       var m = pw * 0.055; fw = pw + 2 * m; fh = ph + m + pw * 0.26;

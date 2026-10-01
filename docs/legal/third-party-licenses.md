@@ -7,13 +7,22 @@
 |---|---|---|---|---|
 | supabase-js | 2.x (bundled UMD) | `js/vendor/supabase.js`, licence `js/vendor/supabase-js.LICENSE` | MIT | Attribution kept. Contacts the Supabase project only |
 | html2canvas | 1.4.1 | `js/vendor/html2canvas.min.js`, licence `js/vendor/html2canvas.LICENSE` | MIT | Self-hosted since this patch (was loaded from cdnjs). Its bundle includes `tslib` (0BSD) |
+| ONNX Runtime Web | 1.22.0 | `js/vendor/ort/` (3 files), licence `js/vendor/ort/LICENSE` | MIT | Runs the cutout model in WebAssembly, on the device. Loaded only when someone makes a cutout |
 | Stick-It's own code | n/a | `index.html`, `js/*.js`, `legal/*`, `supabase/*` | the repository `LICENSE` | |
 
 No other runtime library. Development/test only (not shipped): `@electric-sql/pglite` (Apache-2.0), `@supabase/supabase-js` (MIT) in `supabase/tests`.
 Server-side (Supabase Edge Functions): `npm:@supabase/supabase-js` (MIT), run by Supabase.
 
+## Machine-learning models (run on the device, shipped from this site)
+| Model | File | Licence | Notes |
+|---|---|---|---|
+| U²-Net (portable "p" version) | `assets/models/u2netp.onnx` (4.6 MB) | Apache-2.0 (official repository) | Default "Quick" cutout. Attribution: https://github.com/xuebinqin/U-2-Net |
+| silueta (size-reduced U²-Net, distributed by `rembg`, MIT) | `assets/models/silueta.onnx` (44 MB) | Apache-2.0 lineage; **provenance of the weights file is less explicit: owner/counsel to confirm or remove** | "Finer edges" retry only. Choosing and rejecting alternatives: `docs/cutout/provider-evaluation.md` |
+
+Rejected for licence reasons (not shipped): RMBG-1.4 (non-commercial), the community ISNet conversion (AGPL-3.0).
+
 ## Fonts
-82 families, all **SIL OFL 1.1** or **Apache 2.0**, self-hosted with their licence files. No copyleft beyond OFL's "keep the licence with the font, don't sell the font alone, don't reuse reserved names", no non-commercial licences, no restrictions on web embedding. Full list: `docs/fonts-licenses.md`.
+85 families, all **SIL OFL 1.1** or **Apache 2.0**, self-hosted with their licence files. No copyleft beyond OFL's "keep the licence with the font, don't sell the font alone, don't reuse reserved names", no non-commercial licences, no restrictions on web embedding. Full list: `docs/fonts-licenses.md`.
 
 ## Icons, textures, images, sound
 | Asset | Source | Licence / status |
@@ -28,7 +37,7 @@ Server-side (Supabase Edge Functions): `npm:@supabase/supabase-js` (MIT), run by
 
 ## Services (not bundled)
 Supabase, GitHub Pages, Google and GitHub sign-in: governed by their own terms; see `00-data-and-third-party-inventory.md`.
-No machine-learning model or provider is used (the image cut-out hook returns "not available").
+Cutouts use **no provider and no network service**: segmentation runs in the browser (see above). The model files are fetched from Stick-It's own site the first time they are needed.
 
 ## Flags
 - Copyleft: **none** found in what ships. (OFL is a permissive-with-conditions font licence, not copyleft for the app.)

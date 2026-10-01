@@ -15,7 +15,8 @@ Written from the code and the deployed configuration as of this commit (not from
 | localStorage | `stickyboard.migrated.<board id>`, `stickit.migration.declined.<user id>` | "This guest board was already imported" / "don't ask again" | Import flow | Clearing site data |
 | localStorage | `stickit.age.ok`, `stickit.age.blocked` | A timestamp that the age screen was passed (1 h) / failed (24 h). **No birth date.** | Age screen | Expire; clearing site data |
 | localStorage | `stickit.dev.config` | Developer override; only honoured on localhost | Development | n/a |
-| IndexedDB | `stickit-media` | Voice memos, videos and cached pictures (guest media; downloaded copies of account media) | Product (media storage) | Sign-out wipes account media; clearing site data |
+| IndexedDB | `stickit-media` | Voice memos, videos and cached pictures (guest media; downloaded copies of account media) **and finished cutouts** (key `co-...`: a transparent PNG made on the device) | Product (media storage) | Sign-out wipes account media; clearing site data |
+| localStorage | `stickit.cutout.hint`, `stickit.rcUsed`, `stickit.age.known` | "You have seen the cutout tips", "you have used the right-click menu", the 90-day age-band hint (band only, never a date) | Product | Clearing site data |
 | Cookies | none set by Stick-It (verified: no `document.cookie` use) | | | |
 
 ### 1.2 In the Supabase project (only for signed-in people)
@@ -30,7 +31,11 @@ Written from the code and the deployed configuration as of this commit (not from
 | `shares`, `share_items`, `share_assets` | token **hash** (not the token), copy of shared items, identity shown (name, bio, photo) frozen at creation, active flag | Share links | Public to anyone with the link |
 | `share_reports` | reason text, reporter id if signed in | Abuse reports | |
 | `copyright_reports` | reporter name, e-mail, address (optional), description, URL, statements, signature | Copyright complaints (**intake switched off until the owner enables it**) | Service role only |
-| `comments`, `reminders` | schema only | Not used by any screen yet | |
+| `comments` | text (up to 2,000 characters; the app caps it lower), author, time, the object it is attached to, soft-delete flag | Comments attached to objects (v0.8.0). Never free-floating | Visible to board members; written by editors/owners |
+| `object_reviews` | state (changes requested / ready for review), optional reason (300 chars), who, when | The lightweight review step | Visible to board members; written only through `set_review_state` |
+| `reminders` | schema only | Not used by any screen yet | |
+| Realtime channel `board:<id>` (private, members only) | display name, which object a person is editing/moving, a heartbeat | "Who is here" and the soft edit lock | **Not stored**: it exists only while the page is open (presence state is dropped when the person leaves) |
+| `assets` kind `cutout` | a transparent PNG made on the device, with `source_asset_id` pointing at the original photo | Real cutouts | Same privacy and deletion rules as any picture |
 | `storage_tombstones` | storage path of a deleted file | Makes sure deleted files are removed | |
 
 ### 1.3 Logs and technical data (provider-side)
@@ -57,7 +62,8 @@ Written from the code and the deployed configuration as of this commit (not from
 | Analytics / error reporting / session replay | **None present** (searched the whole repository) | | | | | | | | |
 | E-mail provider | **None present** (Stick-It sends no e-mail; Supabase Auth is used with OAuth only) | | | | | | | | |
 | Payment provider (Stripe etc.) | **None present** | | | | | | | | |
-| Image cut-out provider | **None present** (the hook returns "not available") | | | | | | | | |
+| Image cut-out provider | **None**. Cutouts are computed on the device by a bundled model (ONNX Runtime Web + U²-Net family); no photo is sent anywhere for this, no key exists | | | | | | | | |
+| **ONNX Runtime Web 1.22.0** + model files (`js/vendor/ort/`, `assets/models/`) | On-device cutout | Nothing leaves the browser. The runtime and model are downloaded from Stick-It's own site the first time a cutout is made (4.6 MB, or 44 MB for "Finer edges") | Only the loader/progress | Optional feature | browser HTTP cache | n/a | MIT / Apache-2.0 | n/a | n/a |
 | Embeds, social-sharing widgets, advertising, tracking pixels | **None present** | | | | | | | | |
 
 ## 3. Network origins observed

@@ -1640,8 +1640,8 @@
   .po-receipt .poTotal{ display:flex; justify-content:space-between; align-items:baseline; margin-top:8px; padding-top:6px; border-top:1px solid rgba(59,56,47,0.55); font-size:0.95rem; font-weight:700; }
   .po-receipt .poTotalLab{ letter-spacing:0.12em; font-size:0.72rem; }
   .po-receipt .poBar{ margin-top:10px; text-align:center; font-size:0.62rem; letter-spacing:0.14em; opacity:0.45; border-top:1px dashed rgba(59,56,47,0.3); padding-top:6px; }
-  .po-receipt.v-faded .poSheet{ color:#6a655a; background-image:linear-gradient(90deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%, rgba(255,255,255,0.28) 80%), linear-gradient(180deg,#f8f6ee,#efebde); }
-  .po-receipt.v-faded .poBody, .po-receipt.v-faded .poTotal{ opacity:0.78; }
+  .po-receipt.v-faded .poSheet{ color:#4e4a3f; background-image:linear-gradient(90deg, rgba(255,255,255,0.35), rgba(255,255,255,0) 40%, rgba(255,255,255,0.28) 80%), linear-gradient(180deg,#f8f6ee,#efebde); }
+  .po-receipt.v-faded .poBody, .po-receipt.v-faded .poTotal{ opacity:0.9; }
   .po-receipt.v-folded .poSheet{ background-image:linear-gradient(180deg, transparent 47%, rgba(0,0,0,0.07) 49.4%, rgba(255,255,255,0.45) 50.4%, transparent 53%), linear-gradient(180deg,#fbf9f2,#f4f1e6); }
   .po-receipt.v-clean .poSheet, .po-receipt.v-folded .poSheet, .po-receipt.v-faded .poSheet{ clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%); padding-bottom:14px; }
   .po-receipt.v-torn .poSheet{ padding-bottom:22px; }
@@ -1750,13 +1750,13 @@
   .presenceBar{ display:inline-flex; align-items:center; margin-left:8px; }
   .presenceBar[hidden]{ display:none; }
   .presAv{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; margin-left:-5px; border-radius:50%; border:2px solid var(--panel);
-    background:hsl(var(--h, 200) 42% 44%); color:#fff; font:700 0.68rem 'Sora',sans-serif; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
+    background:hsl(var(--h, 200) 45% 32%); color:#fff; font:700 0.68rem 'Sora',sans-serif; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
   .presAv:first-child{ margin-left:0; }
   .presMore{ background:var(--accent-soft); color:var(--ink); }
   /* an object someone else is working on: a quiet outline and a small initial, no glow, nothing that keeps moving */
   .peerActive, .peerEditing{ outline:1.5px solid color-mix(in srgb, var(--accent-strong) 70%, transparent); outline-offset:5px; }
   .peerBadge{ position:absolute; top:-12px; left:50%; transform:translateX(-50%); z-index:4; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    background:hsl(var(--h, 200) 42% 44%); color:#fff; font:700 0.64rem 'Sora',sans-serif; border:2px solid var(--panel); pointer-events:none; }
+    background:hsl(var(--h, 200) 45% 32%); color:#fff; font:700 0.64rem 'Sora',sans-serif; border:2px solid var(--panel); pointer-events:none; }
   .peerEditing .peerBadge::after{ content:'\270E'; position:absolute; right:-9px; bottom:-6px; font-size:0.7rem; color:var(--ink); }
   .cmtTab{ all:unset; box-sizing:border-box; position:absolute; top:-9px; left:-9px; z-index:4; min-width:22px; height:22px; padding:0 5px; border-radius:6px 6px 6px 2px;
     display:none; align-items:center; justify-content:center; cursor:pointer; background:#fff7d6; color:#5a4a1c; border:1px solid rgba(90,74,28,0.35); box-shadow:0 1px 3px rgba(0,0,0,0.25);

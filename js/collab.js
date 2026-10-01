@@ -131,6 +131,7 @@
     if (host && host.refresh) host.refresh();
   };
   C.active = function () { return !!S; };
+  C.canComment = function () { return !!S && S.opts.canComment !== false && S.opts.comments !== false; };
   C.setEditing = function (id) { if (!S || S.editing === id) return; S.editing = id || null; S.send(); };
   C.setActive = function (id) { if (!S || S.active === id) return; S.active = id || null; S.send(); };
   C.blockedBy = function (id) { if (!S) return null; var o = core.lockOwner(S.peers, String(id), Date.now(), S.selfKey); return o ? o.name : null; };

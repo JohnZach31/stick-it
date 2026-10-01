@@ -27,6 +27,9 @@ Stick-It is operated by **Jonathan Zachevsky**, an individual in **Israel**. No 
 | **Preferences** | How you appear on shared links, handwriting font, default note colour, and whether you want product-update e-mails (**off unless you turn it on, and not available under 18**; we record when you changed it) | To apply your choices |
 | **Your content** | Boards, notes (text, formatting, positions), pictures, voice memos, videos, board covers | To provide the service |
 | **Collaboration data** | Boards you belong to and your role; invitations you create | To let people share boards |
+| **Comments and review** | The text of comments you add to an object, who wrote them and when; a review state on an object (changes requested / ready for review) with an optional short reason | To let collaborators discuss an object. Visible to everyone on that board |
+| **Presence** (not stored) | While a shared board is open: your display name, and which object you are editing or moving | To show who is here and to stop two people editing one note at once. It lives only while the page is open and is not saved |
+| **Cutouts** | The cutout picture you make from a photo (stored like any picture). **Cutouts are made on your device: your photo is not sent to any service for this** | To show a photo as a sticker |
 | **Share links** | A copy of what you shared, the name/picture/bio you chose to show, whether the link is active. The link's secret address is stored only as a one-way hash | To make links work and let you turn them off |
 | **Reports** | Content or copyright reports you send us | To handle abuse and copyright complaints |
 | **Technical and security data** | Standard request data (IP address, device/browser type, time) is processed by our hosting and database providers | To deliver and protect the service |
@@ -77,6 +80,7 @@ Our providers may process data outside Israel. [OWNER INPUT REQUIRED: the region
 | Abandoned sign-ups (an account that never finished the age step and owns nothing) | Removed by the same daily job after 7 days |
 | Share links | Until you turn them off or delete your account |
 | Age result on your device | Kept in your browser until you clear it; never contains a birth date |
+| Comments and review states | Until they are deleted, or the object, board or account is deleted |
 | Reports | [OWNER INPUT REQUIRED: how long reports are kept] |
 | Provider logs and backups | Controlled by Supabase and GitHub. [OWNER INPUT REQUIRED: retention for the chosen plan] |
 
