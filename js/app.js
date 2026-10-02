@@ -176,6 +176,7 @@
     camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>',
     film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"></path></svg>',
     sticky: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v10l-6 6H4z"></path><path d="M14 20v-6h6"></path></svg>',
+    expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"></path></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>',
     pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>'
@@ -826,7 +827,7 @@
       return cloudRefs({
         id: newId(), type: item.type,
         x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0),
-        w: Math.round(clampNum(item.w, 120, 480, 200)),
+        w: Math.round(item.type === "audio" ? clampNum(item.w, AUDIO_MIN_W, AUDIO_MAX_W, AUDIO_W) : clampNum(item.w, VIDEO_MIN_W, VIDEO_MAX_W, 200)),
         imgRatio: clampNum(item.imgRatio, 0.2, 5, 0.5625),
         rot: clampNum(item.rot, -12, 12, 0), z: 1,
         mediaId: mid || undefined, duration: clampNum(item.duration, 0, 86400, 0),
@@ -2922,11 +2923,13 @@
     sec = Math.max(0, Math.round(sec || 0));
     return Math.floor(sec / 60) + ":" + pad2(sec % 60);
   }
+  function fmtClock(sec){ sec = Math.max(0, Math.floor(sec || 0)); return pad2(Math.floor(sec / 60)) + ":" + pad2(sec % 60); }
+  var AUDIO_W = 236, AUDIO_MIN_W = 190, AUDIO_MAX_W = 440, VIDEO_MIN_W = 120, VIDEO_MAX_W = 480;
   function objSize(n){
     if(isPhoto(n)) return photoFrameSize(n);
     if(isPaper(n)) return paperSize(n);
     if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
-    if(n.type === "audio") return {w:236, h:66};
+    if(n.type === "audio") return {w:n.w || AUDIO_W, h:66};
     var w = n.w || 200;
     return {w:w + 16, h:w * (n.imgRatio || 0.5625) + 30 + (n.caption ? 32 : 0)};
   }
@@ -2948,17 +2951,19 @@
     play.setAttribute("aria-label", "Play");
     if(item.type === "audio"){
       el = makeDiv("boardObj memoObj");
+      el.style.setProperty("--pw", (item.w || AUDIO_W) + "px");
       el.appendChild(makeDiv("mTape"));
       play.className = "mPlay";
       el.appendChild(play);
-      var body = makeDiv("mBody");
-      body.appendChild(cap);
-      var wave = document.createElement("div");
-      wave.innerHTML = waveSvg(item.mediaId || item.id);
-      body.appendChild(wave.firstChild);
+      var body = makeDiv("mBody"), mhead = makeDiv("mHead");
+      mhead.appendChild(cap);
+      var waveBox = makeDiv("mWaveBox"), wave = document.createElement("div");
+      wave.innerHTML = waveSvg(item.mediaId || item.id) + waveSvg(item.mediaId || item.id).replace('class="mWave"', 'class="mWave mWaveOn"');
+      while(wave.firstChild) waveBox.appendChild(wave.firstChild);
+      var tm = makeDiv("mTime"); tm.textContent = fmtClock(item.duration);
+      mhead.appendChild(tm);
+      body.appendChild(mhead); body.appendChild(waveBox);
       el.appendChild(body);
-      var tm = makeDiv("mTime"); tm.textContent = fmtDur(item.duration);
-      el.appendChild(tm);
     } else {
       el = makeDiv("boardObj filmObj");
       el.style.setProperty("--pw", (item.w || 200) + "px");
@@ -2967,18 +2972,39 @@
       if(item.poster){ var im = document.createElement("img"); im.alt = ""; im.draggable = false; im.src = item.poster; frame.appendChild(im); }
       play.className = "fPlay";
       frame.appendChild(play);
-      if(item.duration){ var ft = makeDiv("fTime"); ft.textContent = fmtDur(item.duration); frame.appendChild(ft); }
+      var ft = makeDiv("fTime"); ft.textContent = item.duration ? fmtClock(item.duration) : ""; frame.appendChild(ft);
+      frame.appendChild(makeDiv("fProg"));
+      var open = document.createElement("button"); open.type = "button"; open.className = "fOpen"; open.title = "Open large"; open.setAttribute("aria-label", "Open large"); open.innerHTML = ICONS.expand || "\u2922";
+      frame.appendChild(open);
       strip.appendChild(frame);
       el.appendChild(strip);
       el.appendChild(cap);
     }
     el.style.setProperty("--rot", (item.rot || 0) + "deg");
-    return {el:el, cap:cap, play:play};
+    return {el:el, cap:cap, play:play, open:el.querySelector(".fOpen"), waveBox:el.querySelector(".mWaveBox")};
   }
-  var playing = null; // {n, audio}
+  // One thing plays at a time (a recording or an inline video). Progress is painted from the media element's own timeupdate events
+  // (about four a second), only for the one that is playing; nothing else runs.
+  var playing = null; // {n, media}
+  function paintMedia(n, cur, isPlaying){
+    var el = n.el; if(!el) return;
+    var dur = (playing && playing.n.id === n.id && isFinite(playing.media.duration) && playing.media.duration > 0) ? playing.media.duration : (n.duration || 0);
+    var pct = dur ? Math.max(0, Math.min(100, cur / dur * 100)) : 0, sec = Math.floor(cur), started = cur > 0.05 || isPlaying;
+    el.style.setProperty("--prog", pct.toFixed(1) + "%");
+    el.classList.toggle("playing", !!isPlaying);
+    var btn = el.querySelector(".mPlay, .fPlay");
+    if(btn){ var want = isPlaying ? "pause" : "play"; if(btn._st !== want){ btn._st = want; btn.innerHTML = isPlaying ? ICONS.pause : ICONS.play; btn.setAttribute("aria-label", isPlaying ? "Pause" : "Play"); } }
+    if(el._sec !== sec || el._started !== started){
+      el._sec = sec; el._started = started;
+      var t = el.querySelector(".mTime, .fTime");
+      if(t) t.textContent = started ? fmtClock(cur) + " / " + fmtClock(dur) : (dur ? fmtClock(dur) : "");
+    }
+  }
   function stopMediaFor(n){
-    if(playing && playing.n.id === n.id){ playing.audio.pause(); playing = null; }
+    if(playing && playing.n.id === n.id){ try{ playing.media.pause(); }catch(e){} var m = playing; playing = null; paintMedia(m.n, 0, false); }
   }
+  function pauseAllMedia(){ if(playing) try{ playing.media.pause(); }catch(e){} }
+  document.addEventListener("visibilitychange", function(){ if(document.hidden) pauseAllMedia(); });
   // Where can this recording/video be played from? This device's cache first, then a shared link's signed URL,
   // then (signed in) the copy in the account, which is what makes it playable on another device.
   function mediaUrlFor(n){
@@ -3004,7 +3030,22 @@
       : n.mediaState === "missing" ? "Wasn't available when this was moved"
       : "Not on this device";
   }
+  function ensureVideoEl(n, url){
+    var frame = n.el && n.el.querySelector(".fFrame"); if(!frame) return null;
+    var v = frame.querySelector("video");
+    if(!v){
+      v = document.createElement("video"); v.className = "fVideo"; v.playsInline = true; v.preload = "metadata"; v.controls = false; v.setAttribute("aria-label", n.caption || "Video");
+      if(n.poster) v.poster = n.poster;
+      frame.insertBefore(v, frame.firstChild);
+    }
+    if(v.getAttribute("src") !== url) v.src = url;
+    return v;
+  }
   function playAV(n, btn){
+    if(playing && playing.n.id === n.id && playing.media){                           // same one: toggle
+      if(playing.media.paused) playing.media.play().catch(function(){}); else playing.media.pause();
+      return;
+    }
     mediaUrlFor(n).then(function(u){
       if(!u){
         markMissing(n);
@@ -3013,25 +3054,41 @@
         if(n.mediaState === "failed" && cloudSync) cloudSync.retryAll();
         return;
       }
-      if(n.type === "video"){ openVideoModal(n, u); return; }
-      if(playing && playing.n.id === n.id){
-        if(playing.audio.paused){ playing.audio.play(); btn.innerHTML = ICONS.pause; }
-        else { playing.audio.pause(); btn.innerHTML = ICONS.play; }
-        return;
-      }
-      if(playing){ playing.audio.pause(); var ob = playing.n.el && playing.n.el.querySelector(".mPlay"); if(ob) ob.innerHTML = ICONS.play; }
-      var a = new Audio(u);
-      playing = {n:n, audio:a};
-      a.addEventListener("ended", function(){ btn.innerHTML = ICONS.play; if(playing && playing.audio === a) playing = null; });
-      a.play().then(function(){ btn.innerHTML = ICONS.pause; }).catch(function(){ toast("Couldn't play this recording here."); });
+      if(playing) stopMediaFor(playing.n);
+      var media = n.type === "video" ? ensureVideoEl(n, u) : new Audio(u);
+      if(!media){ toast("Couldn't play this here."); return; }
+      var me = {n:n, media:media}; playing = me;
+      media.addEventListener("timeupdate", function(){ if(playing === me) paintMedia(n, media.currentTime, !media.paused); });
+      media.addEventListener("play", function(){ if(playing === me) paintMedia(n, media.currentTime, true); });
+      media.addEventListener("pause", function(){ if(playing === me && !media.ended) paintMedia(n, media.currentTime, false); });
+      media.addEventListener("ended", function(){ if(playing === me){ playing = null; try{ media.currentTime = 0; }catch(e){} } paintMedia(n, 0, false); });
+      media.addEventListener("error", function(){ if(playing === me){ playing = null; paintMedia(n, 0, false); } toast("Couldn't play this " + (n.type === "audio" ? "recording" : "video") + " here."); });
+      media.play().catch(function(){ if(playing === me){ playing = null; paintMedia(n, 0, false); } toast("Couldn't play this " + (n.type === "audio" ? "recording" : "video") + " here."); });
     });
   }
   function openVideoModal(n, url){
+    pauseAllMedia();
     var content = makeDiv("videoModal");
     var v = document.createElement("video");
     v.src = url; v.controls = true; v.playsInline = true; v.autoplay = true;
     content.appendChild(v);
     openModal({title:n.caption || "Video", content:content, width:560, onClose:function(){ v.pause(); }});
+  }
+  function openVideoLarge(n){ mediaUrlFor(n).then(function(u){ if(u) openVideoModal(n, u); else { markMissing(n); toast("This video isn't available here."); } }); }
+  // resize a recording (width only) or a video (width, aspect kept): same handle and rules as photos and paper objects
+  function startAVResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el, before = captureState([n.id]), startX = e.clientX, audio = n.type === "audio";
+    var startW = n.w || (audio ? AUDIO_W : 200), min = audio ? AUDIO_MIN_W : VIDEO_MIN_W, max = audio ? AUDIO_MAX_W : VIDEO_MAX_W, w = startW;
+    document.body.style.cursor = "nwse-resize";
+    function move(ev){ w = Math.round(Math.min(max, Math.max(min, startW + (ev.clientX - startX) / boardZoom))); el.style.setProperty("--pw", w + "px"); }
+    function up(){
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = "";
+      if(w === startW) return;
+      n.w = w; recoverVertical([n]); ensureWidth(); saveNotes(); updateMinimap(); recordChange("Resize " + (audio ? "recording" : "video"), before);
+    }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
   }
   function renderAV(n, isNew){
     var b = buildAVEl(n), el = b.el;
@@ -3044,12 +3101,40 @@
     n.el = el; n.textEl = null; n.captionEl = b.cap;
     b.play.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
     b.play.addEventListener("click", function(e){ e.stopPropagation(); playAV(n, b.play); });
+    if(b.open){
+      b.open.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      b.open.addEventListener("click", function(e){ e.stopPropagation(); openVideoLarge(n); });
+    }
+    if(b.waveBox){                                              // click the waveform to jump to that point (while it is playing or paused mid-way)
+      b.waveBox.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      b.waveBox.addEventListener("click", function(e){
+        e.stopPropagation();
+        if(!(playing && playing.n.id === n.id) || !isFinite(playing.media.duration)) return;
+        var r = b.waveBox.getBoundingClientRect(), f = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+        playing.media.currentTime = f * playing.media.duration; paintMedia(n, playing.media.currentTime, !playing.media.paused);
+      });
+    }
+    var frameEl = el.querySelector(".fFrame");
+    if(frameEl){                                                // a click on a playing video's picture pauses / resumes it (a drag does not)
+      var pd = null;
+      frameEl.addEventListener("pointerdown", function(e){ pd = {x: e.clientX, y: e.clientY}; });
+      frameEl.addEventListener("click", function(e){
+        if(e.target.closest && e.target.closest(".fPlay, .fOpen")) return;
+        if(!pd || Math.hypot(e.clientX - pd.x, e.clientY - pd.y) > 5) return;
+        if(playing && playing.n.id === n.id) playAV(n, b.play);
+      });
+    }
     if(!readOnly){
       var more = document.createElement("button");
       more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options"; more.setAttribute("aria-label", "Options");
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
       more.addEventListener("click", function(e){ e.stopPropagation(); openAVMenu(n, more); });
       el.appendChild(more);
+      var handle = document.createElement("button");
+      handle.className = "pCtl pHandle"; handle.type = "button"; handle.title = "Drag to resize"; handle.setAttribute("aria-label", "Resize " + (n.type === "audio" ? "recording" : "video"));
+      handle.addEventListener("pointerdown", function(e){ startAVResize(e, n); });
+      handle.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      el.appendChild(handle);
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(b.cap.isContentEditable && b.cap.contains(e.target)) return;
@@ -3075,6 +3160,7 @@
   function openAVMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu");
     if(!pop) return;
+    if(n.type === "video") pop.appendChild(menuItem(ICONS.film, "Open large", function(){ closeFloatingPopovers(); openVideoLarge(n); }));
     pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Rename" : "Add a label", function(){ closeFloatingPopovers(); editCaption(n); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4036,6 +4122,68 @@
   // The element is lifted out of the (zoomed) board while focused; its saved
   // position and size never change, only the words do.
   var focusState = null;
+  // ---- the formatting strip in Focus Mode: the common controls without opening the "..." menu. Faint until it is used or hovered.
+  var focusBar = null, focusBarSel = null, focusBarIdle = 0;
+  function buildFocusBar(n){
+    var bar = makeDiv("focusBar"), text = n.textEl, items = [];
+    bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Formatting"); bar.setAttribute("aria-orientation", "horizontal");
+    function add(key, html, label, run, extra){
+      var b = document.createElement("button"); b.type = "button"; b.className = "fbBtn" + (extra ? " " + extra : ""); b.dataset.k = key; b.innerHTML = html; b.title = label; b.setAttribute("aria-label", label); b.setAttribute("aria-pressed", "false");
+      b.tabIndex = items.length ? -1 : 0;                       // one tab stop; arrow keys move along the strip
+      b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      b.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      b.addEventListener("click", function(e){ e.stopPropagation(); run(b); focusBarPulse(); updateFocusBar(); });
+      bar.appendChild(b); items.push(b); return b;
+    }
+    function sep(){ var s = makeDiv("fbSep"); s.setAttribute("aria-hidden", "true"); bar.appendChild(s); }
+    add("bold", ICONS.bold, "Bold (" + MOD + "+B)", function(){ execIn(text, "bold"); });
+    add("italic", ICONS.italic, "Italic (" + MOD + "+I)", function(){ execIn(text, "italic"); });
+    sep();
+    [1, 2, 3].forEach(function(lv){ add("h" + lv, "H" + lv, "Heading " + lv, function(){ toggleHeading(text, lv); }, "fbText"); });
+    sep();
+    add("mark", ICONS.highlighter, "Highlight", function(){ toggleHighlight(text); });
+    add("ul", ICONS.ul, "Bullet list", function(){ setListKind(text, "ul"); });
+    add("ol", ICONS.ol, "Numbered list", function(){ setListKind(text, "ol"); });
+    add("check", ICONS.checklist, "Checklist", function(){ setListKind(text, "check"); });
+    add("link", ICONS.link, "Link", function(b){ openLinkPopover(text, b); });
+    bar.addEventListener("keydown", function(e){
+      var i = items.indexOf(document.activeElement);
+      if(e.key === "ArrowRight" || e.key === "ArrowLeft"){
+        e.preventDefault(); e.stopPropagation();
+        var j = (i + (e.key === "ArrowRight" ? 1 : -1) + items.length) % items.length;
+        items.forEach(function(x){ x.tabIndex = -1; }); items[j].tabIndex = 0; items[j].focus();
+      } else if(e.key === "Escape"){ e.stopPropagation(); e.preventDefault(); try{ text.focus(); }catch(err){} }
+      else e.stopPropagation();
+    });
+    return bar;
+  }
+  function focusBarPulse(){ if(!focusBar) return; focusBar.classList.add("awake"); clearTimeout(focusBarIdle); focusBarIdle = setTimeout(function(){ if(focusBar) focusBar.classList.remove("awake"); }, 2600); }
+  // reflect what is under the caret: bold/italic, heading level, highlight, list kind
+  function updateFocusBar(){
+    if(!focusBar || !focusState) return;
+    var text = focusState.n.textEl, r = selectionIn(text), st = {};
+    if(r){
+      try{ st.bold = document.queryCommandState("bold"); st.italic = document.queryCommandState("italic"); }catch(e){}
+      var node = r.startContainer, h = closestIn(node, "h1", text) ? 1 : closestIn(node, "h2", text) ? 2 : closestIn(node, "h3", text) ? 3 : 0;
+      st.h1 = h === 1; st.h2 = h === 2; st.h3 = h === 3;
+      st.mark = !!closestIn(node, "mark", text);
+      var k = listKind(currentList(text)); st.ul = k === "ul"; st.ol = k === "ol"; st.check = k === "check";
+    }
+    Array.prototype.forEach.call(focusBar.querySelectorAll(".fbBtn"), function(b){ b.setAttribute("aria-pressed", String(!!st[b.dataset.k])); b.classList.toggle("on", !!st[b.dataset.k]); });
+  }
+  function showFocusBar(f){
+    if(focusBar) hideFocusBar();
+    focusBar = buildFocusBar(f.n); f.el.appendChild(focusBar);
+    focusBarSel = function(){ if(focusState && f.n.textEl && f.n.textEl.contains(document.getSelection().anchorNode)){ focusBarPulse(); updateFocusBar(); } };
+    document.addEventListener("selectionchange", focusBarSel);
+    f.n.textEl.addEventListener("keydown", focusBarPulse);
+    updateFocusBar();
+  }
+  function hideFocusBar(){
+    if(focusBarSel) document.removeEventListener("selectionchange", focusBarSel);
+    if(focusBar) focusBar.remove();
+    focusBar = null; focusBarSel = null; clearTimeout(focusBarIdle);
+  }
   function enterFocus(n){
     if(!n || n.type === "photo" || readOnly || focusState || !n.el || !n.textEl) return;
     closeFloatingPopovers(); hideLinkCard();
@@ -4059,6 +4207,7 @@
     el.appendChild(closeBtn);
     focusState = {n:n, el:el, scrim:scrim, placeholder:placeholder, closeBtn:closeBtn};
     document.body.classList.add("focusing");
+    showFocusBar(focusState);
     ensureCaret(n.textEl);
     updateScrollCue(n.textEl);
   }
@@ -4066,6 +4215,7 @@
     if(!focusState) return;
     var f = focusState;
     focusState = null;
+    hideFocusBar();
     f.closeBtn.remove();
     f.el.classList.remove("focused");
     if(f.placeholder.parentNode){ f.placeholder.parentNode.insertBefore(f.el, f.placeholder); f.placeholder.remove(); }

@@ -405,7 +405,7 @@
   .boardObj.static{ cursor:default; }
   .boardObj.static:hover{ transform:rotate(var(--rot, 0deg)); }
   .memoObj{
-    width:236px; padding:10px 14px 10px 10px; display:flex; align-items:center; gap:10px;
+    width:var(--pw, 236px); padding:10px 14px 10px 10px; display:flex; align-items:center; gap:10px; --prog:0%;
     background-color:#f5eedb;
     background-image:repeating-linear-gradient(180deg, transparent 0 17px, rgba(90,120,160,0.12) 17px 18px);
     border-radius:2px 3px 2px 4px; box-shadow:0 1px 1.5px rgba(0,0,0,0.16), 3px 7px 14px var(--shadow); color:#3a3528;
@@ -419,10 +419,15 @@
   .mPlay svg, .fPlay svg{ width:15px; height:15px; }
   .mPlay:active, .fPlay:active{ transform:scale(0.92); }
   .memoObj .mBody{ flex:1; min-width:0; }
+  .memoObj .mHead{ display:flex; align-items:baseline; gap:8px; }
+  .memoObj .mHead .pCaption{ flex:1; min-width:0; }
   .memoObj .pCaption{ font-size:1.05rem; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .memoObj .pCaption.editing{ white-space:normal; }
-  .memoObj .mWave{ display:block; width:100%; height:16px; margin-top:3px; color:#3a3528; opacity:0.55; }
-  .memoObj .mTime{ flex:none; font:600 0.72rem 'Sora', sans-serif; opacity:0.7; font-variant-numeric:tabular-nums; }
+  .memoObj .mWaveBox{ position:relative; height:16px; margin-top:3px; cursor:default; }
+  .memoObj .mWave{ position:absolute; inset:0; display:block; width:100%; height:100%; color:#3a3528; opacity:0.38; }
+  .memoObj .mWave.mWaveOn{ opacity:0.95; clip-path:inset(0 calc(100% - var(--prog, 0%)) 0 0); }
+  .memoObj.playing .mWaveBox{ cursor:pointer; }
+  .memoObj .mTime{ flex:none; font:600 0.72rem 'Sora', sans-serif; opacity:0.82; font-variant-numeric:tabular-nums; white-space:nowrap; }
   .boardObj.missing .mPlay, .boardObj.missing .fPlay{ opacity:0.35; cursor:default; }
   .boardObj .mNote{ font:500 0.62rem 'Sora', sans-serif; opacity:0.7; margin-top:2px; }
   .filmObj{ width:calc(var(--pw, 200px) + 16px); }
@@ -437,7 +442,19 @@
   .filmObj .fFrame{ position:relative; width:var(--pw, 200px); aspect-ratio:var(--ar, 16 / 9); background:#35302b; overflow:hidden; }
   .filmObj .fFrame img{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; }
   .filmObj .fPlay{ position:absolute; left:50%; top:50%; margin:-19px 0 0 -19px; border-color:#f3eee2; color:#f3eee2; background:rgba(0,0,0,0.25); }
-  .filmObj .fTime{ position:absolute; right:6px; bottom:5px; font:600 0.66rem 'Sora', sans-serif; color:#f3eee2; background:rgba(0,0,0,0.45); padding:1px 5px; border-radius:4px; }
+  .filmObj .fTime{ position:absolute; right:6px; bottom:7px; font:600 0.66rem 'Sora', sans-serif; color:#f3eee2; background:rgba(0,0,0,0.55); padding:1px 5px; border-radius:4px; font-variant-numeric:tabular-nums; white-space:nowrap; z-index:2; }
+  .filmObj .fTime:empty{ display:none; }
+  .filmObj .fVideo{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#000; display:block; }
+  .filmObj .fProg{ position:absolute; left:0; bottom:0; height:3px; width:var(--prog, 0%); background:#f3eee2; opacity:0; z-index:2; transition:opacity .2s ease; pointer-events:none; }
+  .filmObj.playing .fProg{ opacity:0.9; }
+  .filmObj .fOpen{ all:unset; position:absolute; top:5px; right:5px; z-index:3; width:24px; height:24px; border-radius:6px; background:rgba(0,0,0,0.5); color:#f3eee2; display:none; align-items:center; justify-content:center; cursor:pointer; font-size:0.9rem; }
+  .filmObj .fOpen svg{ width:13px; height:13px; }
+  .filmObj.selected .fOpen, .filmObj:focus-within .fOpen, .filmObj .fFrame:hover .fOpen{ display:flex; }
+  .filmObj .fOpen:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  .filmObj.playing .fPlay{ opacity:0; transition:opacity .2s ease; }
+  .filmObj.playing:hover .fPlay, .filmObj.playing.selected .fPlay, .filmObj.playing .fPlay:focus-visible{ opacity:1; }
+  .filmObj .fFrame{ cursor:default; }
+  .filmObj.playing .fFrame{ cursor:pointer; }
   .filmObj .pCaption{
     display:table; margin:7px auto 0; max-width:var(--pw, 200px); background:#fbf8ef; color:#3a3528; padding:2px 10px 3px;
     font-size:1rem; transform:rotate(-2deg); box-shadow:0 1px 3px rgba(0,0,0,0.2);
@@ -1930,3 +1947,19 @@
 .doneActs{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
 @media (max-width:720px){ .donePile{ bottom:60px; } }
 @media (prefers-reduced-motion: reduce){ .donePile.bump{ animation:none; } .note.toDone{ transition:none !important; } }
+
+/* ---------- Focus Mode formatting strip: a faint strip of sticky paper along the bottom edge of the note ---------- */
+.note.focused > .text{ padding-bottom:54px; }
+.focusBar{ position:absolute; left:10px; right:44px; bottom:8px; z-index:4; display:flex; align-items:center; gap:2px; padding:4px 6px; border-radius:10px; overflow-x:auto; scrollbar-width:none;
+  background:rgba(255,255,255,0.5); border:1px solid rgba(60,45,15,0.16); box-shadow:0 1px 3px rgba(40,25,5,0.14); opacity:0.5; transition:opacity .25s ease; }
+.focusBar::-webkit-scrollbar{ display:none; }
+.focusBar:hover, .focusBar:focus-within, .focusBar.awake{ opacity:1; }
+.fbBtn{ all:unset; box-sizing:border-box; flex:none; min-width:30px; height:30px; padding:0 6px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; color:#2e2616; }
+.fbBtn svg{ width:17px; height:17px; display:block; }
+.fbText{ font:800 0.74rem 'Sora',sans-serif; }
+.fbBtn:hover{ background:rgba(0,0,0,0.08); }
+.fbBtn:focus-visible{ outline:2px solid var(--focus); outline-offset:-2px; }
+.fbBtn.on, .fbBtn[aria-pressed="true"]{ background:rgba(0,0,0,0.16); box-shadow:inset 0 0 0 1px rgba(0,0,0,0.3); }
+.fbSep{ flex:none; width:1px; height:18px; margin:0 4px; background:rgba(0,0,0,0.2); }
+body.dark .focusBar{ background:rgba(255,255,255,0.7); }
+@media (prefers-reduced-motion: reduce){ .focusBar{ transition:none; } }
