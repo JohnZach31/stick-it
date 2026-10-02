@@ -528,6 +528,28 @@
     });
     return names.map(function(x){ return "'" + x + "'"; }).join(", ") + ", cursive";
   }
+  // CAPTION-SAFE fonts: small labels and captions never use a loose or ornamental hand (Reenie Beanie, Rock Salt, Kristi ... are lovely
+  // at note size and unreadable at 13 px). Each script has a short list of clear, handwriting-flavoured or print-like faces; the first
+  // is the default. Note fonts are untouched: only tiny physical labels use this set.
+  var CAPTION_SAFE = {
+    latin:    ["Patrick Hand", "Handlee", "Architects Daughter", "Kalam", "Delicious Handrawn", "Indie Flower"],
+    hebrew:   ["Varela Round", "Alef", "Heebo", "Rubik", "Miriam Libre", "Playpen Sans Hebrew"],
+    cyrillic: ["Neucha", "Pangolin", "Rubik", "Caveat"],
+    arabic:   ["Mada", "Harmattan", "Reem Kufi"],
+    zh: ["Ma Shan Zheng"], ja: ["Klee One"], ko: ["Gamja Flower"]
+  };
+  function captionList(text){ return CAPTION_SAFE[detectScript(String(text || ""))] || CAPTION_SAFE.latin; }
+  // the face to use for a caption: the person's pick if it can draw this text, else the script's default (never the note's own font)
+  function captionFontFor(pref, text){ var list = captionList(text); return pref && list.indexOf(pref) !== -1 ? pref : list[0]; }
+  function captionStack(pref, text){
+    var first = captionFontFor(pref, text), names = [first];
+    SCRIPT_ORDER.forEach(function(sc){ var d = CAPTION_SAFE[sc][0]; if(names.indexOf(d) === -1) names.push(d); });
+    return names.map(function(x){ return "'" + x + "'"; }).join(", ") + ", sans-serif";
+  }
+  function nextCaptionFont(item){
+    var list = captionList(item.caption || ""), cur = captionFontFor(item.captionFont, item.caption || "");
+    return list[(list.indexOf(cur) + 1) % list.length];
+  }
   // fonts that can draw a script: its own, plus ones from other lists that also ship its letters (e.g. Caveat has Cyrillic)
   function fontPool(script){
     script = script || "latin";
@@ -755,6 +777,7 @@
   var PHOTO_STYLES = ["polaroid", "cutout", "mounted"];
   var PHOTO_STYLE_NAMES = {polaroid:"Polaroid", cutout:"Cut-out", mounted:"Mounted cut-out"};
   var PHOTO_MIN_W = 80, PHOTO_MAX_W = 900;
+  var CUT_BORDERS = ["none", "thin", "medium"];                              // white scissor border round a cutout (default: thin)
   var BACKINGS = ["cardboard", "kraft", "paper", "notebook", "graph"];      // mounted-cutout materials (all free)
   function isPhoto(n){ return !!n && n.type === "photo"; }
   // Voice memos and videos: the board keeps metadata (and a small poster frame);
@@ -778,7 +801,9 @@
         if(/^[\w-]{1,64}$/.test(String(item.cutoutKey || ""))) o.cutoutKey = String(item.cutoutKey);
         if(ca || o.cutoutKey){ o.cutoutRatio = clampNum(item.cutoutRatio, 0.05, 20, 1); }
         if(BACKINGS.indexOf(item.backing) !== -1) o.backing = item.backing;
+        if(CUT_BORDERS.indexOf(item.cutBorder) !== -1) o.cutBorder = item.cutBorder;
       }
+      if(FONT_BY_NAME[item.captionFont]) o.captionFont = item.captionFont;
       return o;
     }
     if(window.Stick && Stick.objects && Stick.objects.isKind(item.type)){
@@ -850,7 +875,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -906,6 +931,8 @@
     if(c.cutoutKey !== undefined && !/^[\w-]{1,64}$/.test(String(c.cutoutKey))) delete c.cutoutKey;
     if(c.cutoutRatio !== undefined) c.cutoutRatio = clampNum(c.cutoutRatio, 0.05, 20, 1);
     if(c.backing !== undefined && BACKINGS.indexOf(c.backing) === -1) delete c.backing;
+    if(c.cutBorder !== undefined && CUT_BORDERS.indexOf(c.cutBorder) === -1) delete c.cutBorder;
+    if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
     if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
     delete c.image; delete c.cutout;                     // media only ever arrives through assets
@@ -1639,7 +1666,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -1759,6 +1786,7 @@
   function applySelection(){
     notes.forEach(function(n){ if(n.el) n.el.classList.toggle("selected", selected.has(n.id)); });
     document.body.classList.toggle("multi-sel", selected.size > 1);
+    document.body.classList.toggle("hasSel", selected.size > 0);          // the selected object owns attention: neighbours go quiet (CSS)
     renderSelBar();
   }
   function setSelection(ids){
@@ -2453,13 +2481,13 @@
     function finished(n, style){
       var src = raw(n);
       if(!src || !window.Stick || !Stick.sticker) return null;
-      var mode = style === "mounted" ? "mounted" : "sticker", backing = mode === "mounted" ? (n.backing || "cardboard") : "";
-      var ck = src + "|" + mode + "|" + backing, hit = comps[ck];
+      var mode = style === "mounted" ? "mounted" : "sticker", backing = mode === "mounted" ? (n.backing || "cardboard") : "", border = cutBorderOf(n);
+      var ck = src + "|" + mode + "|" + backing + "|" + border, hit = comps[ck];
       if(hit && hit.url) return hit;
       if(hit === "fail") return null;
       if(!hit){
         comps[ck] = "pending";
-        Stick.sticker.compose(src, {mode: mode, material: backing, seed: hashStr(String(n.id) + (n.cutoutKey || n.cutoutAssetId || ""))}).then(function(r){
+        Stick.sticker.compose(src, {mode: mode, material: backing, border: border, seed: hashStr(String(n.id) + (n.cutoutKey || n.cutoutAssetId || ""))}).then(function(r){
           comps[ck] = r;
           var live = findNote(n.id);
           if(live && live.el) rerenderNote(live);
@@ -2474,7 +2502,7 @@
   // helpers the Cutout Maker (js/cutout-maker.js) needs from the app
   window.Stick = window.Stick || {};
   Stick.ui = {
-    ICONS: ICONS, toast: function(m){ toast(m); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
+    ICONS: ICONS, toast: function(m){ toast(m); }, modal: function(o){ return openModal(o); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
     loader: {show: function(t){ cloudOverlay(t); }, hide: function(){ hideCloudOverlay(); }, done: function(t, after){ stickLoaderDone(t, after); }, fail: function(t, retry){ stickLoaderFail(t, retry); }}
   };
   async function copyCutoutBlob(fromKey, toKey){
@@ -2514,7 +2542,7 @@
     var cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
     cap.dir = "auto";
     cap.textContent = item.caption || "";
-    cap.style.fontFamily = fontStack(item.font);
+    cap.style.fontFamily = captionStack(item.captionFont, item.caption);
     if(style === "polaroid") frame.appendChild(cap);
     body.appendChild(frame);
     el.appendChild(body);
@@ -2652,6 +2680,14 @@
     rerenderNote(n);
     recordChange("Change photo style", before);
   }
+  function cutBorderOf(n){ return CUT_BORDERS.indexOf(n.cutBorder) !== -1 ? n.cutBorder : "thin"; }
+  function setCutBorder(n, b){
+    if(CUT_BORDERS.indexOf(b) === -1 || cutBorderOf(n) === b) return;
+    var before = captureState([n.id]);
+    n.cutBorder = b;
+    saveNotes(); rerenderNote(n);
+    recordChange("Change border", before);
+  }
   function setBacking(n, backing){
     if(BACKINGS.indexOf(backing) === -1 || n.backing === backing) return;
     var before = captureState([n.id]);
@@ -2682,6 +2718,7 @@
     MediaStore.put(key, res.blob).catch(function(){ toast("Couldn't keep the cutout on this device, so it lasts only until you close the page."); });
     CutoutRT.remember(key, res.blob);
     n.cutoutKey = key; n.cutoutRatio = +res.ratio.toFixed(4); delete n.cutoutAssetId; delete n.cutout;
+    if(CUT_BORDERS.indexOf(res.border) !== -1) n.cutBorder = res.border;
     n.photoStyle = style;
     saveNotes(); rerenderNote(n);
     recordChange("Cut out photo", before);
@@ -2741,8 +2778,15 @@
     });
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.postcard, "Make postcard", function(){ closeFloatingPopovers(); makePostcardFromPhoto(n); }));
+    pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos([n.id]); }));
     pop.appendChild(menuItem(ICONS.scissors, hasRealCutout(n) ? "Redo cutout\u2026" : "Make cutout\u2026", function(){ closeFloatingPopovers(); startCutout(n, n.photoStyle); }));
     if(hasRealCutout(n)) pop.appendChild(menuItem(ICONS.close, "Remove cutout", function(){ closeFloatingPopovers(); removeCutout(n); }));
+    if(hasRealCutout(n)){
+      var bdh = makeDiv("menuHint"); bdh.textContent = "Border"; pop.appendChild(bdh);
+      CUT_BORDERS.forEach(function(bd){
+        pop.appendChild(menuItem(bd === cutBorderOf(n) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', bd === "none" ? "No border" : bd === "thin" ? "Thin border" : "Medium border", function(){ closeFloatingPopovers(); setCutBorder(n, bd); }));
+      });
+    }
     if(hasRealCutout(n) && n.photoStyle === "mounted"){
       var bh = makeDiv("menuHint"); bh.textContent = "Backing"; pop.appendChild(bh);
       BACKINGS.forEach(function(bk){
@@ -2751,6 +2795,13 @@
     }
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Edit caption" : "Add caption", function(){ closeFloatingPopovers(); editCaption(n); }));
+    if(n.caption) pop.appendChild(menuItem(ICONS.pencil, "Caption font: " + captionFontFor(n.captionFont, n.caption), function(){
+      closeFloatingPopovers();
+      var before = captureState([n.id]);
+      n.captionFont = nextCaptionFont(n);
+      saveNotes(); rerenderNote(n);
+      recordChange("Change caption font", before);
+    }));
     if(n.caption) pop.appendChild(menuItem(ICONS.close, "Remove caption", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -2884,7 +2935,7 @@
     var el, cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
     cap.dir = "auto";
     cap.textContent = item.caption || "";
-    cap.style.fontFamily = fontStack(item.font);
+    cap.style.fontFamily = captionStack(item.captionFont, item.caption);
     var play = document.createElement("button");
     play.innerHTML = ICONS.play;
     play.setAttribute("aria-label", "Play");
@@ -3174,9 +3225,17 @@
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
         if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
         var group = selected.has(n.id) && selected.size > 1;
+        var fEl = e.target.closest && e.target.closest(".poF"), wasOnly = selected.size === 1 && selected.has(n.id), sx = e.clientX, sy = e.clientY;
         if(!group) setSelection([n.id]);
         bringToFront(n, el);
         startDrag(e, n, group ? selectedNotes() : [n]);
+        if(fEl && wasOnly){                                  // already selected: a plain click on its text edits it (the text cursor promises that)
+          window.addEventListener("pointerup", function once(ev){
+            window.removeEventListener("pointerup", once);
+            if(Math.hypot(ev.clientX - sx, ev.clientY - sy) > 4) return;
+            setTimeout(function(){ if(fEl.isConnected && !activePaperEdit) editPaperField(n, fEl); }, 0);
+          });
+        }
       });
       el.addEventListener("dblclick", function(e){
         e.preventDefault(); e.stopPropagation();
@@ -3380,7 +3439,8 @@
   }
   function makeStripFromPhotos(ids){
     var photos = ids.map(findNote).filter(function(n){ return isPhoto(n); });
-    if(photos.length < Stick.objects.STRIP_MIN || photos.length > Stick.objects.STRIP_MAX){ toast("Choose between " + Stick.objects.STRIP_MIN + " and " + Stick.objects.STRIP_MAX + " photos."); return; }
+    if(photos.length < Stick.objects.STRIP_MIN){ stripNeedsMore(photos.length, function(){ openStripPicker(photos.map(function(p){ return p.id; })); }); return; }
+    if(photos.length > Stick.objects.STRIP_MAX){ stripNeedsMore(photos.length, function(){ openStripPicker(photos.slice(0, Stick.objects.STRIP_MAX).map(function(p){ return p.id; })); }); return; }
     photos.sort(function(a, b){ return (a.x - b.x) || (a.y - b.y); });          // left to right, then top to bottom
     var cx = photos.reduce(function(s, p){ return s + p.x; }, 0) / photos.length, cy = photos.reduce(function(s, p){ return s + p.y; }, 0) / photos.length;
     var strip = newPaper("photo_strip", cx + 90, cy + 140, {variant: "vertical", frames: stripFramesFromPhotos(photos), font: pickFont()});
@@ -3404,14 +3464,56 @@
     toast("Made a photo strip.", "Undo", function(){ undoIfTop(action); });
     return strip;
   }
-  function createStripFromFiles(bx, by){
+  // One branded modal for "this isn't enough photos" (the same dialog system as every other question in the app).
+  function stripNeedsMore(have, retry){
+    var tooMany = have > Stick.objects.STRIP_MAX;
+    openModal({
+      title: tooMany ? "Photo strips hold up to " + Stick.objects.STRIP_MAX + " photos" : "Photo strips need at least two photos",
+      sub: tooMany ? "Pick the ones you want on the strip." : (have ? "Pick one more photo to make a strip." : "Pick two or more photos to make a strip."),
+      width: 380,
+      actions: [{label: "Exit", value: false}, {label: tooMany ? "Choose photos" : "Pick another", kind: "primary", value: true}],
+      onClose: function(v){ if(v && retry) setTimeout(retry, 0); }
+    });
+  }
+  // Choose photos already on the board (a small tray of thumbnails). Whatever was selected before stays selected.
+  function openStripPicker(preIds){
+    var photos = notes.filter(isPhoto), chosen = new Set(preIds || []), content = makeDiv("stripPick"), grid = makeDiv("stripPickGrid"), msg = makeDiv("stripPickMsg");
+    msg.setAttribute("role", "status");
+    if(photos.length < Stick.objects.STRIP_MIN){
+      var none = document.createElement("p"); none.className = "acctSub"; none.textContent = "This board has only " + photos.length + " photo" + (photos.length === 1 ? "" : "s") + ". Add another photo first, or start a strip from your device with the right-click menu.";
+      content.appendChild(none);
+    }
+    var make = null;
+    function sync(){
+      var k = chosen.size; msg.textContent = k + " chosen (" + Stick.objects.STRIP_MIN + " to " + Stick.objects.STRIP_MAX + ")";
+      if(make) make.disabled = k < Stick.objects.STRIP_MIN || k > Stick.objects.STRIP_MAX;
+    }
+    photos.forEach(function(p, i){
+      var b = document.createElement("button"); b.type = "button"; b.className = "stripPickItem"; b.setAttribute("aria-pressed", chosen.has(p.id) ? "true" : "false");
+      b.setAttribute("aria-label", "Photo " + (i + 1) + (p.caption ? ": " + p.caption : ""));
+      if(p.image){ var im = new Image(); im.alt = ""; im.src = p.image; b.appendChild(im); } else { var ph = makeDiv("stripPickBlank"); ph.innerHTML = ICONS.strip; b.appendChild(ph); }
+      var tick = makeDiv("stripPickTick"); tick.innerHTML = ICONS.tick; b.appendChild(tick);
+      b.addEventListener("click", function(){
+        if(chosen.has(p.id)) chosen.delete(p.id); else if(chosen.size < Stick.objects.STRIP_MAX) chosen.add(p.id);
+        b.setAttribute("aria-pressed", chosen.has(p.id) ? "true" : "false"); sync();
+      });
+      grid.appendChild(b);
+    });
+    content.appendChild(grid); content.appendChild(msg);
+    var m = openModal({title: "Choose photos for the strip", sub: "They go onto the strip left to right, top to bottom.", content: content, width: 420,
+      actions: [{label: "Cancel", value: false}, {label: "Make photo strip", kind: "primary", value: true, id: "stripPickMake"}],
+      onClose: function(v){ if(v && chosen.size >= Stick.objects.STRIP_MIN) setTimeout(function(){ makeStripFromPhotos(Array.from(chosen)); }, 0); }});
+    make = m.card.querySelector("#stripPickMake"); sync();
+  }
+  function createStripFromFiles(bx, by, prior){
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.multiple = true;
+    prior = prior || [];
     inp.onchange = function(){
-      var files = Array.prototype.filter.call(inp.files || [], function(f){ return f.type.indexOf("image/") === 0; }).slice(0, Stick.objects.STRIP_MAX);
-      if(files.length < Stick.objects.STRIP_MIN){ toast("Choose at least " + Stick.objects.STRIP_MIN + " photos for a strip."); return; }
+      var files = prior.concat(Array.prototype.filter.call(inp.files || [], function(f){ return f.type.indexOf("image/") === 0; })).slice(0, Stick.objects.STRIP_MAX);
+      if(files.length < Stick.objects.STRIP_MIN){ stripNeedsMore(files.length, function(){ createStripFromFiles(bx, by, files); }); return; }
       Promise.all(files.map(loadPhotoFile)).then(function(loaded){
         createPaper("photo_strip", bx, by, {variant: "vertical", font: pickFont(), frames: loaded.map(function(l){ return {image: l.src, ratio: clampNum(l.ratio, 0.3, 3, 0.75)}; })});
-      }, function(){ toast("An image couldn't be read."); });
+      }, function(){ toast("One of those images couldn't be read."); });
     };
     inp.click();
   }
@@ -3690,7 +3792,7 @@
   function openGroupMenu(anchor, x, y){
     var ids = Array.from(selected), pop = openFloatingPopoverAt({left: x, right: x, top: y, bottom: y, width: 0, height: 0}, "noteMenu", null);
     var h = makeDiv("menuHint"); h.textContent = ids.length + " selected"; pop.appendChild(h);
-    var onlyPhotos = ids.length >= Stick.objects.STRIP_MIN && ids.length <= Stick.objects.STRIP_MAX && ids.every(function(id){ return isPhoto(findNote(id)); });
+    var onlyPhotos = ids.every(function(id){ return isPhoto(findNote(id)); });
     if(onlyPhotos) pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos(ids); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4828,7 +4930,7 @@
   function openModal(o){
     var opener = document.activeElement;
     var backdrop = makeDiv("acctBackdrop");
-    var card = makeDiv("acctCard modalCard");
+    var card = makeDiv("acctCard modalCard" + (o.slip ? " slipCard" : ""));
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
     if(o.width) card.style.width = o.width + "px";
@@ -8343,7 +8445,8 @@
       me: {uid: user.id || "", name: (settings.account && settings.account.name) || getDisplayName()},
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
-        openPopover: function(anchor){ closeFloatingPopovers(); var pop = openFloatingPopoverAt(anchor.getBoundingClientRect(), "cmtPop", anchor); return pop; }
+        openPopover: function(anchor){ closeFloatingPopovers(); var pop = openFloatingPopoverAt(anchor.getBoundingClientRect(), "cmtPop", anchor); return pop; },
+        modal: function(o){ return openModal(o); }
       }
     });
     document.getElementById("presenceBar").setAttribute("aria-label", "People on this board");

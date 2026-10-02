@@ -86,5 +86,38 @@ const near = (a, b, e = 1e-4) => Math.abs(a - b) <= e;
   ok(al[32 * W + 32] === 255 && al[2 * W + 2] === 0 && al.length === W * H, 'probToAlpha: subject solid, background empty, full-size output');
 }
 
+// ---- v0.8.0 polish: confidence-aware hole filling, edge anti-aliasing that spares thin detail, speckle snapping
+{
+  const w = 120, h = 120, mk = () => { const a = new Uint8Array(w * h); for (let y = 20; y < 100; y++) for (let x = 20; x < 100; x++) a[y * w + x] = 255; return a; };
+  // two pockets inside the subject: one the model half-believed in (accident), one it was sure was background (a real gap)
+  const a = mk(), conf = new Float32Array(w * h).fill(0.9);
+  for (let y = 40; y < 44; y++) for (let x = 40; x < 44; x++) { a[y * w + x] = 0; conf[y * w + x] = 0.55; }
+  for (let y = 70; y < 74; y++) for (let x = 70; x < 74; x++) { a[y * w + x] = 0; conf[y * w + x] = 0.02; }
+  const out = M.cleanMask(Uint8Array.from(a), w, h, { conf, grid: 2 });
+  ok(out[41 * w + 41] === 255, 'an accidental pocket (model still half-sure) is filled');
+  ok(out[71 * w + 71] === 0, 'a real gap (model sure it is background) is kept, so lattice and arches survive');
+  const noConf = M.cleanMask(Uint8Array.from(a), w, h, { grid: 2 });
+  ok(noConf[71 * w + 71] === 255, 'without confidence the old behaviour is unchanged');
+}
+{
+  const w = 100, h = 60, a = new Uint8Array(w * h);
+  for (let y = 10; y < 50; y++) for (let x = 10; x < 60; x++) a[y * w + x] = 255;            // a solid block with a hard stair edge
+  for (let x = 62; x < 98; x++) a[30 * w + x] = 255;                                         // a one-pixel-thin bar attached to it
+  const out = M.antialias(Uint8Array.from(a), w, h, 0.8);
+  let soft = 0; for (let y = 8; y < 52; y++) for (let x = 8; x < 12; x++) { const v = out[y * w + x]; if (v > 0 && v < 255) soft++; }
+  ok(soft > 20, 'the solid block gets a soft anti-aliased edge');
+  ok(out[30 * w + 80] === 255 && out[29 * w + 80] === 0, 'a one-pixel bar (thin detail) is left exactly as it was');
+  ok(out[30 * w + 30] === 255 && out[2 * w + 2] === 0, 'interior and far background are untouched');
+  ok(M.antialias(a, w, h, 0) === a, 'strength 0 does nothing');
+}
+{
+  const a = Uint8Array.from([0, 3, 6, 7, 100, 247, 248, 249, 255]);
+  M.snapExtremes(a);
+  ok(a.join() === '0,0,0,7,100,247,248,255,255', 'faint haze snaps to nothing, near-solid snaps to solid, the middle is kept');
+  const w = 60, h = 60, edge = new Uint8Array(w * h); for (let y = 15; y < 45; y++) for (let x = 15; x < 45; x++) edge[y * w + x] = 255;
+  const sm = M.refineAlpha(edge, w, h, 0, 0, 1);
+  ok(sm.length === w * h && sm[30 * w + 30] === 255, 'refineAlpha accepts a smoothing amount without moving the subject');
+}
+
 console.log(`${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

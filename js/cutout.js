@@ -81,6 +81,7 @@
   M.cleanMask = function (alpha, w, h, opts) {
     opts = opts || {};
     var f = Math.max(1, opts.grid || 4), keepFrac = opts.keepFrac == null ? 0.04 : opts.keepFrac, holeFrac = opts.holeFrac == null ? 0.004 : opts.holeFrac;
+    var conf = opts.conf || null, holeConf = opts.holeConf == null ? 0.3 : opts.holeConf;     // conf: the model's own probability per pixel (0..1)
     var gw = Math.ceil(w / f), gh = Math.ceil(h / f), g = new Uint8Array(gw * gh), x, y, i;
     for (y = 0; y < h; y++) for (x = 0; x < w; x++) if (alpha[y * w + x] > 127) g[((y / f) | 0) * gw + ((x / f) | 0)] = 1;
     function label(want) {                       // label components of cells == want; returns {lab, sizes}
@@ -110,7 +111,16 @@
     for (x = 0; x < gw; x++) { touches[bg.lab[x]] = 1; touches[bg.lab[(gh - 1) * gw + x]] = 1; }
     for (y = 0; y < gh; y++) { touches[bg.lab[y * gw]] = 1; touches[bg.lab[y * gw + gw - 1]] = 1; }
     var fill = new Uint8Array(bg.sizes.length);
-    for (i = 1; i < bg.sizes.length; i++) if (!touches[i] && bg.sizes[i] <= keptArea * holeFrac) fill[i] = 1;
+    var confSum = null;
+    if (conf) {                                  // a pocket the model itself still half-believes in is an accident; one it is sure about is a real gap (a lattice, an arch, a handle)
+      confSum = new Float64Array(bg.sizes.length);
+      for (y = 0; y < h; y++) for (x = 0; x < w; x++) { var cc = ((y / f) | 0) * gw + ((x / f) | 0); if (g[cc] === 0) confSum[bg.lab[cc]] += conf[y * w + x]; }
+    }
+    for (i = 1; i < bg.sizes.length; i++) {
+      if (touches[i] || bg.sizes[i] > keptArea * holeFrac) continue;
+      if (confSum && confSum[i] / (bg.sizes[i] * f * f) < holeConf) continue;
+      fill[i] = 1;
+    }
     for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
       var c2 = ((y / f) | 0) * gw + ((x / f) | 0), k = y * w + x;
       if (g[c2] === 1) { if (!keep[fg.lab[c2]]) alpha[k] = 0; }
@@ -120,9 +130,9 @@
   };
 
   // "Edge refine": soft 0..1 feathers the edge, trim -1..1 pulls it in (negative) or pushes it out (positive).
-  M.refineAlpha = function (alpha, w, h, soft, trim) {
-    soft = M.clamp01(soft || 0); trim = Math.max(-1, Math.min(1, trim || 0));
-    if (soft === 0 && trim === 0) return Uint8Array.from(alpha);
+  M.refineAlpha = function (alpha, w, h, soft, trim, smooth) {
+    soft = M.clamp01(soft || 0); trim = Math.max(-1, Math.min(1, trim || 0)); smooth = M.clamp01(smooth || 0);
+    if (soft === 0 && trim === 0) return smooth ? M.antialias(Uint8Array.from(alpha), w, h, smooth) : Uint8Array.from(alpha);
     var n = w * h, a = new Float32Array(n), i, scale = Math.max(w, h) / 1000;
     for (i = 0; i < n; i++) a[i] = alpha[i] / 255;
     var r = Math.max(1, Math.round((soft * 5 + Math.abs(trim) * 4) * scale));
@@ -131,7 +141,30 @@
       var v = M.clamp01((b[i] - (t - half)) / (2 * half));
       out[i] = Math.round(v * v * (3 - 2 * v) * 255);
     }
+    return smooth ? M.antialias(out, w, h, smooth) : out;
+  };
+
+  // Subtle anti-aliasing of the edge: a 3x3 average on edge pixels that belong to a SOLID area only. Thin structure (a lattice bar,
+  // a whisker, a strand of hair) is left exactly as it was, so detail is never washed out. strength 0..1.
+  M.antialias = function (alpha, w, h, strength) {
+    strength = M.clamp01(strength == null ? 0.6 : strength);
+    var n = w * h, a = new Float32Array(n), i;
+    if (strength === 0) return alpha;
+    for (i = 0; i < n; i++) a[i] = alpha[i] / 255;
+    var b1 = M.boxBlur(a, w, h, 1), thick = M.boxBlur(a, w, h, Math.max(2, Math.round(Math.max(w, h) / 220)));
+    var out = new Uint8Array(alpha);
+    for (i = 0; i < n; i++) {
+      var d = b1[i] - a[i];
+      if (d === 0 || thick[i] < 0.34 || thick[i] > 0.9 && a[i] > 0.99) continue;           // not an edge pixel of a solid area
+      out[i] = Math.round(M.clamp01(a[i] + d * strength) * 255);
+    }
     return out;
+  };
+  // drop the faint haze the filter leaves around a mask: almost-nothing becomes nothing, almost-solid becomes solid
+  M.snapExtremes = function (alpha, lo, hi) {
+    lo = lo == null ? 7 : lo; hi = hi == null ? 248 : hi;
+    for (var i = 0; i < alpha.length; i++) { var v = alpha[i]; if (v < lo) alpha[i] = 0; else if (v > hi) alpha[i] = 255; }
+    return alpha;
   };
 
   M.bbox = function (alpha, w, h, thr) {
@@ -146,17 +179,24 @@
     var up = M.resizeBilinear(prob, pw, ph, w, h), r = Math.max(3, Math.round(Math.max(w, h) / 160));
     var q = M.guidedFilter(guide, up, w, h, r, 0.004), out = new Uint8Array(w * h);
     for (var i = 0; i < out.length; i++) out[i] = Math.round(M.clamp01((q[i] - 0.5) * 4.5 + 0.5) * 255);
-    return M.cleanMask(out, w, h);
+    M.snapExtremes(out);
+    M.cleanMask(out, w, h, { conf: up });
+    return M.antialias(out, w, h, 0.6);
   };
 
   // ================================================================== engines + model runtime (browser only)
   var script = root.document && root.document.currentScript;
   var BASE = (script && script.src ? script.src : "").replace(/[^\/]*$/, "");       // .../js/
   var SITE = BASE ? BASE.replace(/js\/$/, "") : "";
+  // quick: the default (Apache-2.0 U²-Net-P, 4.6 MB). quick2: the same model run on the photo and its mirror image and averaged (Retry).
+  // fine: a larger model whose weights' origin is not yet verified, so it is NOT shipped or offered unless the owner switches
+  // Stick.config.FINER_MODEL on (and supplies the file). It is only fetched when someone explicitly picks it.
   C.engines = {
     quick: { id: "quick", file: "assets/models/u2netp.onnx", mb: 4.6, size: 320, tta: false, name: "Quick" },
-    fine:  { id: "fine",  file: "assets/models/silueta.onnx", mb: 44,  size: 320, tta: true,  name: "Finer edges" }
+    quick2: { id: "quick2", file: "assets/models/u2netp.onnx", mb: 4.6, size: 320, tta: true, name: "Second look" },
+    fine:  { id: "fine",  file: "assets/models/silueta.onnx", mb: 44,  size: 320, tta: true,  name: "Finer edges (experimental)" }
   };
+  C.finerEnabled = function () { return !!(Stick.config && Stick.config.FINER_MODEL); };
   C.MAX_SIDE = 1280;                          // working resolution: bounds memory and time; the original is kept untouched
   var ortP = null, sessions = {};
 
@@ -203,16 +243,17 @@
   }
 
   C.available = function () { return typeof root.WebAssembly === "object" && !!root.document; };
-  C.isLoaded = function (id) { return !!sessions[id]; };
+  C.isLoaded = function (id) { var e = C.engines[id]; return !!(e && sessions[e.file]); };
   C.session = function (id, onProgress) {
     var eng = C.engines[id] || C.engines.quick;
-    if (sessions[eng.id]) return sessions[eng.id];
-    sessions[eng.id] = loadOrt().then(function (ort) {
+    if (eng.id === "fine" && !C.finerEnabled()) return Promise.reject(new Error("MODEL_NOT_AVAILABLE"));
+    if (sessions[eng.file]) return sessions[eng.file];                      // engines that share a file share one loaded model
+    sessions[eng.file] = loadOrt().then(function (ort) {
       return fetchBytes(SITE + eng.file, onProgress).then(function (buf) {
         return ort.InferenceSession.create(new Uint8Array(buf), { executionProviders: ["wasm"], graphOptimizationLevel: "all" });
       });
-    }).catch(function (e) { delete sessions[eng.id]; throw e; });
-    return sessions[eng.id];
+    }).catch(function (e) { delete sessions[eng.file]; throw e; });
+    return sessions[eng.file];
   };
 
   // ---- image helpers

@@ -107,9 +107,10 @@
   S.compose = function (source, opts) {
     opts = opts || {};
     var mode = opts.mode === "mounted" ? "mounted" : "sticker", seed = opts.seed == null ? 1 : opts.seed;
+    var border = opts.border === "none" || opts.border === "medium" ? opts.border : "thin", bf = border === "medium" ? 2.1 : 1;       // the white scissor border: none | thin (default) | medium
     return loadImage(source).then(function (img) {
       var iw = img.naturalWidth, ih = img.naturalHeight, big = Math.max(iw, ih);
-      var r = mode === "mounted" ? Math.max(8, big * 0.075) : Math.max(2.5, big * 0.013);
+      var r = mode === "mounted" ? Math.max(8, big * 0.075) : border === "none" ? 0 : Math.max(2.5, big * 0.013 * bf);
       var M = Math.ceil(r * 1.25) + 3, W = iw + 2 * M, H = ih + 2 * M, cv = canvas(W, H), cx = cv.getContext("2d");
       var rng = rngFrom(hashStr(seed + "|" + (opts.material || "")));
       if (mode === "mounted") {
@@ -119,10 +120,12 @@
         cx.drawImage(tex, 0, 0);
         cx.globalCompositeOperation = "source-atop"; cx.strokeStyle = "rgba(0,0,0,0.0)";
         cx.globalCompositeOperation = "source-over";
-        var rim = smooth(dilate(img, W, H, M, Math.max(2.5, big * 0.011), hashStr(seed + "s")), 2);       // thin white scissor line round the print itself
-        var rx = rim.getContext("2d"); rx.globalCompositeOperation = "source-in"; rx.fillStyle = "#fdfcf8"; rx.fillRect(0, 0, W, H);
-        cx.drawImage(rim, 0, 0);
-      } else {
+        if (border !== "none") {
+          var rim = smooth(dilate(img, W, H, M, Math.max(2.5, big * 0.011 * bf), hashStr(seed + "s")), 2);       // thin white scissor line round the print itself
+          var rx = rim.getContext("2d"); rx.globalCompositeOperation = "source-in"; rx.fillStyle = "#fdfcf8"; rx.fillRect(0, 0, W, H);
+          cx.drawImage(rim, 0, 0);
+        }
+      } else if (border !== "none") {
         var edge = smooth(dilate(img, W, H, M, r, hashStr(seed + "e")), Math.max(1, Math.round(r * 0.3)));
         var ex = edge.getContext("2d"); ex.globalCompositeOperation = "source-in"; ex.fillStyle = "#fdfcf8"; ex.fillRect(0, 0, W, H);
         cx.drawImage(edge, 0, 0);

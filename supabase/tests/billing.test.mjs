@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -196,12 +197,13 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const exists = (f) => fs.existsSync(path.join(root, f));
   const idx = read('index.html');
   const app = read('js/app.js');
+  const trackedFiles = execSync('git ls-files', { cwd: root, encoding: 'utf8' }).split('\n');
   // scripts and CSP
   for (const f of ['js/cutout.js', 'js/sticker.js', 'js/cutout-maker.js', 'js/objects.js', 'js/collab.js']) ok(exists(f) && idx.includes(`<script src="${f}"></script>`), `${f} exists and is loaded by index.html`);
   const csp = idx.match(/Content-Security-Policy" content="([^"]+)"/)[1];
   ok(/script-src 'self' 'wasm-unsafe-eval';/.test(csp) && !/unsafe-eval'[^;]*'unsafe-eval'/.test(csp) && !/script-src[^;]*'unsafe-inline'/.test(csp), 'CSP allows WebAssembly compilation only (no JavaScript eval, no inline script)');
   ok(!/https?:\/\/(?!localhost|127\.0\.0\.1)[^"'\s]*\.(onnx|wasm)/.test(read('js/cutout.js')), 'the model and runtime come from this site, not a third-party host');
-  ok(exists('assets/models/u2netp.onnx') && exists('assets/models/silueta.onnx') && exists('js/vendor/ort/ort-wasm-simd-threaded.wasm') && exists('js/vendor/ort/LICENSE'), 'model files, runtime and the runtime licence are bundled');
+  ok(exists('assets/models/u2netp.onnx') && !trackedFiles.includes('assets/models/silueta.onnx') && /FINER_MODEL: false/.test(read('js/config.js')) && /silueta\.onnx/.test(read('.gitignore')) && exists('js/vendor/ort/ort-wasm-simd-threaded.wasm') && exists('js/vendor/ort/LICENSE'), 'model files, runtime and the runtime licence are bundled');
   ok(/u2netp/.test(read('docs/legal/third-party-licenses.md')) && /Apache-2\.0/.test(read('docs/legal/third-party-licenses.md')) && /silueta/.test(read('docs/legal/third-party-licenses.md')), 'models are listed with their licences');
   ok(exists('docs/cutout/provider-evaluation.md') && /RMBG-1\.4/.test(read('docs/cutout/provider-evaluation.md')) && /AGPL/.test(read('docs/cutout/provider-evaluation.md')), 'the model choice and the rejected licences are documented');
   // no secret or provider call in the browser for cutouts

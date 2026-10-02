@@ -15,3 +15,6 @@ supabase/.branches/
 supabase/.env
 supabase/functions/.env
 supabase/tests/node_modules/
+
+# experimental cutout model: provenance not verified, so it is never committed or published (docs/cutout/provider-evaluation.md)
+assets/models/silueta.onnx

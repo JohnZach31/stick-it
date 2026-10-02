@@ -262,6 +262,21 @@
     }
   };
 
+  // ---- "Request changes": a small review slip (the shared Stick-It modal), reason optional
+  C.askReason = function (host, slip, done) {
+    var box = el("div", "slipBody"), lab = el("label", "slipLabel", "Reason (optional)"), ta = el("textarea", "slipText");
+    ta.rows = 4; ta.maxLength = 300; ta.id = "slipReason"; lab.setAttribute("for", "slipReason");
+    ta.placeholder = "What should change?";
+    var count = el("span", "slipCount", "0 / 300"); ta.addEventListener("input", function () { count.textContent = ta.value.length + " / 300"; });
+    ta.addEventListener("keydown", function (e) { e.stopPropagation(); });
+    box.appendChild(lab); box.appendChild(ta); box.appendChild(count);
+    host.modal({
+      title: "Request changes", sub: "The note’s owner and editors will see this on the object.", content: box, width: 380, slip: true,
+      actions: [{ label: "Cancel", value: false }, { label: "Request changes", kind: "primary", value: true, onClick: function () { done(ta.value.trim()); } }]
+    });
+    setTimeout(function () { try { ta.focus(); } catch (e) {} }, 40);
+  };
+
   // ---- the paper slip: comment thread + review for one object
   C.openSlip = function (n, anchor) {
     if (!S) return;
@@ -290,10 +305,11 @@
       function act(label, state, withReason) {
         var b = el("button", "pillBtn cmtSmall", label); b.type = "button";
         b.addEventListener("click", function () {
-          var reason = "";
-          if (withReason) { reason = root.prompt ? (root.prompt("Why? (optional)", "") || "") : ""; }
-          b.disabled = true;
-          C.setReview(n.id, state, reason).then(function () { paintReview(); host.refresh(); }, function (e) { b.disabled = false; msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
+          var go = function (reason) {
+            b.disabled = true;
+            C.setReview(n.id, state, reason).then(function () { paintReview(); host.refresh(); }, function (e) { b.disabled = false; msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
+          };
+          if (withReason) C.askReason(host, slip, go); else go("");
         });
         acts.appendChild(b);
       }

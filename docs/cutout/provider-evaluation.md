@@ -5,7 +5,8 @@ Evaluated 2026-10-01 for v0.8.0. Decision first, evidence after.
 ## Decision
 **On-device segmentation with the U²-Net family, run in the browser with ONNX Runtime Web (WebAssembly).**
 - **Quick** (default): `u2netp`, 4.6 MB, Apache-2.0, bundled in the repository (`assets/models/u2netp.onnx`).
-- **Finer edges** (used by *Retry*): `silueta`, 44 MB, a size-reduced U²-Net, also bundled (`assets/models/silueta.onnx`), downloaded only if someone presses Retry, with a flipped second pass averaged in.
+- **Second look** (used by *Retry*): the same `u2netp` model run on the photo and on its mirror image, averaged. No extra download.
+- **Finer edges (experimental, NOT shipped)**: `silueta`, 44 MB, a size-reduced U²-Net. Its weights' provenance is unverified, so the file is not in the repository or on the site (`.gitignore`) and the option is off (`FINER_MODEL: false` in `js/config.js`). To experiment locally: put the file at `assets/models/silueta.onnx`, run the dev server, and set `stickit.dev.config` to `{"FINER_MODEL": true}` (honoured on localhost only). It is fetched only when someone explicitly runs that engine.
 - A **guided filter** against the full-resolution photo (our own code, `js/cutout.js`) snaps the model's soft 320-pixel mask onto the real edges of the photo; stray blobs and tiny holes are cleaned; the person can then Erase / Restore / adjust Edges by hand.
 - **No photo leaves the device for a cutout.** There is no provider, no API key, no secret, nothing to rate-limit, and nothing to put on a cloud bill. The only network traffic is the one-off download of the model file(s) and the ONNX runtime from Stick-It's own site.
 
@@ -23,7 +24,7 @@ Evaluated 2026-10-01 for v0.8.0. Decision first, evidence after.
 
 ## Licences (for the owner and counsel)
 - `u2netp.onnx`: from the official U²-Net repository, **Apache-2.0** (https://github.com/xuebinqin/U-2-Net, LICENSE confirmed).
-- `silueta.onnx`: a reduced U²-Net distributed by the `rembg` project (MIT). Its lineage is U²-Net (Apache-2.0); the weights file's own provenance is less explicit than the official one. **Counsel/owner: confirm you are comfortable shipping it, or drop the "finer edges" tier** (the feature then simply has one model). Nothing else depends on it.
+- `silueta.onnx`: a reduced U²-Net distributed by the `rembg` project (MIT). Its lineage is U²-Net (Apache-2.0); the weights file's own provenance is less explicit than the official one. **Decision for this release: not shipped** (kept out of the repository; the feature has one model plus the mirror-image second look). It can be re-added in a later release once the provenance is confirmed or a clearly licensed replacement is found.
 - `onnxruntime-web` 1.22.0: MIT (`js/vendor/ort/LICENSE`).
 - Licence texts/attribution: `docs/legal/third-party-licenses.md`.
 

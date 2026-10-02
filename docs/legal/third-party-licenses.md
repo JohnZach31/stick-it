@@ -17,7 +17,7 @@ Server-side (Supabase Edge Functions): `npm:@supabase/supabase-js` (MIT), run by
 | Model | File | Licence | Notes |
 |---|---|---|---|
 | U²-Net (portable "p" version) | `assets/models/u2netp.onnx` (4.6 MB) | Apache-2.0 (official repository) | Default "Quick" cutout. Attribution: https://github.com/xuebinqin/U-2-Net |
-| silueta (size-reduced U²-Net, distributed by `rembg`, MIT) | `assets/models/silueta.onnx` (44 MB) | Apache-2.0 lineage; **provenance of the weights file is less explicit: owner/counsel to confirm or remove** | "Finer edges" retry only. Choosing and rejecting alternatives: `docs/cutout/provider-evaluation.md` |
+| silueta (size-reduced U²-Net, distributed by `rembg`, MIT) | **not shipped** (the 44 MB file is kept out of the repository and out of the published site: `.gitignore`) | Apache-2.0 lineage; provenance of the weights file is not verified | Experimental only: it is used only when the owner supplies the file locally and sets `FINER_MODEL` (see `docs/cutout/provider-evaluation.md`). Not part of any release until verified |
 
 Rejected for licence reasons (not shipped): RMBG-1.4 (non-commercial), the community ISNet conversion (AGPL-3.0).
 
