@@ -238,6 +238,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(['## TL;DR', '## Highlights', '## Added', '## Improved', '## Changed', '## Fixed', '## Privacy & Security', '## Under the Hood', '## Known Limitations', '## Deferred', '## Development References'].every((h) => notes.includes(h)) && /status: \*\*development\*\*/.test(notes), 'the patch note has every planned section and says development');
   const op = read('supabase/migrations/20261001150000_owner_premium.sql');
   ok(/email_confirmed_at is not null/.test(op) && /lower\(u\.email\)/.test(op) && /enable row level security/.test(op) && !/johnzachws/.test(app + read('js/config.js') + idx), 'owner premium: matched on the verified e-mail in the database, allowlist unreadable to clients, address never shipped to the browser');
+  ok(new RegExp('APP_VERSION: "' + pn[0].version + '", APP_CODENAME: "' + pn[0].codename + '", APP_STATUS: "' + pn[0].status + '"').test(read('js/config.js')) && /id="verTag"/.test(idx), 'the version tag on the page matches the newest patch note (version, codename, status)');
   // e-mail sign-in stays out of production
   ok(/EMAIL_AUTH: false/.test(read('js/config.js')) && !/Continue with email'/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'e-mail sign-in is not offered');
 }

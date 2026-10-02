@@ -17,6 +17,7 @@
   var Stick = root.Stick = root.Stick || {};
 
   var cfg = {
+    APP_VERSION: "0.8.0", APP_CODENAME: "Cut It Out", APP_STATUS: "development",   // keep in step with docs/patch-notes/index.json
     SUPABASE_URL: "https://ndgybpkkjqydvttmiyot.supabase.co",
     SUPABASE_ANON_KEY: "sb_publishable_RMonorbZOjWuBgmNmXxjNw_O2wjbhq3",
 

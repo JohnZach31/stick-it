@@ -1805,3 +1805,6 @@
   #snapStage .po-postcard .poSheet{ perspective:none; }
   #snapStage .po-postcard .poCard{ transform-style:flat; }
   #snapStage .po-postcard .poFace{ backface-visibility:visible; -webkit-backface-visibility:visible; box-shadow:none; border:1px solid rgba(0,0,0,0.12); }
+
+#verTag{ position:fixed; right:10px; bottom:5px; z-index:2; font:500 0.62rem "Sora",sans-serif; letter-spacing:0.04em; color:var(--ink-soft); opacity:.5; pointer-events:none; user-select:none; }
+@media print{ #verTag{ display:none; } }

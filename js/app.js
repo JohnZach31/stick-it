@@ -5520,6 +5520,8 @@
     return {name: acc.name, source: pf.avatarSource || "provider", assetId: pf.avatarAssetId, providerUrl: acc.providerUrl || acc.picture,
             style: pf.avatarStyle, color: pf.avatarColor, emoji: pf.avatarEmoji};
   }
+  (function(){ var v = document.getElementById("verTag"), c = (window.Stick && Stick.config) || {};
+    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); } })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 1 4l6 4 5-7 5 7 6-4-1 10z" fill="#f2b705" stroke="#a87400" stroke-width="1.2" stroke-linejoin="round"></path><circle cx="12" cy="1.6" r="1.3" fill="#fff3b0" stroke="#a87400" stroke-width=".8"></circle><circle cx="1" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle><circle cx="23" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle></svg>';
   function updateAccountIcon(){
     updateAccountIcon0();
