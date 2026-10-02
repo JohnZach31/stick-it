@@ -5520,7 +5520,20 @@
     return {name: acc.name, source: pf.avatarSource || "provider", assetId: pf.avatarAssetId, providerUrl: acc.providerUrl || acc.picture,
             style: pf.avatarStyle, color: pf.avatarColor, emoji: pf.avatarEmoji};
   }
+  var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 1 4l6 4 5-7 5 7 6-4-1 10z" fill="#f2b705" stroke="#a87400" stroke-width="1.2" stroke-linejoin="round"></path><circle cx="12" cy="1.6" r="1.3" fill="#fff3b0" stroke="#a87400" stroke-width=".8"></circle><circle cx="1" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle><circle cx="23" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle></svg>';
   function updateAccountIcon(){
+    updateAccountIcon0();
+    var old = accountBtn.querySelector(".crown");
+    if(old) old.remove();
+    var qs = document.getElementById("quickSignOut");
+    if(qs) qs.hidden = !settings.account;
+    if(settings.account && isPremium()){
+      var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium";
+      accountBtn.appendChild(c);
+      accountBtn.setAttribute("aria-label", "Account (Premium)");
+    } else accountBtn.setAttribute("aria-label", "Account");
+  }
+  function updateAccountIcon0(){
     if(settings.account && CLOUD){
       accountBtn.innerHTML = "";
       var holder = makeDiv("acctAv");
@@ -6507,6 +6520,8 @@
   (function(){ var b = document.getElementById("board"); if(b) b.setAttribute("tabindex", "-1"); })();
   document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
   accountBtn.addEventListener("click", openAccountModal);
+  var quickOut = document.getElementById("quickSignOut");
+  if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } });
   document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};

@@ -135,7 +135,10 @@
     transition:transform .35s ease, color .2s ease, border-color .2s ease;
   }
   .gearBtn:hover{ color:var(--ink); border-color:var(--accent); }
-  #accountBtn{ padding:0; overflow:hidden; flex:none; }
+  #accountBtn{ padding:0; overflow:visible; flex:none; position:relative; }
+  #accountBtn .acctAv{ border-radius:50%; overflow:hidden; width:100%; height:100%; }
+  #accountBtn .crown{ position:absolute; top:-7px; left:50%; width:20px; height:13px; transform:translateX(-50%) rotate(-8deg); pointer-events:none; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); }
+  #accountBtn .crown svg{ width:100%; height:100%; display:block; }
   #accountBtn img{ width:100%; height:100%; border-radius:50%; object-fit:cover; display:block; }
   .gearBtn.spin svg{ animation: spin .5s ease; }
   @keyframes spin{ to{ transform:rotate(90deg); } }
