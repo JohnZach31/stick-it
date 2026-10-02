@@ -3578,7 +3578,7 @@
   // floating in a bowl. The words themselves never change: the real text stays in the note (read once by a screen reader),
   // the letter pieces are decorative (aria-hidden), at most SOUP_MAX of them exist, and only a few notes ever animate.
   // Seeing a soup note never needs Premium; making one does (the server checks that too).
-  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3;
+  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3, SOUP_BOB_MAX = 36;
   function isPremium(){
     if(window.Stick && Stick.dev){ try{ var o = localStorage.getItem("stickit.dev.premium"); if(o === "1") return true; if(o === "0") return false; }catch(e){} }
     return !!(settings.account && settings.account.plan === "premium");
@@ -3597,44 +3597,128 @@
     var t = textEl ? getPlainText(textEl) : htmlToText(n.html || "");
     return String(t || "").replace(/\s+/g, " ").trim();
   }
-  function buildSoupLayer(n, text){
-    var layer = makeDiv("soupLayer"); layer.setAttribute("aria-hidden", "true"); layer.dir = "auto";
-    var rng = seededRng(hashStr(String(n.id || "soup"))), budget = SOUP_MAX, words = text.split(" ").filter(Boolean), cut = false;
-    for(var w = 0; w < words.length && budget > 0; w++){
-      var word = makeDiv("soupWord");
-      var chars = graphemes(words[w]);
-      for(var i = 0; i < chars.length; i++){
-        if(budget <= 0){ cut = true; break; }
-        var t = document.createElement("span"); t.className = "soupTile"; t.textContent = chars[i];
-        t.style.setProperty("--r", Math.round((rng() - 0.5) * 44) + "deg");
-        t.style.setProperty("--dx", Math.round((rng() - 0.5) * 6) + "px");
-        t.style.setProperty("--dy", Math.round((rng() - 0.5) * 7) + "px");
-        t.style.setProperty("--d", (-rng() * 5).toFixed(2) + "s");
-        word.appendChild(t); budget--;
-      }
-      layer.appendChild(word);
-      if(cut) break;
+  // A real bowl: ceramic rim and wall, a broth surface, pasta letters floating in it, a soft shadow underneath. The bowl and letters
+  // are decorative (aria-hidden); the note's own text stays in .text (hidden while resting, shown as a readable card while editing).
+  var SOUP_RATIO = 230 / 300;                                            // bowl height / width
+  var SOUP_BOWL_SVG = '<svg class="soupBowl" viewBox="0 0 300 230" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+    '<defs>' +
+    '<radialGradient id="sbShadow" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#000" stop-opacity=".34"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="sbWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf5e6"/><stop offset=".6" stop-color="#eadfc6"/><stop offset="1" stop-color="#d5c7a6"/></linearGradient>' +
+    '<radialGradient id="sbBroth" cx="42%" cy="38%" r="75%"><stop offset="0" stop-color="#f6b45a"/><stop offset=".6" stop-color="#e58a33"/><stop offset="1" stop-color="#c8641f"/></radialGradient>' +
+    '<linearGradient id="sbIn" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8bb9a"/><stop offset="1" stop-color="#eee4cc"/></linearGradient>' +
+    '</defs>' +
+    '<ellipse cx="150" cy="213" rx="122" ry="13" fill="url(#sbShadow)"/>' +
+    '<path d="M16 92 C 18 168 70 212 150 212 C 230 212 282 168 284 92 Z" fill="url(#sbWall)" stroke="#a89a78" stroke-width="2" stroke-linejoin="round"/>' +
+    '<path d="M24 128 C 52 168 100 182 150 182 C 200 182 248 168 276 128" fill="none" stroke="#cf5a3e" stroke-width="5" stroke-linecap="round" opacity=".85"/>' +
+    '<path d="M31 142 C 58 178 104 192 150 192 C 196 192 242 178 269 142" fill="none" stroke="#cf5a3e" stroke-width="2" stroke-linecap="round" opacity=".7"/>' +
+    '<ellipse cx="150" cy="92" rx="134" ry="62" fill="#fbf6e8" stroke="#a89a78" stroke-width="2"/>' +
+    '<ellipse cx="150" cy="95" rx="122" ry="53" fill="url(#sbIn)"/>' +
+    '<ellipse cx="150" cy="99" rx="114" ry="47" fill="url(#sbBroth)"/>' +
+    '<path d="M60 84 C 90 62 150 56 200 62" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".22"/>' +
+    '<circle cx="86" cy="118" r="3" fill="#ffe0a0" opacity=".5"/><circle cx="224" cy="86" r="2.4" fill="#ffe0a0" opacity=".45"/><circle cx="196" cy="128" r="2" fill="#ffe0a0" opacity=".4"/>' +
+    '</svg>';
+  function soupGeometry(W){ var H = W * SOUP_RATIO; return {W: W, H: H, cx: W * 0.5, cy: H * 0.43, rx: W * 0.36, ry: H * 0.185}; }
+  // Place the words as pasta letters inside the broth ellipse: rows follow the ellipse (shorter near the edge), the tile size shrinks
+  // until everything fits, and anything beyond SOUP_MAX or the smallest readable size is replaced by an ellipsis.
+  function soupLayout(text, W){
+    var G = soupGeometry(W), words = text.split(" ").filter(Boolean).map(function(w){ return graphemes(w); }), total = 0, lastTry = null;
+    for(var s = Math.max(17, Math.min(30, Math.round(W * 0.105))); s >= 17; s--){
+      lastTry = tryLayout(words, s, G);
+      if(lastTry.complete) break;
     }
-    if(!cut && words.length && budget <= 0 && w < words.length) cut = true;
-    if(cut){ var more = makeDiv("soupWord"); var dots = document.createElement("span"); dots.className = "soupTile soupMore"; dots.textContent = "…"; more.appendChild(dots); layer.appendChild(more); }
+    return {G: G, s: lastTry.s, tiles: lastTry.tiles, more: !lastTry.complete};
+  }
+  function tryLayout(words, s, G){
+    var rows = Math.max(1, Math.floor((2 * G.ry * 0.96) / (s * 1.16))), rowH = (2 * G.ry * 0.96) / rows, gap = s * 0.7, adv = s * 0.95;
+    var rowsOut = [], r = 0, cur = [], used = 0, budget = SOUP_MAX, complete = true;
+    function avail(i){ var y = G.cy - G.ry * 0.96 + (i + 0.5) * rowH, k = Math.sqrt(Math.max(0, 1 - Math.pow((y - G.cy) / G.ry, 2))); return Math.max(s * 1.4, 2 * G.rx * k - s * 0.9); }
+    function flush(){ rowsOut.push({items: cur, used: used}); cur = []; used = 0; r++; }
+    outer:
+    for(var wi = 0; wi < words.length; wi++){
+      var ch = words[wi], pos = 0;
+      while(pos < ch.length){
+        if(r >= rows){ complete = false; break outer; }
+        var room = avail(r) - used - (cur.length ? gap : 0), fitN = Math.floor(room / adv), left = ch.length - pos;
+        if(left <= fitN){ cur.push(ch.slice(pos)); used += (cur.length > 1 ? gap : 0) + left * adv; pos = ch.length; }
+        else if(cur.length){ flush(); }                                     // does not fit after the previous word: next row
+        else if(fitN >= 1){ cur.push(ch.slice(pos, pos + fitN)); used += fitN * adv; pos += fitN; flush(); }
+        else flush();
+      }
+    }
+    if(cur.length && r < rows) flush(); else if(cur.length) complete = false;
+    var tiles = [], rng = seededRng(hashStr(words.join("|") + s));
+    rowsOut.forEach(function(row, i){
+      var y = G.cy - G.ry * 0.96 + (i + 0.5) * rowH + (rowsOut.length === 1 ? 0 : 0), x = G.cx - row.used / 2 + adv / 2;
+      row.items.forEach(function(piece, pi){
+        if(pi) x += gap;
+        piece.forEach(function(c, ci){
+          if(budget <= 0){ complete = false; return; }
+          budget--;
+          var wave = Math.sin((ci + pi) * 1.1 + i) * s * 0.11;
+          tiles.push({c: c, x: x, y: y + wave + (rng() - 0.5) * s * 0.22, r: Math.round((rng() - 0.5) * 52), d: (-rng() * 6).toFixed(2), sx: Math.round((rng() - 0.5) * 70), sy: Math.round((rng() - 0.5) * 40)});
+          x += adv;
+        });
+      });
+    });
+    return {s: s, tiles: tiles, complete: complete};
+  }
+  function buildSoupLayer(n, text, W){
+    var lay = soupLayout(text, W), layer = makeDiv("soupLayer"); layer.setAttribute("aria-hidden", "true"); layer.dir = "auto";
+    layer.style.fontSize = (lay.s / 1.3).toFixed(1) + "px";
+    lay.tiles.forEach(function(t, i){
+      var e = document.createElement("span"); e.className = "soupTile" + (i < SOUP_BOB_MAX ? " bob" : ""); e.textContent = t.c;
+      e.style.left = t.x.toFixed(1) + "px"; e.style.top = t.y.toFixed(1) + "px";
+      e.style.setProperty("--r", t.r + "deg"); e.style.setProperty("--d", t.d + "s"); e.style.setProperty("--sx", t.sx + "px"); e.style.setProperty("--sy", t.sy + "px"); e.style.setProperty("--i", String(i));
+      layer.appendChild(e);
+    });
+    if(lay.more){ var m = document.createElement("span"); m.className = "soupTile soupMore"; m.textContent = "…"; m.style.left = (lay.G.cx + lay.G.rx * 0.78).toFixed(1) + "px"; m.style.top = (lay.G.cy + lay.G.ry * 0.7).toFixed(1) + "px"; m.style.setProperty("--r", "0deg"); layer.appendChild(m); }
     return layer;
   }
+  var soupSettleNext = {};                                             // note ids whose letters should drift back into place after editing
   function soupDecorate(el, n, textEl){
-    var old = el.querySelector(".soupLayer"); if(old) old.remove();
-    el.classList.remove("soup");
+    ["soupLayer", "soupBowl"].forEach(function(c){ var old = el.querySelector(":scope > ." + c); if(old) old.remove(); });
+    el.classList.remove("soup"); el.style.height = "";
     if(n.cosmetic !== "soup") return;
     el.classList.add("soup");
-    var layer = buildSoupLayer(n, soupSourceText(n, textEl));
-    layer.style.fontSize = Math.max(17, Math.min(28, Math.round((n.w || NOTE_W) * 0.085))) + "px";
+    var W = n.w || NOTE_W;
+    el.style.height = Math.round(W * SOUP_RATIO) + "px";
+    var holder = document.createElement("div"); holder.innerHTML = SOUP_BOWL_SVG;
+    var bowl = holder.firstChild; el.insertBefore(bowl, el.firstChild);
+    var layer = buildSoupLayer(n, soupSourceText(n, textEl), W);
+    if(soupSettleNext[n.id]){ delete soupSettleNext[n.id]; layer.classList.add("settle"); setTimeout(function(){ layer.classList.remove("settle"); }, 1400); }
     el.appendChild(layer);
+    // the bowl is the handle: dragging it moves the note, a double click starts typing (the paper tab does the same job on a plain note)
+    if(!readOnly && !el._soupWired){
+      el._soupWired = true;
+      el.addEventListener("pointerdown", function(e){
+        if(!el.classList.contains("soup") || el.classList.contains("editing") || (e.target.closest && e.target.closest(".del, .moreBtn, .fontCycle, .tab, .text, .taskDock, .listHint, .checkToggle"))) return;
+        var tab = el.querySelector(":scope > .tab");
+        if(tab) tab.dispatchEvent(new PointerEvent("pointerdown", {clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, pointerType: e.pointerType, button: 0, ctrlKey: e.ctrlKey, metaKey: e.metaKey, bubbles: false, cancelable: true}));
+      });
+      el.addEventListener("dblclick", function(e){ if(el.classList.contains("soup") && !el.classList.contains("editing") && n.textEl && !(e.target.closest && e.target.closest(".del, .moreBtn"))){ e.preventDefault(); focusNoScroll(n.textEl); } });
+    }
     soupBalance();
   }
   function applySoup(n){ if(n.el) soupDecorate(n.el, n, n.textEl); }
-  // only a few soup notes move at once; the rest are still pasta (nothing runs for notes nobody can see)
+  // only a few soup notes move at once, and only the ones on screen (offscreen / hidden pasta is still pasta)
+  var soupObserver = null, soupVisible = new Set();
   function soupBalance(){
     var layers = Array.prototype.slice.call(document.querySelectorAll(".note.soup:not(.editing) .soupLayer"));
-    layers.forEach(function(l, i){ l.classList.toggle("live", i < SOUP_LIVE_MAX); });
+    if(window.IntersectionObserver && !soupObserver){
+      soupObserver = new IntersectionObserver(function(entries){
+        entries.forEach(function(en){ if(en.isIntersecting) soupVisible.add(en.target); else soupVisible.delete(en.target); });
+        soupBalance();
+      }, {rootMargin: "80px"});
+    }
+    var live = 0;
+    layers.forEach(function(l){
+      if(soupObserver && !l._obs){ l._obs = true; soupObserver.observe(l); }
+      var on = (!soupObserver || soupVisible.has(l)) && live < SOUP_LIVE_MAX && !document.hidden;
+      if(on) live++;
+      l.classList.toggle("live", on);
+    });
   }
+  document.addEventListener("visibilitychange", function(){ soupBalance(); });
   function setNoteCosmetic(n, value){
     if(value === "soup" && !isPremium()){ openPremiumInfo("Alphabet Soup"); return; }
     if((n.cosmetic || "") === (value || "")) return;
@@ -4297,7 +4381,7 @@
       });
       text.addEventListener("blur", function(){
         if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
-        el.classList.remove("editing"); if(n.cosmetic === "soup") applySoup(n);
+        el.classList.remove("editing"); if(n.cosmetic === "soup"){ soupSettleNext[n.id] = true; applySoup(n); }
         resetKeyboardShift();
         // tidy leftovers from editing (empty spans and the like) once the caret has left
         var clean = sanitizeHtml(text.innerHTML);
@@ -4439,9 +4523,9 @@
     zCounter += 1;
     var n = {
       id: newId(),
-      x: Math.max(0, x - NOTE_W/2),
+      x: Math.max(0, x - (opts.cosmetic === "soup" ? 160 : NOTE_W/2)),
       y: clampY(y - 30),
-      w: NOTE_W,
+      w: opts.cosmetic === "soup" ? 320 : NOTE_W,                 // a bowl needs room for its letters
       html: opts.html || "",
       bg: newNoteBg(),
       font: pickFont(),

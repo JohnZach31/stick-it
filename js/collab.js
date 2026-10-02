@@ -285,11 +285,12 @@
     if (!slip) return;
     slip.classList.add("cmtSlip");
     slip.setAttribute("role", "dialog"); slip.setAttribute("aria-label", "Comments on this object");
-    var title = el("div", "cmtHead", "Comments"); slip.appendChild(title);
+    var clip = el("span", "cmtClip"); clip.setAttribute("aria-hidden", "true"); slip.appendChild(clip);       // a little clip holds the slip to the object
+    var title = el("div", "cmtHead"); title.appendChild(el("span", "", "Comments")); var cnt = el("span", "cmtCount"); title.appendChild(cnt); slip.appendChild(title);
     var rvBox = el("div", "cmtReview"); slip.appendChild(rvBox);
     var list = el("div", "cmtList"); list.setAttribute("aria-live", "polite"); slip.appendChild(list);
     var form = el("div", "cmtForm");
-    var input = el("textarea", "cmtInput"); input.rows = 2; input.maxLength = 1000; input.placeholder = "Add a comment"; input.setAttribute("aria-label", "Add a comment");
+    var input = el("textarea", "cmtInput"); input.rows = 2; input.maxLength = 1000; input.placeholder = "Add a comment…"; input.setAttribute("aria-label", "Add a comment");
     var add = el("button", "pillBtn primary cmtAdd", "Add"); add.type = "button";
     var msg = el("p", "cmtMsg"); msg.setAttribute("role", "status");
     if (canEdit) { form.appendChild(input); form.appendChild(add); slip.appendChild(form); } else slip.appendChild(el("p", "cmtMsg", "You can read comments on this board but not add them."));
@@ -298,8 +299,8 @@
     function paintReview() {
       var rv = C.summaryFor(n.id).review; rvBox.innerHTML = "";
       if (rv) {
-        var line = el("p", "cmtRvLine", rv.state === "changes_requested" ? "Changes requested" + (rv.reason ? ": " + rv.reason : "") : "Ready for review");
-        rvBox.appendChild(line);
+        var st = el("div", "cmtStamp rv-" + rv.state, rv.state === "changes_requested" ? "Changes requested" : "Ready for review"); rvBox.appendChild(st);
+        if (rv.reason) rvBox.appendChild(el("p", "cmtRvLine", rv.reason));
       }
       var acts = el("div", "cmtRvActs");
       function act(label, state, withReason) {
@@ -321,10 +322,12 @@
     function paintList() {
       C.listComments(n.id).then(function (rows) {
         list.innerHTML = "";
-        if (!rows.length) list.appendChild(el("p", "cmtEmpty", "No comments yet."));
+        cnt.textContent = rows.length ? String(rows.length) : "";
+        if (!rows.length) list.appendChild(el("p", "cmtEmpty", "Nothing here yet. Add the first note about this."));
         rows.forEach(function (r) {
-          var item = el("div", "cmtItem"), who = el("b", "", r.author || "Someone"), when = el("span", "cmtWhen", fmtWhen(r.created_at)), body = el("p", "cmtBody", r.body);
-          item.appendChild(who); item.appendChild(when); item.appendChild(body);
+          var item = el("div", "cmtItem"), top = el("div", "cmtTop"), av = el("span", "cmtAv", core.initial(r.author || "Someone")), who = el("b", "", r.author || "Someone"), when = el("span", "cmtWhen", fmtWhen(r.created_at)), body = el("p", "cmtBody", r.body);
+          av.style.setProperty("--h", core.hue(r.author_id || r.author || "x")); av.setAttribute("aria-hidden", "true");
+          top.appendChild(av); top.appendChild(who); top.appendChild(when); item.appendChild(top); item.appendChild(body);
           if (r.author_id === S.opts.me.uid || isOwner) {
             var del = el("button", "cmtDel", "Delete"); del.type = "button"; del.setAttribute("aria-label", "Delete this comment");
             del.addEventListener("click", function () { C.deleteComment(r.id).then(paintList, function (e) { msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); }); });
