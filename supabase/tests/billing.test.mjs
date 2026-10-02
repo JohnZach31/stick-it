@@ -241,6 +241,48 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   const op = read('supabase/migrations/20261001150000_owner_premium.sql');
   ok(/email_confirmed_at is not null/.test(op) && /lower\(u\.email\)/.test(op) && /enable row level security/.test(op) && !/johnzachws/.test(app + read('js/config.js') + idx), 'owner premium: matched on the verified e-mail in the database, allowlist unreadable to clients, address never shipped to the browser');
   ok(new RegExp('APP_VERSION: "' + pn[0].version + '", APP_CODENAME: "' + pn[0].codename + '", APP_STATUS: "' + pn[0].status + '"').test(read('js/config.js')) && /id="verTag"/.test(idx), 'the version tag on the page matches the newest patch note (version, codename, status)');
+  // ---- v0.8.0 polish pass: the new UI is Stick-It UI, not prototype UI
+  {
+    const css = read('css/app.css'), col = read('js/collab.js'), mk = read('js/cutout-maker.js'), cutjs = read('js/cutout.js');
+    const appNorm = app.replace(/\r\n/g, '\n');
+    const sources = ['js/app.js', 'js/collab.js', 'js/cutout-maker.js', 'js/objects.js', 'js/sticker.js', 'js/account.js', 'js/sharing.js'].map(read).join('\n');
+    ok(!/\b(window\.|root\.)?(prompt|alert)\s*\(/.test(sources.replace(/Stick\.errors|\/\/[^\n]*/g, '')) && !/[^.\w]confirm\(\s*["'`]/.test(sources), 'no native prompt(), alert() or confirm() anywhere in the app code');
+    ok(/host\.modal\(/.test(col) && !/root\.prompt/.test(col) && /askReason/.test(col) && /slipCard/.test(appNorm), 'Request changes asks for its reason in the shared Stick-It modal (a review slip), not a browser prompt');
+    ok(/function stripNeedsMore/.test(appNorm) && /Photo strips need at least two photos/.test(appNorm) && /Pick another/.test(appNorm) && !/toast\("Choose at least " \+ Stick\.objects\.STRIP_MIN/.test(appNorm), 'a strip with too few photos opens the branded modal (Exit / Pick another), not a toast');
+    ok(/openStripPicker/.test(appNorm) && /aria-pressed/.test(appNorm.slice(appNorm.indexOf('function openStripPicker'), appNorm.indexOf('function createStripFromFiles'))), 'Pick another opens a photo picker that keeps the photos already chosen');
+    // captions
+    ok(['latin', 'hebrew', 'cyrillic', 'arabic'].every((s) => new RegExp(s + ':\\s+\\[').test(appNorm.slice(appNorm.indexOf('var CAPTION_SAFE'), appNorm.indexOf('function captionList')))), 'caption-safe fonts exist for Latin, Hebrew, Cyrillic and Arabic');
+    ok(!/Reenie Beanie|Rock Salt|Kristi|Homemade Apple|Zeyada/.test(appNorm.slice(appNorm.indexOf('var CAPTION_SAFE'), appNorm.indexOf('function captionList'))), 'caption-safe fonts exclude the loose ornamental hands');
+    ok(/captionStack\(item\.captionFont, item\.caption\)/.test(appNorm) && !/cap\.style\.fontFamily = fontStack\(item\.font\)/.test(appNorm), 'photo, recording and video captions use the caption-safe set, never the note font');
+    ok(/clamp\(13px, calc\(var\(--pw, 220px\) \* 0\.078\)/.test(css) && /clamp\(13px, calc\(var\(--pw, 220px\) \* 0\.066\)/.test(css), 'captions never render below 13 px');
+    // cutout maker
+    ok(/Fit subject/.test(mk) && /Fit original/.test(mk) && /fitSubject\(\)/.test(mk) && /autoFit/.test(mk), 'the Cutout Maker frames the detected subject after the automatic cutout (Fit subject / Fit original)');
+    ok(/"Refine"/.test(mk) && /cmkShelf/.test(mk) && /cmkGroup/.test(mk) && /cmkSeg/.test(mk) && !/cmkTools/.test(css), 'the Cutout Maker uses grouped panels (Tools, Brush, View, History, Border) instead of one long row of buttons');
+    ok(/border: state\.border/.test(mk) && /CUT_BORDERS = \["none", "thin", "medium"\]/.test(appNorm) && /border === "none" \|\| opts\.border === "medium"/.test(read('js/sticker.js')), 'white border: None / Thin (default) / Medium, chosen in the maker and changeable from the photo menu');
+    ok(/finerEnabled/.test(cutjs) && /FINER_MODEL: false/.test(read('js/config.js')) && /MODEL_NOT_AVAILABLE/.test(cutjs), 'the finer model is off unless the owner turns it on, and is only fetched when explicitly run');
+    ok(/M\.antialias/.test(cutjs) && /M\.snapExtremes/.test(cutjs) && /conf: up/.test(cutjs), 'mask post-processing: confidence-aware hole filling, edge anti-aliasing that spares thin detail, speckle snapping');
+    // soup
+    const soup = appNorm.slice(appNorm.indexOf('var SOUP_RATIO'), appNorm.indexOf('function setNoteCosmetic'));
+    ok(/class="soupBowl"/.test(soup) && /sbBroth/.test(soup) && /soupLayout/.test(soup) && /Math\.sqrt/.test(soup), 'Alphabet Soup draws a bowl with broth and places pasta letters inside the broth ellipse');
+    ok(/IntersectionObserver/.test(soup) && /SOUP_LIVE_MAX = 2/.test(appNorm) && /SOUP_BOB_MAX = 8/.test(appNorm) && /prefers-reduced-motion: reduce\)\{ \.soupLayer\.live \.soupTile\.bob/.test(css), 'soup animation: at most 2 notes, 8 letters each, only on screen, none with reduced motion');
+    ok(/soupSettleNext/.test(soup) && /\.soupLayer\.settle \.soupTile/.test(css) && /note\.soup\.editing > \.text/.test(css.replace(/\.note\.soup\.editing\s*>\s*\.text/g, '.note.soup.editing > .text')), 'soup editing shows a readable text card over a dimmed bowl, then the letters settle back into the broth');
+    // done pile
+    ok(/function markDone/.test(appNorm) && /function restoreFromPile/.test(appNorm) && /function deleteFromPile/.test(appNorm) && /confirmDialog\(\{title: "Throw this away for good\?"/.test(appNorm), 'the Done pile can take a note, give it back, and delete it permanently after a branded confirmation');
+    ok(/notes\.concat\(donePile\)\.map\(persistForm\)/.test(appNorm) && /snapshot: function\(\)\{ return notes\.concat\(donePile\)/.test(appNorm), 'finished notes are stored and synced with the board (they are not deleted when they leave the canvas)');
+    ok(/Everything\\u2019s checked off\. Move this note to Done\?/.test(appNorm) && !/offerDoneForChecklist[\s\S]{0,400}markDone\(n\);\s*\n\s*}\s*\n\s*}/.test(appNorm.slice(appNorm.indexOf('function offerDoneForChecklist'), appNorm.indexOf('function offerDoneForChecklist') + 700).replace('toast(', 'toast(')), 'a fully ticked checklist offers the Done pile and never moves itself');
+    // selection focus
+    ok(/classList\.toggle\("hasSel"/.test(appNorm) && /body:not\(\.hasSel\) \.note:hover/.test(css) && /body:not\(\.hasSel\) \.photoObj:hover/.test(css) && /body:not\(\.hasSel\) \.boardObj:hover/.test(css) && /\.note\.selected, \.photoObj\.selected, \.boardObj\.selected\{ z-index:9996 !important; \}/.test(css), 'while something is selected the rest of the board stays still (no lift, no sway) and the selected object stays on top');
+    ok(/paperObj\.selected \.poF\{ cursor:text/.test(css) && /plain click on its text edits it/.test(appNorm), 'a selected scrap shows the text cursor on its text and a click there edits it');
+    // media
+    ok(/function fmtClock/.test(appNorm) && /fmtClock\(cur\) \+ " \/ " \+ fmtClock\(dur\)/.test(appNorm) && /mWaveOn/.test(css), 'playing media shows elapsed / duration and a waveform that fills as it plays');
+    ok(/addEventListener\("timeupdate"/.test(appNorm) && !/requestAnimationFrame\([^)]*paintMedia/.test(appNorm) && /visibilitychange", function\(\)\{ if\(document\.hidden\) pauseAllMedia/.test(appNorm), 'media progress comes from timeupdate (no animation-frame loop) and playback pauses when the tab is hidden');
+    ok(/function startAVResize/.test(appNorm) && /AUDIO_MIN_W/.test(appNorm) && /VIDEO_MIN_W/.test(appNorm), 'recordings and videos can be resized');
+    ok(/function ensureVideoEl/.test(appNorm) && /Open large/.test(appNorm) && /className = "fVideo"/.test(appNorm), 'videos play inline on the board, with "Open large" as a separate choice');
+    // focus toolbar and minimap
+    ok(/role", "toolbar"/.test(appNorm.slice(appNorm.indexOf('function buildFocusBar'), appNorm.indexOf('function enterFocus'))) && ['bold', 'italic', 'mark', 'ul', 'ol', 'check', 'link'].every((k) => new RegExp('add\\("' + k + '"').test(appNorm)) && /add\("h" \+ lv/.test(appNorm) && /ArrowRight/.test(appNorm.slice(appNorm.indexOf('function buildFocusBar'), appNorm.indexOf('function enterFocus'))), 'Focus Mode has a keyboard-reachable formatting strip with every common control');
+    ok(/minimapTrack\.addEventListener\("pointerdown"/.test(appNorm) && /miniPills/.test(appNorm) && !/minimapTrack\.innerHTML = ""/.test(appNorm), 'the minimap can be dragged to pan and is no longer rebuilt from scratch on every change');
+    ok(/var PreviewCache/.test(appNorm) && /PreviewCache\.use\(img, shownSrc/.test(appNorm), 'board photos use a small preview instead of the full original');
+  }
   // e-mail sign-in stays out of production
   ok(/EMAIL_AUTH: false/.test(read('js/config.js')) && !/Continue with email'/.test(idx.replace(/<!--[\s\S]*?-->/g, '')), 'e-mail sign-in is not offered');
 }

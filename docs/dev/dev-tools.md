@@ -19,6 +19,7 @@ Point a local page at it: `localStorage.setItem('stickit.dev.config', JSON.strin
 | `setPremium(true/false/null)` | local-only entitlement override for Alphabet Soup; the **server still refuses** a free account |
 | `presenceDemo(true)` / `startPresence('Ana')` | two tabs of one browser stand in for two people (BroadcastChannel transport) |
 | `loader.show/done/fail/hide` | look at the Stick-It loader states |
+| `ui.stripNeedsMore(n)`, `ui.stripPicker()`, `ui.doneTray()`, `ui.askReason()` | open the new dialogs without setting up a board for each |
 
 ## Tests
 ```
@@ -37,3 +38,15 @@ node --experimental-strip-types functions.test.mjs
 
 ## Cutout engine experiments
 The model evaluation (images, scripts, ONNX files) was done outside the repository; the numbers and decision are in `docs/cutout/provider-evaluation.md`. To try the engine on a photo: serve the site with the dev server, open the app, drop a photo, press the style button.
+
+## Performance fixture
+`tools/perf-fixture.js` builds a board of about 55 objects (large photos, soup notes, scraps, media) in this browser's own storage and measures DOM size, running animations, decoded picture memory and the cost of dragging a note:
+```js
+const s = document.createElement('script'); s.src = '/tools/perf-fixture.js'; document.head.appendChild(s);
+await window.__perfFixture.build();      // then reload the page
+await window.__perfFixture.measure();    // after the reload
+```
+Before/after numbers are in `docs/patch-notes/0.8.0-audit.md`.
+
+## Experimental finer cutout model
+Not shipped (see `docs/cutout/provider-evaluation.md`). To try it locally, put a model at `assets/models/silueta.onnx` (it is git-ignored) and set `localStorage.setItem('stickit.dev.config', JSON.stringify({FINER_MODEL: true}))` on localhost.

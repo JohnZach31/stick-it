@@ -3712,7 +3712,7 @@
   // floating in a bowl. The words themselves never change: the real text stays in the note (read once by a screen reader),
   // the letter pieces are decorative (aria-hidden), at most SOUP_MAX of them exist, and only a few notes ever animate.
   // Seeing a soup note never needs Premium; making one does (the server checks that too).
-  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3, SOUP_BOB_MAX = 12;
+  var SOUP_MAX = 100, SOUP_LIVE_MAX = 2, SOUP_BOB_MAX = 8;
   function isPremium(){
     if(window.Stick && Stick.dev){ try{ var o = localStorage.getItem("stickit.dev.premium"); if(o === "1") return true; if(o === "0") return false; }catch(e){} }
     return !!(settings.account && settings.account.plan === "premium");
