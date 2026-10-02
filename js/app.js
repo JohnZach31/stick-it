@@ -2545,7 +2545,7 @@
     img.draggable = false;
     img.style.aspectRatio = "1 / " + (finishedPic ? finishedPic.ratio : isolated ? (item.cutoutRatio || item.imgRatio || 0.75) : (item.imgRatio || 0.75));
     var shownSrc = finishedPic ? finishedPic.url : isolated ? rawCut : item.image;
-    if(shownSrc) img.src = shownSrc; else frame.classList.add("pending");
+    if(shownSrc){ if(shownSrc === item.image && !isolated && !finishedPic) PreviewCache.use(img, shownSrc, item.w || defaultPhotoW(item)); else img.src = shownSrc; } else frame.classList.add("pending");
     frame.appendChild(img);
     var cap = makeDiv("pCaption" + (item.caption ? "" : " empty"));
     cap.dir = "auto";
@@ -2918,6 +2918,47 @@
       }
     };
   })();
+  // Board previews: a picture on the board is drawn a few hundred pixels wide, but the stored original can be 1000 px or more, and a
+  // browser keeps every visible picture decoded at its full size (about 3 MB for a 1000 x 750 photo). So the board shows a small preview
+  // (made once, kept as a blob) and swaps it in as soon as it is ready; the original stays untouched for the lightbox-size views, export,
+  // sharing and cutouts. Previews only ever shrink: a picture already close to its drawn size is used as it is.
+  var PreviewCache = (function(){
+    var map = new Map(), order = [], MAX = 160;
+    function keyOf(src, target){ return (src.length > 160 ? src.length + ":" + src.slice(-40) : src) + "@" + target; }
+    function targetFor(cssW){
+      var dpr = Math.min(2, window.devicePixelRatio || 1);
+      return Math.max(160, Math.ceil(cssW * dpr * 1.6 / 32) * 32);                 // sharp up to the board's largest zoom (1.6)
+    }
+    function make(src, target){
+      return new Promise(function(resolve){
+        var im = new Image();
+        im.onload = function(){
+          if(!im.naturalWidth || im.naturalWidth <= target * 1.25){ resolve(null); return; }       // already about the right size
+          var s = target / im.naturalWidth, c = document.createElement("canvas"); c.width = target; c.height = Math.max(1, Math.round(im.naturalHeight * s));
+          var g = c.getContext("2d"); g.imageSmoothingQuality = "high"; g.drawImage(im, 0, 0, c.width, c.height);
+          c.toBlob(function(b){ resolve(b ? URL.createObjectURL(b) : null); }, "image/jpeg", 0.86);
+        };
+        im.onerror = function(){ resolve(null); };
+        im.src = src;
+      });
+    }
+    // set `img`'s source: a ready preview at once, otherwise the original now and the preview when it is ready
+    function use(img, src, cssW){
+      if(!src){ return; }
+      if(!/^(data:image\/|blob:)/.test(src)){ img.src = src; return; }
+      var target = targetFor(cssW || 220), k = keyOf(src, target), hit = map.get(k);
+      if(hit && hit.url){ img.src = hit.url; return; }
+      if(hit && hit.url === null && hit.done){ img.src = src; return; }
+      img.src = src;
+      if(!hit){
+        hit = {url: undefined, done: false, waiters: []}; map.set(k, hit); order.push(k);
+        if(order.length > MAX){ var old = order.shift(), o = map.get(old); if(o && o.url) URL.revokeObjectURL(o.url); map.delete(old); }
+        make(src, target).then(function(u){ hit.url = u; hit.done = true; hit.waiters.forEach(function(f){ f(u); }); hit.waiters = []; });
+      }
+      hit.waiters.push(function(u){ if(u && img.parentNode && img.getAttribute("src") === src) img.src = u; });
+    }
+    return {use: use};
+  })();
   var MAX_STORED_VIDEO = 60 * 1024 * 1024;
   function fmtDur(sec){
     sec = Math.max(0, Math.round(sec || 0));
@@ -3254,7 +3295,7 @@
     } else if(t === "postcard"){
       var card = makeDiv("poCard"), front = makeDiv("poFace poFront"), back = makeDiv("poFace poBack");
       var pic = makeDiv("poPic"); pic.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
-      if(item.image){ var im = document.createElement("img"); im.src = item.image; im.alt = item.location ? "Postcard picture: " + item.location : "Postcard picture"; im.draggable = false; pic.appendChild(im); }
+      if(item.image){ var im = document.createElement("img"); PreviewCache.use(im, item.image, item.w || 320); im.alt = item.location ? "Postcard picture: " + item.location : "Postcard picture"; im.draggable = false; pic.appendChild(im); }
       else { var add = document.createElement("button"); add.type = "button"; add.className = "poAddPic"; add.textContent = "Add a photo"; pic.appendChild(add); api.addPic = add; }
       front.appendChild(pic); front.appendChild(paperField("poLocation", "location", item, true));
       var left = makeDiv("poMsgCol"); left.appendChild(paperField("poMessage", "message", item, true));
@@ -3270,7 +3311,7 @@
       (item.frames || []).forEach(function(f, i){
         var fr = makeDiv("poFrame"); fr.style.aspectRatio = "1 / " + (f.ratio || 0.75);
         var src = stripFrameSrc(f);
-        if(src){ var im2 = document.createElement("img"); im2.src = src; im2.alt = f.cap || "Strip picture " + (i + 1) + " of " + item.frames.length; im2.draggable = false; fr.appendChild(im2); }
+        if(src){ var im2 = document.createElement("img"); PreviewCache.use(im2, src, item.w || 140); im2.alt = f.cap || "Strip picture " + (i + 1) + " of " + item.frames.length; im2.draggable = false; fr.appendChild(im2); }
         else fr.classList.add("pending");
         frames.appendChild(fr);
       });
@@ -3671,7 +3712,7 @@
   // floating in a bowl. The words themselves never change: the real text stays in the note (read once by a screen reader),
   // the letter pieces are decorative (aria-hidden), at most SOUP_MAX of them exist, and only a few notes ever animate.
   // Seeing a soup note never needs Premium; making one does (the server checks that too).
-  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3, SOUP_BOB_MAX = 36;
+  var SOUP_MAX = 100, SOUP_LIVE_MAX = 3, SOUP_BOB_MAX = 12;
   function isPremium(){
     if(window.Stick && Stick.dev){ try{ var o = localStorage.getItem("stickit.dev.premium"); if(o === "1") return true; if(o === "0") return false; }catch(e){} }
     return !!(settings.account && settings.account.plan === "premium");
@@ -6994,6 +7035,10 @@
         host: {refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); }, openPopover: function(){ return null; }}});
       return "presence on";
     };
+    Stick.dev.ui = {                // local only: open the new dialogs without setting up a board for each (used in the polish pass tests)
+      stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
+      askReason: function(){ return Stick.collab.askReason({modal: openModal}, null, function(){}); }
+    };
     Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
     Stick.dev.loader = {         // local only: look at the loader states without needing a slow network
       show: function(t, cover){ cloudOverlay(t || "Loading…", !!cover); },
@@ -7232,39 +7277,58 @@
   });
 
   // ---------- minimap ----------
+  // The strip mirrors every object's position. Rebuilt at most once per frame, reusing its little pills (a note drag used to rebuild the
+  // whole strip on every pointer move).
+  var miniPills = [], miniView = null, miniRaf = 0;
   function updateMinimap(){
-    minimapTrack.innerHTML = "";
-    var boardWidth = ensureWidth();
-    var trackWidth = minimapTrack.clientWidth || 1;
-    notes.forEach(function(n){
-      var m = document.createElement("div");
-      m.className = "miniNote";
+    if(miniRaf) return;
+    miniRaf = requestAnimationFrame(function(){ miniRaf = 0; paintMinimap(); });
+  }
+  function paintMinimap(){
+    var boardWidth = ensureWidth(), trackWidth = minimapTrack.clientWidth || 1, list = notes;
+    while(miniPills.length < list.length){ var m = document.createElement("div"); m.className = "miniNote"; minimapTrack.insertBefore(m, miniView); miniPills.push(m); }
+    while(miniPills.length > list.length) miniPills.pop().remove();
+    list.forEach(function(n, i){
+      var m = miniPills[i];
       m.style.left = ((n.x/boardWidth)*trackWidth) + "px";
       m.style.width = Math.max(3, (NOTE_W/boardWidth)*trackWidth) + "px";
       m.style.background = isObj(n) ? (n.type === "video" ? "#4a433c" : isPaper(n) ? "#e6dcc4" : "#cfc6b0") : n.bg;
-      minimapTrack.appendChild(m);
     });
-    var view = document.createElement("div");
-    view.className = "miniView";
-    view.id = "miniViewIndicator";
-    minimapTrack.appendChild(view);
     updateMinimapViewport();
   }
+  (function initMinimap(){
+    miniView = document.createElement("div"); miniView.className = "miniView"; miniView.id = "miniViewIndicator"; minimapTrack.appendChild(miniView);
+  })();
   function updateMinimapViewport(){
-    var view = document.getElementById("miniViewIndicator");
-    if(!view) return;
+    if(!miniView) return;
     var boardWidth = boardInner.scrollWidth || 1;
     var trackWidth = minimapTrack.clientWidth || 1;
-    view.style.left = ((board.scrollLeft/boardWidth)*trackWidth) + "px";
-    view.style.width = Math.max(8, (window.innerWidth/boardWidth)*trackWidth) + "px";
+    miniView.style.left = ((board.scrollLeft/boardWidth)*trackWidth) + "px";
+    miniView.style.width = Math.max(8, (window.innerWidth/boardWidth)*trackWidth) + "px";
   }
-  minimapTrack.addEventListener("click", function(e){
-    var rect = minimapTrack.getBoundingClientRect();
-    var ratio = (e.clientX - rect.left) / rect.width;
-    var boardWidth = boardInner.scrollWidth;
-    var target = ratio*boardWidth - window.innerWidth/2;
-    board.scrollTo({left: Math.max(0, target), behavior:"smooth"});
-  });
+  // Drag the viewport rectangle to pan the board; press anywhere else on the strip to jump there and keep dragging.
+  (function(){
+    var drag = null, lastX = 0;
+    function apply(){
+      if(!drag) return;
+      var ratio = (lastX - drag.grab - drag.rect.left) / drag.rect.width, boardWidth = boardInner.scrollWidth;
+      board.scrollLeft = Math.max(0, Math.min(boardWidth - board.clientWidth, ratio * boardWidth - window.innerWidth / 2));
+    }
+    minimapTrack.addEventListener("pointerdown", function(e){
+      if(e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      var rect = minimapTrack.getBoundingClientRect(), vr = miniView.getBoundingClientRect();
+      var onView = e.clientX >= vr.left - 2 && e.clientX <= vr.right + 2;
+      drag = {rect: rect, grab: onView ? e.clientX - (vr.left + vr.width / 2) : 0};
+      lastX = e.clientX;
+      try{ minimapTrack.setPointerCapture(e.pointerId); }catch(err){}
+      minimapTrack.classList.add("dragging");
+      apply();
+    });
+    minimapTrack.addEventListener("pointermove", function(e){ if(!drag) return; lastX = e.clientX; apply(); });          // pointer events already arrive at most once a frame; setting scrollLeft is cheap
+    function end(e){ if(!drag) return; drag = null; minimapTrack.classList.remove("dragging"); try{ minimapTrack.releasePointerCapture(e.pointerId); }catch(err){} }
+    minimapTrack.addEventListener("pointerup", end); minimapTrack.addEventListener("pointercancel", end);
+  })();
   var recoverT = null;
   // the board can change size without a window resize (panes, split views, the header wrapping)
   if(window.ResizeObserver) new ResizeObserver(function(){
@@ -7576,7 +7640,7 @@
         : "Drop or paste a photo onto the board to pin it as a print, then use its little style button for a Polaroid or a cut-out. Double-click any note to pick it up and write comfortably; Esc puts it back."},
       {sel:null, title:"Handle a few at once", body:"Ctrl/Cmd+click notes, or drag a box on empty board, to select several. Then move, duplicate, share or delete them together. Ctrl/Cmd+Z undoes almost anything on the board.", desktopOnly:true},
       {sel:"#searchInput", title:"Find a note", body:"Type here to dim every note that doesn't match. Click a match to jump back to the full board with it selected."},
-      {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump straight there."},
+      {sel:"#minimap", title:"See the whole board", body:"This strip mirrors every note's position along the board. Click anywhere on it to jump there, or drag the highlighted window to pan the board."},
       {sel:"#accountBtn", title:"Sign in (optional)", body:"Sign in with Google so your real name and photo show up on notes you share, or stay a guest. Totally up to you."},
       {sel:"#gearBtn", title:"Settings", body:"Dark mode, a fixed font for new notes, tidying up blank notes, and exporting or importing your board."},
       {sel:"#shareBtn", title:"Share your board", body:"Get a public, read-only link to the whole board, or a JPEG snapshot. To share just a few notes, select them and choose Share instead."},

@@ -936,19 +936,23 @@
   @media (max-width: 600px){
     .minimap{ display:none; }
   }
-  .minimapTrack{ position:relative; height:100%; cursor:pointer; padding:0 4px; }
+  .minimapTrack{ position:relative; height:100%; cursor:pointer; padding:0 4px; touch-action:none; user-select:none; -webkit-user-select:none; }
+  .minimapTrack.dragging{ cursor:grabbing; }
   .miniNote{
     position:absolute; top:8px; bottom:8px; border-radius:999px;
     box-shadow:0 0 0 1px rgba(255,255,255,0.7);
     transition:transform .12s ease;
   }
   .miniNote:hover{ transform:scaleY(1.25); }
+  .minimapTrack.dragging .miniNote:hover{ transform:none; }
   .miniView{
     position:absolute; top:3px; bottom:3px;
     border:1.5px solid var(--accent);
     background:rgba(201,138,46,0.16);
-    pointer-events:none; border-radius:999px;
+    pointer-events:none; border-radius:999px; transition:background .12s ease;
   }
+  .minimapTrack:hover .miniView{ background:rgba(201,138,46,0.26); }
+  .minimapTrack.dragging .miniView{ background:rgba(201,138,46,0.34); border-width:2px; }
 
   /* shared-view banner */
   .shareBanner{
