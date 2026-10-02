@@ -864,6 +864,8 @@
       z: 1, categoryIndex: 0,
       isTask: !!item.isTask, done: !!item.done,
       cosmetic: item.cosmetic === "soup" ? "soup" : undefined,
+      doneAt: Number(item.doneAt) > 0 && Number(item.doneAt) < 1e14 ? Number(item.doneAt) : undefined,
+      doneBy: Number(item.doneAt) > 0 && item.doneBy ? String(item.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60) : undefined,
       due: /^\d{4}-\d{2}-\d{2}$/.test(item.due || "") ? item.due : "",
       dueTime: /^\d{2}:\d{2}$/.test(item.dueTime || "") ? item.dueTime : "09:00",
       image: safeImage(item.image),
@@ -875,7 +877,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -932,6 +934,8 @@
     if(c.cutoutRatio !== undefined) c.cutoutRatio = clampNum(c.cutoutRatio, 0.05, 20, 1);
     if(c.backing !== undefined && BACKINGS.indexOf(c.backing) === -1) delete c.backing;
     if(c.cutBorder !== undefined && CUT_BORDERS.indexOf(c.cutBorder) === -1) delete c.cutBorder;
+    if(c.doneAt !== undefined){ c.doneAt = Number(c.doneAt); if(!(c.doneAt > 0 && c.doneAt < 1e14)) delete c.doneAt; }
+    if(c.doneBy !== undefined) c.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60);
     if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
     if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
@@ -1065,6 +1069,7 @@
   var NOTES_KEY = activeBoardId ? notesKeyFor(activeBoardId) : null;
 
   var notes = [];
+  var donePile = [];                                 // finished notes (see the Done pile section); stored with the notes, not drawn on the board
   var firstRun = false;
   if((!readOnly || viewerMode) && !singleNoteMode){
     var stored = NOTES_KEY ? safeGet(NOTES_KEY) : null;
@@ -1085,17 +1090,18 @@
     }
   }
 
+  (function(){ var live = [], done = []; notes.forEach(function(o){ (Number(o.doneAt) > 0 ? done : live).push(o); }); notes = live; donePile = done; })();
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
 
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
-    safeSet(NOTES_KEY, notes.map(persistForm));
+    safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
     if(cloudSync) cloudSync.notesChanged();
   }
   // write the cache without telling the sync layer (used when the change came from the server)
   function saveNotesCache(){
-    if(NOTES_KEY) safeSet(NOTES_KEY, notes.map(persistForm));
+    if(NOTES_KEY) safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
   }
   function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
@@ -1182,6 +1188,7 @@
   }
 
   function updateCount(){
+    if(typeof updateDonePile === "function") updateDonePile(false);
     countEl.textContent = notes.length + (notes.length === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
   }
 
@@ -1666,7 +1673,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -4206,6 +4213,7 @@
           saveNotes();
           rerenderNote(n);
           recordChange(n.done ? "Mark done" : "Mark not done", before);
+          if(n.done) toast("Everything’s checked off. Move this note to Done?", "Move to Done", function(){ markDone(findNote(n.id)); });
         });
         taskRow.appendChild(doneBtn);
 
@@ -4347,6 +4355,7 @@
           e.preventDefault();
           li.setAttribute("data-checked", li.getAttribute("data-checked") === "true" ? "false" : "true");
           notifyInput(text);
+          if(li.getAttribute("data-checked") === "true") offerDoneForChecklist(n);
         }
       });
       text.addEventListener("paste", function(e){
@@ -4932,6 +4941,7 @@
     pop.appendChild(menuItem(ICONS.sticky, n.cosmetic === "soup" ? "Remove Alphabet Soup" : isPremium() ? "Alphabet Soup" : "Alphabet Soup (Premium)", function(){
       closeFloatingPopovers(); setNoteCosmetic(n, n.cosmetic === "soup" ? null : "soup");
     }));
+    pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -4958,6 +4968,120 @@
     }, {kbd:"\u203A"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
+  }
+
+  // ---------- the Done pile: finished notes go into a little stack at the board's edge, not into the bin ----------
+  // A finished note keeps its words, colour, place and who finished it and when. It leaves the board (so the board stays calm) but stays
+  // in the same stored list as everything else (so it syncs, exports and survives a reload). It can be read, put back, or thrown away.
+  function isDoneItem(o){ return !!o && Number(o.doneAt) > 0; }
+  function findPile(id){ for(var i = 0; i < donePile.length; i++){ if(donePile[i].id === id) return donePile[i]; } return null; }
+  function pileTitle(o){
+    var t = "";
+    if(o.type === "photo" || o.type === "audio" || o.type === "video") t = o.caption || "";
+    else if(isPaper(o)) t = Stick.objects.text(o);
+    else t = htmlToText(o.html || "");
+    t = String(t || "").replace(/\s+/g, " ").trim();
+    return t || "Empty note";
+  }
+  function pileWhen(o){ try{ return new Date(o.doneAt).toLocaleDateString(undefined, {day:"numeric", month:"short"}); }catch(e){ return ""; } }
+  var pileBtn = null;
+  function ensurePileBtn(){
+    if(pileBtn) return pileBtn;
+    pileBtn = document.createElement("button");
+    pileBtn.type = "button"; pileBtn.className = "donePile"; pileBtn.hidden = true;
+    pileBtn.innerHTML = '<span class="dpStack" aria-hidden="true"><i></i><i></i><i></i></span><span class="dpLabel"></span>';
+    pileBtn.addEventListener("click", openDoneTray);
+    document.body.appendChild(pileBtn);
+    return pileBtn;
+  }
+  function updateDonePile(bump){
+    var b = ensurePileBtn(), k = donePile.length;
+    b.hidden = !k || singleNoteMode || readOnly;
+    b.querySelector(".dpLabel").textContent = "Done \u00b7 " + k;
+    b.setAttribute("aria-label", "Done pile: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it.");
+    if(bump && !b.hidden){ b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); }
+  }
+  function whoAmI(){ return (CLOUD && settings.account && settings.account.name) || ""; }       // only signed-in people are named (guests are not)
+  // Mark done: the note shrinks and slides to the pile. Undo brings it back exactly where it was.
+  function markDone(n){
+    if(readOnly || !n || isDoneItem(n) || n.type) return;
+    endEditing(); closeFloatingPopovers();
+    var snap = snapNote(n), el = n.el, id = n.id;
+    snap.doneAt = Date.now(); var by = whoAmI(); if(by) snap.doneBy = String(by).slice(0, 60);
+    function take(){
+      var cur = findNote(id); if(!cur) return;
+      removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(id); clearDecorations(id);
+      donePile.push(Object.assign({}, snap));
+      applySelection(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateDonePile(true);
+    }
+    function put(){
+      var pi = donePile.findIndex(function(x){ return x.id === id; }); if(pi !== -1) donePile.splice(pi, 1);
+      var c = Object.assign({}, snap); delete c.doneAt; delete c.doneBy; if(c.phys) c.phys = Object.assign({}, c.phys);
+      if(!findNote(id)){ notes.push(c); renderNote(c, false, {focus:false}); }
+      updateDonePile(false);
+    }
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches, target = ensurePileBtn();
+    if(el && !reduce && !target.hidden || (el && !reduce && donePile.length === 0)){
+      var r = el.getBoundingClientRect(), t = target.hidden ? {left: 16, top: window.innerHeight - 60, width: 90, height: 40} : target.getBoundingClientRect();
+      var dx = (t.left + t.width / 2 - (r.left + r.width / 2)) / boardZoom, dy = (t.top + t.height / 2 - (r.top + r.height / 2)) / boardZoom;
+      el.classList.add("toDone");
+      el.style.transform = "translate(" + dx + "px," + dy + "px) rotate(" + ((n.rot || 0) - 12) + "deg) scale(0.2)";
+      el.style.opacity = "0";
+      setTimeout(take, 520);
+    } else take();
+    var action = pushHistory({label: "Mark done", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
+    toast("Moved to Done.", "Undo", function(){ undoIfTop(action); });
+  }
+  function restoreFromPile(id){
+    var o = findPile(id); if(!o) return;
+    var c = Object.assign({}, o); delete c.doneAt; delete c.doneBy; if(c.phys) c.phys = Object.assign({}, c.phys);
+    zCounter += 1; c.z = zCounter; c.y = clampY(c.y);
+    donePile.splice(donePile.indexOf(o), 1);
+    notes.push(c); renderNote(c, true, {focus:false});
+    ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateDonePile(false);
+    var action = pushHistory({label: "Restore from Done", custom: true, t: Date.now(),
+      undo: function(){ var cur = findNote(c.id); if(cur){ removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(c.id); clearDecorations(c.id); } donePile.push(o); updateDonePile(false); return true; },
+      redo: function(){ var i = donePile.indexOf(o); if(i !== -1) donePile.splice(i, 1); if(!findNote(c.id)){ notes.push(c); renderNote(c, false, {focus:false}); } updateDonePile(false); return true; }});
+    setSelection([c.id]);
+  }
+  function deleteFromPile(id){
+    var o = findPile(id); if(!o) return Promise.resolve(false);
+    return confirmDialog({title: "Throw this away for good?", body: "\u201c" + pileTitle(o).slice(0, 60) + "\u201d will be deleted. This can\u2019t be undone.", confirm: "Delete", danger: true}).then(function(ok){
+      if(!ok) return false;
+      var i = donePile.indexOf(o); if(i !== -1) donePile.splice(i, 1);
+      saveNotes(); updateDonePile(false); return true;
+    });
+  }
+  function openDoneTray(){
+    var content = makeDiv("doneTray"), list = makeDiv("doneList"), modal = null;
+    content.appendChild(list);
+    function paint(){
+      list.innerHTML = "";
+      if(!donePile.length){ var e = document.createElement("p"); e.className = "acctSub"; e.textContent = "Nothing in the pile yet."; list.appendChild(e); return; }
+      donePile.slice().sort(function(a, b){ return b.doneAt - a.doneAt; }).forEach(function(o){
+        var row = makeDiv("doneRow"), chip = makeDiv("doneChip"), body = makeDiv("doneBody"), tt = makeDiv("doneTitle"), meta = makeDiv("doneMeta"), acts = makeDiv("doneActs"), full = makeDiv("doneFull");
+        chip.style.background = o.bg || "#f6e58a"; chip.setAttribute("aria-hidden", "true");
+        tt.textContent = pileTitle(o); tt.dir = "auto";
+        meta.textContent = "Done " + pileWhen(o) + (o.doneBy ? " \u00b7 " + o.doneBy : "");
+        full.hidden = true; full.dir = "auto"; full.textContent = pileTitle(o); full.style.fontFamily = o.font ? fontStack(o.font) : "";
+        function btn(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn cmtSmall " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); acts.appendChild(b); return b; }
+        var rd = btn("Read", "", function(){ full.hidden = !full.hidden; rd.textContent = full.hidden ? "Read" : "Hide"; rd.setAttribute("aria-expanded", String(!full.hidden)); }); rd.setAttribute("aria-expanded", "false");
+        btn("Put back", "primary", function(){ restoreFromPile(o.id); if(!donePile.length && modal) modal.close(true); else paint(); });
+        btn("Delete\u2026", "", function(){ deleteFromPile(o.id).then(function(ok){ if(ok){ if(!donePile.length && modal) modal.close(true); else paint(); } }); });
+        body.appendChild(tt); body.appendChild(meta); body.appendChild(full); body.appendChild(acts);
+        row.appendChild(chip); row.appendChild(body); list.appendChild(row);
+      });
+    }
+    paint();
+    modal = openModal({title: "Done", sub: "Finished notes wait here. Put one back, read it, or throw it away.", content: content, width: 460, actions: [{label: "Close", value: true}]});
+  }
+  // a checklist with everything ticked: offer the pile, never act on its own
+  function offerDoneForChecklist(n){
+    if(readOnly || !n || !n.textEl || n.type) return;
+    var items = n.textEl.querySelectorAll("ul.checklist > li");
+    if(!items.length) return;
+    for(var i = 0; i < items.length; i++){ if(items[i].getAttribute("data-checked") !== "true") return; }
+    toast("Everything\u2019s checked off. Move this note to Done?", "Move to Done", function(){ markDone(n); });
   }
 
   // ---------- multi-select bar ----------
@@ -6837,7 +6961,7 @@
 
   // ---------- export / import ----------
   function exportPayload(){
-    return {app:"stick-it", version:2, board:currentBoardName(), exportedAt:new Date().toISOString(), notes:notes.map(serializeNote)};
+    return {app:"stick-it", version:2, board:currentBoardName(), exportedAt:new Date().toISOString(), notes:notes.concat(donePile).map(serializeNote)};
   }
   // Pictures that live in the account are downloaded into the file so it stays portable. Recordings and videos are
   // not included (their files stay in the account / on the device); the dialog says so.
@@ -8220,11 +8344,12 @@
 
   // what the sync layer needs from the app
   var cloudHost = {
-    snapshot: function(){ return notes.map(persistForm); },
-    getObject: function(id){ var n = findNote(id); return n ? persistForm(n) : null; },
+    snapshot: function(){ return notes.concat(donePile).map(persistForm); },
+    getObject: function(id){ var n = findNote(id) || findPile(id); return n ? persistForm(n) : null; },
     // changes that came from the server: applied without an undo step
     applyRemote: function(d){
       (d.removes || []).forEach(function(id){
+        var pi = donePile.findIndex(function(x){ return x.id === id; }); if(pi !== -1) donePile.splice(pi, 1);
         var n = findNote(id); if(!n) return;
         selected.delete(id);
         if(n.el) n.el.remove();
@@ -8233,7 +8358,13 @@
       });
       (d.upserts || []).forEach(function(raw){
         var o = cloudSanitize(raw); if(!o) return;
-        var ex = findNote(o.id);
+        var ex = findNote(o.id), inPile = donePile.findIndex(function(x){ return x.id === o.id; });
+        if(isDoneItem(o)){                                          // finished on another device: it belongs in the pile
+          if(ex){ if(ex.el) ex.el.remove(); notes.splice(notes.indexOf(ex), 1); selected.delete(ex.id); clearDecorations(ex.id); }
+          if(inPile !== -1) donePile[inPile] = o; else donePile.push(o);
+          return;
+        }
+        if(inPile !== -1) donePile.splice(inPile, 1);               // put back on another device: fall through and draw it
         if(ex){
           var keepImg = ex.image, was = ex.assetId || ex.attachedAssetId;
           Object.keys(ex).forEach(function(k){ if(["el","textEl","captionEl","badgeEl"].indexOf(k) === -1) delete ex[k]; });
@@ -8246,7 +8377,7 @@
           renderNote(o, false, {focus:false});
         }
       });
-      ensureWidth(); updateCount(); updateMinimap(); applySelection();
+      ensureWidth(); updateCount(); updateMinimap(); applySelection(); updateDonePile(false);
       if(searchInput.value.trim()) runSearch();
       saveNotesCache();
     },

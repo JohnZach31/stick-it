@@ -1905,3 +1905,28 @@
 .stripPickTick svg{ width:12px; height:12px; }
 .stripPickItem[aria-pressed="true"] .stripPickTick{ display:flex; }
 .stripPickMsg{ margin-top:8px; font-size:0.78rem; color:var(--ink-soft); }
+
+/* ---------- Done pile: a small stack at the board's edge ---------- */
+.donePile{ position:fixed; left:14px; bottom:46px; z-index:9990; display:flex; align-items:center; gap:9px; padding:7px 14px 7px 10px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; box-shadow:0 2px 8px var(--shadow); font:600 0.78rem 'Sora',sans-serif; transition:transform .15s ease, border-color .15s ease; }
+.donePile[hidden]{ display:none; }
+.donePile:hover{ border-color:var(--accent); transform:translateY(-1px); }
+.donePile:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.donePile.bump{ animation:donePileBump .5s ease; }
+@keyframes donePileBump{ 0%{ transform:scale(1); } 35%{ transform:scale(1.12); } 100%{ transform:scale(1); } }
+.dpStack{ position:relative; width:24px; height:20px; flex:none; }
+.dpStack i{ position:absolute; left:0; right:0; height:14px; border-radius:2px; border:1px solid rgba(90,74,28,0.35); background:#f6e58a; box-shadow:0 1px 1px rgba(0,0,0,0.15); }
+.dpStack i:nth-child(1){ top:6px; transform:rotate(-4deg); background:#bfe3c8; }
+.dpStack i:nth-child(2){ top:3px; transform:rotate(3deg); background:#f6c9d6; }
+.dpStack i:nth-child(3){ top:0; transform:rotate(-1deg); }
+.note.toDone{ transition:transform .5s cubic-bezier(.5,0,.8,.45), opacity .5s ease !important; pointer-events:none; z-index:99999 !important; }
+.doneList{ display:flex; flex-direction:column; gap:8px; max-height:min(52vh, 420px); overflow-y:auto; padding:2px; }
+.doneRow{ display:flex; gap:10px; padding:9px 10px; border:1px solid var(--line); border-radius:10px; background:var(--field); }
+.doneChip{ flex:none; width:22px; height:28px; border-radius:2px; border:1px solid rgba(90,74,28,0.3); box-shadow:0 1px 2px rgba(0,0,0,0.18); transform:rotate(-3deg); margin-top:2px; }
+.doneBody{ flex:1; min-width:0; }
+.doneTitle{ font:600 0.88rem/1.3 'Sora',sans-serif; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
+.doneMeta{ margin-top:2px; font:500 0.7rem 'Sora',sans-serif; color:var(--ink-soft); }
+.doneFull{ margin-top:6px; padding:8px 10px; border-radius:8px; background:var(--panel); border:1px dashed var(--line); font-size:1rem; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere; max-height:180px; overflow-y:auto; }
+.doneFull[hidden]{ display:none; }
+.doneActs{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+@media (max-width:720px){ .donePile{ bottom:60px; } }
+@media (prefers-reduced-motion: reduce){ .donePile.bump{ animation:none; } .note.toDone{ transition:none !important; } }
