@@ -48,6 +48,9 @@ const slice = (from, to) => { const a = app.indexOf(from), b = app.indexOf(to, a
   ok(K.fromEvent(ev({ key: 'K', ctrlKey: true, shiftKey: true }), false) === 'Mod+Shift+K', 'Shift is kept with a letter');
   ok(K.fromEvent(ev({ key: 'Shift', shiftKey: true }), false) === null, 'a modifier alone is not a shortcut');
   ok(K.fromEvent(ev({ key: '?', shiftKey: true }), false) === '?', 'Shift+/ is just "?"');
+  ok(K.fromEvent(ev({ key: 'ע', code: 'KeyU', ctrlKey: true }), false) === 'Mod+U', 'on a Hebrew keyboard the shortcut follows the key place (Ctrl+U)');
+  ok(K.fromEvent(ev({ key: 'מ', code: 'KeyN' }), false) === 'N' && K.fromEvent(ev({ key: 'к', code: 'KeyR', ctrlKey: true }), false) === 'Mod+R', 'Hebrew and Cyrillic layouts map to the Latin key');
+  ok(K.fromEvent(ev({ key: 'é', code: 'Digit2' }), false) === 'É', 'a key that is not on the letter row keeps its own name');
   ok(K.check('N', {}).ok, 'a plain letter is fine');
   ok(K.check('Mod+T', {}).kind === 'reserved', 'Ctrl+T is browser-reserved');
   ok(K.check('Mod+W', {}).kind === 'reserved', 'Ctrl+W is browser-reserved');

@@ -27,6 +27,9 @@
     if (isMac ? e.ctrlKey : e.metaKey) parts.push(isMac ? "Ctrl" : "Meta");
     if (e.altKey) parts.push("Alt");
     var k = norm(key);
+    // On a non-Latin keyboard layout (Hebrew, Arabic, Cyrillic...) the key typed is not "N" or "K", but the key in that place is.
+    // Browsers decide their own shortcuts by that place, so a shortcut follows the place too.
+    if (key.length === 1 && !/[\x00-\x7f]/.test(key) && /^Key[A-Z]$/.test(e.code || "")) k = e.code.charAt(3);
     // Shift is part of a character ("?" is already Shift+/), so it is only kept for letters, digits, symbols with Mod/Alt, and named keys
     var isChar = key.length === 1;
     if (e.shiftKey && (!isChar || /[A-Za-z0-9]/.test(key) || mod || e.altKey)) parts.push("Shift");

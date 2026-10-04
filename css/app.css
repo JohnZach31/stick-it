@@ -2304,3 +2304,9 @@ html[data-a11y-motion="reduce"] .ptCard{ animation:none; }
 @media (hover:none){ :where(.pillBtn, .gearBtn, .asAction, .bmGo, .tourBtns button):not(:disabled):hover{ background-color:transparent; } }
 @media (prefers-reduced-motion: reduce){ :where(.pillBtn, .gearBtn, .menuItem, .asAction, .zoneMore, .bmGo, .tourBtns button){ transition:none; } :where(.pillBtn, .gearBtn, .asAction, .bmGo, .menuItem, .tourBtns button):not(:disabled):active{ transform:none; } }
 html[data-a11y-motion="reduce"] :where(.pillBtn, .gearBtn, .menuItem, .asAction, .zoneMore, .bmGo, .tourBtns button){ transition:none; }
+
+/* ---------- Collaborate (Premium) ---------- */
+.btn[hidden]{ display:none; }
+.collabDlg{ display:flex; flex-direction:column; gap:6px; }
+.collabDlg select, .collabDlg input{ width:100%; }
+.collabOut{ display:flex; flex-direction:column; gap:8px; margin-top:6px; min-height:1.2em; font-size:0.84rem; }

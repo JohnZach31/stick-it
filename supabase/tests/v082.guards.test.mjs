@@ -51,6 +51,17 @@ ok(/BOOKMARK_MAX = 30/.test(app) && /function goToBookmark/.test(app), 'bookmark
 ok(/release: function\(id\)\{ var u = urls\.get\(id\)/.test(app) && /MediaStore\.release\(n\.mediaId\)/.test(app), 'removing a voice memo or video lets go of its object URL (and the blob it keeps alive)');
 ok(/OV\.layer\("language-chooser"/.test(app), 'the inline language list is an Esc layer of its own');
 
+// ---- mark many done, typing sync, Ctrl+U, Collaborate
+ok(/function markDoneGroup\(ids\)/.test(app) && /markDoneGroup\(ids\); \}\)/.test(app) && /run: function\(\)\{ markDoneGroup\(selIds\(\)\); \}/.test(app), 'several selected notes can be marked done together (selection bar, right-click menu and the shortcut)');
+ok(/pushHistory\(\{label: "Mark " \+ list\.length \+ " done"/.test(app), 'marking several done is one undo step');
+ok(/function saveNotesTyping\(\)/.test(app) && /text\._t = setTimeout\(saveNotesTyping, 250\)/.test(app) && /typingNotifyT = setTimeout\(flushTypingNotify, Math\.max\(0, Math\.min\(2000/.test(app), 'typing keeps the device copy current but tells the account only after a pause');
+ok(/pagehide", flushTypingNotify/.test(app) && /scope = scope === "global" \? "global" : "local";\s+flushTypingNotify\(\);/.test(app), 'a buffered typing change is sent when the page is hidden, closed or signed out');
+ok(/e\.code === "KeyU"/.test(app), 'Ctrl+U never opens view-source from inside a note, on any keyboard layout');
+ok(/id="collabBtn" hidden/.test(html) && html.indexOf('id="collabBtn"') > html.indexOf('id="publishBtn"'), 'the Collaborate button sits under Publish in the share panel and starts hidden');
+ok(/function canShowCollab\(\)\{[\s\S]*?!CLOUD[\s\S]*?Stick\.auth\.user\(\)[\s\S]*?!isPremium\(\)[\s\S]*?meta\.access === "owner"/.test(app), 'Collaborate shows only for a signed-in Premium owner of a cloud board');
+ok(/collabBtn\.hidden = !canShowCollab\(\)/.test(app) && /if\(willOpen\) updateCollabButton\(\)/.test(app), 'the button is re-checked every time the share panel opens');
+ok(/Stick\.repo\.createInvite\(activeBoardId, email, role\)/.test(app) && /Stick\.repo\.acceptInvite\(t\)/.test(app) && /#invite=\(\[a-f0-9\]\{64\}\)/.test(app), 'invites are created and accepted through the existing server functions');
+
 // ---- patch tour data
 {
   const pd = read('js/patch-data.js');

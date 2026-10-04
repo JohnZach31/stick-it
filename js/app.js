@@ -1353,8 +1353,26 @@
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
   if(typeof applyLook === "function") applyLook();
 
+  // While someone types, the note is kept on this device at once but the account is told only after they pause (or every 10 s at most),
+  // so the sync pill does not flash "Saving" on every pause between words. Anything else that saves tells the account straight away.
+  var typingNotifyT = null, typingFirst = 0;
+  function flushTypingNotify(){
+    clearTimeout(typingNotifyT); typingNotifyT = null;
+    if(!typingFirst) return;
+    typingFirst = 0; if(cloudSync) cloudSync.notesChanged();
+  }
+  function saveNotesTyping(){
+    if(readOnly || singleNoteMode || !NOTES_KEY) return;
+    saveNotesCache();
+    if(!typingFirst) typingFirst = Date.now();
+    clearTimeout(typingNotifyT);
+    typingNotifyT = setTimeout(flushTypingNotify, Math.max(0, Math.min(2000, 10000 - (Date.now() - typingFirst))));
+  }
+  document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "hidden") flushTypingNotify(); });
+  window.addEventListener("pagehide", flushTypingNotify);
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
+    clearTimeout(typingNotifyT); typingNotifyT = null; typingFirst = 0;
     safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
     if(cloudSync) cloudSync.notesChanged();
@@ -4292,6 +4310,7 @@
     var onlyPhotos = ids.every(function(id){ return isPhoto(findNote(id)); });
     if(onlyPhotos) pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos(ids); }));
     var anyUnpinned = ids.some(function(id){ var q = findNote(id); return q && !isPinned(q); });
+    if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDoneGroup(ids); }, {title: "Move the selected notes to the Done pile"}));
     pop.appendChild(menuItem(ICONS.pin, anyUnpinned ? "Pin in place" : "Unpin", function(){ closeFloatingPopovers(); setPinned(ids, anyUnpinned); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4814,7 +4833,7 @@
         updateScrollCue(text);
         n.html = text.innerHTML;
         clearTimeout(text._t);
-        text._t = setTimeout(saveNotes, 250);
+        text._t = setTimeout(saveNotesTyping, 250);
         clearTimeout(text._d);
         text._d = setTimeout(function(){
           refreshDates(n);
@@ -4825,7 +4844,7 @@
         }, 450);
       });
       text.addEventListener("keydown", function(e){
-        if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "u"){ e.preventDefault(); return; } // no underline
+        if((e.ctrlKey || e.metaKey) && !e.altKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); return; } // no underline, and never the browser’s view-source (also on a Hebrew keyboard, where the key is not "u")
         if(e.key === "Enter" && !e.shiftKey){
           if(handleListEnter(text, e)) return;
           if(focusState && focusState.n === n) return;
@@ -5695,6 +5714,36 @@
     var action = pushHistory({label: "Mark done", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
     toast("Moved to Done.", "Undo", function(){ undoIfTop(action); });
   }
+  // Mark every selected note done in one step: one history entry, one toast, one Undo. Only ordinary notes go to the pile
+  // (photos, recordings and other objects stay on the board).
+  function markDoneGroup(ids){
+    if(readOnly) return;
+    var list = ids.map(findNote).filter(function(n){ return n && !n.type && !isDoneItem(n); });
+    if(!list.length){ toast("Select some notes first. Photos and other objects can’t be marked done."); return; }
+    if(list.length === 1){ markDone(list[0]); return; }
+    endEditing(); closeFloatingPopovers();
+    var by = whoAmI(), at = Date.now();
+    var snaps = list.map(function(n){ var o = snapNote(n); o.doneAt = at; if(by) o.doneBy = String(by).slice(0, 60); return o; });
+    function take(){
+      snaps.forEach(function(sn){
+        var cur = findNote(sn.id); if(!cur) return;
+        removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(sn.id); clearDecorations(sn.id);
+        donePile.push(Object.assign({}, sn));
+      });
+      applySelection(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateDonePile(true);
+    }
+    function put(){
+      snaps.forEach(function(sn){
+        var pi = donePile.findIndex(function(x){ return x.id === sn.id; }); if(pi !== -1) donePile.splice(pi, 1);
+        var c = Object.assign({}, sn); delete c.doneAt; delete c.doneBy; if(c.phys) c.phys = Object.assign({}, c.phys);
+        if(!findNote(c.id)){ notes.push(c); renderNote(c, false, {focus:false}); }
+      });
+      ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateDonePile(false);
+    }
+    take();
+    var action = pushHistory({label: "Mark " + list.length + " done", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
+    toast("Moved " + list.length + " notes to Done.", "Undo", function(){ undoIfTop(action); });
+  }
   function restoreFromPile(id){
     var o = findPile(id); if(!o) return;
     var c = Object.assign({}, o); delete c.doneAt; delete c.doneBy; if(c.phys) c.phys = Object.assign({}, c.phys);
@@ -5766,6 +5815,7 @@
       selBar.appendChild(b);
       return b;
     }
+    if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) add(ICONS.tick, "Mark done", function(){ markDoneGroup(ids); });
     add(ICONS.copy, "Duplicate", function(){ duplicateNotes(ids); });
     add(ICONS.move, "Move " + ids.length + " to…", function(b){
       var pop = openFloatingPopover(b, "noteMenu");
@@ -6904,6 +6954,7 @@
   shareBtn.addEventListener("click", function(){
     var willOpen = sharePanel.hidden;
     closeOtherPanels(willOpen ? sharePanel : null);
+    if(willOpen) updateCollabButton();
     sharePanel.hidden = !willOpen; if(willOpen) shareLayer.open();
   });
   document.addEventListener("click", function(e){
@@ -9467,7 +9518,7 @@
     run: function(){ var ids = selIds(); var any = ids.some(function(id){ return !isPinned(findNote(id)); }); setPinned(ids, any); }});
   defineAction({id: "done", label: "Mark selected as done", group: "Selection", keywords: "finish complete tick", def: "Shift+D", edit: true,
     when: function(){ return selIds().length > 0; },
-    run: function(){ selIds().map(findNote).forEach(function(n){ if(n) markDone(n); }); }});
+    run: function(){ markDoneGroup(selIds()); }});
   defineAction({id: "focus", label: "Open selection in Focus Mode", group: "Selection", keywords: "large big full", def: "F",
     when: function(){ var ids = selIds(); return ids.length === 1 && !findNote(ids[0]).type; },
     run: function(){ enterFocus(findNote(selIds()[0])); }});
@@ -10098,6 +10149,7 @@
     rememberAccount(Stick.auth.user() || {id: settings.account.sub, email: settings.account.email}, res.profile);
     settings.accountPrefs = res.settings;
     saveSettings();
+    updateCollabButton();
     if(typeof adoptAccountShortcuts === "function") { adoptAccountShortcuts(res.settings && res.settings.uiPrefs); if(typeof adoptAccountPatchTour === "function") adoptAccountPatchTour(res.settings && res.settings.uiPrefs); }
   }
   function refreshAccountData(){
@@ -10122,6 +10174,7 @@
   }
   async function cloudSignOut(scope){
     scope = scope === "global" ? "global" : "local";
+    flushTypingNotify();
     if(cloudSync && cloudSync.hasPending()){
       var go = await confirmDialog({title:"Sign out with unsynced changes?", body:"Some recent changes haven't reached your account yet. Signing out on this device will lose them.", confirm:"Sign out anyway", danger:true});
       if(!go) return;
@@ -10349,6 +10402,9 @@
       if(ev === "SIGNED_OUT" && !cloudSigningOut){ authLost = true; updateSyncPill("problem", "Please sign in again."); }
       if(ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED"){ if(authLost && cloudSync){ authLost = false; updateSyncPill("saving"); cloudSync.retryAll(); } }
     });
+    if(!session && !viewerMode){
+      try{ if(sessionStorage.getItem(INVITE_KEY)){ toast("Sign in to accept your invitation."); setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 600); } }catch(e){}
+    }
     if(!session){
       // can't prove who we are right now (offline, or the login expired): work from the cache; edits stay queued
       authLost = !navigator.onLine ? false : true;
@@ -10375,6 +10431,7 @@
       toast(er.offline ? "You're offline. Connect to load your boards." : Stick.errors.friendly(er));
       return;
     }
+    if(await maybeAcceptInvite()) return;
     cloudSync.attach(activeBoardId);
     updateSyncPill("saved");
     watchPhotoLoading(); await cloudSync.start(); watchPhotoLoading();
@@ -10398,6 +10455,86 @@
       stickLoaderDone("Signed in.", function(){ location.reload(); });          // boots again as this account
     }, function(){ hideCloudOverlay(); toast("Couldn't finish signing in."); });
   }
+
+  // ---------- Collaborate (Premium): invite people to your board ----------
+  // The button exists only for a signed-in Premium owner of the board they are looking at; for everyone else it stays hidden (not greyed out).
+  // An invite is a link that works once, for 7 days, for one chosen person (by e-mail) or anyone who holds it. People accepting an invite do not
+  // need Premium. The server checks who may create and accept invites; this only decides what to show.
+  var collabBtn = document.getElementById("collabBtn");
+  function canShowCollab(){
+    if(!CLOUD || readOnly || viewerMode || singleNoteMode || !activeBoardId) return false;
+    if(!(window.Stick && Stick.auth && Stick.auth.user && Stick.auth.user())) return false;
+    if(!isPremium()) return false;
+    var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {};
+    return !meta.access || meta.access === "owner";
+  }
+  function updateCollabButton(){ if(collabBtn) collabBtn.hidden = !canShowCollab(); }
+  function inviteLink(token){ return location.origin + location.pathname + "#invite=" + token; }
+  function openCollabDialog(){
+    if(!canShowCollab()){ updateCollabButton(); return; }
+    var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {};
+    var wrap = makeDiv("collabDlg");
+    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. Each link works once and expires after 7 days.</p>' +
+      '<label class="asLbl" for="cbRole">They can</label>' +
+      '<select id="cbRole" class="asIn"><option value="editor">Add, move and edit notes</option><option value="viewer">Look, but not change anything</option></select>' +
+      '<label class="asLbl" for="cbEmail">Their e-mail (optional)</label>' +
+      '<input id="cbEmail" class="asIn" type="email" autocomplete="off" maxlength="254" placeholder="Leave empty to let anyone with the link join">' +
+      '<p class="asHint" id="cbHint">With an e-mail, only that account can use the link.</p>' +
+      '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>';
+    openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
+      {label: "Close", value: false},
+      {label: "Create invite link", kind: "primary", id: "cbCreate", onClick: function(close, btn){
+        var email = wrap.querySelector("#cbEmail").value.trim(), role = wrap.querySelector("#cbRole").value, out = wrap.querySelector("#cbOut");
+        if(email && !validEmail(email)){ out.textContent = "That e-mail doesn’t look right."; return false; }
+        setBusy(btn, true, "Creating…");
+        Stick.repo.createInvite(activeBoardId, email, role).then(function(r){
+          setBusy(btn, false);
+          var url = inviteLink(r.token);
+          out.innerHTML = "";
+          var inp = document.createElement("input"); inp.className = "asIn"; inp.readOnly = true; inp.value = url; inp.setAttribute("aria-label", "Invite link");
+          var copy = document.createElement("button"); copy.type = "button"; copy.className = "pillBtn"; copy.textContent = "Copy link";
+          copy.addEventListener("click", function(){ copyText(url).then(function(ok){ flashCopied(copy, ok ? "Copied!" : "Select and copy"); }); });
+          var note = document.createElement("p"); note.className = "asHint"; note.textContent = (role === "viewer" ? "Viewer" : "Editor") + " link" + (email ? " for " + email : "") + ". Send it only to the person you mean.";
+          out.appendChild(inp); out.appendChild(copy); out.appendChild(note);
+          inp.focus(); inp.select();
+        }, function(e){ setBusy(btn, false); out.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
+        return false;
+      }}
+    ]});
+  }
+  if(collabBtn) collabBtn.addEventListener("click", function(){ sharePanel.hidden = true; openCollabDialog(); });
+  // opening someone's invite link (#invite=...): join once signed in; a signed-out visitor signs in first and is brought back to it
+  var INVITE_KEY = "stickit.pendingInvite";
+  function inviteTokenFromHash(){ var m = /^#invite=([a-f0-9]{64})$/i.exec(location.hash || ""); return m ? m[1].toLowerCase() : null; }
+  function rememberInviteFromHash(){
+    var t = inviteTokenFromHash();
+    if(t){ try{ sessionStorage.setItem(INVITE_KEY, t); }catch(e){} try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){} }
+  }
+  async function maybeAcceptInvite(){
+    var t = null; try{ t = sessionStorage.getItem(INVITE_KEY); }catch(e){}
+    if(!t || !/^[a-f0-9]{64}$/.test(t)) return false;
+    try{ sessionStorage.removeItem(INVITE_KEY); }catch(e){}
+    cloudOverlay("Joining the board…");
+    try{
+      var boardId = await Stick.repo.acceptInvite(t);
+      if(boardId){
+        await cloudSync.fillBoardCache(boardId);
+        safeSet(ACTIVE_BOARD_KEY, boardId);
+        stickLoaderDone("You’re in.", function(){ location.reload(); });
+        return true;
+      }
+    }catch(e){
+      var er = Stick.errors.parse(e), msg = String(er && er.message || "");
+      hideCloudOverlay();
+      toast(/INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
+        : /INVITE_USED/.test(msg) ? "That invitation was already used."
+        : /EMAIL_MISMATCH/.test(msg) ? "That invitation was made for a different e-mail address."
+        : /INVITE_NOT_FOUND/.test(msg) ? "We couldn’t find that invitation."
+        : Stick.errors.friendly(er));
+    }
+    return false;
+  }
+  rememberInviteFromHash();
 
   // ---------- What's New / patch tour ----------
   // The words come from docs/patch-notes/patch-notes.json (through js/patch-data.js), so the app, the website and the Markdown notes tell the same
