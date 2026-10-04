@@ -127,6 +127,7 @@ TEMPLATE = '''<!DOCTYPE html>
 <title>{title} ({draft}) · Stick-It</title>
 <link rel="stylesheet" href="{up}assets/fonts/fonts.css">
 <link rel="stylesheet" href="{cssup}legal.css">
+<script src="{up}js/a11y.js"></script>
 </head>
 <body data-page="{page}" data-lang="{lang}">
 <a class="skip" href="#main">{skip}</a>
@@ -141,8 +142,10 @@ TEMPLATE = '''<!DOCTYPE html>
 </main>
 <footer class="foot"><a href="{up}index.html">{back}</a></footer>
 <script src="{up}js/config.js"></script>
+<script src="{up}js/lang.js"></script>
 <script src="{up}js/legal-config.js"></script>
 <script src="{cssup}legal.js"></script>
+<script src="{cssup}legal-ui.js"></script>
 </body>
 </html>
 '''

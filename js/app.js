@@ -539,6 +539,7 @@
     return "hsl(" + hue + "," + sat + "%," + light + "%)";
   }
 
+  function mirrorTheme(){ try{ if(window.StickA11y && settings) StickA11y.set({theme: settings.theme === "dark" ? "dark" : "light"}); }catch(e){} }
   var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null, guestConfirmed:false, theme:"light" };
   if(settings.displayName === undefined) settings.displayName = "";
   if(settings.account === undefined) settings.account = null;
@@ -550,7 +551,7 @@
   if(settings.cleanupEmpty === undefined) settings.cleanupEmpty = true;
   // With a real backend, the old browser-only "signed in" display state means nothing: only a real session counts.
   if(CLOUD_OK && !CLOUD && settings.account) settings.account = null;
-  document.body.classList.toggle("dark", settings.theme === "dark");
+  document.body.classList.toggle("dark", settings.theme === "dark"); mirrorTheme();
 
   // ---------- fonts: script-aware picking and harmonious fallback stacks ----------
   function fontInfo(name){ return FONT_BY_NAME[name] || FONT_BY_NAME[FONTS[0].name]; }
@@ -6444,7 +6445,7 @@
 
   var settingsSnapshot = null;
   function applySettingsUI(){
-    document.body.classList.toggle("dark", settings.theme === "dark");
+    document.body.classList.toggle("dark", settings.theme === "dark"); mirrorTheme();
     applyLook();
     syncSwitch(darkToggle, settings.theme === "dark");
     syncSwitch(lockToggle, !!settings.lockFont);
@@ -6830,8 +6831,7 @@
     ["Young people & parents", "legal/young-people.html", "What under-18s and parents can expect."],
     ["Storage", "legal/storage.html", "What is kept on your device."],
     ["Accessibility", "legal/accessibility.html", "How Stick-It aims to work for everyone."],
-    ["Copyright / DMCA", "legal/copyright.html", "Report content or send a notice."],
-    ["עברית", "legal/he/privacy.html", "מדיניות הפרטיות בעברית."]
+    ["Copyright / DMCA", "legal/copyright.html", "Report content or send a notice."]
   ];
   function buildLegalPane(cc, pane){
     pane.innerHTML = '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
@@ -6841,6 +6841,19 @@
     wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version, with a short tour.</small></span><span class="go" aria-hidden="true">›</span>';
     wn.addEventListener("click", function(){ openWhatsNew(); });
     list.appendChild(wn);
+    // the globe: only languages whose legal pages are complete are listed (js/lang.js); the same registry will serve the app later
+    var langs = window.Stick && Stick.lang ? Stick.lang.complete("legal") : [];
+    if(langs.length > 1){
+      var gb = document.createElement("button"); gb.type = "button"; gb.className = "asAction ccLink"; gb.id = "ccLang"; gb.setAttribute("aria-expanded", "false"); gb.setAttribute("aria-controls", "ccLangList");
+      gb.innerHTML = '<span class="lbl"><span class="t">Language</span><small>Read the legal pages in another language.</small></span><span class="go" aria-hidden="true">›</span>';
+      var gl = document.createElement("div"); gl.className = "ccLangList"; gl.id = "ccLangList"; gl.hidden = true;
+      langs.forEach(function(l){
+        var a = document.createElement("a"); a.className = "asAction ccLink ccLangItem"; a.href = l.code === "en" ? "legal/privacy.html" : "legal/" + l.code + "/privacy.html"; a.target = "_blank"; a.rel = "noopener"; a.lang = l.code; a.dir = l.dir; a.textContent = l.native;
+        gl.appendChild(a);
+      });
+      gb.addEventListener("click", function(){ gl.hidden = !gl.hidden; gb.setAttribute("aria-expanded", gl.hidden ? "false" : "true"); });
+      list.appendChild(gb); list.appendChild(gl);
+    }
     LEGAL_ABOUT.forEach(function(l){
       var a = document.createElement("a"); a.className = "asAction ccLink"; a.href = l[1]; a.target = "_blank"; a.rel = "noopener";
       a.innerHTML = '<span class="lbl"><span class="t"></span><small></small></span><span class="go" aria-hidden="true">›</span>';
@@ -8055,7 +8068,7 @@
   syncSwitch(darkToggle, settings.theme === "dark");
   darkToggle.addEventListener("click", function(){
     settings.theme = settings.theme === "dark" ? "light" : "dark";
-    document.body.classList.toggle("dark", settings.theme === "dark");
+    document.body.classList.toggle("dark", settings.theme === "dark"); mirrorTheme();
     syncSwitch(darkToggle, settings.theme === "dark");
   });
 

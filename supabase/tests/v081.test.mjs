@@ -97,7 +97,7 @@ const sandbox = (code, extra = {}) => { const ctx = vm.createContext({ Math, Arr
 {
   const lc = fs.readFileSync(path.join(root, 'legal', 'legal.css'), 'utf8');
   ok(/article::after/.test(lc) && /repeating-linear-gradient/.test(lc) && /html\[dir="rtl"\] article::after/.test(lc), 'legal pages are a spiral-notebook page, mirrored for right-to-left');
-  ok(/prefers-color-scheme: dark/.test(lc.slice(lc.indexOf('v0.8.1'))) && /@media print/.test(lc), 'the notebook has a dark version and prints plainly');
+  ok(/data-a11y-theme="dark"/.test(lc.slice(lc.indexOf('v0.8.1'))) && /@media print/.test(lc), 'the notebook has a dark version and prints plainly');
   ok(!/Sora.*cursive/.test(lc) && /--bodyfont:'Sora'/.test(lc), 'body text stays in a plain readable face; only headings use handwriting');
 }
 
@@ -111,10 +111,10 @@ const sandbox = (code, extra = {}) => { const ctx = vm.createContext({ Math, Arr
   const rows = [...md.matchAll(/^\| (.+?) \| (SHIPPED|PARTIAL|DEFERRED|NOT IMPLEMENTED)[^|]* \|$/gm)];
   ok(rows.length >= 20 && rows.some((r) => r[2] === 'PARTIAL') && rows.some((r) => r[2] === 'SHIPPED'), 'the status audit uses the four honest statuses and is not all "shipped"');
   const index = JSON.parse(pn('index.json')), data = JSON.parse(pn('patch-notes.json'));
-  ok(index[0].version === '0.8.1' && data[0].version === '0.8.1' && index[0].tldr === data[0].tldr && index[0].file === '0.8.1.md' && index[0].date === null && data[0].date === null, 'index.json and patch-notes.json agree and neither marks 0.8.1 as released');
-  ok(['highlights', 'added', 'improved', 'fixed', 'limitations'].every((k) => Array.isArray(data[0][k]) && data[0][k].length > 0), 'the structured data has highlights, added, improved, fixed and limitations');
+  ok(index[1].version === '0.8.1' && data[1].version === '0.8.1' && index[1].tldr === data[1].tldr && index[1].file === '0.8.1.md' && index[1].date === null && data[1].date === null, 'index.json and patch-notes.json agree and neither marks 0.8.1 as released');
+  ok(['highlights', 'added', 'improved', 'fixed', 'limitations'].every((k) => Array.isArray(data[1][k]) && data[1][k].length > 0), 'the structured data has highlights, added, improved, fixed and limitations');
   const js = pn('patch-notes.js');
-  ok(/^export const patchNotes = \[/m.test(js) && js.includes(JSON.stringify(data[0].tldr)), 'patch-notes.js (for the website) is generated from the same data');
+  ok(/^export const patchNotes = \[/m.test(js) && js.includes(JSON.stringify(data[1].tldr)), 'patch-notes.js (for the website) is generated from the same data');
   const sum = pn('0.8.1-summary.md');
   ok(['## TL;DR', '## Already completed before this patch', '## What was added in 0.8.1', '## What was fixed', '## What was improved', '## What remains partial', '## What is deferred', '## What I can test right now', '## Release blockers', '## Status table'].every((h) => sum.includes(h)), '0.8.1-summary.md has every planned section');
 }
