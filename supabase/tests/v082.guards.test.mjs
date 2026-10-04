@@ -47,6 +47,10 @@ ok(/BOOKMARK_MAX = 30/.test(app) && /function goToBookmark/.test(app), 'bookmark
   ok(f({ type: 'zone', carry: true, variant: 'felt', bg: '#112233' }).carry === true, 'a real carry flag and material survive');
 }
 
+// ---- validation-pass fixes
+ok(/release: function\(id\)\{ var u = urls\.get\(id\)/.test(app) && /MediaStore\.release\(n\.mediaId\)/.test(app), 'removing a voice memo or video lets go of its object URL (and the blob it keeps alive)');
+ok(/OV\.layer\("language-chooser"/.test(app), 'the inline language list is an Esc layer of its own');
+
 // ---- patch tour data
 {
   const pd = read('js/patch-data.js');

@@ -3180,6 +3180,8 @@
     return {
       put: function(id, blob){ return run("readwrite", function(st){ return st.put(blob, id); }); },
       remember: function(id, blob){ var u = URL.createObjectURL(blob); urls.set(id, u); return u; },
+      // let go of the object URL (and so of the blob it keeps alive) when its note leaves the board; it is made again if the note comes back
+      release: function(id){ var u = urls.get(id); if(u){ try{ URL.revokeObjectURL(u); }catch(e){} urls.delete(id); } },
       blob: function(id){ return run("readonly", function(st){ return st.get(id); }).then(function(b){ return b || null; }); },
       url: function(id){
         if(urls.has(id)) return Promise.resolve(urls.get(id));
@@ -4950,7 +4952,7 @@
   }
 
   function removeNoteEl(n, animate){
-    if(isAV(n)) stopMediaFor(n);
+    if(isAV(n)){ stopMediaFor(n); if(n.mediaId) MediaStore.release(n.mediaId); }
     var elRef = n.el;
     if(!elRef) return;
     if(!animate){ elRef.remove(); return; }
@@ -6851,7 +6853,8 @@
         var a = document.createElement("a"); a.className = "asAction ccLink ccLangItem"; a.href = l.code === "en" ? "legal/privacy.html" : "legal/" + l.code + "/privacy.html"; a.target = "_blank"; a.rel = "noopener"; a.lang = l.code; a.dir = l.dir; a.textContent = l.native;
         gl.appendChild(a);
       });
-      gb.addEventListener("click", function(){ gl.hidden = !gl.hidden; gb.setAttribute("aria-expanded", gl.hidden ? "false" : "true"); });
+      var langLayer = OV.layer("language-chooser", function(){ gl.hidden = true; gb.setAttribute("aria-expanded", "false"); gb.focus(); }, function(){ return !gl.hidden && gl.isConnected; });
+      gb.addEventListener("click", function(){ gl.hidden = !gl.hidden; gb.setAttribute("aria-expanded", gl.hidden ? "false" : "true"); if(gl.hidden) langLayer.close(); else langLayer.open(); });
       list.appendChild(gb); list.appendChild(gl);
     }
     LEGAL_ABOUT.forEach(function(l){
