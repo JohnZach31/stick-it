@@ -2027,3 +2027,26 @@ body.tidying .note, body.tidying .photoObj, body.tidying .boardObj{ transition:l
 .cleanSum{ margin-top:12px; font:700 0.86rem 'Sora',sans-serif; }
 .cleanNote{ margin-top:4px; font-size:0.76rem; color:var(--ink-soft); line-height:1.4; }
 @media (prefers-reduced-motion: reduce){ body.tidying .note, body.tidying .photoObj, body.tidying .boardObj{ transition:none; } }
+
+/* ---------- the status slip at the foot of the canvas, and the same loader inside a dialog ---------- */
+.footSlip{ position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom,0px)); transform:translateX(-50%); z-index:9985; display:flex; align-items:center; gap:9px; max-width:calc(100vw - 28px);
+  padding:6px 14px 6px 10px; border-radius:999px; background:var(--panel); color:var(--ink); border:1px solid var(--line); box-shadow:0 3px 12px var(--shadow); font:600 0.78rem 'Sora',sans-serif; pointer-events:none; animation:fsIn .22s ease both; }
+.footSlip[hidden]{ display:none; }
+.footSlip .fsRetry{ pointer-events:auto; all:unset; cursor:pointer; font:700 0.76rem 'Sora',sans-serif; color:var(--accent-strong); text-decoration:underline; padding:2px 4px; }
+.footSlip .fsRetry:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; border-radius:4px; }
+.footSlip .fsRetry[hidden]{ display:none; }
+.fsNote{ position:relative; width:20px; height:20px; flex:none; animation:slWobble 1.1s ease-in-out infinite; transform-origin:50% 62%; }
+.fsNote span{ position:absolute; inset:0; }
+.fsNote svg{ width:100%; height:100%; display:block; }
+.fsGreen{ opacity:0; }
+.footSlip.ok .fsRed{ opacity:0; }
+.footSlip.ok .fsGreen{ opacity:1; }
+.footSlip.ok .fsNote{ animation:slStick .46s cubic-bezier(.34,1.56,.64,1) both; }
+.footSlip.fail .fsNote{ animation:slShake .42s ease both; }
+@keyframes fsIn{ from{ opacity:0; transform:translateX(-50%) translateY(6px); } to{ opacity:1; transform:translateX(-50%); } }
+.slLocal{ display:flex; align-items:center; gap:8px; padding:10px 2px; font:600 0.86rem 'Sora',sans-serif; color:var(--ink-soft); }
+.slLocal[hidden]{ display:none; }
+.slLocal .slMini{ margin:0; }
+.slLocal.fail{ color:var(--ink); flex-wrap:wrap; }
+@media (max-width:720px){ .footSlip{ bottom:calc(72px + env(safe-area-inset-bottom,0px)); } }
+@media (prefers-reduced-motion: reduce){ .footSlip{ animation:none; } .fsNote, .footSlip.ok .fsNote, .footSlip.fail .fsNote{ animation:none !important; transform:none !important; } }

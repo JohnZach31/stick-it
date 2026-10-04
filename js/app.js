@@ -2649,7 +2649,7 @@
   // helpers the Cutout Maker (js/cutout-maker.js) needs from the app
   window.Stick = window.Stick || {};
   Stick.ui = {
-    ICONS: ICONS, toast: function(m){ toast(m); }, modal: function(o){ return openModal(o); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
+    ICONS: ICONS, miniLoader: function(){ return miniLoaderHtml(); }, toast: function(m){ toast(m); }, modal: function(o){ return openModal(o); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
     loader: {show: function(t){ cloudOverlay(t); }, hide: function(){ hideCloudOverlay(); }, done: function(t, after){ stickLoaderDone(t, after); }, fail: function(t, retry){ stickLoaderFail(t, retry); }}
   };
   async function copyCutoutBlob(fromKey, toKey){
@@ -3226,7 +3226,9 @@
       if(playing.media.paused) playing.media.play().catch(function(){}); else playing.media.pause();
       return;
     }
+    busyStart("media", "Loading media\u2026", {delay: 500});
     mediaUrlFor(n).then(function(u){
+      busyEnd("media");
       if(!u){
         markMissing(n);
         toast(n.mediaState === "uploading" ? "This is still uploading from another device."
@@ -3722,7 +3724,7 @@
     removed.forEach(function(id){ var n = findNote(id); if(n){ removeNoteEl(n, false); notes.splice(notes.indexOf(n), 1); selected.delete(id); clearDecorations(id); } });
     zCounter += 1; strip.z = zCounter; notes.push(strip); renderNote(strip, true, {focus:false});
     ensureWidth(); saveNotes(); updateCount(); updateMinimap(); setSelection([strip.id]);
-    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); }, 0);
+    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); watchPhotoLoading(); }, 0);
     var action = pushHistory({label:"Make photo strip", custom:true, t:Date.now(),
       undo:function(){
         var cur = findNote(strip.id); if(cur){ removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(cur.id); clearDecorations(cur.id); }
@@ -3826,7 +3828,7 @@
         var before = captureState([n.id]);
         cur.frames = work; cur.caption = Stick.objects.clean.one(capIn.value, 80);
         saveNotes(); rerenderNote(cur); recordChange("Edit photo strip", before);
-        if(cloudSync){ cloudSync.notesChanged(); cloudSync.hydrateAll(); }
+        if(cloudSync){ cloudSync.notesChanged(); cloudSync.hydrateAll(); watchPhotoLoading(); }
       }});
   }
 
@@ -5062,7 +5064,7 @@
     return c;
   }
   function insertNotes(list, label){
-    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); }, 0);
+    if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); watchPhotoLoading(); }, 0);
     list.forEach(function(n){
       zCounter += 1; n.z = zCounter;
       n.y = clampY(n.y);
@@ -5624,9 +5626,9 @@
     var isGroup = shareable.length > 1;
     var items, link, shareInfo = null;
     if(cloudShare){
-      cloudOverlay("Getting ready to share\u2026");
+      busyStart("share", "Preparing share\u2026", {delay: 250});
       var ready = await cloudSync.settle(60000);     // the link can only point at things that have reached the server
-      hideCloudOverlay();
+      busyEnd("share");
       if(!ready){ toast("Couldn't finish saving to your account yet. Check your connection and try again."); return; }
       var kept = shareable.filter(function(n){ return !isAV(n) || n.assetId; });
       avLeft = shareable.length - kept.length;
@@ -6621,13 +6623,14 @@
   async function openManageShares(onChange){
     var content = document.createElement("div");
     content.className = "acctSub"; content.style.textAlign = "left";
-    content.textContent = "Loading\u2026";
-    openModal({title: "Your active links", content: content, width: 460, actions: [{label: "Done", kind: "primary", value: true}]});
+    var modal = openModal({title: "Your active links", content: content, width: 460, actions: [{label: "Done", kind: "primary", value: true}]});
+    var ld = localLoader(content, "Loading your links\u2026");
     try{
       var list = await Stick.share.list();
       var names = {};
       try{ (await Stick.repo.listBoards()).forEach(function(b){ names[b.id] = b.name; }); }catch(e){}
       var act = list.filter(function(x){ return x.is_active; });
+      await new Promise(function(r){ ld.stop(r); });
       content.innerHTML = "";
       if(!act.length){ content.textContent = "You have no active share links."; return; }
       var note = document.createElement("p"); note.style.margin = "0 0 10px";
@@ -6649,7 +6652,7 @@
         });
         row.appendChild(t); row.appendChild(b); content.appendChild(row);
       });
-    }catch(e){ content.textContent = "Couldn't load your links: " + Stick.errors.friendly(Stick.errors.parse(e)); }
+    }catch(e){ if(!modal.card.isConnected){ ld.stop(); return; } ld.fail("Couldn\u2019t load your links. " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ modal.close(false); setTimeout(function(){ openManageShares(onChange); }, 0); }); }
   }
 
   function openDeleteAccount(){
@@ -7204,7 +7207,9 @@
       return "presence on";
     };
     Stick.dev.ui = {                // local only: open the new dialogs without setting up a board for each (used in the polish pass tests)
-      cleanUp: function(){ openCleanUp(); }, stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
+      cleanUp: function(){ openCleanUp(); }, activeShares: function(){ openManageShares(function(){}); },
+      foot: {start: function(t, d){ busyStart('dev', t || 'Loading board…', {delay: d == null ? 0 : d}); }, done: function(t){ busyDone('dev', t || 'Done.'); }, fail: function(t){ busyFail('dev', t || 'Couldn’t load photos.', function(){}); }, end: function(){ busyEnd('dev'); }},
+      stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
       askReason: function(){ return Stick.collab.askReason({modal: openModal}, null, function(){}); }
     };
     Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
@@ -7768,7 +7773,9 @@
   // Signed in: a LIVE link. Whoever has it always sees the board as it currently is, read-only.
   async function publishLiveBoard(){
     shareResult.innerHTML = '<p class="muted">Getting your board ready\u2026</p>';
+    busyStart("share", "Preparing share\u2026", {delay: 250});
     var ready = await cloudSync.settle(60000);
+    busyEnd("share");
     if(!ready){ shareResult.innerHTML = '<p class="muted">Couldn\'t finish saving to your account yet. Check your connection and try again.</p>'; return; }
     var info, ident = shareIdentity();
     try{ info = await Stick.share.createLive(activeBoardId, ident.name, ident); }
@@ -8820,6 +8827,89 @@
     setTimeout(function(){ try{ btn.focus(); }catch(e){} }, 50);
   }
 
+  // ---- the status slip at the foot of the canvas ------------------------------------------------------------------------
+  // "Stick-It is still working": a small slip with the red note, along the bottom edge. The board stays visible and usable (the slip
+  // ignores the pointer except for its Try again link). It only appears when something has taken longer than `delay`, stays long enough
+  // to read, turns green for a moment when the thing finished, and stays (with a way to retry) only when it failed.
+  var FT = {items: [], el: null, timer: null};
+  function ftFind(key){ for(var i = 0; i < FT.items.length; i++){ if(FT.items[i].key === key) return FT.items[i]; } return null; }
+  function ftDrop(key){ FT.items = FT.items.filter(function(i){ return i.key !== key; }); ftPaint(); }
+  function ftEl(){
+    if(FT.el && FT.el.isConnected) return FT.el;
+    var e = makeDiv("footSlip"); e.setAttribute("role", "status"); e.setAttribute("aria-live", "polite"); e.hidden = true;
+    e.innerHTML = '<span class="fsNote" aria-hidden="true"><span class="fsRed">' + buildLogoSvg(LOGO_COLORS.loading.fill, LOGO_COLORS.loading.dark) + '</span><span class="fsGreen">' + buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark) + '</span></span><span class="fsMsg"></span><button type="button" class="fsRetry" hidden>Try again</button>';
+    document.body.appendChild(e); FT.el = e; return e;
+  }
+  function ftPaint(){
+    clearTimeout(FT.timer);
+    var now = Date.now(), live = FT.items.filter(function(i){ return i.state !== "work" || now - i.t >= i.delay; });
+    var e = ftEl();
+    if(!live.length){
+      e.hidden = true;
+      var waiting = FT.items.filter(function(i){ return i.state === "work"; });
+      if(waiting.length) FT.timer = setTimeout(ftPaint, Math.max(30, Math.min.apply(null, waiting.map(function(i){ return i.t + i.delay - now; }))));
+      return;
+    }
+    var top = live[live.length - 1];
+    if(!top.shownAt) top.shownAt = now;
+    e.hidden = false; e.classList.toggle("ok", top.state === "ok"); e.classList.toggle("fail", top.state === "fail");
+    e.querySelector(".fsMsg").textContent = top.text;
+    var rb = e.querySelector(".fsRetry");
+    rb.hidden = top.state !== "fail";
+    if(top.state === "fail"){ rb.textContent = top.retry ? "Try again" : "OK"; rb.onclick = function(){ var r = top.retry; ftDrop(top.key); if(r) r(); }; }
+  }
+  // start (or update) a piece of work. `delay`: nothing shows until it has taken this long (default 400 ms).
+  function busyStart(key, text, opts){
+    var it = ftFind(key);
+    if(it){ it.text = text; it.state = "work"; }
+    else { it = {key: key, text: text, state: "work", t: Date.now(), delay: opts && opts.delay != null ? opts.delay : 400, shownAt: 0}; FT.items.push(it); }
+    ftPaint(); return key;
+  }
+  // finished well: if the slip was showing it turns green with `text` for a moment, otherwise nothing ever appears
+  function busyDone(key, text){
+    var it = ftFind(key); if(!it) return;
+    if(!it.shownAt){ ftDrop(key); return; }
+    it.state = "ok"; if(text) it.text = text;
+    var wait = Math.max(0, 450 - (Date.now() - it.shownAt));
+    setTimeout(function(){ ftPaint(); setTimeout(function(){ if(ftFind(key) === it && it.state === "ok") ftDrop(key); }, 900); }, wait);
+  }
+  // finished without a result of its own (e.g. a quiet refresh): just remove it, after it has been readable for a moment
+  function busyEnd(key){
+    var it = ftFind(key); if(!it) return;
+    if(!it.shownAt){ ftDrop(key); return; }
+    setTimeout(function(){ if(ftFind(key) === it && it.state === "work") ftDrop(key); }, Math.max(0, 500 - (Date.now() - it.shownAt)));
+  }
+  function busyFail(key, text, retry){
+    var it = ftFind(key) || (FT.items.push({key: key, delay: 0, t: Date.now(), shownAt: 0}), ftFind(key));
+    it.state = "fail"; it.text = text; it.retry = retry || null; ftPaint();
+  }
+  // the same loader inside a section or dialog (not over the whole screen): shows after a short beat, never flickers
+  function localLoader(box, text){
+    var el = makeDiv("slLocal"), done = false, shown = 0, timer;
+    el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite"); el.hidden = true;
+    el.innerHTML = miniLoaderHtml() + '<span class="slLocalMsg"></span><button type="button" class="pillBtn cmtSmall slLocalRetry" hidden>Try again</button>';
+    el.querySelector(".slLocalMsg").textContent = text;
+    box.appendChild(el);
+    timer = setTimeout(function(){ if(!done){ el.hidden = false; shown = Date.now(); } }, 150);
+    return {
+      el: el,
+      stop: function(cb){ done = true; clearTimeout(timer); var wait = shown ? Math.max(0, 300 - (Date.now() - shown)) : 0; setTimeout(function(){ el.remove(); if(cb) cb(); }, wait); },
+      fail: function(msg, retry){ done = true; clearTimeout(timer); el.hidden = false; el.classList.add("fail"); el.querySelector(".slMini").remove(); el.querySelector(".slLocalMsg").textContent = msg;
+        var b = el.querySelector(".slLocalRetry"); b.hidden = !retry; b.onclick = function(){ el.remove(); if(retry) retry(); }; }
+    };
+  }
+
+  // pictures coming down from the account: the foot slip says so while any are still on their way (checked twice a second, only then)
+  var photoWatch = null;
+  function photosPending(){ return notes.some(function(n){ return (isPhoto(n) || n.type === "postcard") && (n.assetId) && !n.image && n.mediaState !== "failed" && n.mediaState !== "missing"; }); }
+  function watchPhotoLoading(){
+    if(photoWatch || !CLOUD) return;
+    var t0 = Date.now();
+    photoWatch = setInterval(function(){
+      if(photosPending() && Date.now() - t0 < 30000){ busyStart("photos", "Loading photos…", {delay: 600}); }
+      else { clearInterval(photoWatch); photoWatch = null; busyEnd("photos"); }
+    }, 500);
+  }
   // one quiet word in the header; nothing on individual notes
   function updateSyncPill(state, note){
     if(!CLOUD){ syncPill.hidden = true; return; }
@@ -8828,6 +8918,7 @@
     var labels = {saved:"Saved", saving:"Saving\u2026", offline:"Offline", problem: authLost ? "Sign in again" : "Sync problem"};
     syncPill.className = "syncPill " + state;
     syncPill.textContent = labels[state] || "Saved";
+    if(state === "saving") busyStart("sync", "Syncing\u2026", {delay: 1200}); else if(state === "offline") busyStart("sync", "Reconnecting\u2026", {delay: 1500}); else busyEnd("sync");
     syncPill.title = state === "problem" ? ((note || "Some changes couldn't be saved.") + " Click to try again.")
       : state === "offline" ? "You're offline. Changes are kept on this device and will sync when you're back." : "";
   }
@@ -9201,7 +9292,7 @@
     }
     cloudSync.attach(activeBoardId);
     updateSyncPill("saved");
-    await cloudSync.start();
+    watchPhotoLoading(); await cloudSync.start(); watchPhotoLoading();
     startCollab();
     refreshBoardsQuietly();
     // Boards made as a guest on this device that were never imported (signed in again later, or the first offer
