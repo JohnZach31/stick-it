@@ -5463,6 +5463,12 @@
         e.stopPropagation();
         enterFocus(n);
       });
+      // Ctrl/Cmd+click anywhere on a note (not only its tab) adds it to, or removes it from, the selection. A link still opens with Ctrl+click.
+      el.addEventListener("pointerdown", function(e){
+        if(!(e.ctrlKey || e.metaKey) || focusState || (e.pointerType === "mouse" && e.button !== 0)) return;
+        if(e.target.closest && e.target.closest("a[href], .del, .moreBtn, .fontCycle, .quickDone, .noteHandle, .noteEdge, .pCtl, .taskDock, .focusClose")) return;
+        e.preventDefault(); e.stopPropagation(); endEditing(); toggleSelected(n.id);
+      }, true);
       tab.addEventListener("pointerdown", function(e){
         e.stopPropagation();
         e.preventDefault();
