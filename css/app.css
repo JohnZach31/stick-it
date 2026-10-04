@@ -2344,3 +2344,33 @@ body.dark .text a{ color:var(--link, #8fb4ff); }
   .note:not(.selected) .noteEdge{ display:none; }
   .note.selected .noteEdgeB::after{ width:52px; height:6px; bottom:10px; background:rgba(0,0,0,0.38); }
 }
+
+/* ---------- top-bar buttons: a small, quiet movement on hover or keyboard focus (v0.8.2) ----------
+   Each icon does one thing that fits it, in about a third of a second, then rests. Nothing loops, nothing bounces for long.
+   Off for touch screens (no hover), for "reduce motion", and when the system asks for less movement. */
+@media (hover:hover) and (prefers-reduced-motion:no-preference){
+  html:not([data-a11y-motion="reduce"]) .rightButtons .gearBtn svg,
+  html:not([data-a11y-motion="reduce"]) .rightButtons .gearBtn{ transition:transform .32s cubic-bezier(.3,1.4,.5,1), color .15s ease, border-color .15s ease, background-color .15s ease, box-shadow .2s ease; }
+  html:not([data-a11y-motion="reduce"]) .rightButtons .gearBtn:hover{ box-shadow:0 2px 7px rgba(60,45,10,0.16); }
+  /* settings: the cog turns a little way, like a quarter-click */
+  html:not([data-a11y-motion="reduce"]) #gearBtn:is(:hover,:focus-visible) svg{ transform:rotate(70deg); }
+  /* sign out: the arrow slides toward the door */
+  html:not([data-a11y-motion="reduce"]) #quickSignOut:is(:hover,:focus-visible) svg{ transform:translateX(3px); }
+  /* clean up: the broom sweeps */
+  html:not([data-a11y-motion="reduce"]) #cleanBtn:is(:hover,:focus-visible) svg{ animation:hbSweep .5s ease-in-out 1; transform-origin:80% 20%; }
+  /* share: it tips and grows a touch, as if about to send */
+  html:not([data-a11y-motion="reduce"]) #shareBtn:is(:hover,:focus-visible) svg{ transform:rotate(14deg) scale(1.1); }
+  /* shortcuts: the keyboard dips like a pressed key */
+  html:not([data-a11y-motion="reduce"]) #kbdBtn:is(:hover,:focus-visible) svg{ transform:translateY(1.5px) scale(0.96); }
+  /* help: the question mark tilts, curious */
+  html:not([data-a11y-motion="reduce"]) #helpBtn:is(:hover,:focus-visible){ animation:hbWonder .45s ease 1; }
+  /* account: the picture lifts a little and the crown (if there is one) gives a tiny shake */
+  html:not([data-a11y-motion="reduce"]) #accountBtn:is(:hover,:focus-visible) .acctAv{ transform:translateY(-1.5px) scale(1.04); }
+  html:not([data-a11y-motion="reduce"]) #accountBtn .acctAv{ transition:transform .28s cubic-bezier(.3,1.4,.5,1); }
+  html:not([data-a11y-motion="reduce"]) #accountBtn:is(:hover,:focus-visible) .crown{ animation:hbCrown .5s ease 1; }
+  /* the pressed feel stays: it overrides the movement for a moment */
+  html:not([data-a11y-motion="reduce"]) .rightButtons .gearBtn:active svg{ transition-duration:.08s; }
+}
+@keyframes hbSweep{ 0%{ transform:rotate(0); } 30%{ transform:rotate(-16deg); } 65%{ transform:rotate(12deg); } 100%{ transform:rotate(0); } }
+@keyframes hbWonder{ 0%{ transform:rotate(0); } 35%{ transform:rotate(-12deg) scale(1.08); } 70%{ transform:rotate(8deg) scale(1.04); } 100%{ transform:rotate(0); } }
+@keyframes hbCrown{ 0%,100%{ transform:translateX(-50%) rotate(-8deg); } 30%{ transform:translateX(-50%) rotate(-16deg) translateY(-1px); } 65%{ transform:translateX(-50%) rotate(0deg); } }

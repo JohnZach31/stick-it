@@ -72,6 +72,8 @@ ok(/var selTip = null/.test(app) && /makeDiv\("floatPop selTip"\)/.test(app) && 
 ok(/window\.addEventListener\("keydown", function\(e\)\{\s+if\(!\(e\.ctrlKey \|\| e\.metaKey\)[\s\S]*?\}, true\);/.test(app) && /KeyU/.test(app), 'Ctrl+U is caught on the window in the capture phase, before the browser can open view-source');
 ok(/function startNoteResize\(e, n, axis\)/.test(app) && /noteEdgeB/.test(app) && /@media \(pointer:coarse\)\{[\s\S]*?noteEdgeB/.test(css), 'a note can be pulled longer or wider by its edge, with a finger-sized grab bar on touch screens');
 
+ok(/@media \(hover:hover\) and \(prefers-reduced-motion:no-preference\)\{[\s\S]*?#gearBtn:is\(:hover,:focus-visible\) svg\{ transform:rotate\(70deg\)/.test(css) && /@keyframes hbSweep/.test(css), 'the top-bar buttons have one small hover movement each, only where hovering exists and motion is allowed');
+
 // ---- patch tour data
 {
   const pd = read('js/patch-data.js');
