@@ -1126,6 +1126,10 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
+  // (declared here, above everything that runs while the page loads: the cached board is sanitised during boot, long before the zone code below)
+  var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
+  var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
+  var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
   var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
@@ -1289,7 +1293,10 @@
     }
   };
 
-  var readOnly = /^#(sb|s)=/.test(location.hash);   // legacy board link (#sb=) or a new server link (#s=<token>)
+  // A page opened from a share link (#s=<token> or the legacy #sb=) only SHOWS what was shared. It must never write to anyone's account, even
+  // when the person looking is signed in (the owner opening their own link, or anyone else with an account of their own).
+  var SHARE_LINK_PAGE = /^#(sb|s)=/.test(location.hash);
+  var readOnly = SHARE_LINK_PAGE;                    // legacy board link (#sb=) or a new server link (#s=<token>)
   var viewerMode = false;                            // signed in, but only allowed to look at this board
   var needsCloudBootstrap = false, needsBoardFill = false;
   // Desktop: double-click makes a note (single clicks stay free for selecting).
@@ -1332,6 +1339,16 @@
   }
   var NOTES_KEY = activeBoardId ? notesKeyFor(activeBoardId) : null;
 
+  // Objects that this device could not read (a malformed cache entry, a row it does not understand). They are left exactly as they are on the
+  // server: the sync layer is told to treat them as present, so being unreadable here can never get them deleted.
+  var quarantined = {};
+  function sanitizeSafely(raw){
+    var c = null;
+    try{ c = cloudSanitize(raw); }catch(err){ try{ console.warn("Stick-It: one object could not be read and was left alone:", raw && raw.id, err); }catch(e2){} }
+    if(!c && raw && raw.id !== undefined) quarantined[String(raw.id)] = true;
+    else if(c) delete quarantined[String(c.id)];
+    return c;
+  }
   var notes = [];
   var donePile = [];                                 // finished notes (see the Done pile section); stored with the notes, not drawn on the board
   var firstRun = false;
@@ -1345,7 +1362,7 @@
       {id:"seed-3", x:70, y:280, html:"Tap \u2022\u2022\u2022 on a note for headings, checklists, a highlighter, colours and more.", bg:randomColor(), font:pickFont(), rot:rand(-5,5), z:3, categoryIndex:0}
     ]);
     if(CLOUD){
-      notes = notes.map(cloudSanitize).filter(Boolean);        // cached from the server: never trust it blindly
+      notes = notes.map(sanitizeSafely).filter(Boolean);        // cached from the server: never trust it blindly (and never lose what cannot be read)
     } else {
       notes.forEach(function(n){
         if(n.html === undefined) n.html = escapeHtml(n.text || "");
@@ -1384,6 +1401,7 @@
   }
   // write the cache without telling the sync layer (used when the change came from the server)
   function saveNotesCache(){
+    if(SHARE_LINK_PAGE) return;                       // the shared copies on screen are never written over this account's own cached board
     if(NOTES_KEY) safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
   }
@@ -5988,9 +6006,6 @@
   // A zone is a plain object like the others (it syncs, copies, pins and undoes the same way) but it sits underneath everything and only
   // its title strip and its corner handle take the pointer, so the notes on top and the empty board around it stay easy to use.
   // Deleting a zone only removes the paper: the notes on it are never touched. "Move with its notes" is off until chosen.
-  var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
-  var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
-  var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
   function zoneMaterial(n){ return ZONE_MATERIALS.some(function(m){ return m[0] === n.variant; }) ? n.variant : "paper"; }
   function zoneBox(n){ return {l: n.x, t: n.y, r: n.x + (n.w || 360), b: n.y + (n.h || 240)}; }
   function noteCenter(o){ var el = o.el, w = o.w || NOTE_W, h = (el && el.offsetHeight) || NOTE_H; return {x: o.x + w / 2, y: o.y + h / 2}; }
@@ -10554,6 +10569,8 @@
 
   // what the sync layer needs from the app
   var cloudHost = {
+    protectedIds: function(){ return quarantined; },           // unreadable here is not the same as deleted: never sent as a delete
+    isShareView: function(){ return SHARE_LINK_PAGE; },       // the sync layer refuses to attach to a board from a share-link page
     snapshot: function(){ return notes.concat(donePile).map(persistForm); },
     getObject: function(id){ var n = findNote(id) || findPile(id); return n ? persistForm(n) : null; },
     // changes that came from the server: applied without an undo step
@@ -10567,7 +10584,7 @@
         clearDecorations(id);
       });
       (d.upserts || []).forEach(function(raw){
-        var o = cloudSanitize(raw); if(!o) return;
+        var o = sanitizeSafely(raw); if(!o) return;
         var ex = findNote(o.id), inPile = donePile.findIndex(function(x){ return x.id === o.id; });
         if(isDoneItem(o)){                                          // finished on another device: it belongs in the pile
           if(ex){ if(ex.el) ex.el.remove(); notes.splice(notes.indexOf(ex), 1); selected.delete(ex.id); clearDecorations(ex.id); }
@@ -10584,7 +10601,7 @@
         } else {
           zCounter = Math.max(zCounter, o.z || 0);
           notes.push(o);
-          renderNote(o, false, {focus:false});
+          try{ renderNote(o, false, {focus:false}); }catch(err){ try{ console.warn("Stick-It: one object could not be drawn:", o && o.id, err); }catch(e2){} }
         }
       });
       ensureWidth(); updateCount(); updateMinimap(); applySelection(); updateDonePile(false);
@@ -11123,7 +11140,7 @@
     }
     syncNoteMaxHeight();
     ensureWidth();
-    notes.forEach(function(n){ renderNote(n, false); });
+    notes.forEach(function(n){ try{ renderNote(n, false); }catch(err){ try{ console.warn("Stick-It: one object could not be drawn:", n && n.id, err); }catch(e2){} } });
     updateCount();
     applyZoom();
     if(!readOnly) setTimeout(function(){ if(boardInner.clientHeight) recoverVertical(); }, 300);
@@ -11140,7 +11157,7 @@
   setTimeout(function(){ setLogo("ready"); }, 450);
   if(!singleNoteMode && !readOnly) setTimeout(maybeOfferPatchTour, 2200);
 
-  if(CLOUD_OK && !singleNoteMode){
+  if(CLOUD_OK && !singleNoteMode && !SHARE_LINK_PAGE){          // a share-link page never starts the account sync
     if(window.Stick.auth.callbackPending) finishSignIn();
     else if(CLOUD) startCloud();
   }

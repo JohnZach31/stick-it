@@ -473,6 +473,62 @@ try {
     P.sync.stop();
   }
 
+  // ============================================================ INCIDENT REGRESSIONS (data safety)
+  // 2026-10-04: opening a share link in a browser that is signed in soft-deleted the account's whole board. The share page's own objects (the
+  // shared copies) were diffed against what the account already knew, and every real object read as "removed".
+  {
+    const O = await device('incident.owner@example.com');
+    const bd = await O.Stick.repo.createBoard('Main Board', null);
+    O.open(bd.id); await O.sync.start();
+    const mine = [note({ html: 'one' }), note({ html: 'two' }), note({ html: 'three' }),
+      { id: crypto.randomUUID(), type: 'photo', x: 1, y: 2, w: 200, rot: 0, z: 2, caption: 'p', imgRatio: 0.75 },
+      { id: crypto.randomUUID(), type: 'receipt', x: 5, y: 5, w: 230, rot: 0, z: 3, title: 'R', variant: 'clean' }];
+    O.notes.push(...mine); O.sync.notesChanged(); await sleep(150); await O.sync.flush();
+    const active = async () => (await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is null', [bd.id])).rows[0].c;
+    const restore = () => admin('update public.board_objects set deleted_at=null where board_id=$1', [bd.id]);
+    ok(await active() === 5, 'incident: the board starts with 5 live objects on the server');
+
+    // the same browser (same storage and session) now has a share-link page open: its objects are the shared copies, with ids that are not the account's
+    const sharedCopy = [{ id: 's0', x: 0, y: 0, w: 250, rot: 0, z: 1, html: 'shared copy', bg: 'hsl(50,90%,80%)', font: 'Caveat' }];
+    const viewHost = Object.assign({}, O.host, { snapshot: () => sharedCopy, getObject: () => null, isShareView: () => true });
+    const mk = (host) => O.Stick.createSync({ host, storage: O.ls, keys: O.keys, config: { debounceMs: 15, maxWaitMs: 60, pollMs: 1e9, batch: 100 } });
+    const view = mk(viewHost);
+    view.attach(bd.id);
+    ok(view.boardId() === null, 'incident: a share-link page refuses to attach to a board');
+    await view.start(); view.notesChanged(); await sleep(200); await view.flush();
+    ok(await active() === 5, 'incident: a share-link page never deletes anything (5 of 5 still live)');
+    ok((await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is not null', [bd.id])).rows[0].c === 0, 'incident: no row was soft-deleted');
+    view.stop();
+
+    // negative control: without the refusal, that very situation deletes everything (so this test really can see the bug)
+    const bad = mk(Object.assign({}, viewHost, { isShareView: undefined }));
+    bad.attach(bd.id); await bad.start(); await sleep(100); await bad.flush();
+    ok(await active() === 0, 'control: without the guard the same situation WOULD delete the whole board (the test can see the bug)');
+    bad.stop(); await restore();
+    ok(await active() === 5, 'control: (test housekeeping) rows restored');
+
+    // an object this device could not read is "present", never "deleted"
+    const keep = mine[3].id;
+    const unreadable = mk(Object.assign({}, O.host, { snapshot: () => O.host.snapshot().filter(o => o.id !== keep), protectedIds: () => ({ [keep]: true }) }));
+    unreadable.attach(bd.id); await unreadable.start(); unreadable.notesChanged(); await sleep(200); await unreadable.flush();
+    ok(await active() === 5, 'incident: an object this device could not read is never deleted from the account');
+    unreadable.stop();
+    const plain = mk(Object.assign({}, O.host, { snapshot: () => O.host.snapshot().filter(o => o.id !== keep) }));
+    plain.attach(bd.id); await plain.start(); await sleep(100); await plain.flush();
+    ok(await active() === 4, 'control: without protection a missing object IS deleted (so the protection above is what saved it)');
+    plain.stop(); await restore();
+
+    // owner and a visitor with their own account: the visitor's share-link page must not touch the visitor's own board either
+    const V2 = await device('incident.visitor@example.com');
+    const vb = await V2.Stick.repo.createBoard('Visitor board', null);
+    V2.open(vb.id); await V2.sync.start();
+    V2.notes.push(note({ html: 'v1' }), note({ html: 'v2' })); V2.sync.notesChanged(); await sleep(150); await V2.sync.flush();
+    const vview = V2.Stick.createSync({ host: Object.assign({}, V2.host, { snapshot: () => sharedCopy, getObject: () => null, isShareView: () => true }), storage: V2.ls, keys: V2.keys, config: { debounceMs: 15, maxWaitMs: 60, pollMs: 1e9, batch: 100 } });
+    vview.attach(vb.id); await vview.start(); vview.notesChanged(); await sleep(150);
+    ok((await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is null', [vb.id])).rows[0].c === 2, 'incident: opening someone else\'s share link never touches the visitor\'s own board');
+    vview.stop(); V2.sync.stop(); O.sync.stop();
+  }
+
   A.sync.stop(); B.sync.stop(); V.sync.stop();
 } catch (e) { fail++; console.log('  EXCEPTION', e && e.stack || e); }
 finally { srv.kill(); }

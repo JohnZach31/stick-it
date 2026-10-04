@@ -74,6 +74,21 @@ ok(/function startNoteResize\(e, n, axis\)/.test(app) && /noteEdgeB/.test(app) &
 
 ok(/@media \(hover:hover\) and \(prefers-reduced-motion:no-preference\)\{[\s\S]*?#gearBtn:is\(:hover,:focus-visible\) svg\{ transform:rotate\(70deg\)/.test(css) && /@keyframes hbSweep/.test(css), 'the top-bar buttons have one small hover movement each, only where hovering exists and motion is allowed');
 
+// ---- data-safety incident (2026-10-04): share pages, boot-time sanitising, unreadable objects
+{
+  const at = (t) => app.indexOf(t);
+  ok(at('var SHARE_LINK_PAGE = /^#(sb|s)=/.test(location.hash);') > 0, 'a share-link page is identified once, from the address');
+  ok(app.includes('if(CLOUD_OK && !singleNoteMode && !SHARE_LINK_PAGE){'), 'a share-link page never starts the account sync, even when signed in');
+  ok(app.includes('isShareView: function(){ return SHARE_LINK_PAGE; }') && read('js/sync.js').includes('host.isShareView && host.isShareView()'), 'the sync layer itself refuses to attach from a share-link page');
+  ok(app.includes('if(SHARE_LINK_PAGE) return;                       // the shared copies on screen are never written over this account'), 'a share-link page never overwrites the cached board');
+  ok(at('var ZONE_MATERIALS = [') > 0 && at('var ZONE_MATERIALS = [') < at('notes = notes.map(sanitizeSafely)'), 'the zone constants exist before the cached board is sanitised at boot (a cached zone used to crash the page)');
+  ok(app.split('var ZONE_MATERIALS').length === 2, 'the zone constants are declared exactly once');
+  ok(app.includes('notes = notes.map(sanitizeSafely).filter(Boolean)') && app.includes('var o = sanitizeSafely(raw); if(!o) return;'), 'every object is sanitised one at a time: one bad object cannot stop the rest');
+  ok(app.includes('protectedIds: function(){ return quarantined; }') && read('js/sync.js').includes('host.protectedIds'), 'an object this device could not read is never sent to the server as a delete');
+  ok(app.includes('try{ renderNote(n, false); }catch(err)') && app.includes('try{ renderNote(o, false, {focus:false}); }catch(err)'), 'one object that cannot be drawn does not blank the board');
+  ok(!app.includes('notes = notes.map(cloudSanitize)'), 'the old all-or-nothing sanitising is gone');
+}
+
 // ---- patch tour data
 {
   const pd = read('js/patch-data.js');

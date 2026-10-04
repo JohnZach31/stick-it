@@ -117,6 +117,8 @@
         else if (k.d) ups.push({ id: o.id, row: row, h: h, base: k.v });        // undo of a delete: bring it back
         else if (k.h !== h) ups.push({ id: o.id, row: row, h: h, base: k.v });
       });
+      var prot = (host.protectedIds && host.protectedIds()) || {};          // objects this device could not read are present, just not drawn
+      Object.keys(prot).forEach(function (id) { cur[id] = true; });
       Object.keys(known).forEach(function (id) { if (!cur[id] && !known[id].d) dels.push(id); });
       return { snap: snap, ups: ups, dels: dels };
     }
@@ -377,7 +379,12 @@
     S.hydrateAll = function () { host.snapshot().forEach(hydrate); };
 
     // ------------------------------------------------------------ lifecycle
-    S.attach = function (id) { boardId = id; blocked = {}; loadKnown(); };
+    // A page that is only showing someone's shared link must never be attached to a board: its in-memory objects are the shared copies, and
+    // the diff against what this account already knows would read every real object as "removed" and soft-delete it on the server.
+    S.attach = function (id) {
+      if (host.isShareView && host.isShareView()) { boardId = null; return; }
+      boardId = id; blocked = {}; loadKnown();
+    };
     S.boardId = function () { return boardId; };
     S.start = async function () {
       if (started || !boardId) return;
