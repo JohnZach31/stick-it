@@ -2488,3 +2488,36 @@ html[data-a11y-motion="reduce"] .shopObj .shF input.bad{ animation:none; }
 .shopObj.v-a .shTotal{ padding-right:62px; }
 .shopObj.v-a .shStamp{ right:10px; }
 body.dark .shopObj .shLink{ color:#8fb4ff; }
+
+/* ---------- Shopping List: spacing rhythm (header > section break > item group > metadata) ---------- */
+.shopObj{ --gHead:11px; --gSection:15px; --gItem:6px; --gMeta:3px; }
+.shopObj .shPaper{ padding:13px 15px 16px; }
+/* header block: the title and its count, then a clear step down to the first item */
+.shopObj .shHead{ margin-bottom:var(--gHead); padding-bottom:7px; }
+.shopObj .shSummary{ margin-top:3px; }
+/* an item is a small group: its name, then what is printed about it; items are set apart from each other */
+.shopObj .shRow{ padding:2px 0; margin-bottom:var(--gItem); min-height:26px; }
+.shopObj .shItems > .shRow:last-child{ margin-bottom:0; }
+.shopObj .shBox{ margin-top:3px; }
+.shopObj .shMeta{ margin-top:var(--gMeta); padding-inline-start:7px; line-height:1.45; }
+.shopObj .shNote{ margin-top:2px; padding-inline-start:7px; line-height:1.45; }
+.shopObj .shMeta + .shNote{ margin-top:1px; }
+.shopObj .shEdit{ margin:5px 0 4px 7px; padding-bottom:4px; gap:4px 14px; }
+/* section breaks are the biggest steps inside the paper */
+.shopObj .shAddRow{ margin-top:10px; padding:2px 0; }
+.shopObj.emptyList .shAddRow{ margin-top:6px; }
+.shopObj .shDivider{ margin:var(--gSection) 0 7px; padding-top:9px; gap:18px; flex-wrap:wrap; }
+.shopObj .shDivider > span:first-child{ letter-spacing:0.1em; }
+.shopObj .shClear{ margin-inline-start:auto; padding:2px 4px 2px 12px; }
+.shopObj .shInCart{ margin-top:2px; }
+.shopObj .shTotal{ margin-top:13px; padding-top:8px; }
+/* the cart sits clear of the printed lines: blank paper below the total, then the drawing */
+.shopObj.v-a{ padding-bottom:26px; }
+.shopObj.v-a .shPaper{ padding-bottom:30px; }
+.shopObj.v-a .shCart{ right:-9px; bottom:-10px; }
+.shopObj.v-a .shTotal{ padding-right:0; }
+.shopObj.v-b{ padding-bottom:34px; }
+.shopObj.v-b .shPaper{ padding-bottom:42px; }
+.shopObj.v-b .shCart{ bottom:-8px; }
+.shopObj.v-c .shPaper{ padding-bottom:22px; }
+.shopObj.v-c .shHead{ min-height:34px; margin-bottom:12px; }
