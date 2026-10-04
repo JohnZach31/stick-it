@@ -6130,11 +6130,12 @@
     acctTrapKey = function(e){ if(acctBackdrop === backdrop) trapTab(e, backdrop, card); };
     document.addEventListener("keydown", acctTrapKey, true);
 
-    var nav = card.querySelector(".ccNav"), panesBox = card.querySelector(".ccPanes"), foot = card.querySelector("#ccFoot"), closers = [], moved = [], built = {}, saved = false;
+    var nav = card.querySelector(".ccNav"), panesBox = card.querySelector(".ccPanes"), foot = card.querySelector("#ccFoot"), closers = [], moved = [], built = {}, hooks = {}, saved = false;
     var cc = CC = {backdrop: backdrop, card: card, panes: {}, tabs: {}, active: null, accountSave: null, focusProfile: null,
       onClose: function(fn){ closers.push(fn); },
       markSaved: function(){ saved = true; saveSettings(); settingsSnapshot = null; },
       adopt: function(el, pane){ if(!el) return; moved.push({el: el, home: el.parentNode}); pane.appendChild(el); },
+      once: function(id, fn){ (hooks[id] = hooks[id] || []).push(fn); },
       show: show,
       teardown: function(){
         closers.forEach(function(fn){ try{ fn(); }catch(e){} });
@@ -6163,6 +6164,7 @@
       cc.active = id;
       CC_SECTIONS.forEach(function(x){ var on = x.id === id; cc.tabs[x.id].setAttribute("aria-selected", String(on)); cc.tabs[x.id].tabIndex = on ? 0 : -1; cc.panes[x.id].hidden = !on; });
       if(sec.build && !built[id]){ built[id] = true; sec.build(cc, cc.panes[id]); }
+      if(hooks[id]){ var hs = hooks[id]; delete hooks[id]; hs.forEach(function(f){ try{ f(); }catch(e){} }); }          // work that only this section needs happens when it is first shown
       foot.hidden = sec.footer === false; card.dataset.section = id;
       var er = card.querySelector("#asErr"); if(er) er.textContent = "";
       panesBox.scrollTop = 0;
@@ -7298,7 +7300,9 @@
         $("asRetry").addEventListener("click", loadUsage);
       });
     }
-    loadUsage();
+    var usageLoaded = false;
+    function ensureUsage(){ if(usageLoaded) return; usageLoaded = true; loadUsage(); }
+    cc.once("account", ensureUsage); cc.once("privacy", ensureUsage);       // the numbers are fetched when a section that shows them is opened
 
     function loadProviders(){
       var box = $("asProviders");
@@ -7334,7 +7338,7 @@
         $("asRetryP").addEventListener("click", loadProviders);
       });
     }
-    loadProviders();
+    cc.once("account", loadProviders);
 
     // ---------- e-mail preference (staged like the rest: Save writes it, Cancel drops it)
     draft.marketingOptIn = !!pr.marketingOptIn;

@@ -14,7 +14,8 @@
   }
   var F = window.__perfFixture = {};
   F.key = function () { return Object.keys(localStorage).filter(function (k) { return /^stickyboard\.notes\./.test(k); })[0]; };
-  F.build = function () {
+  F.build = function (copies) {
+    copies = Math.max(1, copies || 1);
     var out = [], z = 1, id = 0, x, y, W = 1500;
     function nid(p) { return p + (++id); }
     var colors = ['hsl(52,96%,76%)', 'hsl(344,82%,86%)', 'hsl(146,50%,80%)', 'hsl(203,78%,85%)', 'hsl(24,92%,83%)', 'hsl(262,62%,87%)'];
@@ -30,8 +31,10 @@
     for (i = 0; i < 2; i++) out.push({ id: nid('f'), type: 'photo_strip', x: 1300 + i * 200, y: 100, w: 140, variant: 'vertical', caption: 'Strip', frames: [{ image: photoData(40 + i, 800, 600), ratio: 0.75 }, { image: photoData(50 + i, 800, 600), ratio: 0.75 }], rot: i, z: ++z, phys: {} });
     out.push({ id: nid('a'), type: 'audio', x: 700, y: 1440, w: 236, mediaId: 'none-a', duration: 5, mime: 'audio/wav', caption: 'Memo', font: 'Caveat', createdAt: 1, z: ++z, rot: 0, phys: {} });
     out.push({ id: nid('v'), type: 'video', x: 1000, y: 1440, w: 220, mediaId: 'none-v', duration: 4, mime: 'video/webm', imgRatio: 0.5625, caption: 'Clip', font: 'Caveat', createdAt: 1, z: ++z, rot: 0, phys: {} });
-    localStorage.setItem(F.key(), JSON.stringify(out));
-    return out.length + ' objects written; reload the page';
+    var all = out.slice();
+    for (var c = 1; c < copies; c++) out.forEach(function (o) { if (o.image || o.frames) return; var k = JSON.parse(JSON.stringify(o)); k.id = o.id + '_' + c; k.x = o.x + c * 2600; if (k.frames) k.frames = k.frames; all.push(k); });
+    localStorage.setItem(F.key(), JSON.stringify(all));
+    return all.length + ' objects written; reload the page';
   };
   F.measure = async function () {
     await new Promise(function (r) { setTimeout(r, 1500); });
