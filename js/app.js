@@ -2178,6 +2178,15 @@
     execIn(textEl, "formatBlock", cur === "h" + level ? "<div>" : "<h" + level + ">");
   }
 
+  // Ctrl/Cmd+U underlines inside a note. This listener runs first (capture phase, on the window) so the browser never gets to open its
+  // view-source page while someone is writing, whichever element has focus and whatever the keyboard layout.
+  window.addEventListener("keydown", function(e){
+    if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || !(e.code === "KeyU" || (e.key && e.key.toLowerCase() === "u"))) return;
+    var ae = document.activeElement, editing = ae && ae.isContentEditable && ae.classList && ae.classList.contains("text");
+    if(editing){ e.preventDefault(); e.stopPropagation(); if(!readOnly) execIn(ae, "underline"); return; }
+    if(!readOnly && !singleNoteMode && (selected.size || isTyping())) e.preventDefault();       // a selected note or a field: never view-source
+  }, true);
+
   // ---------- selection tip: a small Stick-It toolbar over the words you highlight ----------
   // Appears above selected text inside the note you are editing (Bold, Italic, Underline, Highlight, Link, Title line). The browser's own
   // selection menu stays out of the way on desktop; this one carries the same actions the note's ... menu has.
@@ -2196,21 +2205,24 @@
     var fresh = !selTip || selTipText !== t.text;
     if(fresh){
       hideSelTip();
-      var bar = makeDiv("selTip"); bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Format the selected words");
+      var bar = makeDiv("floatPop selTip"), grid = makeDiv("fmtGrid");
+      bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Format the selected words");
       function add(html, label, run, key){
-        var b = document.createElement("button"); b.type = "button"; b.className = "stBtn"; b.innerHTML = html; b.title = label; b.setAttribute("aria-label", label); if(key) b.dataset.k = key;
+        var b = document.createElement("button"); b.type = "button"; b.innerHTML = html; b.title = label; b.setAttribute("aria-label", label); if(key) b.dataset.k = key;
         b.addEventListener("mousedown", function(e){ e.preventDefault(); });
         b.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
         b.addEventListener("click", function(e){ e.stopPropagation(); run(b); setTimeout(paintSelTip, 0); });
-        bar.appendChild(b); return b;
+        grid.appendChild(b); return b;
       }
       var tx = t.text;
+      [1, 2].forEach(function(lv){ add("H" + lv, "Heading " + lv, function(){ toggleHeading(tx, lv); }, "h" + lv); });
       add(ICONS.bold, "Bold (" + MOD + "+B)", function(){ execIn(tx, "bold"); }, "bold");
       add(ICONS.italic, "Italic (" + MOD + "+I)", function(){ execIn(tx, "italic"); }, "italic");
       add(ICONS.underline, "Underline (" + MOD + "+U)", function(){ execIn(tx, "underline"); }, "underline");
-      add(ICONS.highlighter, "Highlight", function(){ toggleHighlight(tx); }, "mark");
+      add(ICONS.highlighter, "Highlight selected text", function(){ toggleHighlight(tx); }, "mark");
+      add(ICONS.checklist, "Checklist", function(){ setListKind(tx, "check"); }, "check");
       add(ICONS.link, "Link", function(b){ openLinkPopover(tx, b); }, "link");
-      var arrow = makeDiv("stArrow"); arrow.setAttribute("aria-hidden", "true"); bar.appendChild(arrow);
+      bar.appendChild(grid);
       document.body.appendChild(bar); selTip = bar; selTipText = t.text; selTipLayer.open();
     }
     paintSelTip(t);
@@ -2220,14 +2232,14 @@
     t = t || selTipTarget(); if(!t){ hideSelTip(); return; }
     var bar = selTip, bw = bar.offsetWidth, bh = bar.offsetHeight, vw = window.innerWidth;
     var left = Math.min(Math.max(8, t.rect.left + t.rect.width / 2 - bw / 2), vw - bw - 8);
-    var top = t.rect.top - bh - 10, below = false;
-    if(top < 8){ top = t.rect.bottom + 10; below = true; }
-    bar.style.left = left + "px"; bar.style.top = top + "px"; bar.classList.toggle("below", below);
-    var arrow = bar.querySelector(".stArrow"); if(arrow) arrow.style.left = Math.min(Math.max(14, t.rect.left + t.rect.width / 2 - left), bw - 14) + "px";
+    var top = t.rect.top - bh - 10;
+    if(top < 8) top = t.rect.bottom + 10;
+    bar.style.left = left + "px"; bar.style.top = top + "px";
     var st = {};
     try{ st.bold = document.queryCommandState("bold"); st.italic = document.queryCommandState("italic"); st.underline = document.queryCommandState("underline"); }catch(e){}
-    var r = selectionIn(t.text); st.mark = !!(r && closestIn(r.startContainer, "mark", t.text)); st.link = !!(r && closestIn(r.startContainer, "a", t.text));
-    Array.prototype.forEach.call(bar.querySelectorAll(".stBtn"), function(b){ var on = !!st[b.dataset.k]; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+    var r = selectionIn(t.text);
+    if(r){ var nd = r.startContainer; st.h1 = !!closestIn(nd, "h1", t.text); st.h2 = !!closestIn(nd, "h2", t.text); st.mark = !!closestIn(nd, "mark", t.text); st.link = !!closestIn(nd, "a", t.text); st.check = listKind(currentList(t.text)) === "check"; }
+    Array.prototype.forEach.call(bar.querySelectorAll("button"), function(b){ var on = !!st[b.dataset.k]; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
   }
   document.addEventListener("selectionchange", function(){
     cancelAnimationFrame(selTipRaf);
@@ -4928,7 +4940,7 @@
         }, 450);
       });
       text.addEventListener("keydown", function(e){
-        if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); execIn(text, "underline"); return; }   // underline, never the browser's view-source (also on a Hebrew keyboard, where the key is not "u")
+        if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); return; }   // underline is applied by the window handler; never the browser's view-source (also on a Hebrew keyboard, where the key is not "u")
         if(e.key === "Enter" && !e.shiftKey){
           if(handleListEnter(text, e)) return;
           if(focusState && focusState.n === n) return;

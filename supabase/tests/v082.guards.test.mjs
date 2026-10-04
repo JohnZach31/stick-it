@@ -68,7 +68,8 @@ ok(/\.text a\{ color:var\(--link/.test(css) && /\.text a::after\{ content:"\\219
 ok(/function toggleChecklistTitle\(textEl\)/.test(app) && /li\.setAttribute\("data-title", "true"\)/.test(app) && /ul\.checklist > li\[data-title="true"\]::before/.test(css), 'a checklist line can be a title with no checkbox');
 ok(/\[:\\uff1a\]\\s\*\$/.test(app), 'a first line ending in a colon becomes the title when a list is made a checklist');
 ok(/li:not\(\[data-title="true"\]\)/.test(app) && /li\.getAttribute\("data-title"\) !== "true" && checkboxHit/.test(app), 'a title is never counted, ticked or clicked as a checkbox');
-ok(/var selTip = null/.test(app) && /role", "toolbar"\); bar\.setAttribute\("aria-label", "Format the selected words"/.test(app) && /\.selTip\{ position:fixed/.test(css), 'highlighting words shows a branded toolbar over them');
+ok(/var selTip = null/.test(app) && /makeDiv\("floatPop selTip"\)/.test(app) && /makeDiv\("fmtGrid"\)/.test(app.slice(app.indexOf('var selTip = null'), app.indexOf('function paintSelTip'))) && /\.floatPop\.selTip\{/.test(css), 'the selection toolbar is a small copy of the note menu: same panel, same grid, same buttons');
+ok(/window\.addEventListener\("keydown", function\(e\)\{\s+if\(!\(e\.ctrlKey \|\| e\.metaKey\)[\s\S]*?\}, true\);/.test(app) && /KeyU/.test(app), 'Ctrl+U is caught on the window in the capture phase, before the browser can open view-source');
 ok(/function startNoteResize\(e, n, axis\)/.test(app) && /noteEdgeB/.test(app) && /@media \(pointer:coarse\)\{[\s\S]*?noteEdgeB/.test(css), 'a note can be pulled longer or wider by its edge, with a finger-sized grab bar on touch screens');
 
 // ---- patch tour data

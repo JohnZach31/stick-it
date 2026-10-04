@@ -2324,19 +2324,13 @@ body.dark .text a{ color:var(--link, #8fb4ff); }
 .text ul.checklist > li[data-title="true"]{ padding-inline-start:0; font-weight:700; opacity:1; }
 .text ul.checklist > li[data-title="true"]::before, .text ul.checklist > li[data-title="true"]::after{ display:none; }
 .fbBtn.on, .stBtn.on{ background:rgba(0,0,0,0.12); }
-.selTip{ position:fixed; z-index:9400; display:flex; align-items:center; gap:2px; padding:4px; background:#33301f; color:#fffdf3; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.3); animation:selTipIn .12s ease-out; }
-.selTip .stBtn{ width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:0; border-radius:7px; background:transparent; color:inherit; cursor:pointer; font:600 0.88rem Georgia, serif; }
-.selTip .stBtn svg{ width:16px; height:16px; }
-.selTip .stBtn:hover{ background:rgba(255,255,255,0.16); }
-.selTip .stBtn.on{ background:var(--accent, #c9871f); color:#fff; }
-.selTip .stBtn:focus-visible{ outline:2px solid #ffd27a; outline-offset:1px; }
-.selTip .stArrow{ position:absolute; bottom:-5px; width:10px; height:10px; background:#33301f; transform:translateX(-50%) rotate(45deg); border-radius:2px; }
-.selTip.below .stArrow{ bottom:auto; top:-5px; }
-body.dark .selTip{ background:#f4eedf; color:#33301f; } body.dark .selTip .stArrow{ background:#f4eedf; }
-body.dark .selTip .stBtn:hover{ background:rgba(0,0,0,0.12); }
-@keyframes selTipIn{ from{ opacity:0; transform:translateY(4px); } }
-@media (prefers-reduced-motion: reduce){ .selTip{ animation:none; } }
-html[data-a11y-motion="reduce"] .selTip{ animation:none; }
+/* the selection toolbar is a small version of the note's ... menu: same panel, same buttons */
+.floatPop.selTip{ z-index:10010; padding:5px; border-radius:12px; overflow:visible; }
+.selTip .fmtGrid{ grid-template-columns:repeat(8, 30px); gap:2px; }
+.selTip .fmtGrid button{ height:30px; }
+.selTip .fmtGrid button.on{ background:var(--accent-soft); box-shadow:inset 0 0 0 1.5px var(--accent); }
+.selTip .fmtGrid button:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+@media (max-width:420px){ .selTip .fmtGrid{ grid-template-columns:repeat(8, 1fr); } .floatPop.selTip{ max-width:calc(100vw - 16px); } }
 /* pull the edge of a note */
 .note .noteEdge{ position:absolute; z-index:4; touch-action:none; }
 .note .noteEdgeB{ left:14px; right:14px; bottom:-6px; height:12px; cursor:ns-resize; }
