@@ -1,6 +1,6 @@
 // Unit tests for the Edge Function handlers (pure logic, no Deno, no network).
 //   node --experimental-strip-types functions.test.mjs
-import { RateLimiter } from '../functions/_shared/http.ts';
+import { RateLimiter, corsHeaders, isLocalDevOrigin } from '../functions/_shared/http.ts';
 import { makeResolveHandler } from '../functions/resolve-share/handler.ts';
 import { makeReportHandler } from '../functions/report-share/handler.ts';
 import { makeGcHandler } from '../functions/gc-assets/handler.ts';
@@ -247,6 +247,16 @@ const req = (body, { method = 'POST', origin = ORIGIN, ip = '1.1.1.1' } = {}) =>
   const lim = mk({ limiter: new RateLimiter(1, 60000) });
   await lim(req(base, { ip: '7.7.7.7' }));
   ok((await lim(req(base, { ip: '7.7.7.7' }))).status === 429, 'rate limited');
+}
+
+// CORS: the production origin and the visitor's own machine on any port; nobody else
+{
+  const allowed = ['https://johnzach31.github.io'];
+  const acao = (o) => corsHeaders(o, allowed)['Access-Control-Allow-Origin'];
+  ok(acao('https://johnzach31.github.io') === 'https://johnzach31.github.io', 'the production origin is allowed');
+  ok(acao('http://localhost:8124') === 'http://localhost:8124' && acao('http://127.0.0.1:5500') === 'http://127.0.0.1:5500' && acao('http://localhost') === 'http://localhost', 'local development works on any port');
+  ok(acao('https://evil.example') === undefined && acao('http://localhost.evil.example') === undefined && acao('http://localhost:8124.evil.example') === undefined && acao('https://localhost:8124') === undefined && acao(null) === undefined, 'other origins, look-alikes and https localhost are not allowed');
+  ok(!isLocalDevOrigin('http://localhost:99999999') && !isLocalDevOrigin('http://user@localhost:80'), 'malformed local origins are refused');
 }
 
 console.log(`${pass} passed, ${fail} failed`);

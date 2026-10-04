@@ -3,6 +3,11 @@
 
 export const TOKEN_RE = /^[a-f0-9]{64}$/;
 
+/** A page served from the visitor's own machine on any port (local development). Nothing outside that machine can be this origin. */
+export function isLocalDevOrigin(origin: string): boolean {
+  return /^http:\/\/(localhost|127\.0\.0\.1)(:\d{1,5})?$/.test(origin);
+}
+
 /** Origins allowed to call the public functions from a browser. */
 export function corsHeaders(origin: string | null, allowed: string[]): Record<string, string> {
   const h: Record<string, string> = {
@@ -11,7 +16,7 @@ export function corsHeaders(origin: string | null, allowed: string[]): Record<st
     "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
     "Access-Control-Max-Age": "600",
   };
-  if (origin && allowed.includes(origin)) h["Access-Control-Allow-Origin"] = origin;
+  if (origin && (allowed.includes(origin) || isLocalDevOrigin(origin))) h["Access-Control-Allow-Origin"] = origin;
   return h;
 }
 

@@ -34,7 +34,8 @@ Real project:
 - Memory: decoded-image memory, cutout model lifetime and live collaboration were not measured; the browser pane cannot report decoded bitmap memory.
 - Signed-in OAuth cannot be driven by the assistant; the owner signs in.
 
-## Public share failure report (open)
+## Public share failure report (RESOLVED: CORS)
+Root cause: the owner opened the link from `http://localhost:8124`, but the functions only allowed `localhost:8123`, so the browser blocked the request (shown as Code: network). Fix: `_shared/http.ts` now allows `http://localhost` and `http://127.0.0.1` on any port, plus the origins in `ALLOWED_ORIGINS`; `resolve-share` and `report-share` were redeployed (other functions pick it up at their next deploy). The original report below is kept for the record.
 Owner saw "Couldn't reach the server" opening a shared board in a private window on the live site. Not reproduced: live-board, snapshot, revoked (410), unknown (404) and malformed links all resolved correctly signed out with empty storage; CORS allows the Pages origin; `resolve-share` v9 is deployed; anon cannot read any table or storage object directly. Remedy shipped: `Stick.share.resolve` now returns a `kind`, the page shows distinct messages with Try again, a code appears under the message (network, timeout, 502, 404, 410). Ask the owner for that code if it recurs. Edge function latency is 1.6-2.3 s per resolve (signing assets); caching resolved assets is a possible later improvement. GitHub Pages caches scripts up to 10 min, so right after a deploy old and new files can briefly mix.
 
 ## Known limitations
