@@ -42,9 +42,13 @@ const mutations = [
   ['strip pictures lose their order',       '20261001120000_paper_objects.sql', "values (oid, ref::uuid, 'attached', i)", "values (oid, ref::uuid, 'attached', 0)"],
   ['free accounts can make Alphabet Soup',  '20261001130000_premium_cosmetics.sql', "if coalesce(p, 'free') <> 'premium' then", "if false then"],
   ['premium check skipped on update',       '20261001130000_premium_cosmetics.sql', "and (tg_op = 'INSERT' or (old.data ->> 'cosmetic') is distinct from (new.data ->> 'cosmetic')) then", "and tg_op = 'INSERT' then"],
-  ['any user can join any board channel',   '20261001140000_collab.sql', "then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;"+'\n'+"    execute $p$create policy board_channel_write", "then true else false end)$p$;"+'\n'+"    execute $p$create policy board_channel_write"],
+  ['any user can join any board channel',   '20261001140000_collab.sql', "then public.can_read_board(substr(realtime.topic(), 7)::uuid) else false end)$p$;" + String.fromCharCode(10) + "      execute $p$create policy board_channel_write", "then true else false end)$p$;" + String.fromCharCode(10) + "      execute $p$create policy board_channel_write"],
   ['editors can request changes',           '20261001140000_collab.sql', "if role <> 'owner' then raise exception 'FORBIDDEN' using errcode = '42501'; end if;", "if role not in ('owner','editor') then raise exception 'FORBIDDEN' using errcode = '42501'; end if;"],
   ['viewers can mark ready for review',     '20261001140000_collab.sql', "if role not in ('owner', 'editor') or not public.can_edit_board(o.board_id) then", "if role is null then"],
+  ['anyone can delete any comment (both layers)', '20261002100000_comment_delete.sql', ["if c.author_id is distinct from uid and not public.is_board_owner(c.board_id) then", "if not public.is_board_owner(old.board_id) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;"], ["if false then", "null;"]],
+  ['the owner can rewrite comments',        '20261002100000_comment_delete.sql', "if new.body is distinct from old.body then raise exception 'FORBIDDEN' using errcode = '42501'; end if;       -- moderation removes, it never edits", "null;"],
+  ['deleted comments can come back',        '20261002100000_comment_delete.sql', "if old.deleted_at is not null and new.deleted_at is distinct from old.deleted_at then", "if false then"],
+  ['former members keep their reach (both layers)', '20261002100000_comment_delete.sql', ["if not public.can_read_board(old.board_id) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;", "or not public.can_read_board(c.board_id) then return; end if;"], ["null;", "then return; end if;"]],
   ['review table writable by browsers',     '20261001140000_collab.sql', "grant select on public.object_reviews to authenticated;", "grant all on public.object_reviews to authenticated;"],
 ];
 
@@ -54,8 +58,11 @@ for (const [name, file, from, to] of mutations) {
   for (const f of fs.readdirSync(migDir)) fs.copyFileSync(path.join(migDir, f), path.join(tmp, f));
   const target = path.join(tmp, file);
   const src = fs.readFileSync(target, 'utf8').split('\r\n').join('\n');   // tolerate CRLF checkouts
-  if (!src.includes(from)) { console.log(`?? cannot apply mutation "${name}" (pattern not found)`); missed++; continue; }
-  fs.writeFileSync(target, src.replace(from, to));
+  const pairs = Array.isArray(from) ? from.map((f, i) => [f, to[i]]) : [[from, to]];       // a mutation may need to break every layer of a defence
+  let mutated = src, okAll = true;
+  for (const [f, t] of pairs) { if (!mutated.includes(f)) { okAll = false; break; } mutated = mutated.replace(f, t); }
+  if (!okAll) { console.log(`?? cannot apply mutation "${name}" (pattern not found)`); missed++; continue; }
+  fs.writeFileSync(target, mutated);
   const r = spawnSync('node', [path.join(here, 'run-tests.mjs')], { env: { ...process.env, MIG_DIR: tmp }, encoding: 'utf8' });
   const caught = r.status !== 0;
   const which = (r.stdout.match(/FAIL\s+(.+)/) || [])[1] || (r.stderr || r.stdout).split('\n').find(l => l.includes('failed')) || '';

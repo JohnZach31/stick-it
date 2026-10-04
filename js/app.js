@@ -1,6 +1,34 @@
 (function(){
   "use strict";
 
+  // ---------- one rule for Esc: close the topmost temporary layer ----------
+  // Everything that floats over the board (a dialog, a menu, a popover, the board list, the tour, Focus Mode...) registers itself as a
+  // layer when it opens. One listener, added before any other, answers Escape: it closes only the most recently opened layer that is
+  // still open and stops there. With no layer open, Esc keeps its older jobs (stop editing, clear the selection).
+  var OV = (function(){
+    var stack = [];
+    function prune(){ stack = stack.filter(function(e){ return e.isOpen(); }); }
+    function layer(id, close, isOpen){
+      var entry = {id: id, close: close, isOpen: isOpen || function(){ return true; }};
+      return {
+        open: function(){ stack = stack.filter(function(e){ return e !== entry; }); stack.push(entry); },
+        close: function(){ stack = stack.filter(function(e){ return e !== entry; }); }
+      };
+    }
+    function top(){ prune(); return stack.length ? stack[stack.length - 1] : null; }
+    document.addEventListener("keydown", function(e){
+      if(e.key !== "Escape" || e.isComposing) return;
+      var t = e.target;
+      if(t && t.matches && t.matches("[data-esc-clear]") && t.value) return;           // a search box clears its text first
+      var layerOnTop = top();
+      if(!layerOnTop) return;
+      e.preventDefault(); e.stopImmediatePropagation();
+      try{ layerOnTop.close(); }catch(err){}
+      prune();
+    }, true);
+    return {layer: layer, top: top, ids: function(){ prune(); return stack.map(function(e){ return e.id; }); }};
+  })();
+
   // ---------- logo: a little sticky note, red while loading, green once ready ----------
   function buildLogoSvg(fill, dark){
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
@@ -512,6 +540,7 @@
   var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null, guestConfirmed:false, theme:"light" };
   if(settings.displayName === undefined) settings.displayName = "";
   if(settings.account === undefined) settings.account = null;
+  if(window.StickA11y){ var a11y = StickA11y.get(); settings.reduceMotion = a11y.motion === "reduce"; settings.highContrast = !!a11y.contrast; }
   if(settings.soundOn === undefined) settings.soundOn = true;
   if(settings.soundVolume === undefined) settings.soundVolume = 60;
   if(settings.guestConfirmed === undefined) settings.guestConfirmed = false;
@@ -756,7 +785,7 @@
     var ripChip = null;
     if(mode === "rip"){
       n.rip = n.rip || ripStyleFor(n);
-      if(!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) && oldH - newH > 24){
+      if(!reducedMotion() && oldH - newH > 24){
         ripChip = makeDiv("ripChip");
         ripChip.style.left = n.x + "px"; ripChip.style.top = (n.y + newH) + "px"; ripChip.style.width = oldW + "px"; ripChip.style.height = (oldH - newH) + "px";
         ripChip.style.background = "var(--note-bg)"; ripChip.style.setProperty("--note-bg", n.bg); ripChip.style.setProperty("--rot", (n.rot || 0) + "deg");
@@ -1234,6 +1263,7 @@
 
   (function(){ var live = [], done = []; notes.forEach(function(o){ (Number(o.doneAt) > 0 ? done : live).push(o); }); notes = live; donePile = done; })();
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
+  if(typeof applyLook === "function") applyLook();
 
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
@@ -1341,12 +1371,22 @@
     if(openPopover) openPopover.remove();
     openPopover = null;
     openPopoverTrigger = null;
+    popLayer.close();
   }
   function openFloatingPopover(triggerBtn, className){
     var rect = triggerBtn.getBoundingClientRect();
     if(openPopoverTrigger === triggerBtn){ closeFloatingPopovers(); return null; }
     return openFloatingPopoverAt(rect, className, triggerBtn);
   }
+  // the layers that are not built by one function of their own
+  var popLayer = OV.layer("popover", function(){ closeFloatingPopovers(); }, function(){ return !!openPopover; });
+  var boardLayer = OV.layer("board-picker", function(){ boardPanel.hidden = true; }, function(){ return !boardPanel.hidden; });
+  var shareLayer = OV.layer("share-panel", function(){ sharePanel.hidden = true; }, function(){ return !sharePanel.hidden; });
+  var captureLayer = OV.layer("add-menu", function(){ closeCaptureMenu(); }, function(){ return !!captureMenuEl; });
+  var tourLayer = OV.layer("tutorial", function(){ endTour(); }, function(){ return !!tourRoot; });
+  var focusLayer = OV.layer("focus-mode", function(){ exitFocus(); }, function(){ return !!focusState; });
+  var recLayer = OV.layer("recording", function(){ if(recording) recording.cancel(); }, function(){ return !!recording; });
+  var menuLayer = OV.layer("menu", function(){ closeMenu(true); }, function(){ return !!openMenuState; });
   var POP_WIDTHS = {cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
   function openFloatingPopoverAt(r, className, triggerBtn){
     closeFloatingPopovers();
@@ -1367,6 +1407,7 @@
     }
     openPopover = pop;
     openPopoverTrigger = triggerBtn || null;
+    popLayer.open();
     return pop;
   }
   document.addEventListener("click", function(e){
@@ -2651,7 +2692,7 @@
   // helpers the Cutout Maker (js/cutout-maker.js) needs from the app
   window.Stick = window.Stick || {};
   Stick.ui = {
-    ICONS: ICONS, miniLoader: function(){ return miniLoaderHtml(); }, toast: function(m){ toast(m); }, modal: function(o){ return openModal(o); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
+    layer: function(id, close, isOpen){ return OV.layer(id, close, isOpen); }, ICONS: ICONS, miniLoader: function(){ return miniLoaderHtml(); }, toast: function(m){ toast(m); }, modal: function(o){ return openModal(o); }, confirm: function(o){ return confirmDialog(o); }, trapTab: function(e, b, c){ trapTab(e, b, c); },
     loader: {show: function(t){ cloudOverlay(t); }, hide: function(){ hideCloudOverlay(); }, done: function(t, after){ stickLoaderDone(t, after); }, fail: function(t, retry){ stickLoaderFail(t, retry); }}
   };
   async function copyCutoutBlob(fromKey, toKey){
@@ -4070,7 +4111,7 @@
     var dot = makeDiv("captureDot");
     dot.style.left = clientX + "px"; dot.style.top = clientY + "px";
     document.body.appendChild(dot);
-    captureMenuEl = m; captureDotEl = dot;
+    captureMenuEl = m; captureDotEl = dot; captureLayer.open();
   }
   // Everything that can be put on the board from an empty spot. `touch: "main"` items are in the first touch menu; the rest sit under More.
   // New physical objects register themselves here (see the object packs) so the two menus never drift apart.
@@ -4259,7 +4300,7 @@
       placeObj(n, bx, by);
       addMediaObject(n, blob, "Add recording");
     };
-    recording = {stop:function(){ finish(false); }, cancel:function(){ finish(true); }};
+    recording = {stop:function(){ finish(false); }, cancel:function(){ finish(true); }}; recLayer.open();
     rec.start(1000);
   }
   // Video: the browser's own picker (camera or library); we keep a poster frame and the duration.
@@ -4389,7 +4430,7 @@
     closeBtn.addEventListener("mousedown", function(e){ e.preventDefault(); });
     closeBtn.addEventListener("click", function(e){ e.stopPropagation(); exitFocus(); });
     el.appendChild(closeBtn);
-    focusState = {n:n, el:el, scrim:scrim, placeholder:placeholder, closeBtn:closeBtn};
+    focusState = {n:n, el:el, scrim:scrim, placeholder:placeholder, closeBtn:closeBtn}; focusLayer.open();
     document.body.classList.add("focusing");
     showFocusBar(focusState);
     ensureCaret(n.textEl);
@@ -4887,11 +4928,11 @@
       html: opts.html || "",
       bg: newNoteBg(),
       font: pickFont(),
-      rot: rand(-6,6),
+      rot: rand(-6,6) * tiltFactor(),
       z: zCounter,
       categoryIndex: 0,
       isTask:false, done:false, due:"", dueTime:"09:00", image:null,
-      phys: makePhys()
+      phys: makeNotePhys()
     };
     if(opts.cosmetic) n.cosmetic = opts.cosmetic;
     notes.push(n);
@@ -5374,7 +5415,7 @@
       if(!findNote(id)){ notes.push(c); renderNote(c, false, {focus:false}); }
       updateDonePile(false);
     }
-    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches, target = ensurePileBtn();
+    var reduce = reducedMotion(), target = ensurePileBtn();
     if(el && !reduce && !target.hidden || (el && !reduce && donePile.length === 0)){
       var r = el.getBoundingClientRect(), t = target.hidden ? {left: 16, top: window.innerHeight - 60, width: 90, height: 40} : target.getBoundingClientRect();
       var dx = (t.left + t.width / 2 - (r.left + r.width / 2)) / boardZoom, dy = (t.top + t.height / 2 - (r.top + r.height / 2)) / boardZoom;
@@ -5504,10 +5545,10 @@
     card.setAttribute("aria-labelledby", h.id); card.setAttribute("tabindex", "-1");
     if(o.sub){ var sub = document.createElement("p"); sub.className = "acctSub"; sub.textContent = o.sub; card.appendChild(sub); }
     if(o.content) card.appendChild(o.content);
-    var closed = false;
+    var closed = false, ovModal = OV.layer("modal", function(){ close(false); }, function(){ return !closed && backdrop.isConnected; });
     function close(result){
       if(closed) return;
-      closed = true;
+      closed = true; ovModal.close();
       backdrop.remove();
       document.removeEventListener("keydown", onKey, true);
       if(opener && opener.focus && document.contains(opener)){ try{ opener.focus(); }catch(e){} }
@@ -5535,7 +5576,7 @@
     closeBtn.addEventListener("click", function(){ close(false); });
     backdrop.addEventListener("mousedown", function(e){ if(e.target === backdrop) close(false); });
     document.addEventListener("keydown", onKey, true);
-    document.body.appendChild(backdrop);
+    document.body.appendChild(backdrop); ovModal.open();
     setTimeout(function(){ if(!card.contains(document.activeElement)){ var f = focusablesIn(card).filter(function(el){ return el !== closeBtn; }); (f[0] || closeBtn).focus(); } }, 0);
     return {card:card, close:close, backdrop:backdrop};
   }
@@ -6063,10 +6104,83 @@
   // Preferences changed in Settings are previewed live but only kept on Save;
   // Cancel (or closing the dialog) puts back what was there when it opened.
   // Clear board and Import are separate, immediate actions with their own confirmation.
-  var STAGED_KEYS = ["lockFont","fontName","theme","cleanupEmpty","displayName","soundOn","soundVolume"];
+  var STAGED_KEYS = ["lockFont","fontName","theme","cleanupEmpty","displayName","soundOn","soundVolume","shadow","paper","tilt","attach","dots","compact","reduceMotion","highContrast"];
+  // ---------- look and feel: a few honest controls, previewed live, kept on Save ----------
+  // shadow 0|1|2 (soft, normal, strong), paper 0|1|2 (off, light, normal), tilt 0|1|2 (straight, gentle, natural: for NEW notes),
+  // attach "mixed"|"tape"|"pin" (for NEW notes), dots, compact, reduceMotion and highContrast (the last two are shared with the legal
+  // pages through js/a11y.js).
+  function lookDefaults(){ return {shadow: 1, paper: 2, tilt: 2, attach: "mixed", dots: true, compact: false}; }       // a function, so it works before this section has run
+  function lookVal(k){ return settings[k] === undefined ? lookDefaults()[k] : settings[k]; }
+  function reducedMotion(){
+    return !!((window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) || document.documentElement.getAttribute("data-a11y-motion") === "reduce");
+  }
+  function applyLook(){
+    var b = document.body, sh = lookVal("shadow"), px = lookVal("paper");
+    b.classList.toggle("sh-soft", sh === 0); b.classList.toggle("sh-strong", sh === 2);
+    b.classList.toggle("px-off", px === 0); b.classList.toggle("px-light", px === 1);
+    b.classList.toggle("no-dots", !lookVal("dots")); b.classList.toggle("compact", !!lookVal("compact"));
+    var h = document.documentElement;
+    if(settings.reduceMotion) h.setAttribute("data-a11y-motion", "reduce"); else h.removeAttribute("data-a11y-motion");
+    if(settings.highContrast) h.setAttribute("data-a11y-contrast", "on"); else h.removeAttribute("data-a11y-contrast");
+  }
+  function tiltFactor(){ return [0, 0.5, 1][lookVal("tilt")] === undefined ? 1 : [0, 0.5, 1][lookVal("tilt")]; }
+  function makeNotePhys(){
+    var p = makePhys(), a = lookVal("attach");
+    if(a === "tape"){ p.pin = false; if(!p.tape) p.tape = 1 + Math.floor(Math.random() * 5); }
+    else if(a === "pin"){ p.pin = true; p.tape = 0; }
+    return p;
+  }
+  // a small radio group made of buttons (arrow keys move, like a real radio group)
+  function segControl(box, label, options, get, set){
+    box.className = "segCtl"; box.setAttribute("role", "radiogroup"); box.setAttribute("aria-label", label);
+    function paint(){
+      box.innerHTML = "";
+      options.forEach(function(o){
+        var b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "radio"); b.textContent = o[1];
+        var on = String(get()) === String(o[0]); b.setAttribute("aria-checked", String(on)); b.tabIndex = on ? 0 : -1; b.className = on ? "on" : "";
+        b.addEventListener("click", function(){ set(o[0]); paint(); });
+        b.addEventListener("keydown", function(e){
+          var i = options.findIndex(function(x){ return String(x[0]) === String(get()); }), j = i;
+          if(e.key === "ArrowRight" || e.key === "ArrowDown") j = (i + 1) % options.length; else if(e.key === "ArrowLeft" || e.key === "ArrowUp") j = (i + options.length - 1) % options.length; else return;
+          e.preventDefault(); set(options[j][0]); paint(); var nb = box.querySelector('[aria-checked="true"]'); if(nb) nb.focus();
+        });
+        box.appendChild(b);
+      });
+    }
+    paint();
+  }
+  function buildLookSection(cc, pane){
+    var sec = document.createElement("section"); sec.className = "setSec"; sec.id = "secLook";
+    sec.innerHTML = '<h4>Paper &amp; canvas</h4>' +
+      '<div class="setRow"><span class="lbl">Note shadows<small>How much each note lifts off the board.</small></span><div id="lkShadow"></div></div>' +
+      '<div class="setRow"><span class="lbl">Paper texture<small>The faint grain and creases on notes.</small></span><div id="lkPaper"></div></div>' +
+      '<div class="setRow"><span class="lbl">New note tilt<small>How crooked new notes land. Existing notes stay as they are.</small></span><div id="lkTilt"></div></div>' +
+      '<div class="setRow"><span class="lbl">Tape or pin<small>What holds new notes up.</small></span><div id="lkAttach"></div></div>' +
+      '<div class="setRow"><label class="lbl" for="lkDots">Canvas dots<small>The faint dot grid behind the notes.</small></label><button class="switch" id="lkDots" role="switch" aria-checked="true"></button></div>' +
+      '<div class="setRow"><label class="lbl" for="lkCompact">Compact controls<small>Smaller buttons in the top bar.</small></label><button class="switch" id="lkCompact" role="switch" aria-checked="false"></button></div>' +
+      '<div class="setRow"><label class="lbl" for="lkMotion">Reduce decorative motion<small>No swaying, bobbing or sliding. Also used on the legal pages.</small></label><button class="switch" id="lkMotion" role="switch" aria-checked="false"></button></div>' +
+      '<div class="setRow"><label class="lbl" for="lkContrast">High-contrast text<small>Darker ink and stronger outlines. Also used on the legal pages.</small></label><button class="switch" id="lkContrast" role="switch" aria-checked="false"></button></div>';
+    pane.appendChild(sec);
+    var q = function(id){ return sec.querySelector("#" + id); };
+    segControl(q("lkShadow"), "Note shadows", [[0, "Soft"], [1, "Normal"], [2, "Strong"]], function(){ return lookVal("shadow"); }, function(v){ settings.shadow = Number(v); applyLook(); });
+    segControl(q("lkPaper"), "Paper texture", [[0, "Off"], [1, "Light"], [2, "Normal"]], function(){ return lookVal("paper"); }, function(v){ settings.paper = Number(v); applyLook(); });
+    segControl(q("lkTilt"), "New note tilt", [[0, "Straight"], [1, "Gentle"], [2, "Natural"]], function(){ return lookVal("tilt"); }, function(v){ settings.tilt = Number(v); });
+    segControl(q("lkAttach"), "Tape or pin", [["mixed", "Mixed"], ["tape", "Tape"], ["pin", "Pin"]], function(){ return lookVal("attach"); }, function(v){ settings.attach = v; });
+    function sw(id, key, getv){
+      var b = q(id); syncSwitch(b, getv());
+      b.addEventListener("click", function(){ settings[key] = !getv(); syncSwitch(b, getv()); applyLook(); });
+    }
+    sw("lkDots", "dots", function(){ return !!lookVal("dots"); });
+    sw("lkCompact", "compact", function(){ return !!lookVal("compact"); });
+    sw("lkMotion", "reduceMotion", function(){ return !!settings.reduceMotion; });
+    sw("lkContrast", "highContrast", function(){ return !!settings.highContrast; });
+  }
+
+
   var settingsSnapshot = null;
   function applySettingsUI(){
     document.body.classList.toggle("dark", settings.theme === "dark");
+    applyLook();
     syncSwitch(darkToggle, settings.theme === "dark");
     syncSwitch(lockToggle, !!settings.lockFont);
     syncSwitch(cleanupToggle, !!settings.cleanupEmpty);
@@ -6124,16 +6238,24 @@
     card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close settings">' + ICONS.close + '</button>' +
       '<header class="ccHead"><h3 id="ccTitle">Settings</h3></header>' +
       '<div class="ccLayout"><nav class="ccNav" role="tablist" aria-orientation="vertical" aria-label="Settings sections"></nav><div class="ccPanes"></div></div>' +
-      '<div class="ccFoot" id="ccFoot"><p class="asErr" id="asErr" role="alert"></p><button type="button" class="pillBtn" id="asCancel">Cancel</button><button type="button" class="pillBtn primary" id="asSave">Save</button></div>';
+      '<div class="ccFoot" id="ccFoot"><p class="asErr" id="asErr" role="alert"></p><p class="ccSaved" id="ccSaved" role="status" aria-live="polite"></p><button type="button" class="pillBtn" id="asCancel">Cancel</button><button type="button" class="pillBtn primary" id="asSave">Save</button></div>';
     document.body.appendChild(backdrop);
     document.addEventListener("keydown", acctEscHandler);
+    OV.layer("control-center", function(){ closeAccountModal(); }, function(){ return acctBackdrop === backdrop; }).open();
     acctTrapKey = function(e){ if(acctBackdrop === backdrop) trapTab(e, backdrop, card); };
     document.addEventListener("keydown", acctTrapKey, true);
 
     var nav = card.querySelector(".ccNav"), panesBox = card.querySelector(".ccPanes"), foot = card.querySelector("#ccFoot"), closers = [], moved = [], built = {}, hooks = {}, saved = false;
     var cc = CC = {backdrop: backdrop, card: card, panes: {}, tabs: {}, active: null, accountSave: null, focusProfile: null,
       onClose: function(fn){ closers.push(fn); },
-      markSaved: function(){ saved = true; saveSettings(); settingsSnapshot = null; },
+      // Save keeps the dialog open on the same section: the saved values become the new baseline for Cancel, and a small "Saved" shows.
+      markSaved: function(){
+        saveSettings(); settingsSnapshot = {}; STAGED_KEYS.forEach(function(k){ settingsSnapshot[k] = settings[k]; });
+        if(window.StickA11y){ StickA11y.set({motion: settings.reduceMotion ? "reduce" : "system", contrast: !!settings.highContrast}); }
+        var ok = card.querySelector("#ccSaved"), btn = card.querySelector("#asSave");
+        if(ok){ ok.textContent = "✓ Saved"; clearTimeout(cc._okT); cc._okT = setTimeout(function(){ ok.textContent = ""; }, 2600); }
+        if(btn){ btn.disabled = false; btn.textContent = "Save"; }
+      },
       adopt: function(el, pane){ if(!el) return; moved.push({el: el, home: el.parentNode}); pane.appendChild(el); },
       once: function(id, fn){ (hooks[id] = hooks[id] || []).push(fn); },
       show: show,
@@ -6172,8 +6294,9 @@
     card.querySelector("#acctCloseBtn").addEventListener("click", function(){ closeAccountModal(); });
     card.querySelector("#asCancel").addEventListener("click", function(){ closeAccountModal(); });
     card.querySelector("#asSave").addEventListener("click", function(){
+      var okEl = card.querySelector("#ccSaved"); if(okEl) okEl.textContent = "";
       if(cc.accountSave) return cc.accountSave();
-      cc.markSaved(); closeAccountModal(); toast("Settings saved.");
+      cc.markSaved();
     });
 
     // ---- fill the sections. The older Settings panel's controls keep their elements (and listeners); they simply move in here.
@@ -6181,6 +6304,7 @@
     updateCount(); applySettingsUI();
     var signedIn = ccSignedIn();
     cc.adopt(document.getElementById("secAppearance"), cc.panes.appearance);
+    buildLookSection(cc, cc.panes.appearance);
     if(!signedIn) cc.adopt(document.getElementById("sharingSec"), cc.panes.sharing);
     if(signedIn) buildAccountParts(cc); else buildGuestAccount(cc, cc.panes.account);
     cc.adopt(document.getElementById("secBoardData"), cc.panes.privacy);
@@ -6243,14 +6367,21 @@
     pane.innerHTML = '<section class="asCard" aria-labelledby="ccSndH"><h4 id="ccSndH">Sounds</h4>' +
       '<div class="asItem"><label class="lbl" for="sndOn">Sound effects<small>Soft paper sounds for the things you do.</small></label><input type="checkbox" class="asSw" id="sndOn" role="switch"></div>' +
       '<div class="asItem" id="sndVolRow"><label class="lbl" for="sndVol">Volume<small id="sndVolVal"></small></label><input type="range" class="ccRange" id="sndVol" min="0" max="100" step="5"></div>' +
-      '<div class="setBtns"><button type="button" class="pillBtn" id="sndPreview">Play a preview</button></div>' +
+      '<div class="setBtns"><button type="button" class="pillBtn sndPreview" id="sndPreview"><svg class="pvIc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path class="pvA1" d="M16 9.5a3.5 3.5 0 0 1 0 5"/><path class="pvA2" d="M18.6 7a7 7 0 0 1 0 10"/></svg><span class="pvLb">Play a preview</span><span class="pvBar" aria-hidden="true"></span></button></div>' +
       '<p class="asHint">Stick-It doesn’t play sounds yet. This remembers your choice for when it does.</p></section>';
     var on = pane.querySelector("#sndOn"), vol = pane.querySelector("#sndVol"), val = pane.querySelector("#sndVolVal"), prev = pane.querySelector("#sndPreview"), row = pane.querySelector("#sndVolRow");
     function paint(){ on.checked = SoundFx.enabled(); vol.value = String(SoundFx.volume()); vol.disabled = !on.checked; prev.disabled = !on.checked; row.classList.toggle("off", !on.checked); val.textContent = SoundFx.volume() + "%"; vol.setAttribute("aria-valuetext", SoundFx.volume() + " percent"); }
     on.addEventListener("change", function(){ settings.soundOn = on.checked; paint(); if(on.checked) SoundFx.preview(); });
     vol.addEventListener("input", function(){ settings.soundVolume = Number(vol.value); val.textContent = vol.value + "%"; });
     vol.addEventListener("change", function(){ SoundFx.preview(); });
-    prev.addEventListener("click", function(){ if(!SoundFx.preview()) toast("This browser can’t play sounds."); });
+    var pvTimer = 0;
+    prev.addEventListener("click", function(){
+      if(prev.classList.contains("playing")) return;
+      if(!SoundFx.preview()){ toast("This browser can’t play sounds."); return; }
+      prev.classList.add("playing"); prev.setAttribute("aria-busy", "true"); prev.querySelector(".pvLb").textContent = "Playing…";      // one short press-and-sweep, then back to rest
+      clearTimeout(pvTimer);
+      pvTimer = setTimeout(function(){ prev.classList.remove("playing"); prev.removeAttribute("aria-busy"); prev.querySelector(".pvLb").textContent = "Play a preview"; }, 1000);
+    });
     paint();
   }
 
@@ -6328,6 +6459,7 @@
       groups.forEach(function(g){ var any = 0; g.rows.forEach(function(r){ var hit = !v || v.split(/\s+/).every(function(w){ return r.text.indexOf(w) !== -1; }); r.el.hidden = !hit; if(hit){ any++; shown++; } }); g.el.hidden = !any; });
       none.hidden = !!shown; count.textContent = v ? shown + (shown === 1 ? " shortcut" : " shortcuts") : "";
     }
+    q.setAttribute("data-esc-clear", "1");
     q.addEventListener("input", filter);
     q.addEventListener("keydown", function(e){ if(e.key === "Escape" && q.value){ e.stopPropagation(); q.value = ""; filter(); } });
   }
@@ -6361,7 +6493,7 @@
   shareBtn.addEventListener("click", function(){
     var willOpen = sharePanel.hidden;
     closeOtherPanels(willOpen ? sharePanel : null);
-    sharePanel.hidden = !willOpen;
+    sharePanel.hidden = !willOpen; if(willOpen) shareLayer.open();
   });
   document.addEventListener("click", function(e){
     if(!sharePanel.hidden && !sharePanel.contains(e.target) && e.target !== shareBtn && !shareBtn.contains(e.target)){
@@ -6427,7 +6559,7 @@
   }
   (function(){ var v = document.getElementById("verTag"), c = (window.Stick && Stick.config) || {};
     if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); } })();
-  var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true"><path d="M2 14 1 4l6 4 5-7 5 7 6-4-1 10z" fill="#f2b705" stroke="#a87400" stroke-width="1.2" stroke-linejoin="round"></path><circle cx="12" cy="1.6" r="1.3" fill="#fff3b0" stroke="#a87400" stroke-width=".8"></circle><circle cx="1" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle><circle cx="23" cy="4" r="1.1" fill="#fff3b0" stroke="#a87400" stroke-width=".7"></circle></svg>';
+  var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
     updateAccountIcon0();
     var old = accountBtn.querySelector(".crown");
@@ -6497,6 +6629,8 @@
     acctBackdrop.appendChild(card);
     document.body.appendChild(acctBackdrop);
     document.addEventListener("keydown", acctEscHandler);
+    var signInBackdrop = acctBackdrop;
+    OV.layer("account", function(){ closeAccountModal(); }, function(){ return acctBackdrop === signInBackdrop; }).open();
     var myBackdrop = acctBackdrop;
     acctTrapKey = function(e){ if(acctBackdrop === myBackdrop) trapTab(e, myBackdrop, card); };
     document.addEventListener("keydown", acctTrapKey, true);
@@ -6961,6 +7095,7 @@
     anchor.parentNode.appendChild(menu);
     anchor.setAttribute("aria-expanded", "true");
     function items(){ return Array.prototype.slice.call(menu.querySelectorAll("button")); }
+    menuLayer.open();
     var st = {anchor: anchor, menu: menu,
       outside: function(e){ if(!menu.contains(e.target) && e.target !== anchor && !anchor.contains(e.target)) closeMenu(false); },
       keys: function(e){
@@ -6980,6 +7115,40 @@
   // The signed-in parts of the Control Center. Their markup is dropped into the Account, Appearance, Sharing and Privacy & Data
   // sections; one closure wires all of it (every element is found through the shared dialog card), so a keystroke in the Bio
   // field only touches the text it changes. cc: {card, panes, show(id), onClose(fn), accountSave}
+  // ---- the plan chip in Account: hover, keyboard focus or a tap shows what the plan includes (no pricing, no marketing)
+  function planFeatures(plan){
+    var L = (Stick.config && Stick.config.PLAN_LIMITS) || {}, lim = L[plan] || {}, boards = lim.boards || (plan === "premium" ? 6 : 2);
+    var gb = plan === "premium" ? "5 GB" : "200 MB";
+    var base = [boards + " cloud boards", gb + " of pictures and recordings", "Sharing links", "Comments and review", "Cutouts", "Search"];
+    if(plan === "premium") base.push("Alphabet Soup");
+    return base;
+  }
+  function wirePlanChip(btn, pop){
+    var plan = btn.dataset.plan === "premium" ? "premium" : "free", open = false, t = 0;
+    pop.innerHTML = '<b class="ppTitle"></b><ul class="ppList"></ul>';
+    pop.querySelector(".ppTitle").textContent = plan === "premium" ? "Premium" : "Free";
+    var ul = pop.querySelector(".ppList");
+    planFeatures(plan).forEach(function(f){ var li = document.createElement("li"); li.textContent = f; ul.appendChild(li); });
+    function show(){ clearTimeout(t); open = true; pop.hidden = false; btn.setAttribute("aria-expanded", "true"); layer.open(); }
+    function hide(){ clearTimeout(t); open = false; pop.hidden = true; btn.setAttribute("aria-expanded", "false"); layer.close(); }
+    var layer = OV.layer("plan-popover", function(){ if(open){ open = false; pop.hidden = true; btn.setAttribute("aria-expanded", "false"); } }, function(){ return open; });
+    btn.addEventListener("mouseenter", function(){ clearTimeout(t); t = setTimeout(show, 120); });
+    btn.addEventListener("mouseleave", function(){ clearTimeout(t); t = setTimeout(hide, 160); });
+    pop.addEventListener("mouseenter", function(){ clearTimeout(t); }); pop.addEventListener("mouseleave", function(){ t = setTimeout(hide, 160); });
+    btn.addEventListener("focus", show);
+    btn.addEventListener("blur", function(){ t = setTimeout(hide, 120); });
+    btn.addEventListener("click", function(e){ e.preventDefault(); if(open && pop.dataset.tapped === "1"){ pop.dataset.tapped = ""; hide(); } else { pop.dataset.tapped = "1"; show(); } });   // a tap opens it on touch screens, and a second tap closes it
+    return {hide: hide};
+  }
+  // storage: what is used, what is left, and the total, in words as well as in the bar
+  function storageHtml(u){
+    var used = Number(u.storage_used) || 0, quota = Number(u.storage_quota) || 0, left = Math.max(0, quota - used), pct = quota ? Math.min(100, Math.round(100 * used / quota)) : 0;
+    var txt = fmtBytes(used) + " used, " + fmtBytes(left) + " left of " + fmtBytes(quota);
+    return '<div class="asStat wide asStore"><small>Storage</small>' +
+      '<div class="asStoreNums"><span><b>' + fmtBytes(used) + '</b> used</span><span><b>' + fmtBytes(left) + '</b> left</span><span class="tot">' + fmtBytes(quota) + ' total</span></div>' +
+      '<div class="asBar2" role="img" aria-label="' + escapeAttr(txt + " (" + pct + " percent used)") + '"><i class="u" style="width:' + pct + '%"></i><i class="r"></i></div>' +
+      '<div class="asStoreKey" aria-hidden="true"><span><i class="kU"></i>Used</span><span><i class="kR"></i>Remaining</span></div></div>';
+  }
   function buildAccountParts(cc){
     var card = cc.card, P = cc.panes;
     closeMenu();
@@ -7044,7 +7213,7 @@
         '<section class="asCard" aria-labelledby="asH4">' +
           '<h4 id="asH4">Account</h4>' +
           '<div class="asItem"><span class="lbl">E-mail<small>Only you can see this.</small></span><span class="val">' + escapeHtml(acc.email || "") + '</span></div>' +
-          '<div class="asItem"><span class="lbl">Plan<small id="asPlanNote"></small></span><span class="val"><b id="asPlanName">' + escapeHtml((acc.plan || "free").charAt(0).toUpperCase() + (acc.plan || "free").slice(1)) + '</b></span></div>' +
+          '<div class="asItem"><span class="lbl">Plan<small id="asPlanNote"></small></span><span class="val planWrap"><button type="button" class="planChip" id="asPlanName" data-plan="' + escapeAttr(acc.plan === "premium" ? "premium" : "free") + '" aria-expanded="false" aria-controls="asPlanPop" aria-describedby="asPlanPop">' + escapeHtml((acc.plan || "free").charAt(0).toUpperCase() + (acc.plan || "free").slice(1)) + '</button><div class="planPop" id="asPlanPop" role="tooltip" hidden></div></span></div>' +
           '<div class="asStats" id="asStats" aria-live="polite"></div>' +
           '<h5>Connected accounts</h5>' +
           '<div id="asProviders"></div>' +
@@ -7277,6 +7446,8 @@
     });
 
     // ---------- account facts (loaded from the server; nothing invented)
+    var planUi = wirePlanChip($("asPlanName"), $("asPlanPop"));
+    cc.onClose(function(){ planUi.hide(); });
     $("asPlanNote").textContent = (acc.plan === "premium") ? "Thank you for supporting Stick-It." : "Premium is coming later. Nothing to buy yet.";
     function statSkeleton(){
       $("asStats").innerHTML = '<div class="asStat"><small>Boards</small><span class="asSkel"></span></div><div class="asStat"><small>Items</small><span class="asSkel"></span></div>' +
@@ -7288,12 +7459,13 @@
       statSkeleton();
       Stick.account.usage().then(function(u){
         if(!card.isConnected) return;
-        $("asPlanName").textContent = String(u.plan).charAt(0).toUpperCase() + String(u.plan).slice(1);
+        var pl = u.plan === "premium" ? "premium" : "free"; $("asPlanName").textContent = pl.charAt(0).toUpperCase() + pl.slice(1);
+        if($("asPlanName").dataset.plan !== pl){ $("asPlanName").dataset.plan = pl; planUi.hide(); wirePlanChip($("asPlanName"), $("asPlanPop")); }
         var pct = u.storage_quota ? Math.min(100, Math.round(100 * u.storage_used / u.storage_quota)) : 0;
         var cells = [];
         if(u.boards != null) cells.push('<div class="asStat"><small>Boards</small>' + u.boards + (u.boards_limit ? ' / ' + u.boards_limit : '') + '</div>');
         if(u.objects != null) cells.push('<div class="asStat"><small>Items</small>' + u.objects + '</div>');
-        if(u.storage_used != null) cells.push('<div class="asStat"><small>Storage</small>' + fmtBytes(u.storage_used) + '<div class="asBar" title="' + pct + '% of ' + fmtBytes(u.storage_quota) + '"><i style="width:' + pct + '%"></i></div></div>');
+        if(u.storage_used != null) cells.push(storageHtml(u));
         if(u.member_since) cells.push('<div class="asStat"><small>Member since</small>' + escapeHtml(monthYear(u.member_since)) + '</div>');
         $("asStats").innerHTML = cells.join("");
         activeShares = u.active_shares; paintShareCount();
@@ -7389,10 +7561,13 @@
       try{
         var res = await Stick.account.save(draft, stage);
         applyAccountData(res);
+        // the saved profile is the new starting point; stay where you are
+        pf = (settings.account && settings.account.prof) || {}; pr = Object.assign({}, Stick.account.DEFAULTS, settings.accountPrefs || {});
+        savedHandle = pr.handle || ""; handleStatus = "idle"; avSig = ""; pvSig = "";
+        if(stage.url) URL.revokeObjectURL(stage.url);
+        stage = {action: "keep", blob: null, url: null};
+        draft.handle = pr.handle || draft.handle; paintHandleHelp(); refreshHero();
         cc.markSaved();
-        cleanup();
-        closeAccountModal();
-        toast("Settings saved.");
       }catch(e){
         var er = Stick.errors.parse(e);
         btn.disabled = false; btn.textContent = "Save";
@@ -7769,7 +7944,7 @@
       n.x = nx; n.y = ny;
       if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; }
     });
-    var anim = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    var anim = !reducedMotion();
     if(anim){ document.body.classList.add("tidying"); setTimeout(function(){ document.body.classList.remove("tidying"); }, 800); }
     ensureWidth(); saveNotes(); updateMinimap(); recoverVertical(plan.placed.map(function(p){ return p.it.n; }));
     recordChange(scope === "screen" ? "Clean up (my screen)" : "Clean up (whole canvas)", before);
@@ -8212,7 +8387,7 @@
     tourRoot.appendChild(block);
     tourRoot.appendChild(spot);
     tourRoot.appendChild(card);
-    document.body.appendChild(tourRoot);
+    document.body.appendChild(tourRoot); tourLayer.open();
     renderTourStep();
     window.addEventListener("resize", positionTourStep);
   }
@@ -8735,7 +8910,7 @@
     brandBtn.addEventListener("click", function(){
       var willOpen = boardPanel.hidden;
       closeOtherPanels(willOpen ? boardPanel : null);
-      boardPanel.hidden = !willOpen;
+      boardPanel.hidden = !willOpen; if(willOpen) boardLayer.open();
       if(willOpen) renderBoardList();
     });
     document.addEventListener("click", function(e){

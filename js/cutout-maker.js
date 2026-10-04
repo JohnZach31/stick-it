@@ -380,6 +380,8 @@
         else UI.trapTab(e, backdrop, card);
       }
       doc.addEventListener("keydown", onKey, true);
+      var escLayer = UI.layer ? UI.layer("cutout-maker", function () { if (state.tool === "refine") { closeRefine(true); setTool("erase"); return; } cancel(); }, function () { return !state.closed; }) : null;
+      if (escLayer) escLayer.open();
       doc.addEventListener("keyup", function ku(e) { if (e.key === " ") spaceDown = false; if (state.closed) doc.removeEventListener("keyup", ku); });
       root.addEventListener("resize", layout);
 

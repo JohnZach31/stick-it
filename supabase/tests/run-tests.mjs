@@ -875,6 +875,43 @@ group('N. owner allowlist: verified e-mail always gets premium');
   ok((await run('su', 'select plan from public.profiles where id=$1', [other.id])).rows[0].plan === 'free', 'any other verified account stays on the free plan');
 }
 
+
+// ================================================================ O. deleting comments
+group('O. deleting comments: author, owner, and nobody else');
+{
+  const o = mk('olga'), a = mk('anya'), b = mk('boaz'), v = mk('vera'), out = mk('otto');
+  for (const p of [o, a, b, v, out]) { await run('su', 'insert into auth.users (id,email) values ($1,$2)', [p.id, p.email]); await attest(p.id); }
+  const B = await board(o, 'Moderated');
+  for (const [p, role] of [[a, 'editor'], [b, 'editor'], [v, 'viewer']]) await run('su', 'insert into public.board_members (board_id, user_id, role) values ($1,$2,$3)', [B.id, p.id, role]);
+  const objId = uuid();
+  await run(o, 'select public.sync_objects($1,$2::jsonb,$3::jsonb)', [B.id, JSON.stringify([{ id: objId, type: 'note', x: 1, y: 1, width: 250, rotation: 0, z_index: 1, data: { html: 'hi', bg: 'hsl(40,90%,80%)' } }]), '[]']);
+  const say = async (p, text) => (await run(p, 'insert into public.comments (board_id, object_id, author_id, body) values ($1,$2,$3,$4) returning id', [B.id, objId, p.id, text])).rows[0].id;
+  const live = async (id) => (await run('su', 'select deleted_at from public.comments where id=$1', [id])).rows[0].deleted_at === null;
+  const del = (p, id) => run(p, 'select public.delete_comment($1)', [id]);
+
+  const byB = await say(b, 'boaz says hello'), byA = await say(a, 'anya says hello'), byA2 = await say(a, 'second');
+  ok(denied(await del(a, byB)) && await live(byB), "user A (an editor) cannot delete user B's comment");
+  ok(denied(await del(v, byB)) && await live(byB), 'a viewer cannot delete a comment');
+  ok(denied(await del(out, byB)) && await live(byB) || (!(await del(out, byB)).error && await live(byB)), 'a stranger cannot delete it (and learns nothing about it)');
+  ok(denied(await del('anon', byB)) && await live(byB), 'a signed-out caller cannot delete it');
+  ok(!(await del(b, byB)).error && !(await live(byB)), 'the author can delete their own comment');
+  ok(!(await del(o, byA)).error && !(await live(byA)), 'the board owner can delete any comment on the board');
+  ok(!(await del(o, byB)).error, 'deleting twice is harmless');
+  // direct writes are guarded too, not only the function
+  ok(denied(await run(b, 'update public.comments set deleted_at = now() where id=$1', [byA2])) || (await live(byA2)), "an editor cannot delete someone else's comment by updating the row");
+  ok(await live(byA2), '...and it is still there');
+  ok(denied(await run(o, "update public.comments set body='rewritten by the owner' where id=$1", [byA2])) || (await run('su', 'select body from public.comments where id=$1', [byA2])).rows[0].body === 'second', "the owner cannot rewrite someone else's words");
+  ok((await run('su', 'select body from public.comments where id=$1', [byA2])).rows[0].body === 'second', '...the words are unchanged');
+  ok(!(await run(a, "update public.comments set body='edited by anya' where id=$1", [byA2])).error, 'an author can still edit their own words');
+  ok(denied(await run(o, 'update public.comments set deleted_at = null where id=$1', [byA])), 'a deleted comment cannot be brought back through the API');
+  ok(denied(await run(a, 'update public.comments set author_id = $2 where id=$1', [byA2, b.id])), 'a comment cannot be reassigned to someone else');
+  // an author who has left the board can no longer touch the comment
+  const byA3 = await say(a, 'third');
+  await run('su', 'delete from public.board_members where board_id=$1 and user_id=$2', [B.id, a.id]);
+  ok(!(await del(a, byA3)).error && await live(byA3), 'a former member deleting their old comment does nothing');
+  ok(denied(await run(a, 'update public.comments set deleted_at = now() where id=$1', [byA3])) || (await live(byA3)), 'and cannot reach it by updating the row either');
+}
+
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

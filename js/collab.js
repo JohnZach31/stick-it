@@ -183,9 +183,20 @@
         C.refreshSummary(); return r.data;
       });
   };
+  // The database decides who may delete (the author, or the board's owner); this just asks. The button is also hidden from everyone else.
   C.deleteComment = function (id) {
-    return db().then(function (c) { return c.from("comments").update({ deleted_at: new Date().toISOString() }).eq("id", id); })
+    return db().then(function (c) { return c.rpc("delete_comment", { p_comment: id }); })
       .then(function (r) { if (r.error) throw Stick.errors.parse(r.error); C.refreshSummary(); });
+  };
+  // "Delete comment?" in the shared Stick-It dialog. Your own comment and someone else's (board owner moderating) read differently.
+  C.confirmDelete = function (host, row, mine, done) {
+    var who = row.author || "someone";
+    host.modal({
+      title: mine ? "Delete comment?" : "Delete this comment?",
+      sub: mine ? "Are you sure you want to delete your comment?" : "This comment was written by " + who + ".",
+      width: 360,
+      actions: [{ label: "Cancel", value: false }, { label: "Delete comment", kind: "dangerFill", value: true, onClick: function () { done(); } }]
+    });
   };
   C.setReview = function (objectId, state, reason) {
     return db().then(function (c) { return c.rpc("set_review_state", { p_object: objectId, p_state: state, p_reason: reason || null }); })
@@ -293,7 +304,7 @@
     var rvBox = el("div", "cmtReview"); slip.appendChild(rvBox);
     var list = el("div", "cmtList"); list.setAttribute("aria-live", "polite"); slip.appendChild(list);
     var form = el("div", "cmtForm");
-    var input = el("textarea", "cmtInput"); input.rows = 2; input.maxLength = 1000; input.placeholder = "Add a comment…"; input.setAttribute("aria-label", "Add a comment");
+    var input = el("textarea", "cmtInput"); input.rows = 1; input.maxLength = 1000; input.placeholder = "Add a comment…"; input.setAttribute("aria-label", "Add a comment");
     var add = el("button", "pillBtn primary cmtAdd", "Add"); add.type = "button";
     var msg = el("p", "cmtMsg"); msg.setAttribute("role", "status");
     if (canEdit) { form.appendChild(input); form.appendChild(add); slip.appendChild(form); } else slip.appendChild(el("p", "cmtMsg", "You can read comments on this board but not add them."));
@@ -341,7 +352,10 @@
           top.appendChild(av); top.appendChild(who); top.appendChild(when);
           if (r.author_id === S.opts.me.uid || isOwner) {
             var del = el("button", "cmtDel"); del.type = "button"; del.setAttribute("aria-label", "Delete this comment"); del.title = "Delete this comment"; del.innerHTML = "&times;";
-            del.addEventListener("click", function () { C.deleteComment(r.id).then(paintList, function (e) { msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); }); });
+            del.addEventListener("click", function () {
+              var go = function () { C.deleteComment(r.id).then(paintList, function (e) { msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); }); };
+              C.confirmDelete(host, r, r.author_id === S.opts.me.uid, go);
+            });
             top.appendChild(del);
           }
           item.appendChild(top); item.appendChild(body);
@@ -356,6 +370,8 @@
       C.addComment(n.id, v).then(function () { input.value = ""; add.disabled = false; paintList(); host.refresh(); },
         function (e) { add.disabled = false; msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
     }
+    function grow() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 96) + "px"; }
+    input.addEventListener("input", grow);
     add.addEventListener("click", post);
     input.addEventListener("keydown", function (e) { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); post(); } e.stopPropagation(); });
     paintReview(); paintList();
