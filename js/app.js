@@ -1126,7 +1126,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1164,7 +1164,9 @@
     if(window.Stick && Stick.objects && Stick.objects.isKind(c.type)){
       var sp = Stick.objects.sanitize(c, paperHelpers());
       if(!sp) return null;
-      if(c.pinned === true) sp.pinned = true; sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
+      if(c.pinned === true) sp.pinned = true;
+      if(c.type === "shopping"){ var dn = Number(c.doneAt); if(dn > 0 && dn < 1e14){ sp.doneAt = dn; if(c.doneBy !== undefined) sp.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60); } }
+      sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
       if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
       if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) !== -1) sp.mediaState = c.mediaState;
       return sp;
@@ -1965,7 +1967,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -3624,7 +3626,7 @@
   var PAPER_MONO = "'Cutive Mono','Courier Prime','Courier New',monospace";
   var PAPER_TYPE = "'Special Elite','Courier Prime','Courier New',monospace";
   function isPaper(n){ return !!n && !!window.Stick && Stick.objects && Stick.objects.isKind(n.type); }
-  function paperHelpers(){ return {safeImage: safeImage, fontOk: function(f){ return !!FONT_BY_NAME[f]; }}; }
+  function paperHelpers(){ return {safeImage: safeImage, safeHref: safeHref, locale: (typeof navigator !== "undefined" && navigator.language) || undefined, tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){ return ""; } })(), fontOk: function(f){ return !!FONT_BY_NAME[f]; }}; }
   function todayShort(){ try{ return new Date().toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"}); }catch(e){ return isoDate(new Date()); } }
   function paperLabel(n){ return Stick.objects.label(n); }
   function paperSize(n){
@@ -3703,6 +3705,7 @@
     return api;
   }
   function buildStaticPaper(item){
+    if(item.type === "shopping") return buildStaticShopping(item);
     var b = buildPaperEl(item); b.el.classList.add("static"); b.el.removeAttribute("tabindex");
     if(item.type === "postcard"){                              // shared or exported views: tap to turn it over
       b.el.addEventListener("click", function(){ var back = !b.el.classList.contains("flipped"); b.el.classList.toggle("flipped", back); });
@@ -3712,6 +3715,7 @@
 
   // ---- placing it on the board, with the same drag / select / group behaviour as every other object
   function renderPaper(n, isNew){
+    if(n.type === "shopping") return renderShopping(n, isNew);
     var b = buildPaperEl(n), el = b.el;
     if(isNew) el.classList.add("new");
     el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.zIndex = n.z;
@@ -3897,6 +3901,393 @@
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   Stick.objects.KINDS.forEach(function(k){ OBJECT_MENUS[k] = paperMenu; });
+
+  // ---------- Shopping List ----------
+  // One node for anything you mean to buy. The base is [ ] Item; quantity, note, price, link and tag are optional, switched on per list in the
+  // note's ... menu, and an item only shows a detail it actually has. A paper receipt strip holds the words; a small fixed-size cart holds
+  // the paper. Ticking an item moves it into "In the cart"; that is NOT the same as marking the whole list Done (separate, in the menu).
+  // Rules, limits and maths live in js/shopping.js. Items are never edited in place in a way that history could see: every change makes a
+  // new items array, so Undo restores exactly what was there.
+  function isShopping(n){ return !!n && n.type === "shopping"; }
+  // the cart is as wide as the note and always the same height: a wire basket with a handle and two wheels. The paper tucks into it.
+  var SHOP_CART = '<div class="shBasket"></div><span class="shWheel l"></span><span class="shWheel r"></span>' +
+    '<svg class="shHandle" viewBox="0 0 44 34" aria-hidden="true" focusable="false"><path d="M2 3h16l14 20" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var SHOP_BOX = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="shBoxLine" d="M5.2 4.6c4.6-.5 9.6-.4 13.6.1.5 4.3.5 9.4.1 14.2-4.3.5-9.1.5-13.9.1-.4-4.8-.4-9.5.2-14.4z" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path class="shTick" d="M6.5 12.6c1.6 1.4 2.8 2.9 4 4.7 2.2-4.4 4.8-8 8.1-11.3" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var SHOP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h2.6l2.3 11h10l2-8H6.3"/><circle cx="9.5" cy="19.2" r="1.4"/><circle cx="16.8" cy="19.2" r="1.4"/></svg>';
+  ICONS.cart = SHOP_ICON;
+  function shopMinor(n){ return Stick.shopping.minorDigits(n.cur); }
+  function shopMoney(n, minor){ return Stick.shopping.formatPrice(minor, n.cur, shopLocale()); }
+  function shopLocale(){ try{ return navigator.language || undefined; }catch(e){ return undefined; } }
+  function shopTz(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){ return ""; } }
+  function shopHas(n, f){ return (n.fields || []).indexOf(f) !== -1; }
+  function shopEditable(){ return !readOnly; }
+
+  // one change to the list: a new items array in, history and saving handled here
+  function shopChange(n, label, make, opts){
+    opts = opts || {};
+    if(!shopEditable() || !n) return false;
+    var before = captureState([n.id]), cur = (n.items || []).map(function(it){ return Object.assign({}, it); }), next = make(cur);
+    if(!next) return false;
+    n.items = next;
+    if(opts.quiet){ saveNotesTyping(); }
+    else { saveNotes(); repaintShopping(n, opts); updateMinimap(); recordChange(label, before); }
+    return true;
+  }
+  function shopSet(n, label, patch){
+    if(!shopEditable()) return;
+    var before = captureState([n.id]);
+    Object.keys(patch).forEach(function(k){ n[k] = patch[k]; });
+    saveNotes(); repaintShopping(n); updateMinimap(); recordChange(label, before);
+  }
+
+  // ---- building the element
+  function shopRow(n, it, st){
+    var S = Stick.shopping, li = document.createElement("li"), inCart = it.c === 1;
+    li.className = "shRow" + (inCart ? " in" : ""); li.dataset.id = it.id; li.dataset.itemId = it.id;
+    var box = document.createElement("button"); box.type = "button"; box.className = "shBox"; box.innerHTML = SHOP_BOX;
+    box.setAttribute("role", "checkbox"); box.setAttribute("aria-checked", inCart ? "true" : "false"); box.setAttribute("aria-label", (inCart ? "In the cart: " : "To buy: ") + (it.t || "item"));
+    if(st.readOnly) box.disabled = true;
+    else box.addEventListener("click", function(e){ e.stopPropagation(); shopTick(n, it.id, !inCart); });
+    li.appendChild(box);
+    var body = makeDiv("shBody"), line = makeDiv("shLine"), txt = document.createElement("span");
+    txt.className = "shText"; txt.textContent = it.t; txt.dir = "auto"; txt.setAttribute("role", "textbox"); txt.setAttribute("aria-label", "Item"); txt.setAttribute("data-ph", "Item");
+    if(!st.readOnly){ txt.contentEditable = "true"; txt.spellcheck = true; wireShopText(n, it, txt); }
+    line.appendChild(txt);
+    // the details this item really has, small and quiet; nothing for a detail it lacks, and nothing for a field that is switched off
+    if(shopHas(n, "qty") && it.q){ var q = document.createElement("span"); q.className = "shQty"; q.textContent = "×" + it.q; line.appendChild(q); }
+    if(shopHas(n, "price") && it.p != null){ var p = document.createElement("span"); p.className = "shPrice"; p.textContent = shopMoney(n, it.p); line.appendChild(p); }
+    if(shopHas(n, "tag") && it.g){ var g = document.createElement("span"); g.className = "shTag"; g.textContent = it.g; line.appendChild(g); }
+    if(shopHas(n, "link") && it.l){
+      var open = st.openId === it.id, lk = document.createElement(open ? "span" : "a"); lk.className = "shLink"; lk.title = open ? "Link" : "Open the link"; lk.textContent = "↗";
+      if(!open){ lk.href = it.l; lk.target = "_blank"; lk.rel = "noopener noreferrer"; lk.setAttribute("aria-label", "Open the link for " + (it.t || "this item")); lk.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); lk.addEventListener("click", function(e){ e.stopPropagation(); }); }
+      line.appendChild(lk);
+    }
+    var fieldsOn = ["qty", "note", "price", "link", "tag"].some(function(f){ return shopHas(n, f); });
+    if(!st.readOnly){
+      if(fieldsOn){
+        var more = document.createElement("button"); more.type = "button"; more.className = "shMore"; more.textContent = "▾"; more.title = "Details"; more.setAttribute("aria-label", "Details for " + (it.t || "this item")); more.setAttribute("aria-expanded", String(st.openId === it.id));
+        more.addEventListener("click", function(e){ e.stopPropagation(); n._openItem = n._openItem === it.id ? null : it.id; repaintShopping(n, {focusDetail: n._openItem}); });
+        line.appendChild(more);
+      }
+      var del = document.createElement("button"); del.type = "button"; del.className = "shDel"; del.innerHTML = "×"; del.title = "Remove"; del.setAttribute("aria-label", "Remove " + (it.t || "this item"));
+      del.addEventListener("click", function(e){ e.stopPropagation(); shopChange(n, "Remove item", function(items){ return Stick.shopping.remove(items, it.id); }); });
+      line.appendChild(del);
+    }
+    body.appendChild(line);
+    if(shopHas(n, "note") && it.n && st.openId !== it.id){ var nt = makeDiv("shNote"); nt.textContent = it.n; nt.dir = "auto"; body.appendChild(nt); }
+    if(st.openId === it.id && !st.readOnly) body.appendChild(shopDetailInputs(n, it));
+    li.appendChild(body);
+    return li;
+  }
+  function shopDetailInputs(n, it){
+    var S = Stick.shopping, wrap = makeDiv("shExtra");
+    function input(f, label, value, attrs){
+      var l = document.createElement("label"); l.className = "shField"; var s = document.createElement("span"); s.textContent = label; l.appendChild(s);
+      var inp = document.createElement("input"); inp.type = "text"; inp.value = value || ""; inp.dataset.f = f; inp.autocomplete = "off"; inp.setAttribute("dir", "auto");
+      Object.keys(attrs || {}).forEach(function(k){ inp.setAttribute(k, attrs[k]); });
+      l.appendChild(inp); wrap.appendChild(l); return inp;
+    }
+    function commit(f, key, inp, parse){
+      var v = inp.value, val = parse(v);
+      if(val === false){ inp.classList.add("bad"); setTimeout(function(){ inp.classList.remove("bad"); }, 600); inp.value = shopFieldValue(n, it, f); return; }
+      var cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0]; if(!cur || shopFieldValue(n, cur, f) === shopFieldValue(n, Object.assign({}, cur, shopPatch(key, val)), f)) return;
+      shopChange(n, "Edit item", function(items){ return S.update(items, it.id, shopPatch(key, val)); }, {keepOpen: true, focusDetail: n._openItem});
+    }
+    function text(f, key, label, max, attrs){
+      var inp = input(f, label, it[key], Object.assign({maxlength: max}, attrs));
+      inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.value = it[key] || ""; inp.blur(); n._openItem = null; repaintShopping(n); } e.stopPropagation(); });
+      inp.addEventListener("change", function(){ commit(f, key, inp, function(v){ v = v.replace(/\s+/g, " ").trim(); return v || null; }); });
+    }
+    if(shopHas(n, "qty")) text("qty", "q", "Quantity", S.LIMITS.qty, {placeholder: "2, 500 g"});
+    if(shopHas(n, "price")){
+      var d = shopMinor(n), inp = input("price", "Price (" + n.cur + ")", it.p == null ? "" : (it.p / Math.pow(10, d)).toFixed(d), {inputmode: "decimal", placeholder: d ? "0." + "0".repeat(d) : "0"});
+      inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.blur(); } e.stopPropagation(); });
+      inp.addEventListener("change", function(){ commit("price", "p", inp, function(v){ if(!v.trim()) return null; var m = S.parsePrice(v, n.cur); return m == null ? false : m; }); });
+    }
+    if(shopHas(n, "note")) text("note", "n", "Note", S.LIMITS.note, {});
+    if(shopHas(n, "link")){
+      var li = input("link", "Link", it.l, {inputmode: "url", maxlength: S.LIMITS.link, placeholder: "https://"});
+      li.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); li.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); li.blur(); } e.stopPropagation(); });
+      li.addEventListener("change", function(){ commit("link", "l", li, function(v){ v = v.trim(); if(!v) return null; if(!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = "https://" + v; var ok = safeHref(v); return ok || false; }); });
+    }
+    if(shopHas(n, "tag")) text("tag", "g", "Tag", S.LIMITS.tag, {});
+    return wrap;
+  }
+  function shopFieldValue(n, it, f){ return f === "qty" ? (it.q || "") : f === "note" ? (it.n || "") : f === "tag" ? (it.g || "") : f === "link" ? (it.l || "") : (it.p == null ? "" : String(it.p)); }
+  function shopPatch(key, val){ var p = {}; p[key] = val == null ? undefined : val; if(val == null) p[key] = undefined; return p; }
+
+  // typing in an item's words: kept as you type (device now, account after a pause); one history step per visit
+  function wireShopText(n, it, span){
+    var before = null, startText = it.t;
+    function holder(){ return window.Stick && Stick.collab && Stick.collab.blockedBy(n.id); }
+    span.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    span.addEventListener("focus", function(){
+      var h = holder(); if(h){ toast(h + " is editing this list."); span.blur(); return; }
+      endEditing(); before = captureState([n.id]); startText = it.t;
+      if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
+      if(!selected.has(n.id)) setSelection([n.id]);
+    });
+    span.addEventListener("input", function(){
+      var t = span.textContent.replace(/[\r\n]+/g, " ").slice(0, Stick.shopping.LIMITS.text);
+      if(span.textContent !== t) span.textContent = t;
+      shopChange(n, "Edit item", function(items){ return Stick.shopping.update(items, it.id, {t: t.replace(/\s+/g, " ").trim()}); }, {quiet: true});
+      var cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0]; if(cur) it = cur;
+    });
+    span.addEventListener("paste", function(e){ e.preventDefault(); var tx = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, tx.replace(/\s+/g, " ")); });
+    span.addEventListener("keydown", function(e){
+      if(e.isComposing) return;
+      if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); span.blur(); var add = n.el && n.el.querySelector(".shAddIn"); if(add) add.focus(); return; }
+      if(e.key === "Escape"){ e.stopPropagation(); e.preventDefault(); span.blur(); return; }
+      if(e.key === "Backspace" && !span.textContent){
+        e.preventDefault(); e.stopPropagation();
+        var idx = (n.items || []).map(function(x){ return x.id; }).indexOf(it.id), prev = n.items[idx - 1];
+        shopChange(n, "Remove item", function(items){ return Stick.shopping.remove(items, it.id); }, {focusId: prev ? prev.id : null, focusEnd: true});
+        return;
+      }
+      if(e.key === "ArrowUp" || e.key === "ArrowDown"){
+        var rows = Array.prototype.slice.call(n.el.querySelectorAll(".shRow .shText")), i = rows.indexOf(span), nx = rows[i + (e.key === "ArrowDown" ? 1 : -1)];
+        if(nx){ e.preventDefault(); nx.focus(); }
+        else if(e.key === "ArrowDown"){ var a2 = n.el.querySelector(".shAddIn"); if(a2){ e.preventDefault(); a2.focus(); } }
+        e.stopPropagation(); return;
+      }
+      e.stopPropagation();
+    });
+    span.addEventListener("blur", function(){
+      if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
+      if(!before) return;
+      var b = before; before = null;
+      var cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0];
+      if(cur && !cur.t && !cur.q && !cur.n && cur.p == null && !cur.l && !cur.g){          // left empty: it was never a real item
+        n.items = Stick.shopping.remove(n.items, it.id); saveNotes(); repaintShopping(n); updateMinimap(); recordChange("Edit item", b); return;
+      }
+      if(cur && cur.t !== startText){ saveNotes(); updateMinimap(); recordChange("Edit item", b); }
+    });
+  }
+
+  function shopTick(n, id, inCart){
+    var row = n.el && n.el.querySelector('.shRow[data-id="' + id + '"]'), from = row ? row.getBoundingClientRect() : null;
+    shopChange(n, inCart ? "Put in the cart" : "Take out of the cart", function(items){ return Stick.shopping.setCart(items, id, inCart, Date.now()); }, {slideId: id, slideFrom: from});
+  }
+  function shopAdd(n, text, keepFocus){
+    var t = String(text || "").replace(/\s+/g, " ").trim();
+    if(!t) return false;
+    if((n.items || []).length >= Stick.shopping.MAX_ITEMS){ toast("A list holds up to " + Stick.shopping.MAX_ITEMS + " items."); return false; }
+    return shopChange(n, "Add item", function(items){ return Stick.shopping.add(items, t, Date.now()); }, {focusAdd: keepFocus !== false});
+  }
+  function shopClearBought(n){
+    var k = Stick.shopping.boughtCount(n.items);
+    if(!k) return;
+    function go(){ shopChange(n, k > 1 ? "Clear " + k + " bought items" : "Clear bought item", function(items){ return Stick.shopping.clearBought(items); }); toast(k > 1 ? "Cleared " + k + " bought items." : "Cleared the bought item.", "Undo", function(){ undo(); }); }
+    if(k === 1){ go(); return; }
+    confirmDialog({title: "Clear " + k + " bought items?", body: "They’ll be removed from this list. You can undo it.", confirm: "Clear"}).then(function(ok){ if(ok) go(); });
+  }
+
+  // fill (or refill) the paper from the list's data. The element stays, so focus, selection and scroll position survive.
+  function repaintShopping(n, opts){
+    opts = opts || {};
+    var el = n.el; if(!el || !el.querySelector(".shPaper")) return;
+    var S = Stick.shopping, ro = readOnly || !!el.classList.contains("static"), openId = opts.keepOpen || opts.focusDetail || n._openItem ? n._openItem : null;
+    var list = el.querySelector(".shList"), scroll = list ? list.scrollTop : 0, old = {};
+    Array.prototype.forEach.call(el.querySelectorAll(".shRow"), function(r){ old[r.dataset.id] = r.getBoundingClientRect(); });
+    if(opts.slideFrom && opts.slideId) old[opts.slideId] = opts.slideFrom;
+    var st = {readOnly: ro, openId: openId};
+    var items = n.items || [], toBuy = S.toBuyItems(items), cart = S.cartItems(items), counts = S.counts(items);
+    el.setAttribute("aria-label", Stick.objects.label(n));
+    el.classList.toggle("allPicked", counts.allPicked); el.classList.toggle("emptyList", !counts.all);
+    var title = el.querySelector(".shTitle"); if(title && document.activeElement !== title) title.textContent = n.title || "";
+    var sum = el.querySelector(".shSummary"); if(sum) sum.textContent = S.summary(items);
+    list.innerHTML = "";
+    var ul1 = document.createElement("ul"); ul1.className = "shItems shToBuy"; ul1.setAttribute("aria-label", "To buy");
+    toBuy.forEach(function(it){ ul1.appendChild(shopRow(n, it, st)); });
+    list.appendChild(ul1);
+    if(!ro){
+      var addRow = makeDiv("shAddRow"), plus = document.createElement("span"); plus.className = "shPlus"; plus.setAttribute("aria-hidden", "true"); plus.textContent = "+";
+      var add = document.createElement("input"); add.type = "text"; add.className = "shAddIn"; add.maxLength = S.LIMITS.text; add.autocomplete = "off"; add.setAttribute("dir", "auto");
+      add.placeholder = counts.all ? "Add an item" : "Add the first item"; add.setAttribute("aria-label", counts.all ? "Add an item" : "Add the first item");
+      add.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      add.addEventListener("keydown", function(e){
+        if(e.isComposing) return;
+        if(e.key === "Enter"){ e.preventDefault(); if(add.value.trim()){ var v = add.value; add.value = ""; shopAdd(n, v, true); } }
+        else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); add.value = ""; add.blur(); }
+        else if(e.key === "ArrowUp"){ var rows = n.el.querySelectorAll(".shToBuy .shRow .shText"); if(rows.length){ e.preventDefault(); rows[rows.length - 1].focus(); } }
+        e.stopPropagation();
+      });
+      add.addEventListener("blur", function(){ if(add.value.trim()){ var v = add.value; add.value = ""; shopAdd(n, v, false); } });
+      addRow.appendChild(plus); addRow.appendChild(add); list.appendChild(addRow);
+    }
+    if(cart.length){
+      var head = makeDiv("shDivider"), lab = document.createElement("span"); lab.textContent = "In the cart"; head.appendChild(lab);
+      if(!ro){
+        var clr = document.createElement("button"); clr.type = "button"; clr.className = "shClear"; clr.textContent = "Clear bought items";
+        clr.addEventListener("click", function(e){ e.stopPropagation(); shopClearBought(n); }); head.appendChild(clr);
+      }
+      head.setAttribute("role", "heading"); head.setAttribute("aria-level", "3");
+      list.appendChild(head);
+      var ul2 = document.createElement("ul"); ul2.className = "shItems shInCart"; ul2.setAttribute("aria-label", "In the cart");
+      cart.forEach(function(it){ ul2.appendChild(shopRow(n, it, st)); });
+      list.appendChild(ul2);
+    }
+    list.scrollTop = scroll;
+    var tot = el.querySelector(".shTotal"), tt = S.totals(items);
+    if(tot){
+      if(shopHas(n, "price") && tt.priced){ tot.hidden = false; tot.textContent = "Total " + shopMoney(n, tt.all) + (tt.cart ? " · in cart " + shopMoney(n, tt.cart) : ""); }
+      else { tot.hidden = true; tot.textContent = ""; }
+    }
+    var stamp = el.querySelector(".shStamp"); if(stamp) stamp.hidden = !counts.allPicked;
+    // a small slide for whatever just moved (not with reduced motion)
+    if(!reducedMotion() && opts.slideId){
+      var row = el.querySelector('.shRow[data-id="' + opts.slideId + '"]'), from = old[opts.slideId];
+      if(row && from && row.animate){ var to = row.getBoundingClientRect(), dy = from.top - to.top; if(Math.abs(dy) > 1) row.animate([{transform: "translateY(" + dy + "px)", opacity: 0.6}, {transform: "none", opacity: 1}], {duration: 360, easing: "cubic-bezier(.3,.8,.3,1)"}); }
+    }
+    if(opts.focusAdd){ var a3 = el.querySelector(".shAddIn"); if(a3) a3.focus(); }
+    if(opts.focusId){ var t3 = el.querySelector('.shRow[data-id="' + opts.focusId + '"] .shText'); if(t3){ t3.focus(); if(opts.focusEnd){ var rg = document.createRange(); rg.selectNodeContents(t3); rg.collapse(false); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } } }
+    else if(opts.focusDetail){ var d3 = el.querySelector('.shRow[data-id="' + opts.focusDetail + '"] .shExtra input'); if(d3 && !opts.keepOpen) d3.focus(); }
+    var nm = el.querySelector(".shTitle"); if(nm) nm.setAttribute("data-ph", "Shopping list");
+  }
+
+  function buildShoppingEl(n, st){
+    st = st || {};
+    var el = makeDiv("boardObj paperObj shopObj" + (st.static ? " static" : ""));
+    el.style.setProperty("--pw", (n.w || Stick.shopping.WIDTH[2]) + "px"); el.style.setProperty("--rot", (n.rot || 0) + "deg");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", Stick.objects.label(n)); if(!st.static) el.tabIndex = 0;
+    var tape = makeDiv("shTape"); tape.setAttribute("aria-hidden", "true"); el.appendChild(tape);
+    var paper = makeDiv("shPaper"), head = makeDiv("shHead"), title = makeDiv("shTitle"), sum = makeDiv("shSummary");
+    title.dir = "auto"; title.setAttribute("role", "textbox"); title.setAttribute("aria-label", "List title");
+    sum.setAttribute("role", "status"); sum.setAttribute("aria-live", "polite");
+    head.appendChild(title); head.appendChild(sum); paper.appendChild(head);
+    var list = makeDiv("shList"); paper.appendChild(list);
+    var tot = makeDiv("shTotal"); tot.hidden = true; paper.appendChild(tot);
+    var stamp = makeDiv("shStamp"); stamp.textContent = "All picked ✓"; stamp.hidden = true; stamp.setAttribute("aria-hidden", "true"); paper.appendChild(stamp);
+    el.appendChild(paper);
+    var cart = makeDiv("shCart"); cart.innerHTML = SHOP_CART; cart.setAttribute("aria-hidden", "true"); el.appendChild(cart);
+    return {el: el, title: title};
+  }
+
+  function renderShopping(n, isNew){
+    var b = buildShoppingEl(n), el = b.el;
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = null;
+    boardInner.appendChild(el);
+    repaintShopping(n);
+    if(!readOnly){
+      function ctl(cls, html, title, onDown){
+        var c = document.createElement("button");
+        c.className = "pCtl " + cls; c.innerHTML = html; c.title = title; c.setAttribute("aria-label", title); c.type = "button";
+        c.addEventListener("pointerdown", function(e){ e.stopPropagation(); if(onDown) onDown(e, c); });
+        c.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        el.appendChild(c); return c;
+      }
+      var more = ctl("pMore", ICONS.more, "Options for this shopping list");
+      more.addEventListener("click", function(e){ e.stopPropagation(); openObjectMenu(n, more); });
+      ctl("pHandle", "", "Drag to resize", function(e){ startPaperResize(e, n); });
+      var title = b.title; title.contentEditable = "true"; title.spellcheck = true; title.setAttribute("data-ph", "Shopping list");
+      title.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      var tBefore = null;
+      title.addEventListener("focus", function(){ endEditing(); tBefore = captureState([n.id]); if(!selected.has(n.id)) setSelection([n.id]); });
+      title.addEventListener("input", function(){ var t = title.textContent.replace(/[\r\n]+/g, " ").slice(0, Stick.shopping.LIMITS.title); if(title.textContent !== t) title.textContent = t; n.title = t.replace(/\s+/g, " ").trim(); saveNotesTyping(); });
+      title.addEventListener("paste", function(e){ e.preventDefault(); var tx = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, tx.replace(/\s+/g, " ")); });
+      title.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); title.blur(); } else e.stopPropagation(); });
+      title.addEventListener("blur", function(){ if(tBefore){ var bb = tBefore; tBefore = null; n.title = Stick.shopping.normalize({type: "shopping", title: n.title}, {}).title; saveNotes(); recordChange("Name list", bb); } });
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(e.target.closest && e.target.closest("button, input, a, .shText, .shTitle, .shExtra")) return;
+        e.preventDefault(); endEditing(); closeCaptureMenu();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);
+      });
+      el.addEventListener("keydown", function(e){
+        if(e.target !== el) return;
+        if(e.key === "Enter"){ e.preventDefault(); var a = el.querySelector(".shAddIn"); if(a) a.focus(); }
+        else if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
+        else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteNotes([n.id]); }
+      });
+      el.addEventListener("focus", function(){ if(!selected.has(n.id)) setSelection([n.id]); });
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once: true});
+    }
+    return el;
+  }
+  function buildStaticShopping(item){ var b = buildShoppingEl(item, {static: true}); b.el.style.position = "relative"; var tmp = {el: b.el, items: item.items, fields: item.fields, cur: item.cur, title: item.title, type: "shopping"}; repaintShopping(tmp); return b.el; }
+
+  // ---- the ... menu: Details, currency, done, and the usual
+  function shoppingMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu");
+    if(!pop) return;
+    var S = Stick.shopping;
+    pop.appendChild(menuItem(ICONS.pencil, "Rename list", function(){ closeFloatingPopovers(); var t = n.el && n.el.querySelector(".shTitle"); if(t){ t.focus(); var rg = document.createRange(); rg.selectNodeContents(t); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } }));
+    var dh = makeDiv("menuHint"); dh.textContent = "Details"; pop.appendChild(dh);
+    S.FIELDS.forEach(function(f){
+      var on = shopHas(n, f);
+      pop.appendChild(menuItem(on ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', S.FIELD_LABEL[f], function(){
+        closeFloatingPopovers();
+        var next = (n.fields || []).filter(function(x){ return x !== f; }); if(!on) next = S.FIELDS.filter(function(x){ return next.indexOf(x) !== -1 || x === f; });
+        if(on) n._openItem = null;
+        shopSet(n, (on ? "Hide " : "Show ") + S.FIELD_LABEL[f].toLowerCase(), {fields: next});
+      }, {cls: on ? "on" : "", title: on ? "Switch this detail off for the whole list (values are kept)" : "Let items in this list have this detail"}));
+    });
+    if(shopHas(n, "price")){
+      var curItem = menuItem(ICONS.move, "Currency: " + n.cur, function(){
+        var open = curItem.nextSibling && curItem.nextSibling.classList && curItem.nextSibling.classList.contains("shCurPick");
+        if(open){ curItem.nextSibling.remove(); return; }
+        var box = makeDiv("shCurPick");
+        S.CURRENCIES.forEach(function(c){
+          var b = document.createElement("button"); b.type = "button"; b.className = "menuItem" + (c[0] === n.cur ? " on" : ""); b.textContent = c[1] + " " + c[0] + " · " + c[2];
+          b.addEventListener("click", function(){ closeFloatingPopovers(); if(c[0] !== n.cur) shopSet(n, "Change currency", {cur: c[0]}); });
+          box.appendChild(b);
+        });
+        curItem.parentNode.insertBefore(box, curItem.nextSibling);
+      }, {kbd: "›", title: "Only this list changes; nothing is converted"});
+      pop.appendChild(curItem);
+    }
+    var bought = S.boughtCount(n.items);
+    pop.appendChild(makeDiv("menuSep"));
+    if(bought) pop.appendChild(menuItem(ICONS.trash, "Clear " + bought + " bought item" + (bought === 1 ? "" : "s"), function(){ closeFloatingPopovers(); shopClearBought(n); }));
+    pop.appendChild(menuItem(ICONS.tick, "Mark list done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "The whole shopping errand is finished. Ticks inside the list are kept."}));
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(pinMenuItem(n));
+    pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
+    var moveItem = menuItem(ICONS.move, "Move to board", function(){
+      var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
+      if(open){ moveItem.nextSibling.remove(); return; }
+      moveItem.parentNode.insertBefore(boardPicker(document.createDocumentFragment(), [n.id]), moveItem.nextSibling);
+    }, {kbd: "›"});
+    pop.appendChild(moveItem);
+    pop.appendChild(menuItem(ICONS.share, "Share list…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
+  }
+  OBJECT_MENUS.shopping = shoppingMenu;
+
+  // ---- creating one: a tiny choice of starting points (Blank first), then the list opens ready for its first item
+  function createShopping(bx, by, presetKey, clientAt){
+    var S = Stick.shopping;
+    function make(key){
+      var p = S.PRESETS[key] || S.PRESETS.blank, vc = viewCenter();
+      var x = bx != null ? bx : vc.x, y = by != null ? by : Math.min(vc.y, 240);
+      var n = newPaper("shopping", x, y, {fields: p.fields.slice(), title: p.title, createdFromPreset: key, cur: S.defaultCurrency(shopLocale(), shopTz()), items: []});
+      insertNotes([n], "Add shopping list"); recoverVertical([n]); dismissHint();
+      setTimeout(function(){ var a = n.el && n.el.querySelector(".shAddIn"); if(a) a.focus(); }, 80);
+      return n;
+    }
+    if(presetKey){ return make(presetKey); }
+    closeFloatingPopovers(); closeCaptureMenu();
+    var at = clientAt || (function(){ var br = boardInner.getBoundingClientRect(), vc = viewCenter(); return {x: br.left + (bx != null ? bx : vc.x) * boardZoom, y: br.top + (by != null ? by : 160) * boardZoom}; })();
+    var pop = openFloatingPopover(pointAnchor(at.x, at.y), "noteMenu"); if(!pop) return null;
+    var h = makeDiv("menuHint"); h.textContent = "Start with"; pop.appendChild(h);
+    ["blank", "groceries", "trip"].forEach(function(k){
+      var b = menuItem(ICONS.cart, S.PRESETS[k].label, function(){ closeFloatingPopovers(); make(k); }, {title: k === "blank" ? "No extra details" : "Switches on a few details; you can change them any time"});
+      pop.appendChild(b);
+    });
+    menuNav(pop); placeAtPointer(pop, at.x, at.y);
+    var first = pop.querySelector("button"); if(first) first.focus();
+    return null;
+  }
 
   // ---- creating one
   function newPaper(kind, bx, by, extra){
@@ -4318,6 +4709,7 @@
     {id: "sticky", group: "Add", label: "Note", icon: ICONS.sticky, touch: "main"},
     {id: "photo", group: "Add", label: "Photo", icon: ICONS.camera, touch: "main"},
     {id: "cutout", group: "Add", label: "Cutout Photo", icon: ICONS.scissors, touch: "more", ready: function(){ return !!(window.Stick && Stick.cutout && Stick.cutout.available()); }},
+    {id: "shopping", group: "Add", label: "Shopping List", icon: ICONS.cart, touch: "more", run: function(bx, by){ createShopping(bx, by); }},
     {id: "receipt", group: "Add", label: "Receipt", icon: ICONS.receipt, touch: "more", run: function(bx, by){ createPaper("receipt", bx, by); }},
     {id: "ticket", group: "Add", label: "Ticket", icon: ICONS.ticket, touch: "more", run: function(bx, by){ createPaper("ticket", bx, by); }},
     {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
@@ -5784,7 +6176,7 @@
   function whoAmI(){ return (CLOUD && settings.account && settings.account.name) || ""; }       // only signed-in people are named (guests are not)
   // Mark done: the note shrinks and slides to the pile. Undo brings it back exactly where it was.
   function markDone(n){
-    if(readOnly || !n || isDoneItem(n) || n.type) return;
+    if(readOnly || !n || isDoneItem(n) || (n.type && n.type !== "shopping")) return;       // notes and shopping lists can be marked done
     endEditing(); closeFloatingPopovers();
     var snap = snapNote(n), el = n.el, id = n.id;
     snap.doneAt = Date.now(); var by = whoAmI(); if(by) snap.doneBy = String(by).slice(0, 60);
@@ -5816,7 +6208,7 @@
   // (photos, recordings and other objects stay on the board).
   function markDoneGroup(ids){
     if(readOnly) return;
-    var list = ids.map(findNote).filter(function(n){ return n && !n.type && !isDoneItem(n); });
+    var list = ids.map(findNote).filter(function(n){ return n && (!n.type || n.type === "shopping") && !isDoneItem(n); });
     if(!list.length){ toast("Select some notes first. Photos and other objects can’t be marked done."); return; }
     if(list.length === 1){ markDone(list[0]); return; }
     endEditing(); closeFloatingPopovers();
@@ -6516,6 +6908,7 @@
     notes.forEach(function(n){
       if(!n.el) return;
       if(!q || isZone(n)){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
+      if(isPaper(n) && !n.textEl){ var pHit = Stick.objects.text(n).toLowerCase().indexOf(q) !== -1; n.el.style.opacity = pHit ? "1" : "0.15"; n.el.style.pointerEvents = pHit ? "" : "none"; return; }
       var searchable = n.textEl || n.captionEl;
       if(!searchable){ n.el.style.opacity = "0.15"; n.el.style.pointerEvents = "none"; return; }
       var idx = textIndex(searchable);
@@ -9610,6 +10003,7 @@
       var ids = editing ? [editing.id] : selIds();
       if(!ids.length) return; if(editing) ae.blur(); duplicateNotes(ids);
     }});
+  defineAction({id: "newShopping", label: "Add a shopping list", group: "Create", keywords: "buy groceries cart trip list purchase", def: "", edit: true, run: function(){ createShopping(); }});
   defineAction({id: "newZone", label: "Add a zone", group: "Create", keywords: "area region section paper background label", def: "", edit: true, run: function(){ createZone(); }});
   defineAction({id: "pin", label: "Pin or unpin selection", group: "Selection", keywords: "lock fix place stay anchor", def: "P", edit: true,
     when: function(){ return selIds().length > 0; },

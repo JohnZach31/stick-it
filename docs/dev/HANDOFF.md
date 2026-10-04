@@ -19,7 +19,7 @@
 
 ## What is actually validated
 Local (stand-in backend, real SQL under PGlite, in-app browser):
-- All suites pass: SQL/RLS 391 (with mutation check: all caught), billing/guards 228, client 142, fake backend 41, functions 89, cutout 26, objects 24, collab 18, v0.8.1 guards 49, v0.8.2 DOM and key rules 38, v0.8.2 guards 36, share errors 30. Run `cd supabase/tests && npm run test:all`.
+- All suites pass: SQL/RLS 391 (with mutation check: all caught), billing/guards 228, client 142, fake backend 41, functions 89, cutout 26, objects 24, collab 18, v0.8.1 guards 49, v0.8.2 DOM and key rules 38, v0.8.2 guards 36, share errors 30, shopping 73. Run `cd supabase/tests && npm run test:all`.
 - Browser-verified: palette, rebinder (reserved/duplicate/Replace, Esc), pin, zones (carry), Clean up (counts, pinned and zone handling, no overlaps, undo), Fit/Rip, spatial history, patch tour (0.8.1 → 0.8.2 card, Show me, Not now, replay, reset), legal reading options and globe, Esc stack, 375 px layout, automated name/label check clean.
 - Memory (local, Chromium, JS heap and DOM counts): notes, zones, palette, Settings, tour, 20 photos, 4 videos, 5 voice memos, delete/undo three times: DOM returns to baseline, heap flat. One leak found and fixed: deleted media kept its object URL (`MediaStore.release`).
 Real project:
@@ -33,6 +33,12 @@ Real project:
 - Physical phone (375/390/430 widths only inspected at 375 in an emulated pane), screen reader.
 - Memory: decoded-image memory, cutout model lifetime and live collaboration were not measured; the browser pane cannot report decoded bitmap memory.
 - Signed-in OAuth cannot be driven by the assistant; the owner signs in.
+
+## Shopping List (phase one shipped, phase two next)
+- Pure rules and tests: `js/shopping.js`, `supabase/tests/shopping.test.mjs`. Registered as an object kind in `js/objects.js` (`shopping`); drawn by `renderShopping` / `repaintShopping` in `js/app.js`; menu `shoppingMenu`; created by `createShopping` (preset popover, Blank first).
+- Data: `{type:"shopping", w, title, fields:[qty|note|price|link|tag], cur, createdFromPreset, items:[{id,t,c,ct,u,q,n,p,l,g}]}`; prices are integer minor units; `ct` is set on tick and cleared on untick; every item has an update stamp `u`.
+- Phase two (not built): item-level live merge by item id for Premium collaboration (newest `u` wins, additions from both sides kept, reorder last-writer-wins, no CRDT). Do not change the generic sync for this phase-one node.
+- Not built yet: drag to reorder, tag filtering.
 
 ## Public share failure report (RESOLVED: CORS)
 Root cause: the owner opened the link from `http://localhost:8124`, but the functions only allowed `localhost:8123`, so the browser blocked the request (shown as Code: network). Fix: `_shared/http.ts` now allows `http://localhost` and `http://127.0.0.1` on any port, plus the origins in `ALLOWED_ORIGINS`; `resolve-share` and `report-share` were redeployed (other functions pick it up at their next deploy). The original report below is kept for the record.

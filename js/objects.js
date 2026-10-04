@@ -8,7 +8,7 @@
   var Stick = root.Stick = root.Stick || {};
   var O = Stick.objects = {};
 
-  O.KINDS = ["receipt", "ticket", "postcard", "photo_strip"];
+  O.KINDS = ["receipt", "ticket", "postcard", "photo_strip", "shopping"];       // "shopping" is a list, its rules live in js/shopping.js
   O.isKind = function (t) { return O.KINDS.indexOf(t) !== -1; };
 
   var VARIANTS = {
@@ -24,9 +24,9 @@
     classic: "Classic", airmail: "Airmail", modern: "Modern",
     vertical: "White strip", film: "Instant film"
   };
-  O.LABELS = { receipt: "receipt", ticket: "ticket", postcard: "postcard", photo_strip: "photo strip" };
+  O.LABELS = { receipt: "receipt", ticket: "ticket", postcard: "postcard", photo_strip: "photo strip", shopping: "shopping list" };
   O.STRIP_MIN = 2; O.STRIP_MAX = 6;
-  O.WIDTH = { receipt: [170, 360, 230], ticket: [190, 480, 330], postcard: [220, 520, 320], photo_strip: [90, 460, 140] };
+  O.WIDTH = { receipt: [170, 360, 230], ticket: [190, 480, 330], postcard: [220, 520, 320], photo_strip: [90, 460, 140], shopping: [230, 420, 290] };
 
   // ---------------------------------------------------------------- text cleaning
   var CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/g;   // control characters and bidi overrides (text spoofing)
@@ -48,6 +48,7 @@
     item = item || {}; h = h || {};
     var t = item.type;
     if (!O.isKind(t)) return null;
+    if (t === "shopping") return Stick.shopping ? Stick.shopping.normalize(item, h) : null;
     var out = { type: t };
     var rng = O.WIDTH[t];
     out.w = Math.round(num(item.w, rng[0], rng[1], rng[2]));
@@ -94,6 +95,7 @@
   // ---------------------------------------------------------------- derived facts
   O.text = function (o) {
     if (!o) return "";
+    if (o.type === "shopping") return Stick.shopping ? Stick.shopping.text(o) : "";
     var parts;
     if (o.type === "receipt") parts = [o.title, o.date, o.body, o.amount];
     else if (o.type === "ticket") parts = [o.title, o.dateTime, o.place, o.details];
@@ -103,6 +105,7 @@
     return parts.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
   };
   O.label = function (o) {
+    if (o && o.type === "shopping") return Stick.shopping ? Stick.shopping.label(o) : "shopping list";
     var l = O.LABELS[o && o.type] || "object", t = o && (o.title || o.location || o.caption);
     return t ? l + ": " + t : l;
   };
@@ -125,6 +128,7 @@
   // rough height for layout code before the element exists (minimap, arrange)
   O.sizeEstimate = function (o) {
     var w = (o && o.w) || O.defaultW(o && o.type), t = o && o.type;
+    if (t === "shopping" && Stick.shopping) return Stick.shopping.sizeEstimate(o);
     if (t === "receipt") { var n = ((o.body || "").split("\n").length || 1); return { w: w, h: Math.round(96 + n * 20 + (o.amount ? 28 : 0) + (o.variant === "torn" ? 14 : 0)) }; }
     if (t === "ticket") return o.orient === "portrait" ? { w: w, h: Math.round(w * 1.55) } : { w: w, h: Math.round(w * 0.46) };
     if (t === "postcard") return { w: w, h: Math.round(w * (o.imgRatio || 0.667)) + 8 };

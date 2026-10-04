@@ -63,7 +63,8 @@ export const patchNotes = [
       "Underline (Ctrl/Cmd+U and a U button), and links now look different from underlined words: coloured, dotted, with a small arrow.",
       "A branded toolbar over highlighted words in a note: Bold, Italic, Underline, Highlight, Link.",
       "Checklist titles: a first line ending in a colon (\"Flight checklist:\") becomes a title with no checkbox, and any line can be switched with the Title line button.",
-      "Pull the bottom or right edge of a note to make it longer or wider; on touch screens a grab bar appears on the selected note."
+      "Pull the bottom or right edge of a note to make it longer or wider; on touch screens a grab bar appears on the selected note.",
+      "Shopping List: one free node for anything you mean to buy (groceries, a toothbrush, Athens souvenirs). A paper receipt strip sits in a small fixed-size cart; ticked items move into 'In the cart' and can be unticked. Quantity, note, price, link and tag are optional per list (all off by default, in the node's ... menu under Details); an item only shows what it has. Start from Blank, Groceries or Trip. Currency is per list (device suggestion, no conversion), prices are whole minor units formatted with Intl, and totals add the prices entered. Ticking items is separate from marking the whole list Done."
     ],
     "improved": [
       "Clean up counts, moves and undoes the same list of notes, leaves pinned notes and notes inside a zone alone, and tidies around them. The button is a broom.",
@@ -95,7 +96,8 @@ export const patchNotes = [
       "Not tested on a physical phone, with a screen reader, or against real Realtime with two accounts.",
       "The memory audit covered notes, zones, photos, video, voice memos, the palette, Settings and the tour; cutouts and live collaboration were not measured.",
       "A report of a shared board link failing in a private window on the live site could not be reproduced; the new error codes should identify the cause if it recurs.",
-      "Collaborate can create and accept invites but cannot yet list or remove members, and the server does not yet require Premium to create an invite (the button is the only gate)."
+      "Collaborate can create and accept invites but cannot yet list or remove members, and the server does not yet require Premium to create an invite (the button is the only gate).",
+      "Shopping List (phase one): single-user behaviour on the existing sync. Live item-by-item merging for Premium collaborators is the next step (items already carry an update stamp for it). Items can't be dragged to reorder yet, and tags don't filter."
     ]
   },
   {
