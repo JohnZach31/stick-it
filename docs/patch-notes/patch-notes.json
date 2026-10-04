@@ -1,0 +1,86 @@
+[
+  {
+    "version": "0.8.1",
+    "codename": "One Place",
+    "title": "Stick-It v0.8.1 — One Place",
+    "date": null,
+    "status": "development",
+    "tldr": "Settings finally stopped living in six different places: account, appearance, sharing, privacy, sounds and shortcuts now share one roof. Notes get a quick done tick and a way to trim empty paper, and the board gets a tidy-up button.",
+    "highlights": [
+      "One settings home for account, appearance, sharing, privacy and data, sounds, shortcuts and legal, with one Save and one Cancel.",
+      "Clean up: tidy what's on your screen or the whole canvas, never delete a thing, and undo it in one step.",
+      "A quick done tick beside the x on every note.",
+      "Fit paper to content, Rip off empty paper, and a quiet corner handle to resize a note.",
+      "Comments hang off the note like a clipped paper slip."
+    ],
+    "added": [
+      "Control Center: one dialog with a left rail (tabs on phones) opened from the avatar, the gear or the keyboard button, each at its own section.",
+      "Sounds section with a sound-effects switch, a volume slider and a soft preview (the sound library itself comes later).",
+      "Searchable Shortcuts cheat-sheet made of small key caps.",
+      "Legal & About section inside the Control Center.",
+      "Clean up button in the top bar with 'Clean my screen' and 'Clean whole canvas', counts before you apply, and one undo.",
+      "Status slip at the foot of the canvas for syncing, loading photos or media, preparing a share and exporting.",
+      "Quick Mark done tick beside the x on notes and checklists.",
+      "Fit paper to content, Rip off empty paper (torn, cut or notebook edge) and Restore full paper in the note menu.",
+      "A subtle corner handle to resize a selected note.",
+      "Comment tab on the object's bottom edge ('Comments · 2') and a compact thread slip that hangs under it.",
+      "Legal pages written on a spiral-notebook page, in English and Hebrew, light and dark."
+    ],
+    "improved": [
+      "Active Shares, comments and the username check use the Stick-It loader instead of plain text.",
+      "Your own comments show your own picture; the crown now sits on the avatar everywhere an avatar is large enough.",
+      "The email-updates row is one short line.",
+      "Account numbers and sign-ins are fetched only when you open a section that shows them.",
+      "The profile avatar and the sharing preview are only redrawn when the picture itself changes."
+    ],
+    "fixed": [
+      "Typing in Bio (or Name) no longer rebuilds the profile picture.",
+      "Pasted text no longer arrives highlighted or a line too low.",
+      "Alphabet Soup no longer carries a strip of washi tape.",
+      "Comment layout: author, time and delete no longer compete with the comment's words."
+    ],
+    "limitations": [
+      "The Control Center was checked against a local stand-in for the account service; it has not been used on the real project yet.",
+      "Other people's pictures do not appear next to their comments (only initials), by design.",
+      "Board switching and first sign-in still use the full-screen loader, because the page reloads.",
+      "The reduced-motion setting was not toggled in a browser and no screen reader was run.",
+      "Finished notes still count toward a board's object limit."
+    ]
+  },
+  {
+    "version": "0.8.0",
+    "codename": "Cut It Out",
+    "title": "Stick-It v0.8.0 — Cut It Out",
+    "date": null,
+    "status": "development",
+    "tldr": "Photos can now be cut out right on your device, you can right-click the board to add things, and the corkboard gains receipts, tickets, postcards, photo strips and a bowl of alphabet soup.",
+    "highlights": [
+      "Real on-device cutouts with a Cutout Maker (Erase, Restore, Refine) and sticker or mounted looks.",
+      "Right-click the board to add things.",
+      "Receipts, tickets, postcards and photo strips.",
+      "Alphabet Soup, a Premium cosmetic.",
+      "A Done pile for finished notes.",
+      "Quiet collaboration: presence, comments and review states."
+    ],
+    "added": [
+      "On-device cutout engine and the Cutout Maker.",
+      "Receipt, Ticket, Postcard and Photo Strip objects.",
+      "Alphabet Soup (Premium, enforced by the server).",
+      "Right-click insertion menu and object menus.",
+      "Done pile, Focus Mode formatting strip, inline video, audio progress and resizing, draggable minimap."
+    ],
+    "improved": [
+      "Boards with many photos use far less memory.",
+      "While one object is selected the rest of the board stays still."
+    ],
+    "fixed": [
+      "A duplicated cutout now draws as soon as its copy exists.",
+      "Dragging a note no longer rebuilds the minimap on every move."
+    ],
+    "limitations": [
+      "Cluttered scenes do not cut out cleanly.",
+      "Realtime presence has not been exercised against a real project yet.",
+      "Touch editing in the Cutout Maker has not been tried on a physical phone."
+    ]
+  }
+]

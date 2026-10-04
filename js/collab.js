@@ -323,7 +323,12 @@
       if (acts.childNodes.length) rvBox.appendChild(acts);
     }
     function paintList() {
+      var loadT = setTimeout(function () {                       // only if it is slow: a quick load never shows a loader
+        if (list.firstChild) return;
+        var ld = el("p", "cmtLoading"); ld.innerHTML = (Stick.ui && Stick.ui.miniLoader ? Stick.ui.miniLoader() : "") + "<span>Loading comments…</span>"; list.appendChild(ld);
+      }, 200);
       C.listComments(n.id).then(function (rows) {
+        clearTimeout(loadT);
         list.innerHTML = "";
         cnt.textContent = rows.length ? String(rows.length) : "";
         if (!rows.length) list.appendChild(el("p", "cmtEmpty", "Nothing here yet. Add the first note about this."));
@@ -343,7 +348,7 @@
           list.appendChild(item);
         });
         list.scrollTop = list.scrollHeight;
-      }, function (e) { list.textContent = ""; msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
+      }, function (e) { clearTimeout(loadT); list.textContent = ""; msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
     }
     function post() {
       var v = input.value.trim(); if (!v) return;

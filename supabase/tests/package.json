@@ -9,11 +9,12 @@
     "test:functions": "node --experimental-strip-types functions.test.mjs",
     "test:protocol": "node --experimental-strip-types fake-supabase.test.mjs",
     "test:client": "node --experimental-strip-types client.test.mjs",
-    "test:all": "node run-tests.mjs && node mutation-check.mjs && node --experimental-strip-types functions.test.mjs && node --experimental-strip-types fake-supabase.test.mjs && node --experimental-strip-types client.test.mjs && node billing.test.mjs && node cutout.test.mjs",
+    "test:all": "node run-tests.mjs && node mutation-check.mjs && node --experimental-strip-types functions.test.mjs && node --experimental-strip-types fake-supabase.test.mjs && node --experimental-strip-types client.test.mjs && node billing.test.mjs && node cutout.test.mjs && node objects.test.mjs && node collab.test.mjs && node v081.test.mjs",
     "fake-supabase": "node --experimental-strip-types fake-supabase/server.mjs",
     "test:billing": "node billing.test.mjs",
     "test:cutout": "node cutout.test.mjs",
-    "test:objects": "node objects.test.mjs && node collab.test.mjs"
+    "test:objects": "node objects.test.mjs && node collab.test.mjs",
+    "test:v081": "node v081.test.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.0",

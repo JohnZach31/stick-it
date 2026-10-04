@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.1",
+    "codename": "One Place",
+    "title": "Stick-It v0.8.1 — One Place",
+    "date": null,
+    "status": "development",
+    "tldr": "Settings finally stopped living in six different places: account, appearance, sharing, privacy, sounds and shortcuts now share one roof. Notes get a quick done tick and a way to trim empty paper, and the board gets a tidy-up button.",
+    "file": "0.8.1.md"
+  },
+  {
     "version": "0.8.0",
     "codename": "Cut It Out",
     "title": "Stick-It v0.8.0 — Cut It Out",

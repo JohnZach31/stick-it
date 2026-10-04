@@ -6190,6 +6190,7 @@
     setTimeout(function(){ var t = cc.tabs[cc.active]; if(t && acctBackdrop === backdrop && !card.contains(document.activeElement)) t.focus(); }, 60);
     return cc;
   }
+  Stick.hooks = Stick.hooks || {}; Stick.hooks.openSettings = function(section){ return openControlCenter(section); };       // any part of the app can open the Control Center at a section
   function legalPointer(){
     var b = document.createElement("button"); b.type = "button"; b.className = "asAction ccPointer";
     b.innerHTML = '<span class="lbl">Privacy Policy, Terms and notices<small>What Stick-It collects, why, and your choices.</small></span><span class="go" aria-hidden="true">›</span>';
@@ -6810,6 +6811,7 @@
   async function exportAllCloud(lblEl){
     var btn = lblEl.closest("button"), label = lblEl.firstChild.textContent;
     btn.disabled = true; lblEl.firstChild.textContent = "Preparing\u2026";
+    busyStart("export", "Preparing your export\u2026", {delay: 300});
     try{
       if(cloudSync){ try{ await cloudSync.flush(); }catch(e){} }
       var boards = await Stick.repo.listBoards();
@@ -6861,6 +6863,7 @@
     }catch(e){
       toast("Couldn't export: " + Stick.errors.friendly(Stick.errors.parse(e)));
     }
+    busyEnd("export");
     btn.disabled = false; lblEl.firstChild.textContent = label;
   }
 
@@ -7466,6 +7469,7 @@
       fail: function(t){ stickLoaderFail(t || "Couldn’t load this board.", function(){}); },
       hide: hideCloudOverlay
     };
+    Stick.hooks.openSettings = function(section){ openControlCenter(section); };
     Stick.hooks.showAgeFlow = function(){ if(!settings.account){ openAccountModal(); renderAccountModal("age"); } };
     var devSec = document.createElement("section");
     devSec.className = "setSec";
@@ -9442,7 +9446,11 @@
       me: {uid: user.id || "", name: (settings.account && settings.account.name) || getDisplayName()},
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
-        openPopover: function(anchor){ closeFloatingPopovers(); var pop = openFloatingPopoverAt(anchor.getBoundingClientRect(), "cmtPop", anchor); return pop; },
+        openPopover: function(anchor){
+          closeFloatingPopovers(); var r = anchor.getBoundingClientRect(), pop = openFloatingPopoverAt(r, "cmtPop", anchor), below = window.innerHeight - r.bottom;
+          if(below >= 250){ pop.style.bottom = "auto"; pop.style.top = (r.bottom + 6) + "px"; pop.style.maxHeight = Math.max(160, below - 16) + "px"; }     // the slip hangs under its tab, not over the object
+          return pop;
+        },
         modal: function(o){ return openModal(o); },
         // your own comments show your own picture; other people show their initial (their pictures are not shared with the board)
         paintAvatar: function(elm, uid){ var me = Stick.auth.user(); if(me && uid === me.id && settings.account){ paintAvatar(elm, accountAvatarSpec()); return true; } return false; }

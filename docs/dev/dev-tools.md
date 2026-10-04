@@ -20,6 +20,8 @@ Point a local page at it: `localStorage.setItem('stickit.dev.config', JSON.strin
 | `presenceDemo(true)` / `startPresence('Ana')` | two tabs of one browser stand in for two people (BroadcastChannel transport) |
 | `loader.show/done/fail/hide` | look at the Stick-It loader states |
 | `ui.stripNeedsMore(n)`, `ui.stripPicker()`, `ui.doneTray()`, `ui.askReason()` | open the new dialogs without setting up a board for each |
+| `ui.controlCenter(section)`, `ui.cleanUp()`, `ui.activeShares()` | open the Control Center at a section (`account`, `appearance`, `sharing`, `privacy`, `sounds`, `shortcuts`, `legal`), the Clean up dialog, or Active Shares |
+| `ui.foot.start(text, delay)`, `.done(text)`, `.fail(text)`, `.end()` | look at the status slip at the foot of the canvas |
 
 ## Tests
 ```
@@ -50,3 +52,10 @@ Before/after numbers are in `docs/patch-notes/0.8.0-audit.md`.
 
 ## Experimental finer cutout model
 Not shipped (see `docs/cutout/provider-evaluation.md`). To try it locally, put a model at `assets/models/silueta.onnx` (it is git-ignored) and set `localStorage.setItem('stickit.dev.config', JSON.stringify({FINER_MODEL: true}))` on localhost.
+
+## Patch notes data
+`docs/patch-notes/patch-notes.json` is the single structured source (highlights, added, improved, fixed, limitations per version). After editing it or `index.json`, run:
+```
+node tools/build-patch-data.mjs     # checks index.json against it and writes docs/patch-notes/patch-notes.js
+```
+The perf fixture also takes a multiplier: `await window.__perfFixture.build(5)` repeats the non-picture objects five times (offscreen cost checks).
