@@ -750,7 +750,7 @@
     el.style.width = newW + "px"; el.style.minHeight = "0px";
     var natural = el.offsetHeight, newH = Math.max(PAPER_MIN_H, Math.ceil(natural + 10));
     el.style.width = prevW; el.style.minHeight = prevMin;
-    if(oldH - newH < 18 && oldW - newW < 12){ toast(mode === "rip" ? "There\\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
+    if(oldH - newH < 18 && oldW - newW < 12){ toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
     var ripChip = null;
     if(mode === "rip"){
       n.rip = n.rip || ripStyleFor(n);
@@ -7204,7 +7204,7 @@
       return "presence on";
     };
     Stick.dev.ui = {                // local only: open the new dialogs without setting up a board for each (used in the polish pass tests)
-      stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
+      cleanUp: function(){ openCleanUp(); }, stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
       askReason: function(){ return Stick.collab.askReason({modal: openModal}, null, function(){}); }
     };
     Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
@@ -7443,6 +7443,120 @@
     check();
     setTimeout(function(){ area.focus(); }, 0);
   });
+
+  // ---------- Clean up: straighten the desk (never deletes anything) ----------
+  // Objects keep their reading order (top to bottom in bands, left to right inside a band) and are set down again in loose rows with
+  // room between them, so nothing overlaps and nothing sits under the header. Sizes and tilt are kept: it should look like a tidied
+  // desk, not a diagram. One undo step brings every object back.
+  var CLEAN_MARGIN = 20, CLEAN_BAND = 140;
+  function cleanRegion(){
+    var br = board.getBoundingClientRect(), ir = boardInner.getBoundingClientRect(), x0 = (br.left - ir.left) / boardZoom;
+    return {x0: x0, x1: x0 + board.clientWidth / boardZoom, y0: 0, y1: boardHeight()};
+  }
+  function cleanItem(n){
+    var sz = objSize(n), w = sz.w, h = sz.h, a = Math.abs((n.rot || 0) * Math.PI / 180);
+    return {n: n, w: w, h: h, bw: w * Math.cos(a) + h * Math.sin(a), bh: w * Math.sin(a) + h * Math.cos(a)};
+  }
+  function cleanVisible(items){
+    var r = cleanRegion();
+    return items.filter(function(it){ return it.n.x < r.x1 && it.n.x + it.w > r.x0 && it.n.y < r.y1 && it.n.y + it.h > r.y0; });
+  }
+  function cleanOrder(items){
+    var sorted = items.slice().sort(function(a, b){ return a.n.y - b.n.y; }), bands = [];
+    sorted.forEach(function(it){
+      var b = bands[bands.length - 1];
+      if(b && it.n.y - b.y0 <= CLEAN_BAND) b.items.push(it); else bands.push({y0: it.n.y, items: [it]});
+    });
+    var out = [];
+    bands.forEach(function(b){ b.items.sort(function(p, q){ return p.n.x - q.n.x; }); out = out.concat(b.items); });
+    return out;
+  }
+  // set the items down in rows inside one page; what does not fit comes back as `rest`
+  function cleanPack(items, page, gap){
+    var rows = [], row = null, x = page.x0, y = page.y0, rest = [];
+    items.forEach(function(it){
+      if(rest.length){ rest.push(it); return; }
+      if(row && x > page.x0 && x + it.bw > page.x1){ y += row.h + gap; x = page.x0; row = null; }
+      if(y + it.bh > page.y1 && (rows.length || row)){ rest.push(it); return; }
+      if(!row){ row = {y: y, h: 0, items: []}; rows.push(row); }
+      row.items.push({it: it, x: x}); row.h = Math.max(row.h, it.bh); x += it.bw + gap;
+    });
+    var placed = [];
+    rows.forEach(function(r, ri){
+      r.items.forEach(function(p, pi){
+        var drop = (r.h - p.it.bh) * (0.3 + ((pi + ri) % 3) * 0.1);            // a little vertical give, so the rows are not ruler-straight
+        placed.push({it: p.it, cx: p.x + p.it.bw / 2, cy: r.y + drop + p.it.bh / 2});
+      });
+    });
+    return {placed: placed, rest: rest};
+  }
+  function cleanPlan(scope){
+    var all = notes.map(cleanItem), items = scope === "screen" ? cleanVisible(all) : all;
+    if(!items.length) return {items: [], placed: []};
+    var order = cleanOrder(items), r = cleanRegion(), pageW = Math.max(480, r.x1 - r.x0 - 2 * CLEAN_MARGIN), pageH = Math.max(200, r.y1 - 2 * CLEAN_MARGIN);
+    var x0 = scope === "screen" ? r.x0 + CLEAN_MARGIN : CLEAN_MARGIN, placed = [], rest = order, pageNo = 0;
+    while(rest.length && pageNo < 60){
+      var page = {x0: x0 + pageNo * (pageW + 60), x1: x0 + pageNo * (pageW + 60) + pageW, y0: CLEAN_MARGIN, y1: CLEAN_MARGIN + pageH};
+      var res = cleanPack(rest, page, 26);
+      if(!res.placed.length){ res.placed = [{it: rest[0], cx: page.x0 + rest[0].bw / 2, cy: page.y0 + rest[0].bh / 2}]; res.rest = rest.slice(1); }
+      placed = placed.concat(res.placed); rest = res.rest; pageNo++;
+    }
+    return {items: items, placed: placed, pages: pageNo};
+  }
+  function applyClean(scope){
+    var plan = cleanPlan(scope);
+    if(!plan.placed.length) return 0;
+    var ids = plan.placed.map(function(p){ return p.it.n.id; }), before = captureState(ids), moved = 0;
+    plan.placed.forEach(function(p){
+      var n = p.it.n, nx = Math.max(0, Math.round(p.cx - p.it.w / 2)), ny = Math.max(8, Math.round(p.cy - p.it.h / 2));
+      if(nx !== Math.round(n.x) || ny !== Math.round(n.y)) moved++;
+      n.x = nx; n.y = ny;
+      if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; }
+    });
+    var anim = !(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if(anim){ document.body.classList.add("tidying"); setTimeout(function(){ document.body.classList.remove("tidying"); }, 800); }
+    ensureWidth(); saveNotes(); updateMinimap(); recoverVertical(plan.placed.map(function(p){ return p.it.n; }));
+    recordChange(scope === "screen" ? "Clean up (my screen)" : "Clean up (whole canvas)", before);
+    return moved;
+  }
+  function openCleanUp(){
+    if(readOnly || singleNoteMode) return;
+    closeFloatingPopovers(); endEditing();
+    var all = notes.map(cleanItem), vis = cleanVisible(all).length, total = all.length;
+    if(!total){ toast("The board is empty, so there is nothing to tidy."); return; }
+    var scope = vis ? "screen" : "board", content = makeDiv("cleanBox"), group = makeDiv("cleanOpts"), summary = makeDiv("cleanSum"), go = null;
+    group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "What to tidy"); summary.setAttribute("role", "status");
+    function plural(k){ return k + (k === 1 ? " item" : " items"); }
+    function opt(id, title, desc, count, icon, disabled){
+      var b = document.createElement("button"); b.type = "button"; b.className = "cleanOpt"; b.setAttribute("role", "radio"); b.dataset.scope = id; b.disabled = !!disabled;
+      b.innerHTML = '<span class="cleanIc" aria-hidden="true">' + icon + '</span><span class="cleanTx"><b></b><span class="cleanDesc"></span><span class="cleanCount"></span></span>';
+      b.querySelector("b").textContent = title; b.querySelector(".cleanDesc").textContent = desc; b.querySelector(".cleanCount").textContent = count;
+      b.addEventListener("click", function(){ if(b.disabled) return; scope = id; paint(); });
+      group.appendChild(b); return b;
+    }
+    opt("screen", "Clean my screen", "Tidy only what you\u2019re looking at right now.", vis ? plural(vis) + " on screen" : "Nothing on screen right now", ICONS.fit, !vis);
+    opt("board", "Clean whole canvas", "Tidy every item on this board, including what\u2019s off to the side.", plural(total) + " on the board", ICONS.rip.replace(/<path[^>]*d="M4 15[^>]*>/, ""), false);
+    function paint(){
+      Array.prototype.forEach.call(group.children, function(b){ var on = b.dataset.scope === scope; b.setAttribute("aria-checked", String(on)); b.classList.toggle("on", on); b.tabIndex = on ? 0 : -1; });
+      summary.textContent = scope === "screen" ? "Tidy " + plural(vis) + " on your screen" : "Tidy " + plural(total) + " across the board";
+      if(go) go.disabled = scope === "screen" && !vis;
+    }
+    group.addEventListener("keydown", function(e){
+      if(e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft"){
+        e.preventDefault(); var ids = ["screen", "board"].filter(function(id){ return !(id === "screen" && !vis); }), i = ids.indexOf(scope);
+        scope = ids[(i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length]; paint();
+        var cur = group.querySelector('[data-scope="' + scope + '"]'); if(cur) cur.focus();
+      }
+    });
+    var note = makeDiv("cleanNote"); note.textContent = "Nothing is deleted. Your items keep their size and tilt, and you can undo it right after.";
+    content.appendChild(group); content.appendChild(summary); content.appendChild(note);
+    var m = openModal({title: "Clean up canvas", sub: "Put things back in order, like straightening up a desk.", content: content, width: 440,
+      actions: [{label: "Cancel", value: false}, {label: "Tidy up", kind: "primary", value: true, id: "cleanGo"}],
+      onClose: function(v){ if(v) setTimeout(function(){ var moved = applyClean(scope); toast(moved ? "Tidied up." : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }});
+    go = m.card.querySelector("#cleanGo"); paint();
+    setTimeout(function(){ var cur = group.querySelector(".cleanOpt.on"); if(cur) cur.focus(); }, 60);
+  }
+  (function(){ var b = document.getElementById("cleanBtn"); if(b) b.addEventListener("click", openCleanUp); })();
 
   // ---------- minimap ----------
   // The strip mirrors every object's position. Rebuilt at most once per frame, reusing its little pills (a note drag used to rebuild the
@@ -9043,7 +9157,9 @@
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
         openPopover: function(anchor){ closeFloatingPopovers(); var pop = openFloatingPopoverAt(anchor.getBoundingClientRect(), "cmtPop", anchor); return pop; },
-        modal: function(o){ return openModal(o); }
+        modal: function(o){ return openModal(o); },
+        // your own comments show your own picture; other people show their initial (their pictures are not shared with the board)
+        paintAvatar: function(elm, uid){ var me = Stick.auth.user(); if(me && uid === me.id && settings.account){ paintAvatar(elm, accountAvatarSpec()); return true; } return false; }
       }
     });
     document.getElementById("presenceBar").setAttribute("aria-label", "People on this board");

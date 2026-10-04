@@ -253,8 +253,10 @@
       var rvText = sm.review ? (sm.review.state === "changes_requested" ? ", changes requested" : ", ready for review") : "";
       tab.setAttribute("aria-label", label + " on this object" + rvText);
       tab.title = label + rvText;
-      var glyph = el("span", "cmtGlyph", sm.review ? (sm.review.state === "changes_requested" ? "!" : "✓") : (sm.count ? String(sm.count) : "+"));
-      glyph.setAttribute("aria-hidden", "true"); tab.appendChild(glyph);
+      // a little paper tab hanging off the bottom edge of the object: "Comments · 2" (with a mark when a review is open)
+      var mark = sm.review ? (sm.review.state === "changes_requested" ? "! " : "✓ ") : "";
+      var glyph = el("span", "cmtGlyph", mark + (sm.count ? "Comments \u00b7 " + sm.count : "Comment"));
+      tab.appendChild(glyph);
       tab.addEventListener("pointerdown", function (e) { e.stopPropagation(); });
       tab.addEventListener("mousedown", function (e) { e.preventDefault(); });
       tab.addEventListener("click", function (e) { e.stopPropagation(); C.openSlip(n, tab); });
@@ -284,6 +286,7 @@
     var slip = host.openPopover(anchor);
     if (!slip) return;
     slip.classList.add("cmtSlip");
+    try { var host0 = anchor && anchor.parentElement, w0 = host0 ? host0.getBoundingClientRect().width : 0; slip.style.width = Math.round(Math.max(244, Math.min(320, w0 || 280))) + "px"; } catch (e) {}
     slip.setAttribute("role", "dialog"); slip.setAttribute("aria-label", "Comments on this object");
     var clip = el("span", "cmtClip"); clip.setAttribute("aria-hidden", "true"); slip.appendChild(clip);       // a little clip holds the slip to the object
     var title = el("div", "cmtHead"); title.appendChild(el("span", "", "Comments")); var cnt = el("span", "cmtCount"); title.appendChild(cnt); slip.appendChild(title);
@@ -325,14 +328,18 @@
         cnt.textContent = rows.length ? String(rows.length) : "";
         if (!rows.length) list.appendChild(el("p", "cmtEmpty", "Nothing here yet. Add the first note about this."));
         rows.forEach(function (r) {
-          var item = el("div", "cmtItem"), top = el("div", "cmtTop"), av = el("span", "cmtAv", core.initial(r.author || "Someone")), who = el("b", "", r.author || "Someone"), when = el("span", "cmtWhen", fmtWhen(r.created_at)), body = el("p", "cmtBody", r.body);
+          var item = el("article", "cmtItem"), top = el("div", "cmtTop"), av = el("span", "cmtAv", core.initial(r.author || "Someone")), who = el("b", "cmtWho", r.author || "Someone"), when = el("time", "cmtWhen", fmtWhen(r.created_at)), body = el("p", "cmtBody", r.body);
           av.style.setProperty("--h", core.hue(r.author_id || r.author || "x")); av.setAttribute("aria-hidden", "true");
-          top.appendChild(av); top.appendChild(who); top.appendChild(when); item.appendChild(top); item.appendChild(body);
+          if (r.created_at) when.setAttribute("datetime", r.created_at);
+          if (host.paintAvatar && r.author_id) { var pic = el("span", "acctAv cmtAv cmtPhoto"); pic.setAttribute("aria-hidden", "true"); if (host.paintAvatar(pic, r.author_id, r.author)) av = pic; }
+          // author and time on one line, the words under them; the delete is a quiet icon at the end of the first line
+          top.appendChild(av); top.appendChild(who); top.appendChild(when);
           if (r.author_id === S.opts.me.uid || isOwner) {
-            var del = el("button", "cmtDel", "Delete"); del.type = "button"; del.setAttribute("aria-label", "Delete this comment");
+            var del = el("button", "cmtDel"); del.type = "button"; del.setAttribute("aria-label", "Delete this comment"); del.title = "Delete this comment"; del.innerHTML = "&times;";
             del.addEventListener("click", function () { C.deleteComment(r.id).then(paintList, function (e) { msg.textContent = Stick.errors.friendly(Stick.errors.parse(e)); }); });
-            item.appendChild(del);
+            top.appendChild(del);
           }
+          item.appendChild(top); item.appendChild(body);
           list.appendChild(item);
         });
         list.scrollTop = list.scrollHeight;
