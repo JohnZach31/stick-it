@@ -59,3 +59,15 @@ Not shipped (see `docs/cutout/provider-evaluation.md`). To try it locally, put a
 node tools/build-patch-data.mjs     # checks index.json against it and writes docs/patch-notes/patch-notes.js
 ```
 The perf fixture also takes a multiplier: `await window.__perfFixture.build(5)` repeats the non-picture objects five times (offscreen cost checks).
+
+## Patch tour / What's New (local only)
+The update card and tour read `Stick.patchData` (generated into `js/patch-data.js` by `node tools/build-patch-data.mjs` from `docs/patch-notes/patch-notes.json`; `tourMode` is `full`, `summary` or `none`). On localhost:
+```js
+Stick.dev.patchTour.reset();    // forget "seen" on this device, then reload to get the update card again
+Stick.dev.patchTour.replay();   // run the tour now
+Stick.dev.patchTour.offer();    // show the update card now
+```
+Nothing like this exists on any other hostname. Signed in, "seen" is also stored in the account's `ui_prefs` (private, 8 kB cap).
+
+## Command palette and shortcuts
+`Stick.palette.open()`, `.close()`, `.actions()` list what the palette would show. Custom shortcuts are saved in the device settings (`shortcuts`) and, when signed in, in `profile_settings.ui_prefs.shortcuts`. Apply `supabase/migrations/20261003100000_ui_prefs.sql` before testing the account sync.

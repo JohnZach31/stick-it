@@ -48,10 +48,42 @@ export const patchNotes = [
       "Comments can be deleted by their author or the board owner, enforced by the database, not just the screen.",
       "Fit paper and Rip really measure the words, not the trailing blank lines."
     ],
-    "added": [],
-    "improved": [],
-    "fixed": [],
-    "limitations": []
+    "added": [
+      "Pin in place: a pinned note, photo or scrap can't be dragged, nudged or tidied away. It stays selectable, editable and unpinnable.",
+      "Board zones: a named patch of paper (paper, kraft, cardboard, grid or felt, in a colour you choose) behind your notes, with an optional 'Move with its notes'.",
+      "Command palette (Ctrl/Cmd+K): every action by name, built from one list that also drives the shortcuts.",
+      "Bookmarks: save the spot you are looking at (B), find it in the palette, rename or delete it.",
+      "Back and Forward through the places you have looked at on a board (Alt+[ and Alt+]).",
+      "Customisable keyboard shortcuts: Change, Reset one, Reset all, with plain warnings for keys the browser, the system or text editing already use. Signed in, they follow your account.",
+      "What's New: a one-time update card (Show me, Not now, View patch notes), a short tour with real targets, and a What's New entry in Legal & About.",
+      "Legal pages: reading options (text size, high contrast, reduce motion, beige or dark) and a globe Language chooser that lists only complete languages.",
+      "Delete a comment: its author can delete their own, the board owner can delete any, and the database enforces it (new migration)."
+    ],
+    "improved": [
+      "Clean up counts, moves and undoes the same list of notes, leaves pinned notes and notes inside a zone alone, and tidies around them. The button is a broom.",
+      "Fit paper and Rip off empty paper measure the words, not trailing blank lines or empty Shift+Enter breaks; a quiet 'Trim empty paper?' offer appears after you stop typing (never automatic).",
+      "Save in Settings stays where you are and says Saved; Appearance has more controls with a live preview that Cancel reverts.",
+      "Esc closes only the topmost temporary layer (palette, tour, comments, board picker, menus, dialogs and more).",
+      "Shortcut key caps are readable in dark mode; buttons share one quiet hover and press feel.",
+      "Legal pages open on beige paper by default and share one type scale in English and Hebrew.",
+      "The crown is a crisp vector in dark mode; the plan chip explains the plan; the storage bar shows used and remaining."
+    ],
+    "fixed": [
+      "Clean up could announce one number and move another; it now uses one fixed list.",
+      "The 'New board links' row no longer lights up its whole row on hover.",
+      "A comment's delete button no longer fights its words for space.",
+      "Select-all and the new-note key keep working after the shortcut rewrite (fixed within the patch)."
+    ],
+    "limitations": [
+      "The comment-delete rules and the new ui_prefs column are in migrations that must be applied to the real project (npx supabase db push); until then deleting a comment and syncing shortcuts will not work against it. Everything was tested against a local stand-in and the SQL test suite.",
+      "Pins are not carried through duplicate, paste or import (by design).",
+      "Bookmarks live on this device for now; they do not sync across devices.",
+      "Clean up treats a zone as a keep-out area and leaves notes inside it where they are; it does not arrange inside a zone.",
+      "The legal text is still a DRAFT and has not been reviewed by a lawyer.",
+      "The plan popover, storage bar and crown were not re-checked while signed in with a real account.",
+      "The memory audit covered notes, zones, the palette, Settings and the tour, not photos, video, voice, cutouts or live collaboration.",
+      "Not tested on a physical phone, with a screen reader, or against real Realtime with two accounts."
+    ]
   },
   {
     "version": "0.8.1",

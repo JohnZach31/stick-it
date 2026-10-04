@@ -2293,3 +2293,14 @@ html[data-a11y-motion="reduce"] .ptCard{ animation:none; }
 .ccLangList{ display:flex; flex-direction:column; gap:2px; padding-inline-start:18px; }
 .ccLangList[hidden]{ display:none; }
 .ccLangItem{ font-weight:600; }
+
+/* ---------- one quiet hover / press language for buttons (v0.8.2) ---------- */
+:where(.pillBtn, .gearBtn, .menuItem, .asAction, .zoneMore, .bmGo, .tourBtns button){ transition:background-color .12s ease, border-color .12s ease, transform .08s ease, box-shadow .12s ease; }
+:where(.pillBtn, .gearBtn, .asAction, .bmGo, .tourBtns button):not(:disabled):hover{ background-color:color-mix(in srgb, var(--accent, #9a5d12) 9%, transparent); }
+:where(.pillBtn.primary, .pillBtn.dangerFill):not(:disabled):hover{ filter:brightness(1.07); }
+:where(.pillBtn, .gearBtn, .asAction, .bmGo, .menuItem, .tourBtns button):not(:disabled):active{ transform:translateY(1px) scale(0.985); }
+:where(.pillBtn, .gearBtn, .asAction, .menuItem, .bmGo, .zoneMore):focus-visible{ outline:2px solid var(--accent, #9a5d12); outline-offset:2px; }
+:where(.pillBtn, .gearBtn):disabled{ opacity:0.5; cursor:not-allowed; }
+@media (hover:none){ :where(.pillBtn, .gearBtn, .asAction, .bmGo, .tourBtns button):not(:disabled):hover{ background-color:transparent; } }
+@media (prefers-reduced-motion: reduce){ :where(.pillBtn, .gearBtn, .menuItem, .asAction, .zoneMore, .bmGo, .tourBtns button){ transition:none; } :where(.pillBtn, .gearBtn, .asAction, .bmGo, .menuItem, .tourBtns button):not(:disabled):active{ transform:none; } }
+html[data-a11y-motion="reduce"] :where(.pillBtn, .gearBtn, .menuItem, .asAction, .zoneMore, .bmGo, .tourBtns button){ transition:none; }

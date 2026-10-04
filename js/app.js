@@ -9379,6 +9379,7 @@
   // keys that do something fixed (editing, closing); a person can't give them away
   var FIXED_BINDINGS = {"Mod+B": "Bold", "Mod+I": "Italic", "Mod+Enter": "Add a comment", "Mod+Shift+Z": "Redo"};
   function defaultKeys(){ var d = {}; ACTIONS.forEach(function(a){ if(a.rebind !== false) d[a.id] = a.def || ""; }); return d; }
+  function fixedKeys(){ var d = {}; ACTIONS.forEach(function(a){ if(a.rebind === false && a.def) d[a.id] = a.def; }); return d; }
   function customKeys(){ return KB ? KB.sanitize(settings.shortcuts || {}, defaultKeys(), IS_MAC, FIXED_BINDINGS) : {}; }
   function activeKeys(){ return KB ? KB.resolve(defaultKeys(), customKeys()) : defaultKeys(); }
   function keyOf(a){ if(a.rebind === false) return a.def || ""; var m = activeKeys(); return m[a.id] || ""; }
@@ -9463,7 +9464,7 @@
       var hasMod = /(^|\+)(Mod|Alt|Ctrl|Meta)\+/.test(b);
       if(isTyping() && !hasMod) return;                                     // letters belong to the text
       if(modalOpen() && !(b === activeKeys().palette && !focusState && !tourRoot)) return;
-      var id = KB.find(activeKeys(), b), a = id ? actionById(id) : null;
+      var id = KB.find(activeKeys(), b) || KB.find(fixedKeys(), b), a = id ? actionById(id) : null;
       if(!a || !actionReady(a)) return;
       if(isTyping() && /^(selectAll|undo|redo)$/.test(a.id)) return;        // inside a note, the browser's own editing applies
       e.preventDefault(); e.stopImmediatePropagation();
