@@ -6837,6 +6837,10 @@
     pane.innerHTML = '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
       '<section class="asCard" aria-labelledby="ccAbH"><h4 id="ccAbH">About Stick-It</h4><p class="ccAbout" id="ccAbout"></p></section>';
     var list = pane.querySelector(".ccLegalList");
+    var wn = document.createElement("button"); wn.type = "button"; wn.className = "asAction ccLink"; wn.id = "ccWhatsNew";
+    wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version, with a short tour.</small></span><span class="go" aria-hidden="true">›</span>';
+    wn.addEventListener("click", function(){ openWhatsNew(); });
+    list.appendChild(wn);
     LEGAL_ABOUT.forEach(function(l){
       var a = document.createElement("a"); a.className = "asAction ccLink"; a.href = l[1]; a.target = "_blank"; a.rel = "noopener";
       a.innerHTML = '<span class="lbl"><span class="t"></span><small></small></span><span class="go" aria-hidden="true">›</span>';
@@ -8772,11 +8776,11 @@
     });
   }
 
-  function startTour(){
+  function startTour(custom){
     if(!panel.hidden) cancelSettings();
     sharePanel.hidden = true;
     closeFloatingPopovers();
-    tourSteps = buildTourSteps();
+    tourSteps = Array.isArray(custom) && custom.length ? custom : buildTourSteps();
     tourIndex = 0;
     tourRoot = document.createElement("div");
     var block = document.createElement("div");
@@ -8863,7 +8867,7 @@
     card.style.top = top + "px";
     card.style.left = left + "px";
   }
-  helpBtn.addEventListener("click", startTour);
+  helpBtn.addEventListener("click", function(){ startTour(); });
 
   kbdBtn.addEventListener("click", function(e){ e.stopPropagation(); openControlCenter("shortcuts"); });
 
@@ -9432,7 +9436,7 @@
   defineAction({id: "shortcuts", label: "Keyboard shortcuts", group: "Go", keywords: "keys keyboard help rebind customize", def: "?", run: function(){ openControlCenter("shortcuts"); }});
   defineAction({id: "settings", label: "Open Settings", group: "Go", keywords: "preferences control center appearance", def: "", run: function(){ openControlCenter(); }});
   defineAction({id: "whatsNew", label: "Show What’s New", group: "Go", keywords: "patch notes changes version tour update", def: "",
-    when: function(){ return typeof openWhatsNew === "function"; }, run: function(){ openWhatsNew(); }});
+    when: function(){ return !!ptData(); }, run: function(){ openWhatsNew(); }});
   defineAction({id: "bookmarkHere", label: "Bookmark this spot", group: "Go", keywords: "save place view remember", def: "B", edit: true, run: function(){ bookmarkThisSpot(); }});
   defineAction({id: "bookmarks", label: "Manage bookmarks…", group: "Go", keywords: "places saved spots rename delete", def: "", run: function(){ manageBookmarks(); }});
 
@@ -10045,7 +10049,7 @@
     rememberAccount(Stick.auth.user() || {id: settings.account.sub, email: settings.account.email}, res.profile);
     settings.accountPrefs = res.settings;
     saveSettings();
-    if(typeof adoptAccountShortcuts === "function") adoptAccountShortcuts(res.settings && res.settings.uiPrefs);
+    if(typeof adoptAccountShortcuts === "function") { adoptAccountShortcuts(res.settings && res.settings.uiPrefs); if(typeof adoptAccountPatchTour === "function") adoptAccountPatchTour(res.settings && res.settings.uiPrefs); }
   }
   function refreshAccountData(){
     if(!CLOUD || !window.Stick || !Stick.auth.user()) return Promise.resolve();
@@ -10346,6 +10350,91 @@
     }, function(){ hideCloudOverlay(); toast("Couldn't finish signing in."); });
   }
 
+  // ---------- What's New / patch tour ----------
+  // The words come from docs/patch-notes/patch-notes.json (through js/patch-data.js), so the app, the website and the Markdown notes tell the same
+  // story. tourMode: "full" = a short walk-through with real targets, "summary" = one card of highlights, "none" = never offered.
+  // Nothing here runs for someone using Stick-It for the first time (they get the normal tutorial) or on a shared, read-only view.
+  var PT_KEY = "stickit.patchTour.v1";
+  function ptData(){ var d = window.Stick && Stick.patchData; return d && d.version ? d : null; }
+  function ptState(){ var s = safeGet(PT_KEY); return s && typeof s === "object" ? s : {}; }
+  function ptMarkSeen(){
+    var d = ptData(); if(!d) return;
+    safeSet(PT_KEY, {seen: d.version, at: Date.now()});
+    if(CLOUD && window.Stick && Stick.auth && Stick.auth.user() && Stick.account && Stick.account.saveUiPrefs){
+      var cur = (Stick.account.cached() && Stick.account.cached().settings && Stick.account.cached().settings.uiPrefs) || {}, next = {};
+      Object.keys(cur).forEach(function(k){ next[k] = cur[k]; });
+      next.patchTour = {seen: d.version};
+      Stick.account.saveUiPrefs(next).catch(function(){});
+    }
+  }
+  // signed in on another device and already saw it there: don't ask again here
+  function adoptAccountPatchTour(prefs){
+    var d = ptData(), remote = prefs && prefs.patchTour && prefs.patchTour.seen;
+    if(!d || remote !== d.version) return;
+    if(ptState().seen !== d.version) safeSet(PT_KEY, {seen: d.version, at: Date.now()});
+    closePatchCard();
+  }
+  function ptSteps(d){
+    return (d.tour || []).map(function(s){ return {sel: s.target || null, title: escapeHtml(s.title || ""), body: escapeHtml(s.body || "")}; });
+  }
+  function startPatchTour(){
+    var d = ptData(); if(!d) return false;
+    if(d.tourMode === "full"){
+      var steps = ptSteps(d).filter(function(s){ if(!s.sel) return true; var el = document.querySelector(s.sel); if(!el) return false; var r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; });
+      if(steps.length){ startTour(steps); return true; }
+    }
+    openWhatsNew(); return true;
+  }
+  var ptCard = null, ptLayer = OV.layer("patch-card", function(){ ptDismiss(); }, function(){ return !!ptCard; });
+  function closePatchCard(){ if(!ptCard) return; ptCard.remove(); ptCard = null; ptLayer.close(); }
+  function ptDismiss(){ ptMarkSeen(); closePatchCard(); }
+  function patchNotesUrl(d){ return "https://github.com/JohnZach31/stick-it/blob/master/docs/patch-notes/" + encodeURIComponent(d.version) + ".md"; }
+  function showPatchCard(d){
+    if(ptCard) return;
+    var card = makeDiv("ptCard"); card.setAttribute("role", "region"); card.setAttribute("aria-label", "What’s new");
+    var h = document.createElement("h4"); h.textContent = "Stick-It updated to v" + d.version + (d.codename ? " · " + d.codename : "");
+    var p = document.createElement("p"); p.textContent = d.tldr || "";
+    var row = makeDiv("ptBtns");
+    function btn(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn " + cls; b.textContent = label; b.addEventListener("click", fn); row.appendChild(b); return b; }
+    var show = btn("Show me", "primary", function(){ ptMarkSeen(); closePatchCard(); startPatchTour(); });
+    btn("Not now", "", function(){ ptDismiss(); });
+    var a = document.createElement("a"); a.className = "ptLink"; a.href = patchNotesUrl(d); a.target = "_blank"; a.rel = "noopener"; a.textContent = "View patch notes";
+    card.appendChild(h); card.appendChild(p); card.appendChild(row); card.appendChild(a);
+    document.body.appendChild(card); ptCard = card; ptLayer.open();
+    var live = makeDiv("sr-only"); live.setAttribute("role", "status"); live.textContent = "Stick-It was updated. " + (d.tldr || ""); card.appendChild(live);
+  }
+  function maybeOfferPatchTour(){
+    var d = ptData();
+    if(!d || d.tourMode === "none" || readOnly || singleNoteMode || tourRoot || focusState) return;
+    var st = ptState();
+    if(st.seen === d.version) return;
+    if(firstRun){ ptMarkSeen(); return; }                     // brand-new people get the normal tutorial, not a list of changes
+    showPatchCard(d);
+  }
+  function openWhatsNew(){
+    var d = ptData(); if(!d){ toast("There’s nothing to show yet."); return; }
+    var wrap = makeDiv("wnBody");
+    var p = document.createElement("p"); p.className = "acctSub"; p.textContent = d.tldr || ""; wrap.appendChild(p);
+    if(d.highlights && d.highlights.length){
+      var ul = document.createElement("ul"); ul.className = "wnList";
+      d.highlights.forEach(function(t){ var li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+      wrap.appendChild(ul);
+    }
+    var actions = [{label: "Close", value: true}];
+    if(d.tourMode === "full") actions.unshift({label: "Show me around", kind: "primary", onClick: function(close){ close(true); setTimeout(function(){ var steps = ptSteps(d); startTour(steps); }, 0); return false; }});
+    var m = openModal({title: "What’s new in v" + d.version + (d.codename ? " · " + d.codename : ""), content: wrap, width: 460, actions: actions});
+    var link = document.createElement("a"); link.className = "ptLink"; link.href = patchNotesUrl(d); link.target = "_blank"; link.rel = "noopener"; link.textContent = "Read the full patch notes";
+    wrap.appendChild(link);
+    ptMarkSeen();
+  }
+  if(window.Stick && Stick.dev){        // local development only
+    Stick.dev.patchTour = {
+      replay: function(){ closePatchCard(); startPatchTour(); return "Replaying the patch tour."; },
+      reset: function(){ try{ localStorage.removeItem(PT_KEY); }catch(e){} return "Patch tour forgotten on this device. Reload to see the update card again."; },
+      offer: function(){ try{ localStorage.removeItem(PT_KEY); }catch(e){} firstRun = false; maybeOfferPatchTour(); return "Offered."; }
+    };
+  }
+
   // ---------- boot ----------
   if(singleNoteMode){
     renderPublicView(location.hash);
@@ -10371,6 +10460,7 @@
     }
   }
   setTimeout(function(){ setLogo("ready"); }, 450);
+  if(!singleNoteMode && !readOnly) setTimeout(maybeOfferPatchTour, 2200);
 
   if(CLOUD_OK && !singleNoteMode){
     if(window.Stick.auth.callbackPending) finishSignIn();

@@ -1,5 +1,58 @@
 [
   {
+    "version": "0.8.2",
+    "codename": "Get a Grip",
+    "title": "Stick-It v0.8.2 — Get a Grip",
+    "date": null,
+    "status": "development",
+    "tldr": "More control, less friction: pin things in place, name areas of the board with zones, jump anywhere from a command palette, change your own keyboard shortcuts, and trim empty paper the way you meant.",
+    "tourMode": "full",
+    "tour": [
+      {
+        "target": null,
+        "title": "Get a Grip",
+        "body": "A few things changed so the board does what you meant. This takes about thirty seconds."
+      },
+      {
+        "target": "#cleanBtn",
+        "title": "Clean up, counted honestly",
+        "body": "The numbers now match what actually moves. Pinned notes and notes inside a zone stay exactly where they are, and one Undo puts everything back."
+      },
+      {
+        "target": "#kbdBtn",
+        "title": "Shortcuts are yours",
+        "body": "Open Shortcuts and press Change on any row to give it your own keys. Ctrl/Cmd+K opens the command palette: type what you want to do."
+      },
+      {
+        "target": "#gearBtn",
+        "title": "Look and feel, with a preview",
+        "body": "Appearance now has more controls and shows them live. Save keeps you where you are and says Saved."
+      },
+      {
+        "target": ".note",
+        "title": "Pin in place",
+        "body": "Open a note's ••• menu and choose Pin in place (or press P). It stays put while you move things around it."
+      },
+      {
+        "target": "#boardInner",
+        "title": "Zones and bookmarks",
+        "body": "Right-click the board and add a Zone to name an area. Press B to bookmark the spot you're looking at, and Alt+[ to go back."
+      }
+    ],
+    "highlights": [
+      "Pin in place: a pinned scrap can't be dragged, nudged or tidied away, but you can still edit it.",
+      "Board zones: named patches of paper behind your notes. Deleting one never deletes its notes.",
+      "Command palette (Ctrl/Cmd+K) and bookmarks for places on a board; Back and Forward remember where you looked.",
+      "Customise your keyboard shortcuts, with clear warnings for keys the browser keeps.",
+      "Comments can be deleted by their author or the board owner, enforced by the database, not just the screen.",
+      "Fit paper and Rip really measure the words, not the trailing blank lines."
+    ],
+    "added": [],
+    "improved": [],
+    "fixed": [],
+    "limitations": []
+  },
+  {
     "version": "0.8.1",
     "codename": "One Place",
     "title": "Stick-It v0.8.1 — One Place",

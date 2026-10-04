@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.2",
+    "codename": "Get a Grip",
+    "title": "Stick-It v0.8.2 — Get a Grip",
+    "date": null,
+    "status": "development",
+    "tldr": "More control, less friction: pin things in place, name areas of the board with zones, jump anywhere from a command palette, change your own keyboard shortcuts, and trim empty paper the way you meant.",
+    "file": "0.8.2.md"
+  },
+  {
     "version": "0.8.1",
     "codename": "One Place",
     "title": "Stick-It v0.8.1 — One Place",
