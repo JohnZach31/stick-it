@@ -156,7 +156,9 @@ ok(S.PRESETS.groceries.fields.join() === 'qty' && S.PRESETS.trip.fields.join() =
   ok(/safeHref\(v\)/.test(app) && /rel = "noopener noreferrer"/.test(app) && /open \? "span" : "a"/.test(app), 'links go through safeHref, and are plain text while the row is being edited');
   ok(/role", "checkbox"/.test(app) && /aria-checked/.test(app) && /role", "status"/.test(app) && /aria-live", "polite"/.test(app), 'items are real checkboxes and the count is announced politely');
   ok(/Intl\.NumberFormat/.test(read('js/shopping.js')) && !/toFixed\(2\)/.test(read('js/shopping.js')), 'prices are formatted with Intl, never by hand');
-  ok(/\.shopObj \.shList\{ max-height:400px;/.test(css) && /\.shopObj \.shCart\{[^}]*height:46px/.test(css), 'the item area scrolls after 400 px and the cart is a fixed height');
+  ok(/\.shopObj \.shList\{ max-height:400px;/.test(css) && /\.shopObj \.shCart\{ position:absolute;[^}]*width:78px/.test(css), 'the item area scrolls after 400 px and the cart is a small accent that is never in the flow');
+ok(/\.shopObj \.shEdit\{ display:flex;/.test(css) && !/shExtra|\.shField/.test(css + app), 'editing details is a row of small inline fields, not a boxed form');
+ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shMeta/.test(css), 'details appear as tiny receipt annotations under the item');
   ok(/prefers-reduced-motion: reduce\)\{ \.shopObj/.test(css) && /!reducedMotion\(\) && opts\.slideId/.test(app), 'the slide into the cart is off with reduced motion');
   ok(/defineAction\(\{id: "newShopping"/.test(app) && /\{id: "shopping", group: "Add"/.test(app), 'a shopping list can be added from the Add menu and the command palette');
 }

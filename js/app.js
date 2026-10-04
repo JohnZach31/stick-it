@@ -3927,9 +3927,15 @@
   // Rules, limits and maths live in js/shopping.js. Items are never edited in place in a way that history could see: every change makes a
   // new items array, so Undo restores exactly what was there.
   function isShopping(n){ return !!n && n.type === "shopping"; }
-  // the cart is as wide as the note and always the same height: a wire basket with a handle and two wheels. The paper tucks into it.
-  var SHOP_CART = '<div class="shBasket"></div><span class="shWheel l"></span><span class="shWheel r"></span>' +
-    '<svg class="shHandle" viewBox="0 0 44 34" aria-hidden="true" focusable="false"><path d="M2 3h16l14 20" fill="none" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  // the cart: small, drawn by hand (uneven wires, a tilted handle, wheels hung from the frame). It is an accent on the paper, never a footer.
+  var SHOP_CART = '<svg viewBox="0 0 100 78" aria-hidden="true" focusable="false">' +
+    '<path class="cFill" d="M25 17C42 15.2 64 16.6 90 14.6L80.5 50.4C65 52.2 47 50.4 33.6 52.6Z"/>' +
+    '<path class="cLine" d="M5.5 9.5C11 8.4 16.5 9.6 21.5 11.4L29.2 19.5"/>' +
+    '<path class="cLine" d="M25 17C42 15.2 64 16.6 90 14.6L80.5 50.4C65 52.2 47 50.4 33.6 52.6Z"/>' +
+    '<path class="cWire" d="M37 18.5L40.4 51"/><path class="cWire" d="M49.2 17.4L50.6 51.6"/><path class="cWire" d="M62 17.2L61.2 51"/><path class="cWire" d="M75.4 16.2L71.6 50.8"/>' +
+    '<path class="cWire" d="M28.8 28.6C50 26.8 70 29.6 85 27.2"/><path class="cWire" d="M31.4 40.4C50 38.8 66.6 41.4 81.6 39"/>' +
+    '<path class="cLine" d="M39.5 52.4L35.8 62.6"/><path class="cLine" d="M75.8 50.4L77.6 62.4"/><path class="cLine" d="M35.8 62.6C46 64 66 63.4 77.6 62.4"/>' +
+    '<circle class="cWheel" cx="35" cy="69" r="5.6"/><circle class="cWheel" cx="78" cy="69" r="5.6"/><circle class="cHub" cx="35" cy="69" r="1.3"/><circle class="cHub" cx="78" cy="69" r="1.3"/></svg>';
   var SHOP_BOX = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path class="shBoxLine" d="M5.2 4.6c4.6-.5 9.6-.4 13.6.1.5 4.3.5 9.4.1 14.2-4.3.5-9.1.5-13.9.1-.4-4.8-.4-9.5.2-14.4z" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>' +
     '<path class="shTick" d="M6.5 12.6c1.6 1.4 2.8 2.9 4 4.7 2.2-4.4 4.8-8 8.1-11.3" fill="none" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var SHOP_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4h2.6l2.3 11h10l2-8H6.3"/><circle cx="9.5" cy="19.2" r="1.4"/><circle cx="16.8" cy="19.2" r="1.4"/></svg>';
@@ -3938,6 +3944,13 @@
   function shopMoney(n, minor){ return Stick.shopping.formatPrice(minor, n.cur, shopLocale()); }
   function shopLocale(){ try{ return navigator.language || undefined; }catch(e){ return undefined; } }
   function shopTz(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){ return ""; } }
+  // the look is being chosen: "a" (cart tucked at the corner), "b" (the receipt emerges from a centred cart), "c" (cart clipped on top, torn paper).
+  // A list may carry a temporary _variant (never saved); in development Stick.dev.shopVariant("b") sets the default for every list.
+  function shopVariant(n){
+    var v = n && n._variant;
+    if(!v && window.Stick && Stick.dev){ try{ v = localStorage.getItem("stickit.dev.shopVariant"); }catch(e){} }
+    return /^[abc]$/.test(v || "") ? v : "a";
+  }
   function shopHas(n, f){ return (n.fields || []).indexOf(f) !== -1; }
   function shopEditable(){ return !readOnly; }
 
@@ -3972,37 +3985,41 @@
     txt.className = "shText"; txt.textContent = it.t; txt.dir = "auto"; txt.setAttribute("role", "textbox"); txt.setAttribute("aria-label", "Item"); txt.setAttribute("data-ph", "Item");
     if(!st.readOnly){ txt.contentEditable = "true"; txt.spellcheck = true; wireShopText(n, it, txt); }
     line.appendChild(txt);
-    // the details this item really has, small and quiet; nothing for a detail it lacks, and nothing for a field that is switched off
-    if(shopHas(n, "qty") && it.q){ var q = document.createElement("span"); q.className = "shQty"; q.textContent = "×" + it.q; line.appendChild(q); }
-    if(shopHas(n, "price") && it.p != null){ var p = document.createElement("span"); p.className = "shPrice"; p.textContent = shopMoney(n, it.p); line.appendChild(p); }
-    if(shopHas(n, "tag") && it.g){ var g = document.createElement("span"); g.className = "shTag"; g.textContent = it.g; line.appendChild(g); }
-    if(shopHas(n, "link") && it.l){
-      var open = st.openId === it.id, lk = document.createElement(open ? "span" : "a"); lk.className = "shLink"; lk.title = open ? "Link" : "Open the link"; lk.textContent = "↗";
-      if(!open){ lk.href = it.l; lk.target = "_blank"; lk.rel = "noopener noreferrer"; lk.setAttribute("aria-label", "Open the link for " + (it.t || "this item")); lk.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); lk.addEventListener("click", function(e){ e.stopPropagation(); }); }
-      line.appendChild(lk);
-    }
     var fieldsOn = ["qty", "note", "price", "link", "tag"].some(function(f){ return shopHas(n, f); });
     if(!st.readOnly){
       if(fieldsOn){
-        var more = document.createElement("button"); more.type = "button"; more.className = "shMore"; more.textContent = "▾"; more.title = "Details"; more.setAttribute("aria-label", "Details for " + (it.t || "this item")); more.setAttribute("aria-expanded", String(st.openId === it.id));
+        var more = document.createElement("button"); more.type = "button"; more.className = "shMore"; more.textContent = "\u25be"; more.title = "Details"; more.setAttribute("aria-label", "Details for " + (it.t || "this item")); more.setAttribute("aria-expanded", String(st.openId === it.id));
         more.addEventListener("click", function(e){ e.stopPropagation(); n._openItem = n._openItem === it.id ? null : it.id; repaintShopping(n, {focusDetail: n._openItem}); });
         line.appendChild(more);
       }
-      var del = document.createElement("button"); del.type = "button"; del.className = "shDel"; del.innerHTML = "×"; del.title = "Remove"; del.setAttribute("aria-label", "Remove " + (it.t || "this item"));
+      var del = document.createElement("button"); del.type = "button"; del.className = "shDel"; del.innerHTML = "\u00d7"; del.title = "Remove"; del.setAttribute("aria-label", "Remove " + (it.t || "this item"));
       del.addEventListener("click", function(e){ e.stopPropagation(); shopChange(n, "Remove item", function(items){ return Stick.shopping.remove(items, it.id); }); });
       line.appendChild(del);
     }
     body.appendChild(line);
-    if(shopHas(n, "note") && it.n && st.openId !== it.id){ var nt = makeDiv("shNote"); nt.textContent = it.n; nt.dir = "auto"; body.appendChild(nt); }
-    if(st.openId === it.id && !st.readOnly) body.appendChild(shopDetailInputs(n, it));
+    // the details this item really has, as tiny receipt annotations under its name; nothing for a detail it lacks or a field that is off
+    var meta = makeDiv("shMeta"), open = st.openId === it.id;
+    if(shopHas(n, "qty") && it.q){ var q = document.createElement("span"); q.className = "shQty"; q.textContent = "\u00d7" + it.q; meta.appendChild(q); }
+    if(shopHas(n, "price") && it.p != null){ var p = document.createElement("span"); p.className = "shPrice"; p.textContent = shopMoney(n, it.p); meta.appendChild(p); }
+    if(shopHas(n, "tag") && it.g){ var g = document.createElement("span"); g.className = "shTag"; g.textContent = it.g; meta.appendChild(g); }
+    if(shopHas(n, "link") && it.l){
+      var lk = document.createElement(open ? "span" : "a"); lk.className = "shLink"; lk.title = open ? "Link" : "Open the link"; lk.textContent = "link \u2197";
+      if(!open){ lk.href = it.l; lk.target = "_blank"; lk.rel = "noopener noreferrer"; lk.setAttribute("aria-label", "Open the link for " + (it.t || "this item")); lk.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); lk.addEventListener("click", function(e){ e.stopPropagation(); }); }
+      meta.appendChild(lk);
+    }
+    if(meta.firstChild && !open) body.appendChild(meta);
+    if(shopHas(n, "note") && it.n && !open){ var nt = makeDiv("shNote"); nt.textContent = it.n; nt.dir = "auto"; body.appendChild(nt); }
+    if(open && !st.readOnly) body.appendChild(shopDetailInputs(n, it));
     li.appendChild(body);
     return li;
   }
   function shopDetailInputs(n, it){
-    var S = Stick.shopping, wrap = makeDiv("shExtra");
+    var S = Stick.shopping, wrap = makeDiv("shEdit");
+    var PRE = {qty: "\u00d7", note: "note", tag: "#", link: "link \u2197"};
+    function curSymbol(){ var c = S.CURRENCIES.filter(function(x){ return x[0] === n.cur; })[0]; return c ? c[1] : n.cur; }
     function input(f, label, value, attrs){
-      var l = document.createElement("label"); l.className = "shField"; var s = document.createElement("span"); s.textContent = label; l.appendChild(s);
-      var inp = document.createElement("input"); inp.type = "text"; inp.value = value || ""; inp.dataset.f = f; inp.autocomplete = "off"; inp.setAttribute("dir", "auto");
+      var l = document.createElement("label"); l.className = "shF f-" + f; var s = document.createElement("span"); s.className = "shPre"; s.textContent = f === "price" ? curSymbol() : PRE[f]; l.appendChild(s);
+      var inp = document.createElement("input"); inp.type = "text"; inp.value = value || ""; inp.dataset.f = f; inp.autocomplete = "off"; inp.setAttribute("dir", "auto"); inp.setAttribute("aria-label", label);
       Object.keys(attrs || {}).forEach(function(k){ inp.setAttribute(k, attrs[k]); });
       l.appendChild(inp); wrap.appendChild(l); return inp;
     }
@@ -4017,7 +4034,7 @@
       inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.value = it[key] || ""; inp.blur(); n._openItem = null; repaintShopping(n); } e.stopPropagation(); });
       inp.addEventListener("change", function(){ commit(f, key, inp, function(v){ v = v.replace(/\s+/g, " ").trim(); return v || null; }); });
     }
-    if(shopHas(n, "qty")) text("qty", "q", "Quantity", S.LIMITS.qty, {placeholder: "2, 500 g"});
+    if(shopHas(n, "qty")) text("qty", "q", "Quantity", S.LIMITS.qty, {placeholder: "2 or 500 g"});
     if(shopHas(n, "price")){
       var d = shopMinor(n), inp = input("price", "Price (" + n.cur + ")", it.p == null ? "" : (it.p / Math.pow(10, d)).toFixed(d), {inputmode: "decimal", placeholder: d ? "0." + "0".repeat(d) : "0"});
       inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.blur(); } e.stopPropagation(); });
@@ -4160,16 +4177,15 @@
     }
     if(opts.focusAdd){ var a3 = el.querySelector(".shAddIn"); if(a3) a3.focus(); }
     if(opts.focusId){ var t3 = el.querySelector('.shRow[data-id="' + opts.focusId + '"] .shText'); if(t3){ t3.focus(); if(opts.focusEnd){ var rg = document.createRange(); rg.selectNodeContents(t3); rg.collapse(false); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } } }
-    else if(opts.focusDetail){ var d3 = el.querySelector('.shRow[data-id="' + opts.focusDetail + '"] .shExtra input'); if(d3 && !opts.keepOpen) d3.focus(); }
+    else if(opts.focusDetail){ var d3 = el.querySelector('.shRow[data-id="' + opts.focusDetail + '"] .shEdit input'); if(d3 && !opts.keepOpen) d3.focus(); }
     var nm = el.querySelector(".shTitle"); if(nm) nm.setAttribute("data-ph", "Shopping list");
   }
 
   function buildShoppingEl(n, st){
     st = st || {};
-    var el = makeDiv("boardObj paperObj shopObj" + (st.static ? " static" : ""));
+    var el = makeDiv("boardObj paperObj shopObj v-" + shopVariant(n) + (st.static ? " static" : ""));
     el.style.setProperty("--pw", (n.w || Stick.shopping.WIDTH[2]) + "px"); el.style.setProperty("--rot", (n.rot || 0) + "deg");
     el.setAttribute("role", "group"); el.setAttribute("aria-label", Stick.objects.label(n)); if(!st.static) el.tabIndex = 0;
-    var tape = makeDiv("shTape"); tape.setAttribute("aria-hidden", "true"); el.appendChild(tape);
     var paper = makeDiv("shPaper"), head = makeDiv("shHead"), title = makeDiv("shTitle"), sum = makeDiv("shSummary");
     title.dir = "auto"; title.setAttribute("role", "textbox"); title.setAttribute("aria-label", "List title");
     sum.setAttribute("role", "status"); sum.setAttribute("aria-live", "polite");
@@ -4211,7 +4227,7 @@
       title.addEventListener("blur", function(){ if(tBefore){ var bb = tBefore; tBefore = null; n.title = Stick.shopping.normalize({type: "shopping", title: n.title}, {}).title; saveNotes(); recordChange("Name list", bb); } });
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
-        if(e.target.closest && e.target.closest("button, input, a, .shText, .shTitle, .shExtra")) return;
+        if(e.target.closest && e.target.closest("button, input, a, .shText, .shTitle, .shEdit")) return;
         e.preventDefault(); endEditing(); closeCaptureMenu();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
         if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
@@ -4281,6 +4297,21 @@
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
   }
   OBJECT_MENUS.shopping = shoppingMenu;
+  if(window.Stick && Stick.dev){        // local development only
+    Stick.dev.shopVariant = function(v){ try{ if(v) localStorage.setItem("stickit.dev.shopVariant", v); else localStorage.removeItem("stickit.dev.shopVariant"); }catch(e){} notes.filter(isShopping).forEach(function(n){ delete n._variant; rerenderNote(n); }); return "Shopping list look: " + (v || "a"); };
+    Stick.dev.shopCycle = function(){ notes.filter(isShopping).sort(function(x, y){ return x.x - y.x; }).forEach(function(n, i){ n._variant = ["a", "b", "c"][i % 3]; rerenderNote(n); }); return "Gave the lists looks a, b, c left to right."; };
+    // three sample lists side by side, one per look (not saved with their look; a reload shows the default look)
+    Stick.dev.shopVariants = function(){
+      var sample = {fields: ["qty", "price", "note", "tag", "link"], cur: "EUR", items: [
+        {t: "Milk", q: "2", p: 340, n: "lactose-free"}, {t: "Electric toothbrush", p: 4990, g: "health", l: "https://shop.example/brush"}, {t: "Olive oil from Crete", q: "1 l", p: 1250},
+        {t: "Eggs", c: 1, ct: 2}, {t: "Coffee", q: "500 g", c: 1, ct: 3, p: 890}]};
+      var made = ["a", "b", "c"].map(function(v, i){
+        var n = newPaper("shopping", 170 + i * 340, 220, Object.assign({title: "Athens trip"}, JSON.parse(JSON.stringify(sample)))); n._variant = v; n.x = 40 + i * 340; n.y = 60; return n;
+      });
+      insertNotes(made, "Add sample shopping lists");
+      return "Added three sample lists: looks a, b and c.";
+    };
+  }
 
   // ---- creating one: a tiny choice of starting points (Blank first), then the list opens ready for its first item
   function createShopping(bx, by, presetKey, clientAt){

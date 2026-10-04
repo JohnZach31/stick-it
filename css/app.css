@@ -2375,92 +2375,116 @@ body.dark .text a{ color:var(--link, #8fb4ff); }
 @keyframes hbWonder{ 0%{ transform:rotate(0); } 35%{ transform:rotate(-12deg) scale(1.08); } 70%{ transform:rotate(8deg) scale(1.04); } 100%{ transform:rotate(0); } }
 @keyframes hbCrown{ 0%,100%{ transform:translateX(-50%) rotate(-8deg); } 30%{ transform:translateX(-50%) rotate(-16deg) translateY(-1px); } 65%{ transform:translateX(-50%) rotate(0deg); } }
 
-/* ---------- Shopping List (v0.8.2) ---------- */
-.shopObj{ width:var(--pw, 290px); display:flex; flex-direction:column; align-items:stretch; font-family:'Caveat','Patrick Hand',cursive; color:#33301f; }
-.shopObj .shTape{ position:absolute; top:-9px; left:50%; width:70px; height:18px; transform:translateX(-50%) rotate(-2deg); background:rgba(255,246,196,0.8); border:1px solid rgba(90,74,28,0.14); z-index:3; pointer-events:none; }
-.shopObj .shPaper{ position:relative; z-index:1; background:#fffdf6; border-radius:3px 3px 0 0; padding:16px 14px 30px; margin-bottom:-26px; box-shadow:0 1px 2px rgba(60,45,10,0.2), 0 6px 14px rgba(60,45,10,0.12);
-  background-image:repeating-linear-gradient(to bottom, transparent 0 27px, rgba(92,134,184,0.13) 27px 28px); background-position:0 52px; }
-.shopObj .shHead{ margin-bottom:6px; }
-.shopObj .shTitle{ font-size:1.45rem; font-weight:700; line-height:1.15; min-height:1.15em; outline:none; user-select:text; -webkit-user-select:text; cursor:text; overflow-wrap:anywhere; touch-action:manipulation; }
+/* ---------- Shopping List (v0.8.2): the receipt is the surface, the cart is a small hand-drawn accent ----------
+   Three looks are being compared (v-a, v-b, v-c); everything shared is written once, only the cart and the paper's edges differ. */
+.shopObj{ --sInk:#3a3526; --sSoft:#6b6550; --sLine:rgba(58,53,38,0.3); --sPaper:#fffdf6; --sCartFill:#fbf6e6; --sTick:#2f7a45; --sPrice:#245f37; --sWarn:#b3402a;
+  width:var(--pw, 290px); color:var(--sInk); font-family:'Caveat','Patrick Hand',cursive; touch-action:pan-y; }
+.shopObj .shCart, .shopObj .shHead{ touch-action:none; }
+.shopObj .shPaper{ position:relative; z-index:1; background:var(--sPaper); border-radius:2px; padding:11px 13px 13px; box-shadow:0 1px 2px rgba(60,45,10,0.2), 0 5px 12px rgba(60,45,10,0.12); }
+/* one deliberate title: handwritten, with a hand-ruled line under the header block */
+.shopObj .shHead{ margin-bottom:5px; padding-bottom:4px; border-bottom:1.5px solid var(--sLine); }
+.shopObj .shTitle{ font-size:1.34rem; font-weight:700; line-height:1.1; min-height:1.1em; outline:none; user-select:text; -webkit-user-select:text; cursor:text; overflow-wrap:anywhere; touch-action:manipulation; }
 .shopObj .shTitle:empty::before, .shopObj .shText:empty::before{ content:attr(data-ph); opacity:0.38; }
 .shopObj .shTitle:focus-visible, .shopObj .shText:focus-visible{ outline:none; background:rgba(255,224,130,0.35); border-radius:3px; }
-.shopObj .shSummary{ font:600 0.68rem 'Sora',sans-serif; color:#6b6550; letter-spacing:0.01em; }
+.shopObj .shSummary{ margin-top:1px; font:600 0.6rem 'Courier Prime','Courier New',monospace; letter-spacing:0.05em; text-transform:uppercase; color:var(--sSoft); }
+.shopObj.allPicked .shSummary{ color:var(--sPrice); }
 .shopObj .shList{ max-height:400px; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; scrollbar-width:thin; padding-right:2px; }
 .shopObj .shItems{ list-style:none; margin:0; padding:0; }
-.shopObj .shRow{ display:flex; align-items:flex-start; gap:8px; padding:2px 0; min-height:28px; position:relative; }
-.shopObj .shBox{ flex:none; width:24px; height:24px; margin-top:1px; padding:0; border:0; background:transparent; color:#4a4430; cursor:pointer; border-radius:6px; }
+.shopObj .shRow{ display:flex; align-items:flex-start; gap:7px; padding:1px 0 2px; min-height:24px; position:relative; }
+.shopObj .shBox{ flex:none; width:21px; height:21px; margin-top:2px; padding:0; border:0; background:transparent; color:var(--sInk); cursor:pointer; border-radius:5px; }
 .shopObj .shBox svg{ width:100%; height:100%; display:block; }
 .shopObj .shBox .shBoxLine, .shopObj .shBox .shTick{ stroke:currentColor; }
 .shopObj .shBox .shTick{ opacity:0; stroke-dasharray:30; stroke-dashoffset:30; transition:opacity .1s ease, stroke-dashoffset .28s ease .05s; }
-.shopObj .shRow.in .shBox .shTick{ opacity:1; stroke-dashoffset:0; color:#2f7a45; }
+.shopObj .shRow.in .shBox .shTick{ opacity:1; stroke-dashoffset:0; color:var(--sTick); }
 .shopObj .shBox:hover:not(:disabled){ background:rgba(0,0,0,0.06); }
 .shopObj .shBox:focus-visible{ outline:2px solid var(--accent, #c9871f); outline-offset:1px; }
 .shopObj .shBody{ flex:1; min-width:0; }
-.shopObj .shLine{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; font-size:1.2rem; line-height:1.2; }
+.shopObj .shLine{ display:flex; align-items:baseline; gap:4px; font-size:1.2rem; line-height:1.15; }
 .shopObj .shText{ position:relative; display:inline-block; min-width:2ch; max-width:100%; outline:none; user-select:text; -webkit-user-select:text; cursor:text; overflow-wrap:anywhere; touch-action:manipulation; }
-.shopObj .shRow.in .shText{ opacity:0.62; }
-.shopObj .shRow.in .shText::after{ content:""; position:absolute; left:-3px; right:-3px; top:52%; height:0.34em; transform:translateY(-50%); background:currentColor; opacity:0.75; pointer-events:none;
+.shopObj .shRow.in .shText{ opacity:0.6; }
+.shopObj .shRow.in .shText::after{ content:""; position:absolute; left:-3px; right:-3px; top:54%; height:0.32em; transform:translateY(-50%); background:currentColor; opacity:0.75; pointer-events:none;
   -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center/100% 100% no-repeat;
           mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 20' preserveAspectRatio='none'%3E%3Cpath d='M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") center/100% 100% no-repeat; }
-.shopObj .shQty, .shopObj .shPrice, .shopObj .shTag, .shopObj .shLink{ font:600 0.7rem 'Sora',sans-serif; color:#5b5540; }
-.shopObj .shQty{ background:rgba(0,0,0,0.06); border-radius:5px; padding:0 5px; }
-.shopObj .shPrice{ color:#245f37; }
-.shopObj .shTag{ border:1px solid rgba(90,74,28,0.35); border-radius:999px; padding:0 7px; font-size:0.64rem; }
-.shopObj .shLink{ text-decoration:none; font-size:0.85rem; color:var(--link, #1d4fb8); cursor:pointer; }
-.shopObj .shNote{ font:italic 400 0.82rem 'Sora',sans-serif; color:#6b6550; margin-top:1px; overflow-wrap:anywhere; }
-.shopObj .shMore, .shopObj .shDel{ border:0; background:transparent; color:#6b6550; cursor:pointer; border-radius:5px; font:600 0.8rem 'Sora',sans-serif; padding:0 5px; line-height:1.5; opacity:0; transition:opacity .12s ease; }
+/* the details an item has, as tiny receipt annotations under its name:  ×2 · €3.40 · #health  /  note: lactose-free */
+.shopObj .shMeta{ display:flex; flex-wrap:wrap; font:500 0.66rem/1.35 'Courier Prime','Courier New',monospace; color:var(--sSoft); margin-top:-1px; }
+.shopObj .shMeta > * + *::before{ content:" \00b7 "; white-space:pre; opacity:0.7; text-decoration:none; }
+.shopObj .shPrice{ color:var(--sPrice); font-weight:700; }
+.shopObj .shTag::before{ content:"#"; opacity:0.7; }
+.shopObj .shMeta > .shTag::before{ content:"#"; }
+.shopObj .shMeta > * + .shTag::before{ content:" \00b7 #"; white-space:pre; }
+.shopObj .shLink{ color:var(--link, #1d4fb8); text-decoration:none; cursor:pointer; }
+.shopObj .shNote{ font:500 0.66rem/1.35 'Courier Prime','Courier New',monospace; color:var(--sSoft); overflow-wrap:anywhere; }
+.shopObj .shNote::before{ content:"note: "; opacity:0.7; }
+.shopObj .shMore, .shopObj .shDel{ border:0; background:transparent; color:var(--sSoft); cursor:pointer; border-radius:5px; font:600 0.74rem 'Sora',sans-serif; padding:0 4px; line-height:1.4; opacity:0; transition:opacity .12s ease; }
 .shopObj .shRow:hover .shMore, .shopObj .shRow:hover .shDel, .shopObj .shRow:focus-within .shMore, .shopObj .shRow:focus-within .shDel, .shopObj.selected .shMore, .shopObj .shMore[aria-expanded="true"]{ opacity:1; }
 .shopObj .shMore:hover, .shopObj .shDel:hover{ background:rgba(0,0,0,0.08); }
-.shopObj .shDel:hover{ color:#b3402a; }
+.shopObj .shDel:hover{ color:var(--sWarn); }
 @media (hover:none){ .shopObj .shMore, .shopObj .shDel{ opacity:0.7; padding:2px 8px; } }
-.shopObj .shExtra{ display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; margin:6px 0 4px; padding:8px; background:rgba(255,224,130,0.22); border-radius:8px; }
-.shopObj .shField{ display:flex; flex-direction:column; gap:1px; font:600 0.62rem 'Sora',sans-serif; color:#6b6550; min-width:0; }
-.shopObj .shField input{ font:500 0.8rem 'Sora',sans-serif; color:#33301f; background:#fffdf6; border:1px solid rgba(90,74,28,0.3); border-radius:6px; padding:3px 6px; min-width:0; user-select:text; -webkit-user-select:text; }
-.shopObj .shField input:focus{ outline:2px solid var(--accent, #c9871f); outline-offset:0; }
-.shopObj .shField input.bad{ border-color:#b3402a; animation:shShake .3s ease; }
+/* editing a row's details: a few inline fields, each a dotted line on the paper. No box. */
+.shopObj .shEdit{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 12px; margin:2px 0 3px; padding:0 0 3px; border-bottom:1px dotted var(--sLine); }
+.shopObj .shF{ display:inline-flex; align-items:baseline; gap:3px; font:500 0.64rem 'Courier Prime','Courier New',monospace; color:var(--sSoft); min-width:0; }
+.shopObj .shF input{ font:600 0.72rem 'Courier Prime','Courier New',monospace; color:var(--sInk); background:transparent; border:0; border-bottom:1px dotted var(--sSoft); border-radius:0; padding:0 1px; min-width:0; outline:none; user-select:text; -webkit-user-select:text; }
+.shopObj .shF input::placeholder{ color:var(--sSoft); opacity:0.45; }
+.shopObj .shF input:focus{ border-bottom:1.5px solid var(--accent, #c9871f); }
+.shopObj .shF.f-qty input{ width:5.5ch; } .shopObj .shF.f-price input{ width:8ch; } .shopObj .shF.f-tag input{ width:10ch; }
+.shopObj .shF.f-note, .shopObj .shF.f-link{ flex:1 1 100%; } .shopObj .shF.f-note input, .shopObj .shF.f-link input{ flex:1; width:100%; }
+.shopObj .shF input.bad{ border-bottom-color:var(--sWarn); animation:shShake .3s ease; }
 @keyframes shShake{ 25%{ transform:translateX(-3px); } 75%{ transform:translateX(3px); } }
-.shopObj .shAddRow{ display:flex; align-items:center; gap:8px; padding:3px 0; }
-.shopObj .shPlus{ flex:none; width:24px; text-align:center; font:700 1.1rem 'Sora',sans-serif; color:#8a846c; }
-.shopObj .shAddIn{ flex:1; min-width:0; border:0; border-bottom:1.5px dashed rgba(90,74,28,0.28); background:transparent; font:inherit; font-size:1.2rem; color:inherit; padding:2px 0; outline:none; user-select:text; -webkit-user-select:text; }
-.shopObj .shAddIn::placeholder{ color:rgba(90,74,28,0.45); }
-.shopObj .shAddIn:focus{ border-bottom-color:var(--accent, #c9871f); }
-.shopObj.emptyList .shAddRow{ margin-top:4px; padding:6px 8px; border:1.5px dashed rgba(90,74,28,0.38); border-radius:8px; background:rgba(255,224,130,0.18); }
-.shopObj .shDivider{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:10px 0 4px; padding-top:6px; border-top:1.5px dashed rgba(90,74,28,0.3); font:700 0.66rem 'Sora',sans-serif; letter-spacing:0.07em; text-transform:uppercase; color:#6b6550; }
-.shopObj .shClear{ border:0; background:transparent; color:#6b6550; font:600 0.64rem 'Sora',sans-serif; text-transform:none; letter-spacing:0; text-decoration:underline; cursor:pointer; padding:2px 4px; border-radius:4px; }
-.shopObj .shClear:hover{ color:#b3402a; background:rgba(0,0,0,0.05); }
-.shopObj .shTotal{ margin-top:8px; padding-top:6px; border-top:1.5px dashed rgba(90,74,28,0.3); text-align:right; font:700 0.78rem 'Sora',sans-serif; color:#33301f; }
-.shopObj .shStamp{ position:absolute; right:12px; top:34px; transform:rotate(-6deg); font:800 0.66rem 'Sora',sans-serif; letter-spacing:0.08em; text-transform:uppercase; color:#b3402a; border:2px solid currentColor; border-radius:5px; padding:1px 7px; opacity:0.72; pointer-events:none; background:rgba(255,253,246,0.6); }
-.shopObj.allPicked .shSummary{ color:#245f37; }
-/* the cart: as wide as the note, always the same height; the paper tucks into the basket */
-.shopObj .shCart{ position:relative; z-index:2; height:46px; flex:none; margin:0 4px; }
-.shopObj .shBasket{ position:absolute; left:0; right:0; top:0; height:30px; border:2.5px solid #7a838c; border-top-width:3px; border-radius:2px 2px 14px 14px / 2px 2px 20px 20px; background-color:rgba(214,221,226,0.97);
-  background-image:repeating-linear-gradient(90deg, rgba(70,80,90,0.32) 0 1.4px, transparent 1.4px 15px), repeating-linear-gradient(0deg, rgba(70,80,90,0.3) 0 1.4px, transparent 1.4px 9px); box-shadow:0 3px 5px rgba(60,45,10,0.18); }
-.shopObj .shWheel{ position:absolute; top:34px; width:11px; height:11px; border-radius:50%; background:#5d656c; border:2px solid #3f454a; box-sizing:border-box; }
-.shopObj .shWheel.l{ left:18%; } .shopObj .shWheel.r{ right:18%; }
-.shopObj .shHandle{ position:absolute; left:-12px; top:-12px; width:34px; height:26px; stroke:#7a838c; pointer-events:none; }
-body.dark .shopObj .shPaper{ background-color:#2b2724; color:#f2eadb; background-image:repeating-linear-gradient(to bottom, transparent 0 27px, rgba(150,170,220,0.12) 27px 28px); box-shadow:0 1px 2px rgba(0,0,0,0.5), 0 6px 14px rgba(0,0,0,0.4); }
-body.dark .shopObj{ color:#f2eadb; }
-body.dark .shopObj .shSummary, body.dark .shopObj .shNote, body.dark .shopObj .shDivider, body.dark .shopObj .shClear, body.dark .shopObj .shMore, body.dark .shopObj .shDel{ color:#b9b19a; }
-body.dark .shopObj .shBox{ color:#e6dfcb; } body.dark .shopObj .shRow.in .shBox .shTick{ color:#7ed39a; }
-body.dark .shopObj .shQty{ background:rgba(255,255,255,0.1); color:#d6cfba; } body.dark .shopObj .shPrice{ color:#7ed39a; } body.dark .shopObj .shTag{ border-color:rgba(242,234,219,0.35); color:#d6cfba; }
-body.dark .shopObj .shTotal{ color:#f2eadb; border-color:rgba(242,234,219,0.25); }
-body.dark .shopObj .shExtra{ background:rgba(255,255,255,0.07); } body.dark .shopObj .shField input{ background:#1f1c1a; color:#f2eadb; border-color:rgba(242,234,219,0.3); }
-body.dark .shopObj .shBasket{ background-color:rgba(70,76,82,0.95); border-color:#9aa3ab; background-image:repeating-linear-gradient(90deg, rgba(200,210,220,0.28) 0 1.4px, transparent 1.4px 15px), repeating-linear-gradient(0deg, rgba(200,210,220,0.25) 0 1.4px, transparent 1.4px 9px); }
-body.dark .shopObj .shHandle{ stroke:#9aa3ab; } body.dark .shopObj .shWheel{ background:#9aa3ab; border-color:#cfd6dc; }
-body.dark .shopObj .shAddIn{ border-bottom-color:rgba(242,234,219,0.3); } body.dark .shopObj .shAddIn::placeholder{ color:rgba(242,234,219,0.45); }
+.shopObj .shAddRow{ display:flex; align-items:center; gap:7px; padding:1px 0; }
+.shopObj .shPlus{ flex:none; width:21px; text-align:center; font:700 1rem 'Sora',sans-serif; color:var(--sSoft); }
+.shopObj .shAddIn{ flex:1; min-width:0; border:0; border-bottom:1px dashed var(--sLine); background:transparent; font:inherit; font-size:1.2rem; color:inherit; padding:0; outline:none; user-select:text; -webkit-user-select:text; }
+.shopObj .shAddIn::placeholder{ color:rgba(58,53,38,0.45); }
+.shopObj .shAddIn:focus{ border-bottom:1.5px solid var(--accent, #c9871f); }
+.shopObj.emptyList .shAddIn{ border-bottom:1.5px solid var(--accent, #c9871f); font-size:1.3rem; }
+.shopObj.emptyList .shAddIn::placeholder{ color:var(--accent, #c9871f); opacity:0.85; }
+.shopObj .shDivider{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:6px 0 2px; padding-top:4px; border-top:1px dashed var(--sLine); font:700 0.58rem 'Courier Prime','Courier New',monospace; letter-spacing:0.08em; text-transform:uppercase; color:var(--sSoft); }
+.shopObj .shClear{ border:0; background:transparent; color:var(--sSoft); font:600 0.6rem 'Courier Prime','Courier New',monospace; text-transform:none; letter-spacing:0; text-decoration:underline; cursor:pointer; padding:1px 3px; border-radius:4px; }
+.shopObj .shClear:hover{ color:var(--sWarn); background:rgba(0,0,0,0.05); }
+.shopObj .shTotal{ margin-top:5px; padding-top:4px; border-top:1px dashed var(--sLine); text-align:right; font:700 0.72rem 'Courier Prime','Courier New',monospace; color:var(--sInk); }
+.shopObj .shStamp{ position:absolute; right:10px; top:12px; transform:rotate(-6deg); font:800 0.58rem 'Courier Prime','Courier New',monospace; letter-spacing:0.08em; text-transform:uppercase; color:var(--sWarn); border:1.5px solid currentColor; border-radius:4px; padding:0 6px; opacity:0.75; pointer-events:none; background:rgba(255,253,246,0.6); }
+
+/* the cart: small, hand-drawn, slightly tilted, and never in the flow */
+.shopObj .shCart{ position:absolute; z-index:2; width:78px; color:var(--sInk); filter:drop-shadow(0 1px 1.5px rgba(60,45,10,0.3)); }
+.shopObj .shCart svg{ display:block; width:100%; height:auto; overflow:visible; }
+.shopObj .shCart .cFill{ fill:var(--sCartFill); fill-opacity:0.95; }
+.shopObj .shCart .cLine{ fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
+.shopObj .shCart .cWire{ fill:none; stroke:currentColor; stroke-width:1.15; stroke-linecap:round; opacity:0.62; }
+.shopObj .shCart .cWheel{ fill:var(--sCartFill); stroke:currentColor; stroke-width:2.1; }
+.shopObj .shCart .cHub{ fill:currentColor; }
+
+/* look A: the cart tucked into the paper's lower corner, the receipt just behind its front */
+.shopObj.v-a{ padding-bottom:22px; }
+.shopObj.v-a .shCart{ right:-9px; bottom:-8px; transform:rotate(-6deg); }
+/* look B: the receipt narrows into a tail that goes into a small cart centred beneath */
+.shopObj.v-b{ padding-bottom:30px; filter:drop-shadow(0 2px 3px rgba(60,45,10,0.26)); }
+.shopObj.v-b .shPaper{ box-shadow:none; padding-bottom:30px; clip-path:polygon(0 0, 100% 0, 100% calc(100% - 22px), calc(50% + 26px) calc(100% - 22px), calc(50% + 21px) 100%, calc(50% - 21px) 100%, calc(50% - 26px) calc(100% - 22px), 0 calc(100% - 22px)); }
+.shopObj.v-b .shCart{ left:50%; bottom:-6px; width:74px; transform:translateX(-50%) rotate(-3deg); }
+/* look C: the cart clipped on the paper's top corner like a sticker; the paper's lower edge is torn; the least height of all */
+.shopObj.v-c{ padding-top:12px; }
+.shopObj.v-c .shPaper{ padding-bottom:16px; -webkit-mask:linear-gradient(135deg, #000 66.7%, transparent 0) bottom/10px 7px repeat-x, linear-gradient(#000, #000) top/100% calc(100% - 6px) no-repeat; mask:linear-gradient(135deg, #000 66.7%, transparent 0) bottom/10px 7px repeat-x, linear-gradient(#000, #000) top/100% calc(100% - 6px) no-repeat; box-shadow:none; }
+.shopObj.v-c{ filter:drop-shadow(0 2px 3px rgba(60,45,10,0.26)); }
+.shopObj.v-c .shCart{ left:-14px; top:-4px; width:58px; transform:rotate(-9deg); }
+.shopObj.v-c .shHead{ padding-left:36px; min-height:30px; }
+.shopObj.v-c .shStamp{ top:10px; }
+
+body.dark .shopObj{ --sInk:#f2eadb; --sSoft:#b9b19a; --sLine:rgba(242,234,219,0.28); --sPaper:#2b2724; --sCartFill:#3a3531; --sTick:#7ed39a; --sPrice:#7ed39a; --sWarn:#ff9f8a; }
+body.dark .shopObj .shPaper{ box-shadow:0 1px 2px rgba(0,0,0,0.5), 0 6px 14px rgba(0,0,0,0.4); }
+body.dark .shopObj.v-b .shPaper, body.dark .shopObj.v-c .shPaper{ box-shadow:none; }
+body.dark .shopObj .shAddIn::placeholder{ color:rgba(242,234,219,0.45); }
+body.dark .shopObj .shStamp{ background:rgba(43,39,36,0.7); }
 .shCurPick{ display:flex; flex-direction:column; padding:2px 6px 6px 22px; }
 .shCurPick .menuItem{ font-size:0.78rem; padding:4px 8px; }
 .shopObj.static{ position:relative; cursor:default; }
 body.read-only .shopObj .shBox{ cursor:default; }
-@media (prefers-reduced-motion: reduce){ .shopObj .shBox .shTick{ transition:none; } .shopObj .shField input.bad{ animation:none; } }
-html[data-a11y-motion="reduce"] .shopObj .shBox .shTick{ transition:none; }
-html[data-a11y-motion="reduce"] .shopObj .shField input.bad{ animation:none; }
-.shopObj{ touch-action:pan-y; }
-.shopObj .shTape, .shopObj .shCart, .shopObj .shHead{ touch-action:none; }
-.shopObj .shTape{ pointer-events:auto; }
 @media (pointer:coarse){
   .shopObj .shRow{ min-height:44px; align-items:center; }
-  .shopObj .shBox{ width:40px; height:40px; margin:-6px -6px -6px -10px; }
+  .shopObj .shBox{ width:40px; height:40px; margin:-8px -8px -8px -12px; }
   .shopObj .shLine{ font-size:1.3rem; }
   .shopObj .shMore, .shopObj .shDel{ min-width:36px; min-height:36px; font-size:1rem; }
 }
+@media (prefers-reduced-motion: reduce){ .shopObj .shBox .shTick{ transition:none; } .shopObj .shF input.bad{ animation:none; } }
+html[data-a11y-motion="reduce"] .shopObj .shBox .shTick{ transition:none; }
+html[data-a11y-motion="reduce"] .shopObj .shF input.bad{ animation:none; }
+.shopObj.v-a .shTotal{ padding-right:62px; }
+.shopObj.v-a .shStamp{ right:10px; }
+body.dark .shopObj .shLink{ color:#8fb4ff; }
