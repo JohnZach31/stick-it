@@ -19,7 +19,7 @@
 
 ## What is actually validated
 Local (stand-in backend, real SQL under PGlite, in-app browser):
-- All suites pass: SQL/RLS 391 (with mutation check: all caught), billing/guards 228, client 142, fake backend 41, functions 89, cutout 26, objects 24, collab 18, v0.8.1 guards 49, v0.8.2 DOM and key rules 38, v0.8.2 guards 36. Run `cd supabase/tests && npm run test:all`.
+- All suites pass: SQL/RLS 391 (with mutation check: all caught), billing/guards 228, client 142, fake backend 41, functions 89, cutout 26, objects 24, collab 18, v0.8.1 guards 49, v0.8.2 DOM and key rules 38, v0.8.2 guards 36, share errors 30. Run `cd supabase/tests && npm run test:all`.
 - Browser-verified: palette, rebinder (reserved/duplicate/Replace, Esc), pin, zones (carry), Clean up (counts, pinned and zone handling, no overlaps, undo), Fit/Rip, spatial history, patch tour (0.8.1 → 0.8.2 card, Show me, Not now, replay, reset), legal reading options and globe, Esc stack, 375 px layout, automated name/label check clean.
 - Memory (local, Chromium, JS heap and DOM counts): notes, zones, palette, Settings, tour, 20 photos, 4 videos, 5 voice memos, delete/undo three times: DOM returns to baseline, heap flat. One leak found and fixed: deleted media kept its object URL (`MediaStore.release`).
 Real project:
@@ -33,6 +33,9 @@ Real project:
 - Physical phone (375/390/430 widths only inspected at 375 in an emulated pane), screen reader.
 - Memory: decoded-image memory, cutout model lifetime and live collaboration were not measured; the browser pane cannot report decoded bitmap memory.
 - Signed-in OAuth cannot be driven by the assistant; the owner signs in.
+
+## Public share failure report (open)
+Owner saw "Couldn't reach the server" opening a shared board in a private window on the live site. Not reproduced: live-board, snapshot, revoked (410), unknown (404) and malformed links all resolved correctly signed out with empty storage; CORS allows the Pages origin; `resolve-share` v9 is deployed; anon cannot read any table or storage object directly. Remedy shipped: `Stick.share.resolve` now returns a `kind`, the page shows distinct messages with Try again, a code appears under the message (network, timeout, 502, 404, 410). Ask the owner for that code if it recurs. Edge function latency is 1.6-2.3 s per resolve (signing assets); caching resolved assets is a possible later improvement. GitHub Pages caches scripts up to 10 min, so right after a deploy old and new files can briefly mix.
 
 ## Known limitations
 - Bookmarks are per device. Zones have no "arrange inside". Pins aren't carried through duplicate/paste/import. App is English only (the language registry `js/lang.js` is ready). Legal text is a draft. Heredocs in this environment collapse double backslashes: write JS/regex files with the Write/Edit tools, not shell heredocs.
