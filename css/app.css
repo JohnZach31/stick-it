@@ -610,10 +610,24 @@
     opacity:0;
     transition:opacity .15s ease, background .15s ease, transform .15s ease;
   }
-  .note:hover .del{ opacity:0.85; }
+  .note:hover .del, .note.selected .del{ opacity:0.85; }
   .del:hover{ background:rgba(0,0,0,0.22); transform:scale(1.1); opacity:1; }
-  body.read-only .del{ display:none; }
+  body.read-only .del, body.read-only .quickDone{ display:none; }
   .del svg{ width:11px; height:11px; }
+  /* quick done: a little hand-drawn tick on a paper dot, beside the x. Green only when it is hovered or focused. */
+  .quickDone{
+    position:absolute; top:6px; right:32px; width:22px; height:22px; border-radius:50%; border:none; padding:0;
+    background:rgba(0,0,0,0.1); color:inherit; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0;
+    transition:opacity .15s ease, background .15s ease, color .15s ease, transform .15s ease;
+  }
+  .quickDone svg{ width:13px; height:13px; }
+  .note:hover .quickDone, .note.selected .quickDone, .quickDone:focus-visible{ opacity:0.85; }
+  .quickDone:hover, .quickDone:focus-visible{ background:rgba(76,140,86,0.28); color:#245a2e; opacity:1; transform:scale(1.1); }
+  .quickDone:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+  body.dark .note .quickDone{ background:rgba(255,255,255,0.1); }
+  body.dark .note .quickDone:hover{ background:rgba(120,200,130,0.3); color:#c9f0cd; }
+  .note.soup .quickDone, .note.focused .quickDone{ display:none; }
+  body.hasSel .note:not(.selected):hover .quickDone{ opacity:0; pointer-events:none; }
 
   .badge{
     position:absolute; top:6px; left:6px;
@@ -1588,6 +1602,8 @@
     .moreBtn svg{ width:17px; height:17px; }
     .del{ width:30px; height:30px; }
     .del svg{ width:14px; height:14px; }
+    .quickDone{ width:30px; height:30px; right:40px; }
+    .quickDone svg{ width:17px; height:17px; }
     .toolbar button{ width:32px; height:32px; }
     .toolbar button svg{ width:16px; height:16px; }
     .colorDot{ width:28px; height:28px; }
@@ -1816,7 +1832,7 @@
   /* ---------- Alphabet Soup: a bowl of soup with pasta letters floating in it (the real words stay in .text and are read once) ---------- */
   .note.soup{ background:none !important; border:0; box-shadow:none !important; border-radius:0; min-height:0; max-height:none; filter:drop-shadow(0 6px 8px rgba(40,25,10,0.18)); }
   .note.soup .paperFx{ display:none; }
-  .note.soup .tab{ top:-6px; }
+  .note.soup .tab{ display:none; }                                   /* a bowl has no washi tape (dragging still works through the bowl) */
   .soupBowl{ position:absolute; inset:0; width:100%; height:100%; display:block; pointer-events:none; transition:opacity .2s ease; }
   .note.soup > .text{ position:absolute; left:11%; right:11%; top:21%; bottom:24%; min-height:0; z-index:3; opacity:0; pointer-events:none; overflow:hidden; color:#3a2410; border-radius:12px; padding:6px 8px; font-size:1rem; line-height:1.3; }
   .note.soup.editing > .text{ opacity:1; pointer-events:auto; overflow:auto; background:rgba(255,249,232,0.96); box-shadow:0 2px 8px rgba(40,25,10,0.25), inset 0 0 0 1px rgba(110,70,25,0.18); }
@@ -1967,3 +1983,21 @@
 .fbSep{ flex:none; width:1px; height:18px; margin:0 4px; background:rgba(0,0,0,0.2); }
 body.dark .focusBar{ background:rgba(255,255,255,0.7); }
 @media (prefers-reduced-motion: reduce){ .focusBar{ transition:none; } }
+
+/* ---------- trimmed paper: the corner handle and the torn edge ---------- */
+.note .noteHandle{ display:none; bottom:-9px; right:-9px; }
+.note.selected .noteHandle{ display:flex; }
+.note.focused .noteHandle, .note.soup .noteHandle{ display:none !important; }
+.note.resizing{ transition:none; user-select:none; }
+.note.ripped{ background:none !important; box-shadow:none !important; }
+body.dark .note.ripped{ background:none !important; box-shadow:none !important; }
+.ripShadow{ position:absolute; inset:0; pointer-events:none; filter:drop-shadow(2px 5px 5px var(--shadow)); z-index:0; }
+.ripFill{ position:absolute; inset:0; background:var(--paper-dim, var(--note-bg, #fff3a8)); clip-path:var(--rip-clip); }
+body:not(.dark) .ripFill{ background:var(--note-bg, #fff3a8); }
+.note.ripped .paperFx{ clip-path:var(--rip-clip); }
+.note.ripped > .text, .note.ripped > .noteImgWrap, .note.ripped > .taskRow{ position:relative; }
+.ripChip{ position:absolute; pointer-events:none; transform-origin:50% 0; transform:rotate(var(--rot, 0deg)); border-radius:0 0 2px 2px; box-shadow:2px 4px 8px var(--shadow);
+  clip-path:polygon(0 0, 100% 0, 100% 100%, 0 100%); transition:transform .75s cubic-bezier(.4,.1,.7,.5), opacity .75s ease; background:var(--note-bg, #fff3a8); }
+body.dark .ripChip{ background:color-mix(in oklab, var(--note-bg, #fff3a8) 36%, #0f0c16); }
+.ripChip.go{ transform:translate(14px, 120px) rotate(calc(var(--rot, 0deg) + 16deg)); opacity:0; }
+@media (prefers-reduced-motion: reduce){ .ripChip{ display:none; } }

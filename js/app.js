@@ -176,6 +176,9 @@
     camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"></path><circle cx="12" cy="13.5" r="3.5"></circle></svg>',
     film: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"></path></svg>',
     sticky: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v10l-6 6H4z"></path><path d="M14 20v-6h6"></path></svg>',
+    doneTick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.9c1.5 1.1 3 2.9 4.3 5 2.8-5.7 6.3-9.3 10.6-12.1"></path></svg>',
+    fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect><path d="M8 14l4-4 4 4"></path></svg>',
+    rip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v7H4z"></path><path d="M4 15l2.5 1.5L9 14.5l2.5 2L14 14.5l2.5 2L19 14.5l1 1"></path></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"></path></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>',
@@ -695,11 +698,143 @@
     }
     var hsl = parseHsl(n.bg);
     if(hsl && hsl.h >= 38 && hsl.h <= 75 && hsl.s >= 35) el.classList.add("on-yellow");
+    st.minHeight = n.h > 0 && !n.cosmetic ? n.h + "px" : "";
+    var oldShadow = el.querySelector(":scope > .ripShadow"); if(oldShadow) oldShadow.remove();
+    if(RIP_STYLES.indexOf(n.rip) !== -1 && !n.cosmetic){
+      el.classList.add("ripped"); st.setProperty("--rip-clip", ripPolygon(n));
+      var rs = document.createElement("div"); rs.className = "ripShadow"; rs.setAttribute("aria-hidden", "true");
+      var rf = document.createElement("div"); rf.className = "ripFill"; rs.appendChild(rf); el.insertBefore(rs, el.firstChild);
+    } else { el.classList.remove("ripped"); st.removeProperty("--rip-clip"); }
+  }
+
+  // ---------- trimming the paper: Fit paper to content, Rip off empty paper, and a quiet corner handle to resize ----------
+  // A note keeps its own height only when someone asks (n.h is a minimum, never a fixed box, so nothing can ever be clipped). n.rip
+  // remembers that the empty paper was torn away and how the new edge looks. The text is never scaled.
+  var PAPER_MIN_H = 96, PAPER_MIN_W = 168, PAPER_MAX_W = 520, RIP_STYLES = ["torn", "cut", "notebook"];
+  function ripStyleFor(n){ var r = seededRng(hashStr(String(n.id) + "ripstyle"))(); return r < 0.6 ? "torn" : r < 0.8 ? "cut" : "notebook"; }
+  // the clip shape of a ripped scrap: a ragged bottom edge, a slanted cut, or a notebook edge torn off its binding
+  function ripPolygon(n){
+    var W = Math.max(120, n.w || NOTE_W), rng = seededRng(hashStr(String(n.id) + "ripedge")), pts = [], i, N;
+    if(n.rip === "cut"){
+      return "polygon(0 0, 100% 0, 100% calc(100% - 2px), 0 calc(100% - " + (6 + Math.round(rng() * 8)) + "px))";
+    }
+    if(n.rip === "notebook"){
+      pts.push("6px 0");
+      for(i = 1; i < 40; i++){ pts.push((i % 2 ? 0 : 6) + "px " + (i * 13) + "px"); }
+      // the left edge is only ragged near the top; the polygon below closes it with a straight left side for the rest of the note
+      return "polygon(100% 0, 100% 100%, 6px 100%, " + pts.slice(0, 40).reverse().filter(function(p){ return parseInt(p.split(" ")[1], 10) <= 520; }).join(", ") + ")";
+    }
+    N = Math.max(8, Math.round(W / 9));
+    pts.push("0 0", "100% 0", "100% calc(100% - " + (1 + Math.round(rng() * 5)) + "px)");
+    for(i = N - 1; i >= 0; i--){ pts.push((i / N * 100).toFixed(2) + "% calc(100% - " + (1 + rng() * 8).toFixed(1) + "px)"); }
+    return "polygon(" + pts.join(", ") + ")";
+  }
+  // the width of the widest line of writing (so a note with a few short lines can be narrowed)
+  function widestLine(n){
+    if(!n.textEl) return 0;
+    try{
+      var r = document.createRange(); r.selectNodeContents(n.textEl);
+      var max = 0; Array.prototype.forEach.call(r.getClientRects(), function(rc){ if(rc.width > max) max = rc.width; });
+      return max / (boardZoom || 1);
+    }catch(e){ return 0; }
+  }
+  // fit: width and height around the content. rip: only the height (the empty part falls away, the width stays).
+  function trimPaper(n, mode){
+    if(readOnly || !n || n.type || !n.el) return;
+    if(n.cosmetic === "soup"){ toast("A soup bowl keeps its own shape."); return; }
+    endEditing(); closeFloatingPopovers();
+    var el = n.el, before = captureState([n.id]), oldH = el.offsetHeight, oldW = n.w || NOTE_W, newW = oldW, prevW = el.style.width, prevMin = el.style.minHeight;
+    if(mode === "fit" && !n.image && !n.isTask){
+      var lw = widestLine(n); if(lw > 0) newW = Math.max(PAPER_MIN_W, Math.min(oldW, Math.ceil(lw) + 36));
+    }
+    el.style.width = newW + "px"; el.style.minHeight = "0px";
+    var natural = el.offsetHeight, newH = Math.max(PAPER_MIN_H, Math.ceil(natural + 10));
+    el.style.width = prevW; el.style.minHeight = prevMin;
+    if(oldH - newH < 18 && oldW - newW < 12){ toast(mode === "rip" ? "There\\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
+    var ripChip = null;
+    if(mode === "rip"){
+      n.rip = n.rip || ripStyleFor(n);
+      if(!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) && oldH - newH > 24){
+        ripChip = makeDiv("ripChip");
+        ripChip.style.left = n.x + "px"; ripChip.style.top = (n.y + newH) + "px"; ripChip.style.width = oldW + "px"; ripChip.style.height = (oldH - newH) + "px";
+        ripChip.style.background = "var(--note-bg)"; ripChip.style.setProperty("--note-bg", n.bg); ripChip.style.setProperty("--rot", (n.rot || 0) + "deg");
+        ripChip.style.zIndex = String((n.z || 1) + 1); boardInner.appendChild(ripChip);
+      }
+    }
+    n.w = newW; n.h = newH;
+    saveNotes(); rerenderNote(n); ensureWidth(); updateMinimap();
+    recordChange(mode === "rip" ? "Rip off empty paper" : "Fit paper to content", before);
+    if(ripChip){
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){ ripChip.classList.add("go"); }); });
+      setTimeout(function(){ ripChip.remove(); }, 900);
+    }
+  }
+  function restorePaper(n){
+    if(readOnly || !n || !n.el) return;
+    var before = captureState([n.id]);
+    delete n.h; delete n.rip; n.w = NOTE_W;
+    saveNotes(); rerenderNote(n); ensureWidth(); updateMinimap();
+    recordChange("Restore full paper", before);
+  }
+  function startNoteResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el, before = captureState([n.id]), sx = e.clientX, sy = e.clientY, w0 = n.w || NOTE_W, h0 = el.offsetHeight, w = w0, h = h0;
+    document.body.style.cursor = "nwse-resize"; el.classList.add("resizing");
+    function move(ev){
+      w = Math.round(Math.min(PAPER_MAX_W, Math.max(PAPER_MIN_W, w0 + (ev.clientX - sx) / boardZoom)));
+      h = Math.round(Math.min(900, Math.max(PAPER_MIN_H, h0 + (ev.clientY - sy) / boardZoom)));
+      el.style.width = w + "px"; el.style.minHeight = h + "px";
+    }
+    function up(){
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = ""; el.classList.remove("resizing");
+      if(w === w0 && Math.abs(h - h0) < 2){ el.style.width = w0 + "px"; el.style.minHeight = n.h ? n.h + "px" : ""; return; }
+      n.w = w; n.h = Math.max(PAPER_MIN_H, Math.round(Math.max(h, 0)));
+      saveNotes(); rerenderNote(n); recoverVertical([n]); ensureWidth(); updateMinimap(); recordChange("Resize note", before);
+    }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
   }
 
   // ---------- sanitising anything that arrives from outside (links, imports, pastes) ----------
   var ALLOWED_TAGS = {DIV:1,P:1,BR:1,B:1,STRONG:1,I:1,EM:1,H1:1,H2:1,H3:1,UL:1,OL:1,LI:1,A:1,MARK:1,SPAN:1};
   var DROP_TAGS = /^(SCRIPT|STYLE|IFRAME|FRAME|OBJECT|EMBED|TEMPLATE|SVG|MATH|NOSCRIPT|FORM|INPUT|TEXTAREA|BUTTON|SELECT|LINK|META|IMG|PICTURE|VIDEO|AUDIO|CANVAS|HEAD|TITLE)$/;
+  // The old highlighter wrote inline background colours. Browsers also write `background-color: rgba(0, 0, 0, 0)` on everything they
+  // copy; that is "no background", not a highlight.
+  function hasRealBackground(style){
+    var m = /background(?:-color)?\s*:\s*([^;]+)/i.exec(style || "");
+    if(!m) return false;
+    var v = m[1].trim().toLowerCase();
+    if(/^(transparent|initial|inherit|unset|none|currentcolor)$/.test(v)) return false;
+    var rgba = /^rgba?\(\s*[\d.]+\s*[, ]\s*[\d.]+\s*[, ]\s*[\d.]+\s*(?:[,/]\s*([\d.]+%?)\s*)?\)$/.exec(v);
+    if(rgba && rgba[1] !== undefined && parseFloat(rgba[1]) === 0) return false;
+    return true;
+  }
+  // What comes off the clipboard from a browser or another app: keep the words and simple formatting (bold, italic, links, lists), drop
+  // everything else. Browsers wrap a copied line in styled spans and end it with a hidden line break; neither belongs in the note, or
+  // the pasted text arrives highlighted and one line too low.
+  function cleanPastedHtml(html){
+    html = String(html || "").replace(/<!--[\s\S]*?-->/g, "").replace(/<br[^>]*Apple-interchange-newline[^>]*>/gi, "");
+    var doc = new DOMParser().parseFromString("<div>" + html + "</div>", "text/html"), root = doc.body.firstChild;
+    if(!root) return "";
+    Array.prototype.slice.call(root.querySelectorAll("[style]")).forEach(function(el){
+      var st = el.getAttribute("style") || "";
+      if(el.tagName === "SPAN"){
+        var bold = /font-weight:\s*(bold|[6-9]00)/i.test(st), ital = /font-style:\s*italic/i.test(st);
+        if(bold || ital){
+          var wrap = doc.createElement(bold ? "b" : "i");
+          while(el.firstChild) wrap.appendChild(el.firstChild);
+          if(bold && ital){ var it = doc.createElement("i"); while(wrap.firstChild) it.appendChild(wrap.firstChild); wrap.appendChild(it); }
+          el.appendChild(wrap);
+        }
+      }
+      el.removeAttribute("style");
+    });
+    var out = sanitizeHtml(root.innerHTML);
+    out = out.replace(/^(?:\s|<br\s*\/?>)+/i, "").replace(/(?:\s|<br\s*\/?>|&nbsp;)+$/i, "");
+    var one = /^<(div|p)>([\s\S]*)<\/\1>$/i.exec(out);                                     // a single wrapper block would start a new line
+    if(one && !/<(div|p|ul|ol|li|h[1-3])[\s>]/i.test(one[2])) out = one[2];
+    return out;
+  }
   function safeHref(href){
     href = String(href || "").trim();
     return /^(https?:|mailto:|tel:)/i.test(href) ? href : null;
@@ -720,7 +855,7 @@
           ch.remove();
           return;
         }
-        if(tag === "SPAN" && /background/i.test(ch.getAttribute("style") || "")){
+        if(tag === "SPAN" && hasRealBackground(ch.getAttribute("style") || "")){
           // the old highlighter wrote inline background colours; turn them into marker strokes
           var mk = doc.createElement("mark");
           mk.className = "hl";
@@ -865,6 +1000,8 @@
       z: 1, categoryIndex: 0,
       isTask: !!item.isTask, done: !!item.done,
       cosmetic: item.cosmetic === "soup" ? "soup" : undefined,
+      h: Number(item.h) >= 60 && Number(item.h) <= 2000 ? Math.round(Number(item.h)) : undefined,
+      rip: RIP_STYLES.indexOf(item.rip) !== -1 ? item.rip : undefined,
       doneAt: Number(item.doneAt) > 0 && Number(item.doneAt) < 1e14 ? Number(item.doneAt) : undefined,
       doneBy: Number(item.doneAt) > 0 && item.doneBy ? String(item.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60) : undefined,
       due: /^\d{4}-\d{2}-\d{2}$/.test(item.due || "") ? item.due : "",
@@ -878,7 +1015,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -935,6 +1072,8 @@
     if(c.cutoutRatio !== undefined) c.cutoutRatio = clampNum(c.cutoutRatio, 0.05, 20, 1);
     if(c.backing !== undefined && BACKINGS.indexOf(c.backing) === -1) delete c.backing;
     if(c.cutBorder !== undefined && CUT_BORDERS.indexOf(c.cutBorder) === -1) delete c.cutBorder;
+    if(c.h !== undefined){ c.h = Number(c.h); if(!(c.h >= 60 && c.h <= 2000)) delete c.h; else c.h = Math.round(c.h); }
+    if(c.rip !== undefined && RIP_STYLES.indexOf(c.rip) === -1) delete c.rip;
     if(c.doneAt !== undefined){ c.doneAt = Number(c.doneAt); if(!(c.doneAt > 0 && c.doneAt < 1e14)) delete c.doneAt; }
     if(c.doneBy !== undefined) c.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60);
     if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
@@ -1674,7 +1813,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -4344,6 +4483,16 @@
     del.setAttribute("aria-label","Delete note");
     del.innerHTML = ICONS.close;
     el.appendChild(del);
+    var qd = null;
+    if(!readOnly && !n.type){
+      var grip = document.createElement("button"); grip.type = "button"; grip.className = "pCtl pHandle noteHandle"; grip.title = "Drag to resize"; grip.setAttribute("aria-label", "Resize note");
+      grip.addEventListener("pointerdown", function(e){ startNoteResize(e, n); }); grip.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      el.appendChild(grip);                                           // a quick "done" tick beside the x (notes and checklists; hidden on soup)
+      qd = document.createElement("button");
+      qd.type = "button"; qd.className = "quickDone"; qd.title = "Mark done"; qd.setAttribute("aria-label", "Mark done");
+      qd.innerHTML = ICONS.doneTick;
+      el.appendChild(qd);
+    }
 
     if(n.isTask){ n.badgeEl = makeBadge(n); el.appendChild(n.badgeEl); }
 
@@ -4564,10 +4713,10 @@
           insert = '<a href="' + escapeAttr(normalizeUrl(one)) + '">' + escapeHtml(one) + '</a>&nbsp;';
         } else if(html){
           // keep simple formatting from other apps, drop their fonts, colours and sizes
-          insert = sanitizeHtml(html.replace(/<!--[\s\S]*?-->/g, ""));
-          if(!htmlToText(insert).trim() && plain) insert = linkifyText(plain);
+          insert = cleanPastedHtml(html);
+          if(!htmlToText(insert).trim() && plain) insert = linkifyText(plain.replace(/\s+$/, ""));
         } else {
-          insert = linkifyText(plain);
+          insert = linkifyText(plain.replace(/\s+$/, ""));
         }
         document.execCommand("insertHTML", false, insert);
       });
@@ -4600,6 +4749,11 @@
         e.stopPropagation();
         deleteNotes([n.id]);
       });
+      if(qd){
+        qd.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+        qd.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        qd.addEventListener("click", function(e){ e.stopPropagation(); markDone(n); });
+      }
 
       el.addEventListener("dblclick", function(e){
         if(focusState || !e.target.closest) return;
@@ -4970,10 +5124,10 @@
     if(one && !/\s/.test(one) && /^(https?:\/\/|www\.)/i.test(one) && normalizeUrl(one)){
       content = '<a href="' + escapeAttr(normalizeUrl(one)) + '">' + escapeHtml(one) + "</a>";
     } else if(html){
-      content = sanitizeHtml(html.replace(/<!--[\s\S]*?-->/g, ""));
-      if(!htmlToText(content).trim()) content = linkifyText(text || "");
+      content = cleanPastedHtml(html);
+      if(!htmlToText(content).trim()) content = linkifyText((text || "").replace(/\s+$/, ""));
     } else {
-      content = linkifyText(text || "");
+      content = linkifyText((text || "").replace(/\s+$/, ""));
     }
     if(!htmlToText(content).trim()) return false;
     var vc = viewCenter();
@@ -5132,6 +5286,11 @@
     pop.appendChild(menuItem(ICONS.sticky, n.cosmetic === "soup" ? "Remove Alphabet Soup" : isPremium() ? "Alphabet Soup" : "Alphabet Soup (Premium)", function(){
       closeFloatingPopovers(); setNoteCosmetic(n, n.cosmetic === "soup" ? null : "soup");
     }));
+    if(n.cosmetic !== "soup"){
+      pop.appendChild(menuItem(ICONS.fit, "Fit paper to content", function(){ trimPaper(n, "fit"); }, {title: "Shrink the note around its words"}));
+      pop.appendChild(menuItem(ICONS.rip, "Rip off empty paper", function(){ trimPaper(n, "rip"); }, {title: "Tear away the unused paper"}));
+      if(n.h || n.rip) pop.appendChild(menuItem(ICONS.sticky, "Restore full paper", function(){ closeFloatingPopovers(); restorePaper(n); }));
+    }
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
@@ -6583,7 +6742,7 @@
       shareDefaultBoardMode: pr.shareDefaultBoardMode, preferredFont: pr.preferredFont, defaultNoteColor: pr.defaultNoteColor
     };
     var stage = {action: "keep", blob: null, url: null};
-    var handleStatus = "idle";
+    var handleStatus = "idle", avSig = "", pvSig = "", pvEls = null;
 
     card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>' +
       '<div class="acctScroll" id="asScroll">' +
@@ -6680,17 +6839,25 @@
     }
     function anonymous(){ return draft.shareDefaultIdentity === "anonymous"; }
     function refreshPreview(){
-      var box = $("asPreview"); box.innerHTML = "";
-      if(anonymous()){ box.textContent = "Shared anonymously. Your name, photo and bio aren\u2019t shown."; return; }
-      var showPhoto = !!draft.shareShowAvatar;
-      var av = makeDiv("acctAv pv");
-      if(showPhoto) paintAvatar(av, avSpec());
-      else { av.style.background = "transparent"; av.style.boxShadow = "inset 0 0 0 1px var(--line)"; av.style.color = "var(--ink-soft)"; av.textContent = "?"; }
-      var t = makeDiv("t"), small = document.createElement("small"), b = document.createElement("b");
-      small.textContent = "What people see"; b.textContent = "Shared by " + (draft.displayName.trim() || "you");
-      t.appendChild(small); t.appendChild(b);
-      if(draft.shareShowBio && draft.bio.trim()){ var i = document.createElement("i"); i.textContent = draft.bio.trim(); t.appendChild(i); }
-      box.appendChild(av); box.appendChild(t);
+      var box = $("asPreview");
+      if(anonymous()){ pvEls = null; pvSig = ""; box.textContent = "Shared anonymously. Your name, photo and bio aren\u2019t shown."; return; }
+      if(!pvEls || !box.contains(pvEls.av)){                               // built once; later keystrokes only change the text
+        box.innerHTML = "";
+        pvEls = {av: makeDiv("acctAv pv"), t: makeDiv("t"), small: document.createElement("small"), b: document.createElement("b"), i: null};
+        pvEls.small.textContent = "What people see";
+        pvEls.t.appendChild(pvEls.small); pvEls.t.appendChild(pvEls.b); box.appendChild(pvEls.av); box.appendChild(pvEls.t); pvSig = "";
+      }
+      var showPhoto = !!draft.shareShowAvatar, sp = avSpec();
+      var sig = (showPhoto ? ["p", sp.source, sp.assetId, sp.providerUrl, sp.style, sp.color, sp.emoji, sp.url, sp.source === "none" ? Array.from((sp.name || "").trim()).slice(0, 2).join("") : ""].join("\u0001") : "q");
+      if(sig !== pvSig){
+        pvSig = sig;
+        if(showPhoto){ pvEls.av.removeAttribute("style"); pvEls.av.textContent = ""; paintAvatar(pvEls.av, sp); }
+        else { pvEls.av.innerHTML = ""; pvEls.av.style.background = "transparent"; pvEls.av.style.boxShadow = "inset 0 0 0 1px var(--line)"; pvEls.av.style.color = "var(--ink-soft)"; pvEls.av.textContent = "?"; }
+      }
+      pvEls.b.textContent = "Shared by " + (draft.displayName.trim() || "you");
+      var bio = draft.shareShowBio && draft.bio.trim() ? draft.bio.trim() : "";
+      if(bio){ if(!pvEls.i){ pvEls.i = document.createElement("i"); pvEls.t.appendChild(pvEls.i); } pvEls.i.textContent = bio; }
+      else if(pvEls.i){ pvEls.i.remove(); pvEls.i = null; }
     }
     function refreshHero(){
       var name = draft.displayName.trim();
@@ -6698,8 +6865,9 @@
       $("asHeroName").style.opacity = name ? "1" : "0.5";
       var hd = $("asHeroHandle"); hd.hidden = !draft.handle; hd.textContent = draft.handle ? "@" + draft.handle : "";
       var hb = $("asHeroBio"); hb.hidden = !draft.bio.trim(); hb.textContent = draft.bio.trim();
-      var eff = effSource();
-      paintAvatar(picEl, avSpec());
+      var eff = effSource(), sp = avSpec();
+      var sig = [sp.source, sp.assetId, sp.providerUrl, sp.style, sp.color, sp.emoji, sp.url, eff === "none" ? Array.from((sp.name || "").trim()).slice(0, 2).join("") : ""].join("\u0001");
+      if(sig !== avSig){ avSig = sig; paintAvatar(picEl, sp); }          // typing a bio or a name must not rebuild (and re-fetch) the picture
       $("asPhotoLbl").textContent = (eff === "none" ? "Add photo" : "Change photo");
       $("asFallVal").textContent = (draft.avatarStyle === "emoji" ? "Emoji" : "Initials") + " \u00B7 " + avColorName(draft.avatarColor);
       refreshPreview();
