@@ -207,6 +207,7 @@
     doneTick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.9c1.5 1.1 3 2.9 4.3 5 2.8-5.7 6.3-9.3 10.6-12.1"></path></svg>',
     fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect><path d="M8 14l4-4 4 4"></path></svg>',
     rip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v7H4z"></path><path d="M4 15l2.5 1.5L9 14.5l2.5 2L14 14.5l2.5 2L19 14.5l1 1"></path></svg>',
+    pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l-1 6 3 3H7l3-3z"></path><path d="M12 12v8"></path></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"></path></svg>',
     pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"></rect><rect x="13.5" y="5" width="4" height="14" rx="1"></rect></svg>',
@@ -770,18 +771,87 @@
     }catch(e){ return 0; }
   }
   // fit: width and height around the content. rip: only the height (the empty part falls away, the width stays).
+  // Where the writing really ends: the bottom of the last piece of visible content (text, a picture, the task row), measured from what is
+  // drawn. Trailing blank lines, empty Shift+Enter breaks, filler <br>s and empty blocks do not count. Blank lines INSIDE the writing
+  // do, because something meaningful comes after them.
+  function meaningfulBottom(n){
+    var el = n && n.el; if(!el) return 0;
+    var z = boardZoom || 1, prevT = el.style.transform, prevTr = el.style.transition, bottom = 0;
+    el.style.transition = "none"; el.style.transform = "none";                      // measure the paper un-tilted
+    var top = el.getBoundingClientRect().top;
+    function see(rc){ if(rc && rc.height > 0){ var b = (rc.bottom - top) / z; if(b > bottom) bottom = b; } }
+    var text = n.textEl;
+    if(text){
+      var walker = document.createTreeWalker(text, NodeFilter.SHOW_TEXT, null), tn;
+      while((tn = walker.nextNode())){
+        if(!/[^\s\u200b\u200c\u200d\u2060\ufeff\u00a0]/.test(tn.nodeValue)) continue;      // only spaces and invisible characters
+        var r = document.createRange(); r.selectNodeContents(tn);
+        var rects = r.getClientRects(); for(var i = 0; i < rects.length; i++) see(rects[i]);
+      }
+      Array.prototype.forEach.call(text.querySelectorAll("img, hr"), function(x){ see(x.getBoundingClientRect()); });
+    }
+    Array.prototype.forEach.call(el.children, function(c){ if(c.classList && (c.classList.contains("noteImgWrap") || c.classList.contains("taskRow"))) see(c.getBoundingClientRect()); });
+    el.style.transform = prevT; el.style.transition = prevTr;
+    return bottom;
+  }
+  var PAPER_BOTTOM = 18;                                          // padding under the last line, so the words are never crowded
+  // after someone stops typing, a note with plenty of empty paper gets a quiet offer (once per note per visit; never automatic)
+  function maybeSuggestTrim(n){
+    if(readOnly || !n || n.type || n.cosmetic || n.h || n._trimAsked || focusState || !n.el || !n.el.isConnected) return;
+    var mb = meaningfulBottom(n); if(!mb) return;
+    if(n.el.offsetHeight - (mb + PAPER_BOTTOM) < 110) return;
+    n._trimAsked = true;
+    toast("Trim empty paper?", "Trim", function(){ var cur = findNote(n.id); if(cur) trimPaper(cur, "rip"); });
+  }
+  // blank lines at the very end of the writing (Enter or Shift+Enter pressed and never used, empty blocks, filler breaks) are not
+  // content: fitting or ripping the paper removes them, so the paper can really end where the words end
+  function isBlankNode(node){
+    if(node.nodeType === 3) return !/[^\s\u200b\u200c\u200d\u2060\ufeff\u00a0]/.test(node.nodeValue);
+    if(node.nodeType !== 1) return true;
+    if(node.tagName === "BR") return true;
+    if(/^(IMG|HR|INPUT)$/.test(node.tagName)) return false;
+    for(var i = 0; i < node.childNodes.length; i++){ if(!isBlankNode(node.childNodes[i])) return false; }
+    return true;
+  }
+  function trimEndBlanks(container){
+    var again = true;
+    while(again){
+      again = false; var last = container.lastChild; if(!last) break;
+      if(isBlankNode(last)){ container.removeChild(last); again = true; continue; }
+      if(last.nodeType === 1 && /^(DIV|P|UL|OL|LI|BLOCKQUOTE)$/.test(last.tagName)){ trimEndBlanks(last); if(isBlankNode(last)){ container.removeChild(last); again = true; } }
+    }
+  }
+  function trimTrailingBlank(html){ var d = document.createElement("div"); d.innerHTML = html; trimEndBlanks(d); return d.innerHTML; }
+  // one undo step that restores whole snapshots (the words may have changed, which the field-by-field history does not track)
+  function recordSnapshots(label, ids, before){
+    var after = captureState(ids);
+    function put(map){
+      ids.forEach(function(id){
+        var n = findNote(id), snap = map[id]; if(!n || !snap) return;
+        SERIAL_FIELDS.forEach(function(k){ if(k in snap) n[k] = snap[k]; else delete n[k]; });
+        rerenderNote(n);
+      });
+      return true;
+    }
+    pushHistory({label: label, custom: true, t: Date.now(), undo: function(){ return put(before); }, redo: function(){ return put(after); }});
+  }
   function trimPaper(n, mode){
     if(readOnly || !n || n.type || !n.el) return;
     if(n.cosmetic === "soup"){ toast("A soup bowl keeps its own shape."); return; }
     endEditing(); closeFloatingPopovers();
-    var el = n.el, before = captureState([n.id]), oldH = el.offsetHeight, oldW = n.w || NOTE_W, newW = oldW, prevW = el.style.width, prevMin = el.style.minHeight;
+    if(n.textEl) n.html = n.textEl.innerHTML;
+    var el = n.el, before = captureState([n.id]), oldH = el.offsetHeight, oldW = n.w || NOTE_W, newW = oldW, prevW = el.style.width;
+    var tidy = trimTrailingBlank(n.html || ""), changedWords = tidy !== (n.html || "");
+    if(changedWords && n.textEl){ n.textEl.innerHTML = tidy; }
     if(mode === "fit" && !n.image && !n.isTask){
       var lw = widestLine(n); if(lw > 0) newW = Math.max(PAPER_MIN_W, Math.min(oldW, Math.ceil(lw) + 36));
     }
-    el.style.width = newW + "px"; el.style.minHeight = "0px";
-    var natural = el.offsetHeight, newH = Math.max(PAPER_MIN_H, Math.ceil(natural + 10));
-    el.style.width = prevW; el.style.minHeight = prevMin;
-    if(oldH - newH < 18 && oldW - newW < 12){ toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
+    el.style.width = newW + "px";
+    var mb = meaningfulBottom(n);
+    if(!mb){ el.style.width = prevW; if(changedWords && n.textEl) n.textEl.innerHTML = before[n.id].html; toast("Write something first, then trim the paper."); return; }
+    var newH = Math.max(PAPER_MIN_H, Math.ceil(mb + PAPER_BOTTOM));
+    el.style.width = prevW;
+    if(oldH - newH < 18 && oldW - newW < 12 && !changedWords){ if(n.textEl && changedWords) n.textEl.innerHTML = before[n.id].html; toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
     var ripChip = null;
     if(mode === "rip"){
       n.rip = n.rip || ripStyleFor(n);
@@ -792,9 +862,9 @@
         ripChip.style.zIndex = String((n.z || 1) + 1); boardInner.appendChild(ripChip);
       }
     }
-    n.w = newW; n.h = newH;
+    n.w = newW; n.h = newH; n.html = tidy;
     saveNotes(); rerenderNote(n); ensureWidth(); updateMinimap();
-    recordChange(mode === "rip" ? "Rip off empty paper" : "Fit paper to content", before);
+    recordSnapshots(mode === "rip" ? "Rip off empty paper" : "Fit paper to content", [n.id], before);
     if(ripChip){
       requestAnimationFrame(function(){ requestAnimationFrame(function(){ ripChip.classList.add("go"); }); });
       setTimeout(function(){ ripChip.remove(); }, 900);
@@ -805,7 +875,7 @@
     var before = captureState([n.id]);
     delete n.h; delete n.rip; n.w = NOTE_W;
     saveNotes(); rerenderNote(n); ensureWidth(); updateMinimap();
-    recordChange("Restore full paper", before);
+    recordSnapshots("Restore full paper", [n.id], before);
   }
   function startNoteResize(e, n){
     e.preventDefault(); e.stopPropagation();
@@ -1046,7 +1116,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1084,7 +1154,7 @@
     if(window.Stick && Stick.objects && Stick.objects.isKind(c.type)){
       var sp = Stick.objects.sanitize(c, paperHelpers());
       if(!sp) return null;
-      sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
+      if(c.pinned === true) sp.pinned = true; sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
       if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
       if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) !== -1) sp.mediaState = c.mediaState;
       return sp;
@@ -1105,6 +1175,7 @@
     if(c.cutBorder !== undefined && CUT_BORDERS.indexOf(c.cutBorder) === -1) delete c.cutBorder;
     if(c.h !== undefined){ c.h = Number(c.h); if(!(c.h >= 60 && c.h <= 2000)) delete c.h; else c.h = Math.round(c.h); }
     if(c.rip !== undefined && RIP_STYLES.indexOf(c.rip) === -1) delete c.rip;
+    if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
     if(c.doneAt !== undefined){ c.doneAt = Number(c.doneAt); if(!(c.doneAt > 0 && c.doneAt < 1e14)) delete c.doneAt; }
     if(c.doneBy !== undefined) c.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60);
     if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
@@ -1856,7 +1927,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -3006,6 +3077,7 @@
       saveNotes(); rerenderNote(n);
       recordChange("Reset photo size", before);
     }));
+    pop.appendChild(pinMenuItem(n));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -3387,6 +3459,7 @@
     if(!pop) return;
     if(n.type === "video") pop.appendChild(menuItem(ICONS.film, "Open large", function(){ closeFloatingPopovers(); openVideoLarge(n); }));
     pop.appendChild(menuItem(ICONS.pencil, n.caption ? "Rename" : "Add a label", function(){ closeFloatingPopovers(); editCaption(n); }));
+    pop.appendChild(pinMenuItem(n));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -3687,6 +3760,7 @@
     }
     if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
     pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(pinMenuItem(n));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -4196,6 +4270,8 @@
     var h = makeDiv("menuHint"); h.textContent = ids.length + " selected"; pop.appendChild(h);
     var onlyPhotos = ids.every(function(id){ return isPhoto(findNote(id)); });
     if(onlyPhotos) pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos(ids); }));
+    var anyUnpinned = ids.some(function(id){ var q = findNote(id); return q && !isPinned(q); });
+    pop.appendChild(menuItem(ICONS.pin, anyUnpinned ? "Pin in place" : "Unpin", function(){ closeFloatingPopovers(); setPinned(ids, anyUnpinned); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -4499,6 +4575,7 @@
 
   function renderNote(n, isNew, opts){
     var made = renderNoteCore(n, isNew, opts);
+    decoratePin(n);
     if(window.Stick && Stick.collab && Stick.collab.active()) Stick.collab.decorate(n, n.el || made);
     return made;
   }
@@ -4777,6 +4854,7 @@
         if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
         el.classList.remove("editing"); if(n.cosmetic === "soup"){ soupSettleNext[n.id] = true; applySoup(n); }
         resetKeyboardShift();
+        setTimeout(function(){ maybeSuggestTrim(n); }, 350);
         // tidy leftovers from editing (empty spans and the like) once the caret has left
         var clean = sanitizeHtml(text.innerHTML);
         if(clean !== text.innerHTML){
@@ -4870,6 +4948,9 @@
 
   var draggingIds = null;
   function startDrag(e, primary, group){
+    var everyone = group;
+    group = group.filter(function(g){ return !isPinned(g); });               // pinned items stay put, even in a group
+    if(!group.length){ everyone.forEach(pinTug); return; }
     var startX = e.clientX, startY = e.clientY;
     var orig = group.map(function(g){ return {n:g, x:g.x, y:g.y}; });
     var before = captureState(group.map(function(g){ return g.id; }));
@@ -5337,6 +5418,7 @@
       if(n.h || n.rip) pop.appendChild(menuItem(ICONS.sticky, "Restore full paper", function(){ closeFloatingPopovers(); restorePaper(n); }));
     }
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
+    pop.appendChild(pinMenuItem(n));
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -5364,6 +5446,35 @@
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
+
+  // ---------- Pin in place: this scrap is pushed down with a pin and stays where it is ----------
+  // Pinned means the POSITION is locked. It can still be selected, edited, resized, commented on, marked done, moved to another board
+  // or deleted. It does not move when a group is dragged or nudged, and Clean up leaves it exactly where it is (and tidies around it).
+  // Duplicates, pastes and imports are never pinned.
+  function isPinned(n){ return !!n && n.pinned === true; }
+  function isZone(n){ return !!n && n.type === "zone"; }
+  function decoratePin(n){
+    var el = n && n.el; if(!el) return;
+    var old = el.querySelector(":scope > .pinBadge"); if(old) old.remove();
+    el.classList.toggle("pinned", isPinned(n));
+    if(!isPinned(n)) return;
+    var b = document.createElement("span"); b.className = "pinBadge"; b.title = "Pinned in place"; b.setAttribute("role", "img"); b.setAttribute("aria-label", "Pinned in place");
+    b.innerHTML = ICONS.pin; el.appendChild(b);
+  }
+  function setPinned(ids, on){
+    var list = ids.map(findNote).filter(function(n){ return n && isPinned(n) !== on; });
+    if(!list.length || readOnly) return;
+    var before = captureState(list.map(function(n){ return n.id; }));
+    list.forEach(function(n){ if(on) n.pinned = true; else delete n.pinned; decoratePin(n); });
+    saveNotes();
+    recordChange(on ? (list.length > 1 ? "Pin " + list.length + " items" : "Pin in place") : (list.length > 1 ? "Unpin " + list.length + " items" : "Unpin"), before);
+    toast(on ? (list.length > 1 ? "Pinned " + list.length + " items in place." : "Pinned in place.") : "Unpinned.");
+  }
+  function pinMenuItem(n){
+    return menuItem(ICONS.pin, isPinned(n) ? "Unpin" : "Pin in place", function(){ closeFloatingPopovers(); setPinned([n.id], !isPinned(n)); }, {title: isPinned(n) ? "Let this move again" : "Keep this exactly where it is"});
+  }
+  // a tug at a pinned note: it does not move, it just shows why
+  function pinTug(n){ if(!n || !n.el || reducedMotion()) return; n.el.classList.remove("pinTug"); void n.el.offsetWidth; n.el.classList.add("pinTug"); setTimeout(function(){ if(n.el) n.el.classList.remove("pinTug"); }, 320); }
 
   // ---------- the Done pile: finished notes go into a little stack at the board's edge, not into the bin ----------
   // A finished note keeps its words, colour, place and who finished it and when. It leaves the board (so the board stays calm) but stays
@@ -7632,7 +7743,7 @@
       return "presence on";
     };
     Stick.dev.ui = {                // local only: open the new dialogs without setting up a board for each (used in the polish pass tests)
-      cleanUp: function(){ openCleanUp(); }, activeShares: function(){ openManageShares(function(){}); },
+      cleanUp: function(p){ openCleanUp(p); }, activeShares: function(){ openManageShares(function(){}); },
       foot: {start: function(t, d){ busyStart('dev', t || 'Loading board…', {delay: d == null ? 0 : d}); }, done: function(t){ busyDone('dev', t || 'Done.'); }, fail: function(t){ busyFail('dev', t || 'Couldn’t load photos.', function(){}); }, end: function(){ busyEnd('dev'); }},
       controlCenter: function(sec){ openControlCenter(sec); }, stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
       askReason: function(){ return Stick.collab.askReason({modal: openModal}, null, function(){}); }
@@ -7878,7 +7989,8 @@
   // ---------- Clean up: straighten the desk (never deletes anything) ----------
   // Objects keep their reading order (top to bottom in bands, left to right inside a band) and are set down again in loose rows with
   // room between them, so nothing overlaps and nothing sits under the header. Sizes and tilt are kept: it should look like a tidied
-  // desk, not a diagram. One undo step brings every object back.
+  // desk, not a diagram. Pinned objects never move and are treated as obstacles. The list of objects is fixed once, when the dialog
+  // opens, and that same list is what is counted, moved and undone.
   var CLEAN_MARGIN = 20, CLEAN_BAND = 140;
   function cleanRegion(){
     var br = board.getBoundingClientRect(), ir = boardInner.getBoundingClientRect(), x0 = (br.left - ir.left) / boardZoom;
@@ -7888,9 +8000,19 @@
     var sz = objSize(n), w = sz.w, h = sz.h, a = Math.abs((n.rot || 0) * Math.PI / 180);
     return {n: n, w: w, h: h, bw: w * Math.cos(a) + h * Math.sin(a), bh: w * Math.sin(a) + h * Math.cos(a)};
   }
-  function cleanVisible(items){
-    var r = cleanRegion();
-    return items.filter(function(it){ return it.n.x < r.x1 && it.n.x + it.w > r.x0 && it.n.y < r.y1 && it.n.y + it.h > r.y0; });
+  // only real, drawn board objects: not the Done pile, not pinned, nothing that is merely a control or a decoration
+  function cleanEligible(){
+    return notes.filter(function(n){ return n.el && n.el.isConnected && !isPinned(n) && !isZone(n); });
+  }
+  // what is actually on screen, judged from where the object is drawn (not from stale coordinates)
+  function onScreen(n){
+    var r = n.el.getBoundingClientRect(), b = board.getBoundingClientRect();
+    return r.width > 0 && r.right > b.left + 2 && r.left < b.right - 2 && r.bottom > b.top + 2 && r.top < b.bottom - 2;
+  }
+  function cleanObstacles(){
+    var out = [];
+    notes.forEach(function(n){ if(n.el && n.el.isConnected && (isPinned(n) || isZone(n))){ var it = cleanItem(n); out.push({l: n.x, t: n.y, r: n.x + it.w, b: n.y + it.h, zone: isZone(n)}); } });
+    return out;
   }
   function cleanOrder(items){
     var sorted = items.slice().sort(function(a, b){ return a.n.y - b.n.y; }), bands = [];
@@ -7902,12 +8024,23 @@
     bands.forEach(function(b){ b.items.sort(function(p, q){ return p.n.x - q.n.x; }); out = out.concat(b.items); });
     return out;
   }
-  // set the items down in rows inside one page; what does not fit comes back as `rest`
-  function cleanPack(items, page, gap){
+  // set the items down in rows inside one page; what does not fit comes back as `rest`. obstacles: rectangles to keep clear of.
+  function cleanPack(items, page, gap, obstacles){
+    obstacles = obstacles || [];
     var rows = [], row = null, x = page.x0, y = page.y0, rest = [];
+    function hit(it, px, py){
+      for(var i = 0; i < obstacles.length; i++){ var o = obstacles[i]; if(px < o.r + gap && px + it.bw > o.l - gap && py < o.b + gap && py + it.bh > o.t - gap) return o; }
+      return null;
+    }
     items.forEach(function(it){
       if(rest.length){ rest.push(it); return; }
-      if(row && x > page.x0 && x + it.bw > page.x1){ y += row.h + gap; x = page.x0; row = null; }
+      var guard = 0, placedHere = false;
+      while(!placedHere && guard++ < 200){
+        if(row && x > page.x0 && x + it.bw > page.x1){ y += row.h + gap; x = page.x0; row = null; continue; }
+        var o = hit(it, x, row ? row.y : y);
+        if(o){ x = o.r + gap; if(x + it.bw > page.x1 && x > page.x0){ if(row){ y += row.h + gap; row = null; } else y = o.b + gap; x = page.x0; } continue; }
+        placedHere = true;
+      }
       if(y + it.bh > page.y1 && (rows.length || row)){ rest.push(it); return; }
       if(!row){ row = {y: y, h: 0, items: []}; rows.push(row); }
       row.items.push({it: it, x: x}); row.h = Math.max(row.h, it.bh); x += it.bw + gap;
@@ -7921,41 +8054,56 @@
     });
     return {placed: placed, rest: rest};
   }
-  function cleanPlan(scope){
-    var all = notes.map(cleanItem), items = scope === "screen" ? cleanVisible(all) : all;
+  function cleanPlan(items){
     if(!items.length) return {items: [], placed: []};
     var order = cleanOrder(items), r = cleanRegion(), pageW = Math.max(480, r.x1 - r.x0 - 2 * CLEAN_MARGIN), pageH = Math.max(200, r.y1 - 2 * CLEAN_MARGIN);
-    var x0 = scope === "screen" ? r.x0 + CLEAN_MARGIN : CLEAN_MARGIN, placed = [], rest = order, pageNo = 0;
+    var scopeScreen = items.length < cleanEligible().length;
+    var x0 = scopeScreen ? r.x0 + CLEAN_MARGIN : CLEAN_MARGIN, placed = [], rest = order, pageNo = 0, obstacles = cleanObstacles();
     while(rest.length && pageNo < 60){
       var page = {x0: x0 + pageNo * (pageW + 60), x1: x0 + pageNo * (pageW + 60) + pageW, y0: CLEAN_MARGIN, y1: CLEAN_MARGIN + pageH};
-      var res = cleanPack(rest, page, 26);
+      var res = cleanPack(rest, page, 26, obstacles);
       if(!res.placed.length){ res.placed = [{it: rest[0], cx: page.x0 + rest[0].bw / 2, cy: page.y0 + rest[0].bh / 2}]; res.rest = rest.slice(1); }
       placed = placed.concat(res.placed); rest = res.rest; pageNo++;
     }
     return {items: items, placed: placed, pages: pageNo};
   }
-  function applyClean(scope){
-    var plan = cleanPlan(scope);
-    if(!plan.placed.length) return 0;
-    var ids = plan.placed.map(function(p){ return p.it.n.id; }), before = captureState(ids), moved = 0;
-    plan.placed.forEach(function(p){
-      var n = p.it.n, nx = Math.max(0, Math.round(p.cx - p.it.w / 2)), ny = Math.max(8, Math.round(p.cy - p.it.h / 2));
-      if(nx !== Math.round(n.x) || ny !== Math.round(n.y)) moved++;
-      n.x = nx; n.y = ny;
+  function cleanTarget(p){ return {x: Math.max(0, Math.round(p.cx - p.it.w / 2)), y: Math.max(8, Math.round(p.cy - p.it.h / 2))}; }
+  // the objects that would really change place (this is the number the person sees)
+  function cleanMoving(plan){ return plan.placed.filter(function(p){ var t = cleanTarget(p); return t.x !== Math.round(p.it.n.x) || t.y !== Math.round(p.it.n.y); }); }
+  // plan from the exact ids chosen when the dialog opened
+  function cleanSnapshot(){
+    var eligible = cleanEligible(), screenIds = eligible.filter(onScreen).map(function(n){ return n.id; }), allIds = eligible.map(function(n){ return n.id; });
+    var pinnedHere = notes.filter(function(n){ return n.el && n.el.isConnected && isPinned(n); });
+    function build(ids){
+      var items = ids.map(findNote).filter(Boolean).map(cleanItem), plan = cleanPlan(items);
+      return {ids: ids, plan: plan, moving: cleanMoving(plan).length};
+    }
+    var pinnedOnScreen = pinnedHere.filter(onScreen).length;
+    return {screen: build(screenIds), board: build(allIds), pinned: {screen: pinnedOnScreen, board: pinnedHere.length}};
+  }
+  function applyClean(snap, scope){
+    var part = scope === "screen" ? snap.screen : snap.board;
+    var plan = cleanPlan(part.ids.map(findNote).filter(Boolean).map(cleanItem)), moving = cleanMoving(plan);
+    if(!moving.length) return 0;
+    var before = captureState(part.ids);
+    moving.forEach(function(p){
+      var n = p.it.n, t = cleanTarget(p);
+      n.x = t.x; n.y = t.y;
       if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; }
     });
-    var anim = !reducedMotion();
-    if(anim){ document.body.classList.add("tidying"); setTimeout(function(){ document.body.classList.remove("tidying"); }, 800); }
-    ensureWidth(); saveNotes(); updateMinimap(); recoverVertical(plan.placed.map(function(p){ return p.it.n; }));
+    if(!reducedMotion()){ document.body.classList.add("tidying"); setTimeout(function(){ document.body.classList.remove("tidying"); }, 800); }
+    ensureWidth(); saveNotes(); updateMinimap(); recoverVertical(moving.map(function(p){ return p.it.n; }));
     recordChange(scope === "screen" ? "Clean up (my screen)" : "Clean up (whole canvas)", before);
-    return moved;
+    return moving.length;
   }
-  function openCleanUp(){
+  function openCleanUp(preset){
     if(readOnly || singleNoteMode) return;
     closeFloatingPopovers(); endEditing();
-    var all = notes.map(cleanItem), vis = cleanVisible(all).length, total = all.length;
-    if(!total){ toast("The board is empty, so there is nothing to tidy."); return; }
-    var scope = vis ? "screen" : "board", content = makeDiv("cleanBox"), group = makeDiv("cleanOpts"), summary = makeDiv("cleanSum"), go = null;
+    var snap = cleanSnapshot();
+    if(!snap.board.ids.length){ toast(snap.pinned.board ? "Everything on this board is pinned in place." : "The board is empty, so there is nothing to tidy."); return; }
+    function run(scope){ setTimeout(function(){ var moved = applyClean(snap, scope); toast(moved ? "Tidied " + moved + (moved === 1 ? " item." : " items.") : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }
+    if(preset === "screen" || preset === "board"){ run(preset); return; }       // from the command palette
+    var vis = snap.screen.moving, total = snap.board.moving, scope = snap.screen.ids.length ? "screen" : "board", content = makeDiv("cleanBox"), group = makeDiv("cleanOpts"), summary = makeDiv("cleanSum"), go = null;
     group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "What to tidy"); summary.setAttribute("role", "status");
     function plural(k){ return k + (k === 1 ? " item" : " items"); }
     function opt(id, title, desc, count, icon, disabled){
@@ -7965,25 +8113,30 @@
       b.addEventListener("click", function(){ if(b.disabled) return; scope = id; paint(); });
       group.appendChild(b); return b;
     }
-    opt("screen", "Clean my screen", "Tidy only what you\u2019re looking at right now.", vis ? plural(vis) + " on screen" : "Nothing on screen right now", ICONS.fit, !vis);
-    opt("board", "Clean whole canvas", "Tidy every item on this board, including what\u2019s off to the side.", plural(total) + " on the board", ICONS.rip.replace(/<path[^>]*d="M4 15[^>]*>/, ""), false);
+    opt("screen", "Clean my screen", "Tidy only what you\u2019re looking at right now.", vis ? plural(vis) + " will move" : (snap.screen.ids.length ? "Already tidy" : "Nothing on screen right now"), ICONS.fit, !vis);
+    opt("board", "Clean whole canvas", "Tidy every item on this board, including what\u2019s off to the side.", total ? plural(total) + " will move" : "Already tidy", ICONS.rip.replace(/<path[^>]*d="M4 15[^>]*>/, ""), !total);
+    function pinNote(){ var k = scope === "screen" ? snap.pinned.screen : snap.pinned.board; return k ? " " + plural(k) + " pinned in place stay where they are." : ""; }
     function paint(){
       Array.prototype.forEach.call(group.children, function(b){ var on = b.dataset.scope === scope; b.setAttribute("aria-checked", String(on)); b.classList.toggle("on", on); b.tabIndex = on ? 0 : -1; });
-      summary.textContent = scope === "screen" ? "Tidy " + plural(vis) + " on your screen" : "Tidy " + plural(total) + " across the board";
-      if(go) go.disabled = scope === "screen" && !vis;
+      var n = scope === "screen" ? vis : total;
+      summary.textContent = n ? (scope === "screen" ? "Tidy " + plural(n) + " on your screen" : "Tidy " + plural(n) + " across the board") : "Everything here is already tidy";
+      note.textContent = "Nothing is deleted. Items keep their size and tilt, and you can undo it right after." + pinNote();
+      if(go) go.disabled = !n;
     }
     group.addEventListener("keydown", function(e){
       if(e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft"){
-        e.preventDefault(); var ids = ["screen", "board"].filter(function(id){ return !(id === "screen" && !vis); }), i = ids.indexOf(scope);
-        scope = ids[(i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : ids.length - 1)) % ids.length]; paint();
+        e.preventDefault(); var ids = ["screen", "board"].filter(function(id){ return id === "screen" ? vis : total; }), i = ids.indexOf(scope);
+        if(!ids.length) return;
+        scope = ids[(i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : ids.length - 1) + ids.length) % ids.length]; paint();
         var cur = group.querySelector('[data-scope="' + scope + '"]'); if(cur) cur.focus();
       }
     });
-    var note = makeDiv("cleanNote"); note.textContent = "Nothing is deleted. Your items keep their size and tilt, and you can undo it right after.";
+    if(!vis && total) scope = "board";
+    var note = makeDiv("cleanNote");
     content.appendChild(group); content.appendChild(summary); content.appendChild(note);
     var m = openModal({title: "Clean up canvas", sub: "Put things back in order, like straightening up a desk.", content: content, width: 440,
       actions: [{label: "Cancel", value: false}, {label: "Tidy up", kind: "primary", value: true, id: "cleanGo"}],
-      onClose: function(v){ if(v) setTimeout(function(){ var moved = applyClean(scope); toast(moved ? "Tidied up." : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }});
+      onClose: function(v){ if(v) run(scope); }});
     go = m.card.querySelector("#cleanGo"); paint();
     setTimeout(function(){ var cur = group.querySelector(".cleanOpt.on"); if(cur) cur.focus(); }, 60);
   }
@@ -9053,7 +9206,8 @@
       else if(key === "ArrowRight") dx = step;
       else return;
       e.preventDefault();
-      var list = selectedNotes();
+      var list = selectedNotes().filter(function(n){ return !isPinned(n); });
+      if(!list.length) return;
       var before2 = captureState(list.map(function(n){ return n.id; }));
       var minX = Math.min.apply(null, list.map(function(n){ return n.x; }));
       var minY = Math.min.apply(null, list.map(function(n){ return n.y; }));

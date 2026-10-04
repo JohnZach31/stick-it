@@ -2197,3 +2197,11 @@ body.dark .ppList li::before{ color:#7fd08a; }
 body.dark .crown{ filter:none; }
 body.dark .crown svg path:first-child{ stroke:#2b1c00; }
 body.dark .avCrownWrap .crown, body.dark #accountBtn .crown{ filter:drop-shadow(0 0 0.5px rgba(255,236,170,0.7)); }
+
+/* ---------- pinned scraps ---------- */
+.pinBadge{ position:absolute; top:-8px; left:-8px; z-index:5; width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:#fff7e0; color:#a63a2a; border:1px solid rgba(90,40,20,0.35); box-shadow:0 1px 3px rgba(0,0,0,0.3); pointer-events:none; }
+.pinBadge svg{ width:12px; height:12px; display:block; }
+body.dark .pinBadge{ background:#3a2f28; color:#ff9f8a; border-color:rgba(255,159,138,0.4); }
+.pinned{ cursor:default; }
+.pinned.pinTug{ animation:pinTug .3s ease; }
+@keyframes pinTug{ 0%,100%{ translate:0 0; } 25%{ translate:-2px 0; } 60%{ translate:2px 0; } }

@@ -33,7 +33,7 @@ const sandbox = (code, extra = {}) => { const ctx = vm.createContext({ Math, Arr
 
 // ---- clean-up layout: reading order, no overlaps, nothing under the header, nothing lost
 {
-  const code = 'var CLEAN_BAND = 140;\n' + slice('function cleanOrder(items){', 'function cleanPlan(scope){');
+  const code = 'var CLEAN_BAND = 140;\n' + slice('function cleanOrder(items){', 'function cleanPlan(items){');
   const ctx = sandbox(code);
   const mk = (id, x, y, w, h) => ({ n: { id, x, y }, w, h, bw: w, bh: h });
   const items = [mk('d', 900, 30, 200, 150), mk('a', 20, 20, 240, 180), mk('c', 40, 400, 200, 200), mk('b', 300, 40, 240, 160), mk('e', 600, 420, 220, 180)];
@@ -85,8 +85,8 @@ const sandbox = (code, extra = {}) => { const ctx = vm.createContext({ Math, Arr
   ok(/class="quickDone"|qd\.className = "quickDone"/.test(app) && /aria-label", "Mark done"/.test(app) && /\.note\.soup \.quickDone/.test(css), 'a note has a quick Mark done tick beside the x (not on soup), with a label');
   ok(/function trimPaper\(n, mode\)/.test(app) && /Fit paper to content/.test(app) && /Rip off empty paper/.test(app) && /Restore full paper/.test(app), 'Fit paper to content, Rip off empty paper and Restore full paper exist');
   ok(/PAPER_MIN_H = 96/.test(app) && /el\.style\.minHeight = "0px"/.test(app), 'a note keeps room for its words: its height is only a minimum');
-  ok(/id="cleanBtn"/.test(html) && /function openCleanUp\(\)/.test(app) && /Clean my screen/.test(app) && /Clean whole canvas/.test(app) && /recordChange\(scope === "screen"/.test(app), 'Clean up is in the top bar, offers my screen / whole canvas, and is one undo step');
-  ok(!/wipe|clear the board|delete everything/i.test(slice('function openCleanUp(){', '(function(){ var b = document.getElementById("cleanBtn")')), 'the Clean up dialog never talks about deleting');
+  ok(/id="cleanBtn"/.test(html) && /function openCleanUp\(preset\)/.test(app) && /Clean my screen/.test(app) && /Clean whole canvas/.test(app) && /recordChange\(scope === "screen"/.test(app), 'Clean up is in the top bar, offers my screen / whole canvas, and is one undo step');
+  ok(!/wipe|clear the board|delete everything/i.test(slice('function openCleanUp(preset){', '(function(){ var b = document.getElementById("cleanBtn")')), 'the Clean up dialog never talks about deleting');
   ok(/function busyStart\(/.test(app) && /function localLoader\(/.test(app) && /busyStart\("sync"/.test(app) && /busyStart\("share"/.test(app) && /busyStart\("media"/.test(app) && /watchPhotoLoading/.test(app), 'the foot slip is wired to syncing, photos, media and sharing');
   ok(/localLoader\(content, "Loading your links/.test(app) && !/content\.textContent = "Loading/.test(app), 'Active Shares uses the branded loader, not plain "Loading…"');
   ok(/function cleanPastedHtml/.test(app) && /Apple-interchange-newline/.test(app), 'pasted text is cleaned of browser wrappers (no stray highlight, no extra line)');
