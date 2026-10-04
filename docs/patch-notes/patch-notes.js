@@ -72,17 +72,18 @@ export const patchNotes = [
       "Clean up could announce one number and move another; it now uses one fixed list.",
       "The 'New board links' row no longer lights up its whole row on hover.",
       "A comment's delete button no longer fights its words for space.",
-      "Select-all and the new-note key keep working after the shortcut rewrite (fixed within the patch)."
+      "Select-all and the new-note key keep working after the shortcut rewrite (fixed within the patch).",
+      "Deleting a voice memo or video left its file in memory until the page reloaded; it is now released (and comes back with Undo)."
     ],
     "limitations": [
-      "The comment-delete rules and the new ui_prefs column are in migrations that must be applied to the real project (npx supabase db push); until then deleting a comment and syncing shortcuts will not work against it. Everything was tested against a local stand-in and the SQL test suite.",
+      "The two new migrations are applied to the real project, but signed-in behaviour against it (comment delete rules, shortcut sync) has not been tested with real accounts.",
       "Pins are not carried through duplicate, paste or import (by design).",
       "Bookmarks live on this device for now; they do not sync across devices.",
       "Clean up treats a zone as a keep-out area and leaves notes inside it where they are; it does not arrange inside a zone.",
       "The legal text is still a DRAFT and has not been reviewed by a lawyer.",
       "The plan popover, storage bar and crown were not re-checked while signed in with a real account.",
-      "The memory audit covered notes, zones, the palette, Settings and the tour, not photos, video, voice, cutouts or live collaboration.",
-      "Not tested on a physical phone, with a screen reader, or against real Realtime with two accounts."
+      "Not tested on a physical phone, with a screen reader, or against real Realtime with two accounts.",
+      "The memory audit covered notes, zones, photos, video, voice memos, the palette, Settings and the tour; cutouts and live collaboration were not measured."
     ]
   },
   {
