@@ -29,6 +29,7 @@
     d.shareDefaultBoardMode = r.share_default_board_mode || "view";
     d.preferredFont = r.preferred_font || ""; d.defaultNoteColor = r.default_note_color || "";
     d.marketingOptIn = !!r.marketing_opt_in;
+    d.uiPrefs = r.ui_prefs && typeof r.ui_prefs === "object" ? r.ui_prefs : {};
     return d;
   }
   function toSettingsRow(s) {
@@ -46,6 +47,8 @@
       marketing_opt_in: !!s.marketingOptIn      // off unless the person switched it on; the server stamps when
     };
   }
+  // interface preferences travel on their own (see saveUiPrefs), so an ordinary settings save never overwrites them
+  function uiPrefsRow(prefs) { return { ui_prefs: prefs && typeof prefs === "object" ? prefs : {} }; }
 
   // Client-side checks (the database enforces the same rules)
   function validate(v) {
@@ -86,8 +89,20 @@
 
   Stick.account = {
     DEFAULTS: DEFAULT_SETTINGS, AVATAR_COLORS: AVATAR_COLORS, HANDLE_RE: HANDLE_RE,
-    validate: validate, drawCrop: drawCrop, cropToBlob: cropToBlob, fromSettingsRow: fromSettingsRow, toSettingsRow: toSettingsRow,
+    validate: validate, drawCrop: drawCrop, cropToBlob: cropToBlob, fromSettingsRow: fromSettingsRow, toSettingsRow: toSettingsRow, uiPrefsRow: uiPrefsRow,
     cached: function () { return cache; },
+    // save the small JSON of interface preferences (custom shortcuts, ...); creates the settings row the first time
+    saveUiPrefs: function (prefs) {
+      var user = Stick.auth.user(); if (!user) return Promise.reject({ code: "NOT_AUTHENTICATED", offline: false, retryable: false });
+      var row = uiPrefsRow(prefs);
+      return db().then(function (c) {
+        return guard(c.from("profile_settings").update(row).eq("user_id", user.id).select()).then(function (rows) {
+          if (rows && rows.length) return rows[0];
+          var ins = { user_id: user.id }; ins.ui_prefs = row.ui_prefs;
+          return guard(c.from("profile_settings").insert(ins).select().single());
+        });
+      }).then(function (r) { if (cache && cache.settings) cache.settings.uiPrefs = r.ui_prefs || {}; return r.ui_prefs || {}; });
+    },
 
     // profile (public part) + private settings, from the server
     load: function () {

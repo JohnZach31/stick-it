@@ -494,6 +494,13 @@ group('I. account settings, avatars, frozen share identity, account deletion');
   ok(!!(await run(u2, 'update public.profile_settings set user_id=$1 where user_id=$2', [u1.id, u2.id])).error, 'settings cannot be re-assigned to another user');
   ok(!(await run(u1, "update public.profile_settings set bio='שלום 你好 مرحبا' where user_id=$1", [u1.id])).error, 'bio accepts RTL and CJK text');
 
+  // --- interface preferences (custom shortcuts) follow the account, privately
+  ok(!(await run(u1, `update public.profile_settings set ui_prefs='{"shortcuts":{"newNote":"M"}}'::jsonb where user_id=$1`, [u1.id])).error, 'owner saves interface preferences');
+  ok((await run(u1, 'select ui_prefs from public.profile_settings where user_id=$1', [u1.id])).rows[0].ui_prefs.shortcuts.newNote === 'M', 'owner reads them back');
+  ok((await run(u2, 'select ui_prefs from public.profile_settings where user_id=$1', [u1.id])).rows.length === 0, 'another user cannot read them');
+  ok(!!(await run(u2, `update public.profile_settings set ui_prefs='[]'::jsonb where user_id=$1`, [u2.id])).error, 'ui_prefs must be a JSON object');
+  ok(!!(await run(u2, `update public.profile_settings set ui_prefs=jsonb_build_object('x', repeat('y', 9000)) where user_id=$1`, [u2.id])).error, 'ui_prefs is capped at 8 kB');
+  ok((await run(u2, `update public.profile_settings set ui_prefs='{"a":1}'::jsonb where user_id=$1 returning 1`, [u1.id])).rows.length === 0, 'nobody can write anyone else’s preferences');
   // --- avatar upload: owner only, no board, size/mime checked, readable by collaborators
   const asA = (await run(u1, "select * from public.create_asset(null,'avatar','image/jpeg',90000)")).rows[0];
   ok(asA && asA.board_id === null && asA.kind === 'avatar', 'avatar asset created without a board');

@@ -6504,9 +6504,7 @@
       ["Drag on empty board", "Select everything inside the box"],
       ["Arrow keys", "Nudge the selection (hold Shift for bigger steps)"],
       [MOD + " + A", "Select everything"],
-      [MOD + " + D", "Duplicate"],
-      ["Delete", "Delete the selection (when you’re not typing)"],
-      ["N", "New note in the middle of the screen"]
+      ["Delete", "Delete the selection (when you’re not typing)"]
     ]},
     {title: "Editing", items: [
       ["Double-click a note", "Open it large (Focus Mode)"],
@@ -6550,9 +6548,105 @@
       [MOD + " + Z", "Undo a stroke"]
     ]}
   ];
+  // the "Your shortcuts" card: every rebindable action, its key, Change / Reset, and the rules that keep a rebind safe
+  function buildRebinder(box, groups){
+    var sec = document.createElement("section"); sec.className = "asCard kbdGroup kbdCustom"; sec.setAttribute("aria-labelledby", "kbdCustomH");
+    sec.innerHTML = '<h4 id="kbdCustomH">Your shortcuts</h4><p class="asHint">Choose a row’s <b>Change</b> and press the keys you want. Shortcuts you change are saved' + (CLOUD ? ' and follow your account.' : ' on this device.') + '</p><div class="kbdRebind"></div><div class="kbdResetAll"><button type="button" class="pillBtn" id="kbdResetAll">Reset all to default</button><span class="asSaved" id="kbdSavedMsg" role="status" aria-live="polite"></span></div>';
+    var list = sec.querySelector(".kbdRebind"), resetAll = sec.querySelector("#kbdResetAll"), saved = sec.querySelector("#kbdSavedMsg");
+    var editingId = null, stopCapture = null, rowsOut = [];
+    function note(msg){ saved.textContent = msg; clearTimeout(note.t); note.t = setTimeout(function(){ saved.textContent = ""; }, 2400); }
+    function listActions(){ return ACTIONS.filter(function(a){ return a.rebind !== false; }); }
+    function capsEl(binding){
+      var keys = makeDiv("kbdKeys"); keys.setAttribute("aria-label", binding ? keyCaps(binding).join(" plus ") : "not set");
+      if(!binding){ var none = document.createElement("span"); none.className = "kbdNone2"; none.textContent = "Not set"; keys.appendChild(none); return keys; }
+      keyCaps(binding).forEach(function(part, i){ if(i){ var plus = document.createElement("span"); plus.className = "kbdPlus"; plus.setAttribute("aria-hidden", "true"); plus.textContent = "+"; keys.appendChild(plus); } var k = document.createElement("kbd"); k.textContent = part; keys.appendChild(k); });
+      return keys;
+    }
+    function setBinding(id, binding){
+      var custom = customKeys(), def = defaultKeys()[id] || "";
+      if(binding === def) delete custom[id]; else custom[id] = binding;
+      saveShortcuts(custom);
+    }
+    function endCapture(){ if(stopCapture){ stopCapture(); stopCapture = null; } editingId = null; rebinderOpen = false; rebLayer.close(); }
+    var rebLayer = OV.layer("shortcut-rebinder", function(){ endCapture(); render(); }, function(){ return !!editingId && sec.isConnected; });
+    function startCapture(a, row, msg, actionsBox){
+      endCapture(); editingId = a.id; rebinderOpen = true; rebLayer.open(); render();
+    }
+    function render(){
+      list.innerHTML = ""; rowsOut = [];
+      var current = activeKeys();
+      listActions().forEach(function(a){
+        var row = makeDiv("kbdRow kbdRebRow"), desc = makeDiv("kbdDesc"), right = makeDiv("kbdRebCtl");
+        var isCustom = Object.prototype.hasOwnProperty.call(customKeys(), a.id);
+        desc.textContent = a.label; if(isCustom){ var tag = document.createElement("small"); tag.className = "kbdCustomTag"; tag.textContent = " · changed"; desc.appendChild(tag); }
+        if(editingId === a.id){
+          row.classList.add("editing");
+          var prompt = document.createElement("span"); prompt.className = "kbdPrompt"; prompt.textContent = "Press a new shortcut…"; prompt.tabIndex = -1; prompt.setAttribute("role", "status"); right.appendChild(prompt);
+          var cancel = document.createElement("button"); cancel.type = "button"; cancel.className = "pillBtn kbdBtn"; cancel.textContent = "Cancel"; cancel.addEventListener("click", function(){ endCapture(); render(); }); right.appendChild(cancel);
+          var msg = document.createElement("p"); msg.className = "kbdMsg"; msg.setAttribute("role", "alert");
+          var box2 = makeDiv("kbdConfirm");
+          row.appendChild(desc); row.appendChild(right);
+          var wrap = makeDiv("kbdRebWrap"); wrap.appendChild(row); wrap.appendChild(msg); wrap.appendChild(box2); list.appendChild(wrap);
+          function onKey(e){
+            if(!sec.isConnected){ endCapture(); return; }
+            if(e.isComposing) return;
+            if(e.target && e.target.closest && e.target === cancel) { if(e.key === "Enter" || e.key === " ") return; }
+            var b = KB.fromEvent(e, IS_MAC);
+            e.preventDefault(); e.stopImmediatePropagation();
+            if(!b){ msg.textContent = "Now press a key to go with it."; return; }
+            var r = KB.check(b, {isMac: IS_MAC, forId: a.id, current: activeKeys(), actions: ACTIONS, fixed: FIXED_BINDINGS});
+            box2.innerHTML = "";
+            if(r.ok){ setBinding(a.id, b); endCapture(); render(); note(a.label + " is now " + KB.sentence(b, IS_MAC) + "."); return; }
+            msg.textContent = r.message;
+            if(r.kind === "duplicate"){
+              var holder = actionById(r.holder);
+              msg.textContent = r.message + " Replace it?";
+              var rep = document.createElement("button"); rep.type = "button"; rep.className = "pillBtn primary kbdBtn"; rep.textContent = "Replace";
+              var keep = document.createElement("button"); keep.type = "button"; keep.className = "pillBtn kbdBtn"; keep.textContent = "Cancel";
+              rep.addEventListener("click", function(){ var custom = customKeys(); custom[r.holder] = ""; var def = defaultKeys()[a.id] || ""; if(b === def) delete custom[a.id]; else custom[a.id] = b; saveShortcuts(custom); endCapture(); render(); note(a.label + " is now " + KB.sentence(b, IS_MAC) + "; " + (holder ? holder.label : "the other action") + " has no shortcut."); });
+              keep.addEventListener("click", function(){ box2.innerHTML = ""; msg.textContent = "Press a new shortcut…"; });
+              box2.appendChild(rep); box2.appendChild(keep); rep.focus();
+              // the captured keys must not fire while the question is open
+            }
+          }
+          document.addEventListener("keydown", onKey, true);
+          stopCapture = function(){ document.removeEventListener("keydown", onKey, true); };
+          setTimeout(function(){ if(editingId === a.id) prompt.focus(); }, 0);
+          rowsOut.push({el: wrap, text: a.label.toLowerCase()});
+          return;
+        }
+        right.appendChild(capsEl(current[a.id] || ""));
+        var chg = document.createElement("button"); chg.type = "button"; chg.className = "pillBtn kbdBtn"; chg.textContent = "Change"; chg.setAttribute("aria-label", "Change the shortcut for " + a.label);
+        chg.addEventListener("click", function(){ startCapture(a); });
+        right.appendChild(chg);
+        if(isCustom){
+          var rs = document.createElement("button"); rs.type = "button"; rs.className = "pillBtn kbdBtn"; rs.textContent = "Reset"; rs.setAttribute("aria-label", "Reset the shortcut for " + a.label + " to default");
+          rs.addEventListener("click", function(){
+            var custom = customKeys(); delete custom[a.id];
+            var clash = KB.find(KB.resolve(defaultKeys(), custom), defaultKeys()[a.id] || "\u0000");
+            if(clash && clash !== a.id){ var other = actionById(clash); note("The default key is taken by " + (other ? other.label : "another action") + ". Reset that one first."); return; }
+            saveShortcuts(custom); render(); note(a.label + " is back to " + (defaultKeys()[a.id] ? KB.sentence(defaultKeys()[a.id], IS_MAC) : "no shortcut") + ".");
+          });
+          right.appendChild(rs);
+        }
+        row.appendChild(desc); row.appendChild(right); list.appendChild(row);
+        rowsOut.push({el: row, text: (a.label + " " + (a.keywords || "") + " " + (current[a.id] ? KB.sentence(current[a.id], IS_MAC) : "")).toLowerCase()});
+      });
+      resetAll.disabled = !Object.keys(customKeys()).length;
+      if(entry){ entry.rows = rowsOut; }
+    }
+    resetAll.addEventListener("click", function(){ endCapture(); saveShortcuts({}); render(); note("All shortcuts are back to their defaults."); });
+    var entry = {el: sec, rows: rowsOut};
+    box.appendChild(sec); groups.push(entry);
+    render();
+    shortcutPaneRefresh = function(){ if(sec.isConnected) render(); else shortcutPaneRefresh = null; };
+    rebinderEl = sec; sec._cleanup = endCapture;
+    return sec;
+  }
   function buildShortcutsPane(cc, pane){
     pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
     var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
+    if(KB) buildRebinder(box, groups);
     SHORTCUT_GROUPS.forEach(function(g){
       var sec = document.createElement("section"); sec.className = "asCard kbdGroup"; var h = document.createElement("h4"); h.textContent = g.title; sec.appendChild(h);
       var rows = [];
@@ -9100,6 +9194,245 @@
     });
   }
 
+  // ---------- actions: one registry behind the shortcuts, the command palette and the shortcut settings ----------
+  // Every command a person can run by key or by name is one entry here: id, label, group, keywords, default key, when it applies, what it does.
+  // The keyboard handler, the palette and the "Shortcuts" pane all read this list, so they can never disagree.
+  var KB = (window.Stick && Stick.keys) || null;
+  var ACTIONS = [];
+  function defineAction(a){ ACTIONS.push(a); return a; }
+  function actionById(id){ for(var i = 0; i < ACTIONS.length; i++){ if(ACTIONS[i].id === id) return ACTIONS[i]; } return null; }
+  function actionReady(a){
+    if(a.edit && (readOnly || singleNoteMode)) return false;
+    try{ return a.when ? !!a.when() : true; }catch(e){ return false; }
+  }
+  // keys that do something fixed (editing, closing); a person can't give them away
+  var FIXED_BINDINGS = {"Mod+B": "Bold", "Mod+I": "Italic", "Mod+Enter": "Add a comment", "Mod+Shift+Z": "Redo"};
+  function defaultKeys(){ var d = {}; ACTIONS.forEach(function(a){ if(a.rebind !== false) d[a.id] = a.def || ""; }); return d; }
+  function customKeys(){ return KB ? KB.sanitize(settings.shortcuts || {}, defaultKeys(), IS_MAC, FIXED_BINDINGS) : {}; }
+  function activeKeys(){ return KB ? KB.resolve(defaultKeys(), customKeys()) : defaultKeys(); }
+  function keyOf(a){ if(a.rebind === false) return a.def || ""; var m = activeKeys(); return m[a.id] || ""; }
+  function keyCaps(binding){ return KB && binding ? KB.format(binding, IS_MAC) : []; }
+
+  var shortcutSyncT = null;
+  function saveShortcuts(custom){
+    if(Object.keys(custom).length) settings.shortcuts = custom; else delete settings.shortcuts;
+    saveSettings();
+    clearTimeout(shortcutSyncT);
+    if(CLOUD && window.Stick && Stick.auth && Stick.auth.user() && Stick.account && Stick.account.saveUiPrefs){
+      shortcutSyncT = setTimeout(function(){
+        var cur = (Stick.account.cached() && Stick.account.cached().settings && Stick.account.cached().settings.uiPrefs) || {};
+        var next = {}; Object.keys(cur).forEach(function(k){ next[k] = cur[k]; });
+        if(Object.keys(custom).length) next.shortcuts = custom; else delete next.shortcuts;
+        Stick.account.saveUiPrefs(next).catch(function(){});
+      }, 700);
+    }
+  }
+  // signed in: what the account holds wins on this device (so two devices agree); nothing stored there yet: this device's choices go up
+  function adoptAccountShortcuts(prefs){
+    var remote = prefs && prefs.shortcuts;
+    if(remote && typeof remote === "object"){
+      var clean = KB ? KB.sanitize(remote, defaultKeys(), IS_MAC, FIXED_BINDINGS) : {};
+      if(JSON.stringify(clean) !== JSON.stringify(settings.shortcuts || {})){ if(Object.keys(clean).length) settings.shortcuts = clean; else delete settings.shortcuts; saveSettings(); refreshShortcutPane(); }
+    } else if(settings.shortcuts && Object.keys(settings.shortcuts).length){ saveShortcuts(settings.shortcuts); }
+  }
+  var shortcutPaneRefresh = null;
+  function refreshShortcutPane(){ if(shortcutPaneRefresh) try{ shortcutPaneRefresh(); }catch(e){} }
+
+  function selIds(){ return Array.from(selected).filter(function(id){ return !!findNote(id); }); }
+  function viewBookmarkPoint(){ return {x: Math.round(viewCenter().x), sy: Math.round(board.scrollTop / (boardZoom || 1)), zoom: boardZoom}; }
+
+  defineAction({id: "newNote", label: "New note", group: "Create", keywords: "add sticky write", def: "N", edit: true,
+    run: function(){
+      var vr = board.getBoundingClientRect(), br = boardInner.getBoundingClientRect();
+      addNoteAt((vr.left + vr.width / 2 - br.left) / boardZoom, (vr.top + Math.min(vr.height / 2, 240) - br.top) / boardZoom, {focus: true});
+    }});
+  defineAction({id: "duplicate", label: "Duplicate selection", group: "Selection", keywords: "copy clone", def: "Mod+D", edit: true,
+    when: function(){ return selected.size > 0 || !!document.querySelector(".note .text:focus"); },
+    run: function(){
+      var ae = document.activeElement;
+      var editing = ae && ae.classList && ae.classList.contains("text") ? notes.filter(function(n){ return n.textEl === ae; })[0] : null;
+      var ids = editing ? [editing.id] : selIds();
+      if(!ids.length) return; if(editing) ae.blur(); duplicateNotes(ids);
+    }});
+  defineAction({id: "pin", label: "Pin or unpin selection", group: "Selection", keywords: "lock fix place stay anchor", def: "P", edit: true,
+    when: function(){ return selIds().length > 0; },
+    run: function(){ var ids = selIds(); var any = ids.some(function(id){ return !isPinned(findNote(id)); }); setPinned(ids, any); }});
+  defineAction({id: "done", label: "Mark selected as done", group: "Selection", keywords: "finish complete tick", def: "Shift+D", edit: true,
+    when: function(){ return selIds().length > 0; },
+    run: function(){ selIds().map(findNote).forEach(function(n){ if(n) markDone(n); }); }});
+  defineAction({id: "focus", label: "Open selection in Focus Mode", group: "Selection", keywords: "large big full", def: "F",
+    when: function(){ var ids = selIds(); return ids.length === 1 && !findNote(ids[0]).type; },
+    run: function(){ enterFocus(findNote(selIds()[0])); }});
+  defineAction({id: "selectAll", label: "Select everything", group: "Selection", keywords: "all", def: "Mod+A", rebind: false, edit: true,
+    run: function(){ setSelection(notes.map(function(n){ return n.id; })); }});
+  defineAction({id: "undo", label: "Undo", group: "Board", keywords: "back revert", def: "Mod+Z", rebind: false, edit: true, run: function(){ undo(); }});
+  defineAction({id: "redo", label: "Redo", group: "Board", keywords: "forward again", def: "Mod+Shift+Z", rebind: false, edit: true, run: function(){ redo(); }});
+  defineAction({id: "cleanScreen", label: "Clean my screen", group: "Board", keywords: "tidy organize arrange visible", def: "", edit: true, run: function(){ openCleanUp("screen"); }});
+  defineAction({id: "cleanBoard", label: "Clean the whole board", group: "Board", keywords: "tidy organize arrange everything canvas", def: "", edit: true, run: function(){ openCleanUp("board"); }});
+  defineAction({id: "cleanUp", label: "Clean up…", group: "Board", keywords: "tidy organize arrange broom", def: "", edit: true, run: function(){ openCleanUp(); }});
+  defineAction({id: "palette", label: "Open the command palette", group: "Go", keywords: "commands actions find run", def: "Mod+K", run: function(){ openPalette(); }});
+  defineAction({id: "search", label: "Search notes", group: "Go", keywords: "find look", def: "/", run: function(){ searchInput.focus(); searchInput.select(); }});
+  defineAction({id: "boards", label: "Switch board", group: "Go", keywords: "boards change open other", def: "",
+    run: function(){ if(boardPanel.hidden) brandBtn.click(); }});
+  defineAction({id: "shortcuts", label: "Keyboard shortcuts", group: "Go", keywords: "keys keyboard help rebind customize", def: "?", run: function(){ openControlCenter("shortcuts"); }});
+  defineAction({id: "settings", label: "Open Settings", group: "Go", keywords: "preferences control center appearance", def: "", run: function(){ openControlCenter(); }});
+  defineAction({id: "whatsNew", label: "Show What’s New", group: "Go", keywords: "patch notes changes version tour update", def: "",
+    when: function(){ return typeof openWhatsNew === "function"; }, run: function(){ openWhatsNew(); }});
+  defineAction({id: "bookmarkHere", label: "Bookmark this spot", group: "Go", keywords: "save place view remember", def: "B", edit: true, run: function(){ bookmarkThisSpot(); }});
+  defineAction({id: "bookmarks", label: "Manage bookmarks…", group: "Go", keywords: "places saved spots rename delete", def: "", run: function(){ manageBookmarks(); }});
+
+  // ---- the keyboard dispatcher
+  if(!singleNoteMode){
+    document.addEventListener("keydown", function(e){
+      if(rebinderOpen && !(rebinderEl && rebinderEl.isConnected)) rebinderOpen = false;
+      if(e.defaultPrevented || e.isComposing || !KB || rebinderOpen) return;
+      var b = KB.fromEvent(e, IS_MAC); if(!b) return;
+      if(paletteState) return;
+      var hasMod = /(^|\+)(Mod|Alt|Ctrl|Meta)\+/.test(b);
+      if(isTyping() && !hasMod) return;                                     // letters belong to the text
+      if(modalOpen() && !(b === activeKeys().palette && !focusState && !tourRoot)) return;
+      var id = KB.find(activeKeys(), b), a = id ? actionById(id) : null;
+      if(!a || !actionReady(a)) return;
+      if(isTyping() && /^(selectAll|undo|redo)$/.test(a.id)) return;        // inside a note, the browser's own editing applies
+      e.preventDefault(); e.stopImmediatePropagation();
+      a.run();
+    });
+  }
+
+  // ---- bookmarks: named places on one board (this device)
+  var BOOKMARK_MAX = 30;
+  function bookmarkKey(){ return "stickyboard." + NS + "bookmarks." + activeBoardId; }
+  function readBookmarks(){
+    var raw = safeGet(bookmarkKey()); if(!Array.isArray(raw)) return [];
+    return raw.filter(function(b){ return b && typeof b.id === "string" && typeof b.name === "string" && isFinite(b.x); }).slice(0, BOOKMARK_MAX);
+  }
+  function writeBookmarks(list){ safeSet(bookmarkKey(), list.slice(0, BOOKMARK_MAX)); }
+  function goToBookmark(b){
+    boardZoom = Math.min(1.6, Math.max(0.5, +b.zoom || 1)); applyZoom();
+    board.scrollLeft = Math.max(0, b.x * boardZoom - board.clientWidth / 2);
+    if(boardZoom > 1) board.scrollTop = Math.max(0, (b.sy || 0) * boardZoom);
+    updateMinimapViewport();
+    toast("Went to “" + b.name + "”.");
+  }
+  function nameDialog(title, label, value, confirmLabel, done){
+    var wrap = makeDiv("nameDlg"), lab = document.createElement("label"), input = document.createElement("input");
+    lab.textContent = label; lab.className = "asLbl"; input.type = "text"; input.className = "asIn"; input.maxLength = 40; input.value = value || ""; input.autocomplete = "off";
+    var id = "nameDlgIn" + (++dialogSeq); input.id = id; lab.setAttribute("for", id); wrap.appendChild(lab); wrap.appendChild(input);
+    var m = openModal({title: title, content: wrap, width: 360, actions: [{label: "Cancel", value: false}, {label: confirmLabel, kind: "primary", id: "nameOk", onClick: function(close){ var v = input.value.replace(/\s+/g, " ").trim(); if(!v){ input.focus(); return false; } done(v); }}]});
+    input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); m.card.querySelector("#nameOk").click(); } });
+    setTimeout(function(){ input.focus(); input.select(); }, 0);
+  }
+  function bookmarkThisSpot(){
+    var list = readBookmarks();
+    if(list.length >= BOOKMARK_MAX){ toast("That’s " + BOOKMARK_MAX + " bookmarks, the most a board holds. Delete one first."); return; }
+    var pt = viewBookmarkPoint();
+    nameDialog("Bookmark this spot", "Name", "Spot " + (list.length + 1), "Save bookmark", function(name){
+      var cur = readBookmarks(); cur.push({id: "bm" + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: name.slice(0, 40), x: pt.x, sy: pt.sy, zoom: pt.zoom});
+      writeBookmarks(cur); toast("Bookmarked “" + name + "”. Find it in the command palette (" + MOD + " + K).");
+    });
+  }
+  function manageBookmarks(){
+    var wrap = makeDiv("bmList"), m;
+    function paint(){
+      wrap.innerHTML = ""; var list = readBookmarks();
+      if(!list.length){ var p = document.createElement("p"); p.className = "acctSub"; p.textContent = "No bookmarks on this board yet. Press B (or use the command palette) to save the spot you are looking at."; wrap.appendChild(p); return; }
+      list.forEach(function(b){
+        var row = makeDiv("bmRow"), go = document.createElement("button"), ren = document.createElement("button"), del = document.createElement("button");
+        go.type = ren.type = del.type = "button"; go.className = "bmGo"; go.textContent = b.name; go.addEventListener("click", function(){ m.close(); goToBookmark(b); });
+        ren.className = del.className = "pillBtn bmBtn"; ren.textContent = "Rename"; del.textContent = "Delete";
+        ren.setAttribute("aria-label", "Rename " + b.name); del.setAttribute("aria-label", "Delete bookmark " + b.name);
+        ren.addEventListener("click", function(){ nameDialog("Rename bookmark", "Name", b.name, "Save", function(v){ var cur = readBookmarks(); cur.forEach(function(x){ if(x.id === b.id) x.name = v.slice(0, 40); }); writeBookmarks(cur); paint(); }); });
+        del.addEventListener("click", function(){ writeBookmarks(readBookmarks().filter(function(x){ return x.id !== b.id; })); paint(); });
+        row.appendChild(go); row.appendChild(ren); row.appendChild(del); wrap.appendChild(row);
+      });
+    }
+    paint();
+    m = openModal({title: "Bookmarks", content: wrap, width: 420, actions: [{label: "Done", kind: "primary", value: true}]});
+  }
+
+  // ---- the command palette
+  var paletteState = null;
+  var palLayer = OV.layer("command-palette", function(){ closePalette(); }, function(){ return !!paletteState; });
+  function paletteItems(){
+    var items = [];
+    ACTIONS.forEach(function(a){
+      if(!actionReady(a)) return;
+      items.push({kind: "action", id: a.id, label: a.label, group: a.group, key: keyOf(a), hay: (a.label + " " + a.group + " " + (a.keywords || "")).toLowerCase(), run: a.run});
+    });
+    readBookmarks().forEach(function(b){ items.push({kind: "bookmark", id: "bm:" + b.id, label: "Go to bookmark: " + b.name, group: "Bookmarks", key: "", hay: ("go to bookmark " + b.name + " place spot").toLowerCase(), run: function(){ goToBookmark(b); }}); });
+    return items;
+  }
+  function paletteScore(it, words){
+    var s = 0;
+    for(var i = 0; i < words.length; i++){
+      var w = words[i], at = it.hay.indexOf(w); if(at === -1) return -1;
+      s += at === 0 ? 3 : (it.hay.charAt(at - 1) === " " ? 2 : 1);
+      if(it.label.toLowerCase().indexOf(w) !== -1) s += 2;
+    }
+    return s;
+  }
+  function openPalette(){
+    if(paletteState){ paletteState.input.focus(); return; }
+    closeFloatingPopovers(); closeCaptureMenu();
+    var opener = document.activeElement;
+    var back = makeDiv("palBackdrop"), card = makeDiv("palCard");
+    card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Command palette");
+    var input = document.createElement("input"); input.type = "text"; input.className = "palInput"; input.placeholder = "Type a command…"; input.autocomplete = "off"; input.spellcheck = false;
+    input.setAttribute("role", "combobox"); input.setAttribute("aria-expanded", "true"); input.setAttribute("aria-controls", "palList"); input.setAttribute("aria-label", "Search commands"); input.setAttribute("aria-autocomplete", "list");
+    var list = document.createElement("ul"); list.className = "palList"; list.id = "palList"; list.setAttribute("role", "listbox");
+    var status = makeDiv("sr-only"); status.setAttribute("role", "status"); status.setAttribute("aria-live", "polite");
+    var foot = makeDiv("palFoot"); foot.textContent = "↑↓ to choose · Enter to run · Esc to close";
+    card.appendChild(input); card.appendChild(list); card.appendChild(status); card.appendChild(foot); back.appendChild(card);
+    var all = paletteItems(), shown = [], sel = 0;
+    function paint(){
+      var q = input.value.trim().toLowerCase(), words = q ? q.split(/\s+/) : [];
+      shown = all.map(function(it){ return {it: it, s: words.length ? paletteScore(it, words) : 0}; }).filter(function(x){ return x.s >= 0; });
+      if(words.length) shown.sort(function(a, b){ return b.s - a.s; });
+      shown = shown.map(function(x){ return x.it; }).slice(0, 40);
+      if(sel >= shown.length) sel = Math.max(0, shown.length - 1);
+      list.innerHTML = "";
+      if(!shown.length){ var none = document.createElement("li"); none.className = "palNone"; none.textContent = "Nothing matches that. Try another word."; none.setAttribute("role", "presentation"); list.appendChild(none); input.removeAttribute("aria-activedescendant"); }
+      shown.forEach(function(it, i){
+        var li = document.createElement("li"); li.className = "palItem" + (i === sel ? " sel" : ""); li.id = "palOpt" + i; li.setAttribute("role", "option"); li.setAttribute("aria-selected", i === sel ? "true" : "false");
+        var t = document.createElement("span"); t.className = "palLabel"; t.textContent = it.label;
+        var g = document.createElement("span"); g.className = "palGroup"; g.textContent = it.group;
+        li.appendChild(t); li.appendChild(g);
+        if(it.key){ var caps = makeDiv("palKeys"); keyCaps(it.key).forEach(function(c){ var k = document.createElement("kbd"); k.textContent = c; caps.appendChild(k); }); li.appendChild(caps); }
+        li.addEventListener("mousemove", function(){ if(sel !== i){ sel = i; mark(); } });
+        li.addEventListener("click", function(){ run(it); });
+        list.appendChild(li);
+      });
+      if(shown.length){ input.setAttribute("aria-activedescendant", "palOpt" + sel); }
+      status.textContent = shown.length + (shown.length === 1 ? " command" : " commands");
+    }
+    function mark(){
+      Array.prototype.forEach.call(list.children, function(li, i){ var on = i === sel; li.classList.toggle("sel", on); li.setAttribute("aria-selected", on ? "true" : "false"); if(on){ input.setAttribute("aria-activedescendant", li.id); li.scrollIntoView({block: "nearest"}); } });
+    }
+    function run(it){ closePalette(true); setTimeout(function(){ try{ it.run(); }catch(err){ toast("That didn’t work. Try again."); } }, 0); }
+    input.addEventListener("input", function(){ sel = 0; paint(); });
+    input.addEventListener("keydown", function(e){
+      if(e.isComposing) return;
+      if(e.key === "ArrowDown"){ e.preventDefault(); if(shown.length){ sel = (sel + 1) % shown.length; mark(); } }
+      else if(e.key === "ArrowUp"){ e.preventDefault(); if(shown.length){ sel = (sel - 1 + shown.length) % shown.length; mark(); } }
+      else if(e.key === "Home" && !input.value){ e.preventDefault(); sel = 0; mark(); }
+      else if(e.key === "End" && !input.value){ e.preventDefault(); sel = Math.max(0, shown.length - 1); mark(); }
+      else if(e.key === "Enter"){ e.preventDefault(); if(shown[sel]) run(shown[sel]); }
+      else if(e.key === "Tab"){ e.preventDefault(); }
+    });
+    back.addEventListener("mousedown", function(e){ if(e.target === back) closePalette(); });
+    document.body.appendChild(back);
+    paletteState = {back: back, input: input, opener: opener};
+    palLayer.open(); paint(); input.focus();
+  }
+  function closePalette(ran){
+    if(!paletteState) return;
+    var st = paletteState; paletteState = null; palLayer.close(); st.back.remove();
+    if(!ran && st.opener && st.opener.focus && document.contains(st.opener)){ try{ st.opener.focus(); }catch(e){} }
+  }
+  // opening the palette from outside (a button, the dev tools)
+  Stick.palette = {open: function(){ openPalette(); }, close: function(){ closePalette(); }, isOpen: function(){ return !!paletteState; }, actions: function(){ return ACTIONS.map(function(a){ return {id: a.id, label: a.label, group: a.group, key: keyOf(a), rebind: a.rebind !== false}; }); }};
+  var rebinderOpen = false, rebinderEl = null;
+
   // ---------- keyboard shortcuts ----------
   function isTyping(){
     var ae = document.activeElement;
@@ -9130,20 +9463,6 @@
         if(key.toLowerCase() === "y" || e.shiftKey) redo(); else undo();
         return;
       }
-      // duplicate works while typing in a note too (and saves you from the bookmark dialog)
-      if(mod && !e.altKey && key.toLowerCase() === "d"){
-        var ae = document.activeElement;
-        var editingNote = ae && ae.classList && ae.classList.contains("text") ? notes.filter(function(n){ return n.textEl === ae; })[0] : null;
-        var ids = editingNote ? [editingNote.id] : Array.from(selected);
-        if(ids.length && (editingNote || !typing)){ e.preventDefault(); if(editingNote) ae.blur(); duplicateNotes(ids); }
-        return;
-      }
-      if(mod && !typing && key.toLowerCase() === "a"){
-        e.preventDefault();
-        setSelection(notes.map(function(n){ return n.id; }));
-        return;
-      }
-
       var isZoomKey = mod && (key === "+" || key === "=" || key === "-" || key === "_" || key === "0");
       if(isZoomKey && !typing){
         e.preventDefault();
@@ -9182,13 +9501,6 @@
         e.preventDefault();
         var act = removeImage(selectedImageNote);
         toast("Image removed.", "Undo", function(){ undoIfTop(act); });
-        return;
-      }
-      // keyboard-only people can start a note too: N puts a new one near the middle of what is on screen, ready to type in
-      if(!typing && !mod && !e.altKey && (key === "n" || key === "N") && !readOnly && !modalOpen()){
-        e.preventDefault();
-        var vr = board.getBoundingClientRect(), br = boardInner.getBoundingClientRect();
-        addNoteAt((vr.left + vr.width / 2 - br.left) / boardZoom, (vr.top + Math.min(vr.height / 2, 240) - br.top) / boardZoom, {focus:true});
         return;
       }
       if(typing || !selected.size) return;
@@ -9546,6 +9858,7 @@
     rememberAccount(Stick.auth.user() || {id: settings.account.sub, email: settings.account.email}, res.profile);
     settings.accountPrefs = res.settings;
     saveSettings();
+    if(typeof adoptAccountShortcuts === "function") adoptAccountShortcuts(res.settings && res.settings.uiPrefs);
   }
   function refreshAccountData(){
     if(!CLOUD || !window.Stick || !Stick.auth.user()) return Promise.resolve();
