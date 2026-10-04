@@ -6120,11 +6120,35 @@
     delete c.mediaId;                                                              // a device-local key means nothing here
     return c;
   }
-  function shareUnavailable(text){
-    var wrap = publicShell();
+  // The page shown when a shared link can't be opened. The words say what is true (gone, never existed, server trouble, no connection);
+  // a short code under them helps when someone reports it, and never carries anything internal.
+  var SHARE_WORDS = {
+    network: "We couldn’t reach Stick-It. Check your connection and try again.",
+    server: "Stick-It couldn’t open this board right now. Try again in a moment.",
+    revoked: "This shared link is no longer available.",
+    not_found: "We couldn’t find this shared board.",
+    signin: "This board is only shared with invited people. Sign in to continue.",
+    rate_limited: "Too many tries. Please wait a minute, then try again.",
+    broken: "This link looks broken or incomplete."
+  };
+  function shareUnavailable(kind, opts){
+    opts = opts || {};
+    var wrap = opts.wrap || publicShell();
     wrap.innerHTML = "";
-    var p = document.createElement("p"); p.className = "muted"; p.textContent = text; wrap.appendChild(p);
-    publicOpenButton(wrap);
+    var p = document.createElement("p"); p.className = "muted"; p.setAttribute("role", "alert"); p.textContent = SHARE_WORDS[kind] || SHARE_WORDS.server; wrap.appendChild(p);
+    if(opts.code){ var c = document.createElement("p"); c.className = "muted"; c.style.cssText = "font-size:0.72rem;margin:-8px 0 0;opacity:0.75;"; c.textContent = "Code: " + opts.code; wrap.appendChild(c); }
+    var row = document.createElement("div"); row.style.cssText = "display:flex;gap:10px;flex-wrap:wrap;justify-content:center;";
+    if(opts.retry){
+      var again = document.createElement("button"); again.className = "btn primary"; again.style.width = "auto"; again.textContent = "Try again";
+      again.addEventListener("click", function(){ opts.retry(wrap); });
+      row.appendChild(again);
+    }
+    wrap.appendChild(row);
+    var openBtn = document.createElement("button");
+    openBtn.className = opts.retry ? "btn" : "btn primary"; openBtn.style.width = "auto"; openBtn.textContent = "Open Stick-It";
+    openBtn.addEventListener("click", function(){ location.hash = ""; location.reload(); });
+    row.appendChild(openBtn);
+    var first = row.querySelector("button"); if(first) setTimeout(function(){ try{ first.focus(); }catch(e){} }, 0);
   }
   function sharerOf(res){
     var av = res.by_avatar && res.assets && res.assets[res.by_avatar];
@@ -6134,7 +6158,7 @@
     var token = window.Stick && Stick.share.tokenFromHash(location.hash);
     shareBanner.hidden = false; copyToMineBtn.hidden = true;
     shareBannerText.textContent = "Opening shared board\u2026";
-    if(!token || !CLOUD_OK){ shareUnavailable("This link looks broken or incomplete."); return; }
+    if(!token || !CLOUD_OK){ shareUnavailable("broken"); return; }
     var last = "";
     function paintLive(res){
       var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
@@ -6146,14 +6170,22 @@
       objs.forEach(function(n, i){ n.id = "s" + i; if(!n.z) n.z = i + 1; if(!n.phys) ensurePhys(n); notes.push(n); renderNote(n, false); });
       ensureWidth(); updateMinimap();
     }
-    Stick.share.resolve(token).then(function(res){
-      if(!res.ok){
-        shareUnavailable(res.reason === "disabled" || res.reason === "expired" ? "The person who shared this has turned the link off."
-          : res.reason === "rate_limited" ? "Too many tries. Please wait a minute and reload."
-          : res.reason === "unavailable" ? "Couldn't reach the server. Check your connection and try again."
-          : "This link isn't available.");
-        return;
-      }
+    var resolving = false, errWrap = null;
+    function attempt(wrap){
+      if(resolving) return;                                       // one request at a time, however often it is clicked
+      resolving = true; if(wrap) errWrap = wrap;
+      if(wrap){ wrap.innerHTML = '<p class="muted" role="status" aria-live="polite" style="display:flex;align-items:center;gap:8px;">' + miniLoaderHtml() + "<span>Opening shared board…</span></p>"; }
+      Stick.share.resolve(token).then(function(res){ resolving = false; handleResolved(res); }, function(){ resolving = false; handleResolved({ok: false, kind: "network", status: 0}); });
+    }
+    function problem(res){
+      var kind = res.kind || "not_found";
+      var recoverable = kind === "network" || kind === "server" || kind === "rate_limited";
+      try{ console.warn("Stick-It share could not be opened:", kind, res.status || "", res.reason || ""); }catch(e){}
+      shareUnavailable(kind, {wrap: errWrap, retry: recoverable ? attempt : null, code: res.timedOut ? "timeout" : (res.status ? String(res.status) : (kind === "network" ? "network" : ""))});
+    }
+    attempt(null);
+    function handleResolved(res){
+      if(!res.ok){ problem(res); return; }
       if(res.type !== "board_live"){
         var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
         objs.forEach(function(n){ if(!n.phys) n.phys = isPhoto(n) ? makePhotoPhys() : isAV(n) ? {} : makePhys(); });
@@ -6175,9 +6207,9 @@
       paintLive(res);
       setInterval(function(){                                          // it's a live link: pick up the owner's changes
         if(document.visibilityState === "hidden") return;
-        Stick.share.resolve(token).then(function(r2){ if(r2.ok && r2.type === "board_live") paintLive(r2); else if(!r2.ok && (r2.reason === "disabled" || r2.reason === "not_found")) location.reload(); });
+        Stick.share.resolve(token).then(function(r2){ if(r2.ok && r2.type === "board_live") paintLive(r2); else if(!r2.ok && (r2.kind === "revoked" || r2.kind === "not_found")) location.reload(); });
       }, 30000);
-    });
+    }
   }
 
   // ---------- board: click to stick, drag a box to select ----------

@@ -46,18 +46,41 @@
     },
 
     // visitor side: no account, only the token. Goes through the resolve-share Edge Function.
+    // Always resolves (never rejects) to {ok:true, ...} or {ok:false, kind, reason, status}, where kind is one of
+    //   network | server | not_found | revoked | signin | rate_limited
+    // so the page can say something true. A network failure or a server error is tried once more before it is reported.
     resolve: function (token) {
-      if (!cfg.CLOUD_CONFIGURED) return Promise.resolve({ ok: false, reason: "unavailable" });
-      return fetch(cfg.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/resolve-share", {
-        method: "POST",
-        headers: { "content-type": "application/json", apikey: cfg.SUPABASE_ANON_KEY, authorization: "Bearer " + cfg.SUPABASE_ANON_KEY },
-        body: JSON.stringify({ token: token })
-      }).then(function (res) {
-        return res.json().catch(function () { return {}; }).then(function (j) {
-          if (res.ok && j && j.ok) return j;
-          return { ok: false, reason: (j && j.reason) || (res.status === 429 ? "rate_limited" : "not_found"), status: res.status };
+      var url = cfg.SUPABASE_URL ? cfg.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/resolve-share" : "";
+      if (!cfg.CLOUD_CONFIGURED) return Promise.resolve({ ok: false, kind: "server", reason: "unavailable", status: 0 });
+      function failure(status, reason) {
+        var kind = status === 429 ? "rate_limited"
+          : (status === 410 || reason === "disabled" || reason === "expired") ? "revoked"
+          : (status === 401 || status === 403 || reason === "sign_in_required") ? "signin"
+          : status >= 500 ? "server" : "not_found";
+        return { ok: false, kind: kind, reason: reason || (kind === "server" ? "unavailable" : "not_found"), status: status };
+      }
+      function once() {
+        var ctl = root.AbortController ? new root.AbortController() : null, timer = ctl ? root.setTimeout(function () { ctl.abort(); }, 15000) : null;
+        return fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json", apikey: cfg.SUPABASE_ANON_KEY, authorization: "Bearer " + cfg.SUPABASE_ANON_KEY },
+          body: JSON.stringify({ token: token }),
+          signal: ctl ? ctl.signal : undefined
+        }).then(function (res) {
+          root.clearTimeout(timer);
+          return res.json().catch(function () { return {}; }).then(function (j) {
+            if (res.ok && j && j.ok) return j;
+            return failure(res.status, j && j.reason);
+          });
+        }, function () {
+          root.clearTimeout(timer);
+          return { ok: false, kind: "network", reason: "unavailable", status: 0, timedOut: !!(ctl && ctl.signal.aborted) };
         });
-      }, function () { return { ok: false, reason: "unavailable" }; });
+      }
+      return once().then(function (r) {
+        if (r.ok || (r.kind !== "network" && r.kind !== "server")) return r;
+        return new Promise(function (go) { root.setTimeout(go, 900); }).then(once);
+      });
     },
     report: function (token, reason) {
       return fetch(cfg.SUPABASE_URL.replace(/\/$/, "") + "/functions/v1/report-share", {
