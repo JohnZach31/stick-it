@@ -2245,3 +2245,36 @@ html[data-a11y-motion="reduce"] .kbdPrompt{ animation:none; }
 .bmGo:hover{ border-color:var(--accent); }
 .bmBtn{ padding:4px 10px; font-size:0.74rem; }
 .nameDlg{ display:flex; flex-direction:column; gap:6px; }
+
+/* ---------- board zones (v0.8.2) ---------- */
+.zone{ position:absolute; box-sizing:border-box; border-radius:6px; pointer-events:none; background:color-mix(in srgb, var(--zone, #fff3a8) 55%, transparent); border:2px dashed color-mix(in srgb, var(--zone, #fff3a8) 55%, #5a4a1c 45%); box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+.zone.new{ animation:zoneIn .25s ease-out; }
+@keyframes zoneIn{ from{ opacity:0; transform:scale(.97); } }
+.zone.selected{ outline:3px solid var(--accent); outline-offset:2px; }
+.zone:focus-visible{ outline:3px solid var(--accent); outline-offset:2px; }
+.zone.mat-kraft{ background:color-mix(in srgb, #c8a373 70%, var(--zone, #fff3a8) 12%); border-style:solid; }
+.zone.mat-cardboard{ background:repeating-linear-gradient(90deg, rgba(0,0,0,0.045) 0 2px, transparent 2px 6px), color-mix(in srgb, #b98f5f 60%, var(--zone, #fff3a8) 10%); border-style:solid; }
+.zone.mat-grid{ background:linear-gradient(rgba(60,90,160,0.16) 1px, transparent 1px) 0 0/22px 22px, linear-gradient(90deg, rgba(60,90,160,0.16) 1px, transparent 1px) 0 0/22px 22px, color-mix(in srgb, var(--zone, #fff3a8) 35%, #fff 65%); border-style:solid; }
+.zone.mat-felt{ background:color-mix(in srgb, var(--zone, #fff3a8) 70%, #234 30%); border-style:solid; border-color:rgba(0,0,0,0.25); }
+.zoneBar{ pointer-events:auto; display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:28px; padding:2px 6px 2px 10px; cursor:grab; border-bottom:1px dashed rgba(0,0,0,0.18); border-radius:4px 4px 0 0; }
+.zoneBar:active{ cursor:grabbing; }
+.zoneTitle{ flex:1; min-width:0; font:700 0.82rem 'Sora',sans-serif; color:#33301f; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; outline:none; }
+.zoneTitle:empty::before{ content:attr(data-ph); opacity:0.5; font-weight:500; }
+.zoneTitle[contenteditable="true"]{ background:rgba(255,255,255,0.7); border-radius:4px; padding:1px 4px; cursor:text; text-overflow:clip; }
+.zone.mat-felt .zoneTitle{ color:#f4eedf; }
+.zoneMore{ pointer-events:auto; flex:none; width:24px; height:24px; border:0; border-radius:6px; background:transparent; color:#33301f; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.55; }
+.zoneMore svg{ width:16px; height:16px; }
+.zone:hover .zoneMore, .zone.selected .zoneMore, .zoneMore:focus-visible{ opacity:1; }
+.zoneMore:hover{ background:rgba(0,0,0,0.1); }
+.zone.mat-felt .zoneMore{ color:#f4eedf; }
+.zoneHandle{ pointer-events:auto; position:absolute; right:2px; bottom:2px; width:18px; height:18px; cursor:nwse-resize; background:linear-gradient(135deg, transparent 0 50%, rgba(0,0,0,0.35) 50% 58%, transparent 58% 68%, rgba(0,0,0,0.35) 68% 76%, transparent 76%); border-radius:0 0 4px 0; opacity:0; }
+.zone:hover .zoneHandle, .zone.selected .zoneHandle{ opacity:1; }
+body.dark .zone{ box-shadow:0 1px 3px rgba(0,0,0,0.5); }
+body.dark .zoneTitle{ color:#f4eedf; } body.dark .zoneMore{ color:#f4eedf; }
+body.dark .zone:not(.mat-felt):not(.mat-kraft):not(.mat-cardboard):not(.mat-grid){ background:color-mix(in srgb, var(--zone, #fff3a8) 28%, #14111f); }
+.zoneSwatches{ display:flex; gap:6px; padding:4px 10px 8px; flex-wrap:wrap; }
+.zoneSw{ width:22px; height:22px; border-radius:50%; border:2px solid rgba(0,0,0,0.25); cursor:pointer; padding:0; }
+.zoneSw.on{ outline:2px solid var(--accent); outline-offset:2px; }
+.menuGap{ display:inline-block; width:1em; }
+@media (prefers-reduced-motion: reduce){ .zone.new{ animation:none; } }
+html[data-a11y-motion="reduce"] .zone.new{ animation:none; }

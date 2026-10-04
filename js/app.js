@@ -207,6 +207,7 @@
     doneTick: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4.6 12.9c1.5 1.1 3 2.9 4.3 5 2.8-5.7 6.3-9.3 10.6-12.1"></path></svg>',
     fit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="1.5"></rect><path d="M8 14l4-4 4 4"></path></svg>',
     rip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v7H4z"></path><path d="M4 15l2.5 1.5L9 14.5l2.5 2L14 14.5l2.5 2L19 14.5l1 1"></path></svg>',
+    zone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2" stroke-dasharray="3 2.5"></rect><path d="M3 9h18"></path></svg>',
     pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6l-1 6 3 3H7l3-3z"></path><path d="M12 12v8"></path></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
     play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"></path></svg>',
@@ -1043,6 +1044,11 @@
       if(FONT_BY_NAME[item.captionFont]) o.captionFont = item.captionFont;
       return o;
     }
+    if(item.type === "zone"){
+      return {id: newId(), type: "zone", x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0), w: Math.round(clampNum(item.w, ZONE_MIN_W, ZONE_MAX_W, 360)), h: Math.round(clampNum(item.h, ZONE_MIN_H, ZONE_MAX_H, 240)),
+        title: String(item.title || "").replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim().slice(0, 40), variant: ZONE_MATERIALS.some(function(m){ return m[0] === item.variant; }) ? item.variant : "paper",
+        bg: safeColor(item.bg) || ZONE_TINTS[0], carry: item.carry === true ? true : undefined, rot: 0, z: 0, phys: {}, createdAt: clampNum(item.createdAt, 0, 1e14, Date.now())};
+    }
     if(window.Stick && Stick.objects && Stick.objects.isKind(item.type)){
       var pc = Stick.objects.normalize(item, paperHelpers());
       if(!pc) return null;
@@ -1116,7 +1122,7 @@
   // Board items are sticky notes unless `type` says otherwise (old boards have no type).
   // For a photo, `w` is the printed photo's width and `image` its source; the
   // original is never modified (`cutout` is reserved for an isolated-subject version).
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1158,6 +1164,16 @@
       if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
       if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) !== -1) sp.mediaState = c.mediaState;
       return sp;
+    }
+    if(c.type === "zone"){
+      c.w = Math.round(clampNum(c.w, ZONE_MIN_W, ZONE_MAX_W, 360)); c.h = Math.round(clampNum(c.h, ZONE_MIN_H, ZONE_MAX_H, 240)); c.z = 0; c.rot = 0;
+      c.title = String(c.title || "").replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+      if(!ZONE_MATERIALS.some(function(m){ return m[0] === c.variant; })) c.variant = "paper";
+      c.bg = safeColor(c.bg) || ZONE_TINTS[0];
+      if(c.carry !== true) delete c.carry;
+      if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
+      delete c.html;
+      return c;
     }
     if(c.type === "audio" || c.type === "video" || c.type === "photo"){
       if(c.caption !== undefined) c.caption = String(c.caption).replace(/\s+/g, " ").trim().slice(0, 120);
@@ -1398,7 +1414,7 @@
     // zoomed in, the scaled board is taller than the window: let it scroll so nothing is out of reach
     board.style.overflowY = boardZoom > 1 ? "auto" : "hidden";
     if(boardZoom <= 1) board.scrollTop = 0;
-    if(ZOOM_KEY) safeSet(ZOOM_KEY, boardZoom);
+    if(ZOOM_KEY) safeSet(ZOOM_KEY, boardZoom); if(typeof scheduleViewCheckpoint === "function") scheduleViewCheckpoint();
     updateMinimap();
   }
 
@@ -1927,7 +1943,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2079,6 +2095,7 @@
     return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
+    if(n && n.type === "zone") return true;                       // a zone is the user’s own layout, never "empty"
     if(isPaper(n)) return Stick.objects.hasContent(n);
     if(isObj(n) || n.image) return true;
     if(n.isTask && n.due) return true;
@@ -4199,6 +4216,7 @@
     {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
     {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
     {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"},
+    {id: "zone", group: "Add", label: "Zone", icon: ICONS.zone, touch: "more", run: function(bx, by){ createZone(bx, by); }},
     {id: "soup", group: "Premium", label: "Alphabet Soup", icon: ICONS.soup, touch: "more", run: function(bx, by){ createSoup(bx, by); }}
   ];
   function insertItems(){ return INSERT_ITEMS.filter(function(it){ return !it.ready || it.ready(); }); }
@@ -4580,6 +4598,7 @@
     return made;
   }
   function renderNoteCore(n, isNew, opts){
+    if(isZone(n)) return renderZone(n, isNew);
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
     if(isPaper(n)) return renderPaper(n, isNew, opts);
     if(isAV(n)) return renderAV(n, isNew, opts);
@@ -5190,7 +5209,7 @@
   function insertNotes(list, label){
     if(cloudSync) setTimeout(function(){ cloudSync.hydrateAll(); watchPhotoLoading(); }, 0);
     list.forEach(function(n){
-      zCounter += 1; n.z = zCounter;
+      zCounter += 1; n.z = isZone(n) ? 0 : zCounter;
       n.y = clampY(n.y);
       notes.push(n);
       renderNote(n, true, {focus:false});
@@ -5453,6 +5472,141 @@
   // Duplicates, pastes and imports are never pinned.
   function isPinned(n){ return !!n && n.pinned === true; }
   function isZone(n){ return !!n && n.type === "zone"; }
+  // ---------- Board zones: a patch of paper laid down behind the notes, so a corner of the board can have a name ----------
+  // A zone is a plain object like the others (it syncs, copies, pins and undoes the same way) but it sits underneath everything and only
+  // its title strip and its corner handle take the pointer, so the notes on top and the empty board around it stay easy to use.
+  // Deleting a zone only removes the paper: the notes on it are never touched. "Move with its notes" is off until chosen.
+  var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
+  var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
+  var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
+  function zoneMaterial(n){ return ZONE_MATERIALS.some(function(m){ return m[0] === n.variant; }) ? n.variant : "paper"; }
+  function zoneBox(n){ return {l: n.x, t: n.y, r: n.x + (n.w || 360), b: n.y + (n.h || 240)}; }
+  function noteCenter(o){ var el = o.el, w = o.w || NOTE_W, h = (el && el.offsetHeight) || NOTE_H; return {x: o.x + w / 2, y: o.y + h / 2}; }
+  function inBox(pt, b){ return pt.x >= b.l && pt.x <= b.r && pt.y >= b.t && pt.y <= b.b; }
+  // the notes whose middle lies inside the zone
+  function zoneContents(z){
+    var box = zoneBox(z);
+    return notes.filter(function(o){ return o !== z && !isZone(o) && o.el && o.el.isConnected && inBox(noteCenter(o), box); });
+  }
+  function insideAnyZone(n){ if(isZone(n)) return false; var c = noteCenter(n); return notes.some(function(z){ return isZone(z) && z.el && z.el.isConnected && inBox(c, zoneBox(z)); }); }
+  function zoneLabel(n){ return n.title ? "Zone: " + n.title : "Untitled zone"; }
+  function renderZone(n, isNew){
+    var el = document.createElement("div");
+    el.className = "zone mat-" + zoneMaterial(n) + (isNew ? " new" : "");
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.width = (n.w || 360) + "px"; el.style.height = (n.h || 240) + "px"; el.style.zIndex = 0;
+    el.style.setProperty("--zone", safeColor(n.bg) || ZONE_TINTS[0]);
+    el.setAttribute("aria-label", zoneLabel(n)); el.setAttribute("role", "group");
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = null;
+    var bar = makeDiv("zoneBar"), title = makeDiv("zoneTitle");
+    title.textContent = n.title || ""; title.setAttribute("data-ph", "Name this zone");
+    bar.appendChild(title);
+    el.appendChild(bar);
+    if(!readOnly){
+      var more = document.createElement("button"); more.type = "button"; more.className = "zoneMore"; more.innerHTML = ICONS.more; more.title = "Zone options"; more.setAttribute("aria-label", "Options for this zone");
+      more.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      more.addEventListener("click", function(e){ e.stopPropagation(); zoneMenu(n, more); });
+      bar.appendChild(more);
+      var handle = makeDiv("zoneHandle"); handle.title = "Drag to resize"; handle.setAttribute("aria-hidden", "true");
+      handle.addEventListener("pointerdown", function(e){ startZoneResize(e, n); });
+      el.appendChild(handle);
+      el.tabIndex = 0;
+      bar.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(title.isContentEditable) return;
+        e.preventDefault(); endEditing(); closeCaptureMenu();
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        var base = group ? selectedNotes() : [n], seen = {}, all = [];
+        base.forEach(function(b){ seen[b.id] = 1; all.push(b); });
+        base.forEach(function(b){ if(isZone(b) && b.carry === true) zoneContents(b).forEach(function(o){ if(!seen[o.id]){ seen[o.id] = 1; all.push(o); } }); });
+        startDrag(e, n, all);
+      });
+      bar.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
+      el.addEventListener("keydown", function(e){
+        if(e.target !== el) return;
+        if(e.key === "Enter"){ e.preventDefault(); editZoneTitle(n); }
+        else if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
+      });
+      el.addEventListener("focus", function(){ if(!selected.has(n.id)) setSelection([n.id]); });
+      el.addEventListener("contextmenu", function(e){ if(e.shiftKey || !e.target.closest(".zoneBar")) return; e.preventDefault(); openObjectContextMenu(n, e.clientX, e.clientY); });
+    }
+    boardInner.appendChild(el);
+    return el;
+  }
+  function editZoneTitle(n){
+    if(readOnly || !n.el) return;
+    var t = n.el.querySelector(".zoneTitle"), before = captureState([n.id]), start = n.title || "", done = false;
+    t.contentEditable = "true"; t.focus();
+    var rg = document.createRange(); rg.selectNodeContents(t); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
+    function finish(commit){
+      if(done) return; done = true;
+      t.removeEventListener("keydown", key); t.removeEventListener("blur", onBlur); t.removeEventListener("paste", paste);
+      t.contentEditable = "false";
+      var v = commit ? t.textContent.replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim().slice(0, 40) : start;
+      t.textContent = v;
+      if(v === start) return;
+      n.title = v; n.el.setAttribute("aria-label", zoneLabel(n)); saveNotes(); recordChange("Name zone", before);
+    }
+    function key(e){ if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); finish(false); n.el.focus(); } else if(e.key === "Enter"){ e.preventDefault(); finish(true); n.el.focus(); } }
+    function onBlur(){ finish(true); }
+    function paste(e){ e.preventDefault(); var tx = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, tx.replace(/\s+/g, " ")); }
+    t.addEventListener("keydown", key); t.addEventListener("blur", onBlur); t.addEventListener("paste", paste);
+  }
+  function startZoneResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el, before = captureState([n.id]), sx = e.clientX, sy = e.clientY, w0 = n.w || 360, h0 = n.h || 240, w = w0, h = h0;
+    setSelection([n.id]);
+    function move(ev){
+      w = Math.round(Math.min(ZONE_MAX_W, Math.max(ZONE_MIN_W, w0 + (ev.clientX - sx) / boardZoom)));
+      h = Math.round(Math.min(ZONE_MAX_H, Math.max(ZONE_MIN_H, h0 + (ev.clientY - sy) / boardZoom)));
+      el.style.width = w + "px"; el.style.height = h + "px";
+    }
+    function up(){
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      if(w === w0 && h === h0) return;
+      n.w = w; n.h = h; saveNotes(); ensureWidth(); updateMinimap(); recordChange("Resize zone", before);
+    }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  }
+  function createZone(bx, by){
+    if(readOnly) return null;
+    var vc = viewCenter();
+    var x = bx != null ? bx : vc.x, y = by != null ? by : Math.min(vc.y, 260);
+    var z = {id: newId(), type: "zone", x: Math.max(0, Math.round(x - 180)), y: Math.max(0, Math.round(y - 120)), w: 360, h: 240, title: "", variant: "paper", bg: ZONE_TINTS[Math.floor(Math.random() * 3)], rot: 0, z: 0, phys: {}, createdAt: Date.now()};
+    z.y = Math.min(z.y, Math.max(0, boardHeight() - z.h - 8));
+    insertNotes([z], "Add zone");
+    setTimeout(function(){ editZoneTitle(z); }, 60);
+    return z;
+  }
+  function zoneMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
+    var count = zoneContents(n).length;
+    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " note on this zone" : " notes on this zone"); pop.appendChild(hint);
+    pop.appendChild(menuItem(ICONS.pencil, "Rename", function(){ closeFloatingPopovers(); editZoneTitle(n); }));
+    var mh = makeDiv("menuHint"); mh.textContent = "Material"; pop.appendChild(mh);
+    ZONE_MATERIALS.forEach(function(m){
+      pop.appendChild(menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
+        closeFloatingPopovers(); var before = captureState([n.id]); n.variant = m[0]; saveNotes(); rerenderNote(n); recordChange("Zone material", before);
+      }, {cls: zoneMaterial(n) === m[0] ? "on" : ""}));
+    });
+    var ch = makeDiv("menuHint"); ch.textContent = "Colour"; pop.appendChild(ch);
+    var sw = makeDiv("zoneSwatches");
+    ZONE_TINTS.forEach(function(c){
+      var b = document.createElement("button"); b.type = "button"; b.className = "zoneSw" + ((safeColor(n.bg) || ZONE_TINTS[0]) === c ? " on" : ""); b.style.background = c; b.setAttribute("aria-label", "Colour " + c);
+      b.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.bg = c; saveNotes(); rerenderNote(n); recordChange("Zone colour", before); });
+      sw.appendChild(b);
+    });
+    pop.appendChild(sw);
+    pop.appendChild(menuItem(n.carry === true ? ICONS.tick : '<span class="menuGap"></span>', "Move with its notes", function(){
+      closeFloatingPopovers(); var before = captureState([n.id]); if(n.carry === true) delete n.carry; else n.carry = true; saveNotes(); recordChange("Zone moves with its notes", before);
+    }, {cls: n.carry === true ? "on" : "", title: "When on, dragging the zone carries the notes lying on it"}));
+    pop.appendChild(pinMenuItem(n));
+    pop.appendChild(menuItem(ICONS.trash, "Delete zone", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger", title: "Only the paper goes; notes on it stay"}));
+  }
+  OBJECT_MENUS.zone = zoneMenu;
   function decoratePin(n){
     var el = n && n.el; if(!el) return;
     var old = el.querySelector(":scope > .pinBadge"); if(old) old.remove();
@@ -6170,7 +6324,7 @@
     clearTimeout(viewSaveT);
     viewSaveT = setTimeout(function(){ safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x}); }, 300);
   }
-  board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); closeCaptureMenu(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); }, {passive:true});
+  board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); closeCaptureMenu(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); scheduleViewCheckpoint(); }, {passive:true});
 
   // ---------- search ----------
   function runSearch(){
@@ -6178,7 +6332,7 @@
     decor.search.clear();
     notes.forEach(function(n){
       if(!n.el) return;
-      if(!q){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
+      if(!q || isZone(n)){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
       var searchable = n.textEl || n.captionEl;
       if(!searchable){ n.el.style.opacity = "0.15"; n.el.style.pointerEvents = "none"; return; }
       var idx = textIndex(searchable);
@@ -8096,7 +8250,7 @@
   }
   // only real, drawn board objects: not the Done pile, not pinned, nothing that is merely a control or a decoration
   function cleanEligible(){
-    return notes.filter(function(n){ return n.el && n.el.isConnected && !isPinned(n) && !isZone(n); });
+    return notes.filter(function(n){ return n.el && n.el.isConnected && !isPinned(n) && !isZone(n) && !insideAnyZone(n); });
   }
   // what is actually on screen, judged from where the object is drawn (not from stale coordinates)
   function onScreen(n){
@@ -9254,6 +9408,7 @@
       var ids = editing ? [editing.id] : selIds();
       if(!ids.length) return; if(editing) ae.blur(); duplicateNotes(ids);
     }});
+  defineAction({id: "newZone", label: "Add a zone", group: "Create", keywords: "area region section paper background label", def: "", edit: true, run: function(){ createZone(); }});
   defineAction({id: "pin", label: "Pin or unpin selection", group: "Selection", keywords: "lock fix place stay anchor", def: "P", edit: true,
     when: function(){ return selIds().length > 0; },
     run: function(){ var ids = selIds(); var any = ids.some(function(id){ return !isPinned(findNote(id)); }); setPinned(ids, any); }});
@@ -9299,6 +9454,36 @@
     });
   }
 
+  // ---- spatial history: Back / Forward through the places you have looked at on this board (this visit only)
+  // A place is remembered once you have stayed somewhere clearly different for a moment, so scrolling past is not recorded.
+  var VH = {list: [], i: -1, timer: null, jumping: false, CAP: 30};
+  function curView(){ return {x: Math.round(viewCenter().x), sy: Math.round(board.scrollTop / (boardZoom || 1)), zoom: boardZoom}; }
+  function viewFar(a, b){ return Math.abs(a.x - b.x) > board.clientWidth * 0.6 / (boardZoom || 1) || Math.abs((a.zoom || 1) - (b.zoom || 1)) > 0.25 || Math.abs(a.sy - b.sy) > 240; }
+  function viewCheckpoint(){
+    if(!VH || VH.jumping) return;
+    var v = curView();
+    if(VH.i < 0){ VH.list = [v]; VH.i = 0; return; }
+    if(!viewFar(VH.list[VH.i], v)) { VH.list[VH.i] = VH.list[VH.i]; return; }
+    VH.list = VH.list.slice(0, VH.i + 1); VH.list.push(v);
+    if(VH.list.length > VH.CAP) VH.list.shift();
+    VH.i = VH.list.length - 1;
+  }
+  function scheduleViewCheckpoint(){ if(!VH) return; clearTimeout(VH.timer); VH.timer = setTimeout(viewCheckpoint, 1100); }
+  function goToView(v){
+    VH.jumping = true; clearTimeout(VH.timer);
+    boardZoom = Math.min(1.6, Math.max(0.5, +v.zoom || 1)); applyZoom();
+    board.scrollLeft = Math.max(0, v.x * boardZoom - board.clientWidth / 2);
+    if(boardZoom > 1) board.scrollTop = Math.max(0, (v.sy || 0) * boardZoom);
+    updateMinimapViewport();
+    setTimeout(function(){ VH.jumping = false; }, 600);
+  }
+  function viewBack(){ viewCheckpoint(); if(VH.i <= 0){ toast("No earlier place to go back to."); return; } VH.i--; goToView(VH.list[VH.i]); }
+  function viewForward(){ if(VH.i < 0 || VH.i >= VH.list.length - 1){ toast("No later place to go forward to."); return; } VH.i++; goToView(VH.list[VH.i]); }
+  setTimeout(viewCheckpoint, 1500);
+  defineAction({id: "viewBack", label: "Go back to the previous place on the board", group: "Go", keywords: "history previous spatial view back", def: "Alt+[", when: function(){ return VH.i > 0 || (VH.i === 0 && viewFar(VH.list[0], curView())); }, run: viewBack});
+  defineAction({id: "viewForward", label: "Go forward to the next place on the board", group: "Go", keywords: "history next spatial view forward", def: "Alt+]", when: function(){ return VH.i >= 0 && VH.i < VH.list.length - 1; }, run: viewForward});
+  Stick.viewHistory = {list: function(){ return VH.list.slice(); }, index: function(){ return VH.i; }, back: viewBack, forward: viewForward, checkpoint: viewCheckpoint};
+
   // ---- bookmarks: named places on one board (this device)
   var BOOKMARK_MAX = 30;
   function bookmarkKey(){ return "stickyboard." + NS + "bookmarks." + activeBoardId; }
@@ -9308,10 +9493,12 @@
   }
   function writeBookmarks(list){ safeSet(bookmarkKey(), list.slice(0, BOOKMARK_MAX)); }
   function goToBookmark(b){
+    viewCheckpoint();
     boardZoom = Math.min(1.6, Math.max(0.5, +b.zoom || 1)); applyZoom();
     board.scrollLeft = Math.max(0, b.x * boardZoom - board.clientWidth / 2);
     if(boardZoom > 1) board.scrollTop = Math.max(0, (b.sy || 0) * boardZoom);
     updateMinimapViewport();
+    scheduleViewCheckpoint(); setTimeout(viewCheckpoint, 400);
     toast("Went to “" + b.name + "”.");
   }
   function nameDialog(title, label, value, confirmLabel, done){
