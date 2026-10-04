@@ -1349,6 +1349,7 @@
     else if(c) delete quarantined[String(c.id)];
     return c;
   }
+  var bootRenderMs = 0;                       // how long drawing the whole board took at page load (dev diagnostics)
   var notes = [];
   var donePile = [];                                 // finished notes (see the Done pile section); stored with the notes, not drawn on the board
   var firstRun = false;
@@ -1488,8 +1489,17 @@
     });
   }
 
+  // Soft warnings by the number of ACTIVE board objects (not the Done pile, not anything soft-deleted). Never blocks creating a note.
+  var boardLevelSeen = 0;
+  function checkBoardSize(){
+    var G = window.Stick && Stick.guard; if(!G || readOnly) return;
+    var lvl = G.level(notes.length);
+    if(lvl > boardLevelSeen){ boardLevelSeen = lvl; toast(G.levelMessage(lvl, notes.length)); }
+    else if(lvl < boardLevelSeen) boardLevelSeen = lvl;
+  }
   function updateCount(){
     if(typeof updateDonePile === "function") updateDonePile(false);
+    if(typeof checkBoardSize === "function") checkBoardSize();
     countEl.textContent = notes.length + (notes.length === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
   }
 
@@ -4298,6 +4308,38 @@
   }
   OBJECT_MENUS.shopping = shoppingMenu;
   if(window.Stick && Stick.dev){        // local development only
+    // numbers for stress-testing big boards: Stick.dev.perf(), Stick.dev.perfRender(), Stick.dev.stress(500), Stick.dev.stressClear()
+    Stick.dev.perf = function(){
+      var q = function(sel){ return document.querySelectorAll(sel).length; };
+      return {active: notes.length, donePile: donePile.length, domNodes: document.getElementsByTagName("*").length, boardDomNodes: boardInner.getElementsByTagName("*").length,
+        mountedMedia: {img: q("img"), video: q("video"), audio: q("audio"), canvas: q("canvas")}, bootRenderMs: bootRenderMs,
+        heapMB: (window.performance && performance.memory) ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, level: Stick.guard ? Stick.guard.level(notes.length) : null};
+    };
+    Stick.dev.perfRender = function(){            // redraw every object once and time it
+      var t0 = performance.now();
+      notes.slice().forEach(function(n){ if(n.el) n.el.remove(); try{ renderNote(n, false); }catch(e){} });
+      void boardInner.offsetHeight;
+      return {ms: Math.round(performance.now() - t0), objects: notes.length};
+    };
+    Stick.dev.stress = function(count){           // guest boards only: it would otherwise sync hundreds of notes to an account
+      if(CLOUD) return "Stress test is only for guest boards (it would sync hundreds of notes to an account).";
+      count = Math.max(1, Math.min(2000, Number(count) || 100));
+      var made = [], t0 = performance.now();
+      for(var i = 0; i < count; i++){
+        zCounter += 1;
+        var n = {id: "st-" + newId(), x: 20 + (i % 36) * 130 + rand(-10, 10), y: 0, w: NOTE_W, html: "Stress note " + i, bg: randomColor(), font: pickFont(), rot: rand(-3, 3), z: zCounter, categoryIndex: 0, phys: makePhys()};
+        n.y = clampY(30 + Math.floor(i / 36) * 70, n);
+        notes.push(n); made.push(n);
+      }
+      made.forEach(function(n){ renderNote(n, false); });
+      void boardInner.offsetHeight;
+      ensureWidth(); saveNotes(); updateCount(); updateMinimap();
+      return Object.assign({addedMs: Math.round(performance.now() - t0)}, Stick.dev.perf());
+    };
+    Stick.dev.stressClear = function(){
+      var ids = notes.filter(function(n){ return /^st-/.test(n.id); }).map(function(n){ return n.id; });
+      deleteNotes(ids, {silent: true}); return "Removed " + ids.length + " stress notes.";
+    };
     Stick.dev.shopVariant = function(v){ try{ if(v) localStorage.setItem("stickit.dev.shopVariant", v); else localStorage.removeItem("stickit.dev.shopVariant"); }catch(e){} notes.filter(isShopping).forEach(function(n){ delete n._variant; rerenderNote(n); }); return "Shopping list look: " + (v || "a"); };
     Stick.dev.shopCycle = function(){ notes.filter(isShopping).sort(function(x, y){ return x.x - y.x; }).forEach(function(n, i){ n._variant = ["a", "b", "c"][i % 3]; rerenderNote(n); }); return "Gave the lists looks a, b, c left to right."; };
     // three sample lists side by side, one per look (not saved with their look; a reload shows the default look)
@@ -5783,11 +5825,33 @@
     setSelection(list.map(function(n){ return n.id; }));
     return recordChange(label, {}, {newIds:list.map(function(n){ return n.id; })});
   }
+  // Actions that multiply objects (duplicate, paste) share one guard (js/boardguard.js): a short burst runs at once, a sustained burst is slowed
+  // down (never dropped; each action stays whole), and an action that would take the board past ~1000 objects asks first.
+  var multiplyLimiter = (window.Stick && Stick.guard) ? Stick.guard.createLimiter({burst: 15, windowMs: 5000, spacingMs: 600}) : null;
+  var multiplyToastAt = 0;
+  function guardedMultiply(count, run){
+    var G = window.Stick && Stick.guard;
+    function go(){
+      if(!multiplyLimiter){ run(); return; }
+      var plan = multiplyLimiter.reserve(Date.now());
+      if(!plan.queued){ run(); return; }
+      if(Date.now() - multiplyToastAt > 8000){ multiplyToastAt = Date.now(); toast("Lots of duplicates \u2014 slowing this down to protect performance."); }
+      setTimeout(run, plan.delay);
+    }
+    if(G && G.needsConfirm(notes.length, count)){
+      confirmDialog({title: "Add " + count + " objects?", body: G.confirmText(notes.length, count), confirm: "Add them"}).then(function(ok){ if(ok) go(); });
+    } else go();
+  }
   function duplicateNotes(ids){
     var src = ids.map(findNote).filter(Boolean);
+    if(!src.length || readOnly) return;
+    guardedMultiply(src.length, function(){ duplicateNow(ids); });
+  }
+  function duplicateNow(ids){
+    var src = ids.map(findNote).filter(Boolean);                 // resolved when it actually runs: a note deleted in the meantime is simply skipped
     if(!src.length) return;
     var copies = src.map(function(s){ var c = paperCopy(serializeNote(s)); if(c){ c.x = s.x + 26; c.y = s.y + 26; } return c; }).filter(Boolean);
-    insertNotes(copies, copies.length > 1 ? "Duplicate " + copies.length + " notes" : "Duplicate note");
+    if(copies.length) insertNotes(copies, copies.length > 1 ? "Duplicate " + copies.length + " notes" : "Duplicate note");
   }
 
   var CLIP_KEY = "stickyboard.clipboard.v1";
@@ -5814,6 +5878,9 @@
   var pasteSeq = 0, lastPasteTs = 0;
   function pasteNotes(data){
     if(!data || !Array.isArray(data.notes) || !data.notes.length) return;
+    guardedMultiply(data.notes.length, function(){ pasteNow(data); });
+  }
+  function pasteNow(data){
     if(data.ts !== lastPasteTs){ lastPasteTs = data.ts; pasteSeq = 0; }
     pasteSeq += 1;
     var sameBoard = data.board === activeBoardId && data.notes.some(function(s){ return findNote(s.id); });
@@ -8847,7 +8914,7 @@
       if(!area.value.trim()){ result = null; status.textContent = ""; status.className = "importStatus"; }
       else {
         result = parseImport(area.value);
-        status.textContent = result.error || ("Found " + result.notes.length + (result.notes.length === 1 ? " note." : " notes."));
+        status.textContent = result.error || ("Found " + result.notes.length + (result.notes.length === 1 ? " note." : " notes.") + (window.Stick && Stick.guard && result.notes.length >= Stick.guard.LEVELS.huge ? " That is a very large board (" + result.notes.length + "), which can be slow and use a lot of memory." : ""));
         status.className = "importStatus " + (result.error ? "bad" : "good");
       }
       go.setAttribute("aria-disabled", String(!(result && !result.error)));
@@ -11177,7 +11244,10 @@
     }
     syncNoteMaxHeight();
     ensureWidth();
+    var bootT0 = (window.performance && performance.now) ? performance.now() : 0;
     notes.forEach(function(n){ try{ renderNote(n, false); }catch(err){ try{ console.warn("Stick-It: one object could not be drawn:", n && n.id, err); }catch(e2){} } });
+    void boardInner.offsetHeight;                // include the browser's layout work, not only creating the elements
+    bootRenderMs = (window.performance && performance.now) ? Math.round(performance.now() - bootT0) : 0;
     updateCount();
     applyZoom();
     if(!readOnly) setTimeout(function(){ if(boardInner.clientHeight) recoverVertical(); }, 300);

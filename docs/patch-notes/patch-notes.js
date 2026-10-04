@@ -75,7 +75,8 @@ export const patchNotes = [
       "Legal pages open on beige paper by default and share one type scale in English and Hebrew.",
       "The crown is a crisp vector in dark mode; the plan chip explains the plan; the storage bar shows used and remaining.",
       "Typing no longer flashes the sync status after every pause: the note is kept on your device at once and sent to your account after you stop typing for about two seconds (at most every ten).",
-      "The top-bar buttons move a little when you hover or focus them: the cog turns, the sign-out arrow slides, the broom sweeps, share tips, the keyboard dips, the question mark tilts, and the avatar lifts with a tiny crown shake. One short movement each, off on touch screens and with reduced motion."
+      "The top-bar buttons move a little when you hover or focus them: the cog turns, the sign-out arrow slides, the broom sweeps, share tips, the keyboard dips, the question mark tilts, and the avatar lifts with a tiny crown shake. One short movement each, off on touch screens and with reduced motion.",
+      "Big boards are protected in layers instead of by a low cap: a burst of duplicates or pastes beyond about 15 in five seconds is slowed (never dropped, never split), a calm message appears at 500, 750 and 1000 active objects, and anything that would add 25 or more objects and take the board to 1000 or more asks first. None of it is tied to a plan."
     ],
     "fixed": [
       "Clean up could announce one number and move another; it now uses one fixed list.",

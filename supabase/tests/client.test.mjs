@@ -473,6 +473,22 @@ try {
     P.sync.stop();
   }
 
+  // ============================================================ board-size safeguards: duplicates are ordinary objects and sync like any other
+  {
+    const D = await device('dup.user@example.com');
+    const bd = await D.Stick.repo.createBoard('Dupes', null);
+    D.open(bd.id); await D.sync.start();
+    const original = note({ html: 'original' });
+    D.notes.push(original);
+    // what a slowed burst of 60 duplicates leaves behind: 60 more objects with their own ids, created over time
+    for (let i = 0; i < 60; i++) { D.notes.push(note({ html: 'original', x: original.x + 26 * (i + 1), y: original.y + 26 * (i + 1) })); if (i % 15 === 0) { D.sync.notesChanged(); await sleep(30); } }
+    D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    const rows = (await admin('select id from public.board_objects where board_id=$1 and deleted_at is null', [bd.id])).rows;
+    ok(rows.length === 61 && new Set(rows.map((r) => r.id)).size === 61, 'duplicated objects all reach the server, each with its own id, none lost and none deleted');
+    ok((await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is not null', [bd.id])).rows[0].c === 0, 'a burst of duplicates deletes nothing');
+    D.sync.stop();
+  }
+
   // ============================================================ INCIDENT REGRESSIONS (data safety)
   // 2026-10-04: opening a share link in a browser that is signed in soft-deleted the account's whole board. The share page's own objects (the
   // shared copies) were diffed against what the account already knew, and every real object read as "removed".

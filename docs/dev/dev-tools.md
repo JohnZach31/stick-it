@@ -71,3 +71,12 @@ Nothing like this exists on any other hostname. Signed in, "seen" is also stored
 
 ## Command palette and shortcuts
 `Stick.palette.open()`, `.close()`, `.actions()` list what the palette would show. Custom shortcuts are saved in the device settings (`shortcuts`) and, when signed in, in `profile_settings.ui_prefs.shortcuts`. Apply `supabase/migrations/20261003100000_ui_prefs.sql` before testing the account sync.
+
+## Big-board diagnostics and stress test (local only)
+```js
+Stick.dev.perf()          // {active, donePile, domNodes, boardDomNodes, mountedMedia:{img,video,audio,canvas}, bootRenderMs, heapMB, level}
+Stick.dev.perfRender()    // redraw every object once, with layout: {ms, objects}
+Stick.dev.stress(500)     // add 500 simple notes (guest boards only; refuses signed-in boards)
+Stick.dev.stressClear()   // remove the stress notes
+```
+`level` is the size warning level (0 below 500 objects, 1 from 500, 2 from 750, 3 from 1000). The safeguards themselves live in `js/boardguard.js` and are tested by `supabase/tests/boardguard.test.mjs`. Viewport rendering is a documented follow-up: `docs/dev/VIEWPORT-VIRTUALIZATION-FOLLOWUP.md`.
