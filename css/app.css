@@ -2050,3 +2050,75 @@ body.tidying .note, body.tidying .photoObj, body.tidying .boardObj{ transition:l
 .slLocal.fail{ color:var(--ink); flex-wrap:wrap; }
 @media (max-width:720px){ .footSlip{ bottom:calc(72px + env(safe-area-inset-bottom,0px)); } }
 @media (prefers-reduced-motion: reduce){ .footSlip{ animation:none; } .fsNote, .footSlip.ok .fsNote, .footSlip.fail .fsNote{ animation:none !important; transform:none !important; } }
+
+/* ---------- Control Center: one dialog for account, appearance, sharing, privacy & data, sounds, shortcuts, legal ---------- */
+.acctCard.acctWide.ccCard{ width:min(900px, 96vw); height:min(680px, 92vh); max-height:92vh; padding:0; display:flex; flex-direction:column; overflow:hidden; text-align:start; }
+.ccHead{ padding:18px 60px 6px 26px; flex:none; }
+.ccHead h3{ margin:0; text-align:start; font:700 1.15rem 'Sora',sans-serif; }
+.ccLayout{ flex:1; min-height:0; display:flex; }
+.ccNav{ flex:none; width:196px; display:flex; flex-direction:column; gap:3px; padding:8px 10px 14px 16px; border-inline-end:1px solid var(--line); overflow-y:auto; scrollbar-width:thin; }
+.ccTab{ all:unset; box-sizing:border-box; display:flex; align-items:center; gap:10px; padding:9px 12px; border-radius:10px 4px 4px 10px; cursor:pointer; font:600 0.86rem 'Sora',sans-serif; color:var(--ink-soft); transition:background .12s ease, color .12s ease; }
+.ccTab:hover{ background:color-mix(in srgb, var(--accent-soft) 55%, transparent); color:var(--ink); }
+.ccTab:focus-visible{ outline:2px solid var(--focus); outline-offset:-2px; }
+.ccTab[aria-selected="true"]{ background:var(--accent-soft); color:var(--ink); box-shadow:inset 3px 0 0 var(--accent-strong); }
+.ccTab .ccIc{ width:18px; height:18px; flex:none; }
+.ccPanes{ flex:1; min-width:0; overflow-y:auto; overscroll-behavior:contain; padding:8px 26px 22px 22px; scrollbar-width:thin; }
+.ccPane{ display:flex; flex-direction:column; gap:16px; outline:none; }
+.ccPane[hidden]{ display:none; }
+.ccFoot{ flex:none; display:flex; align-items:center; justify-content:flex-end; gap:10px; padding:12px 22px; border-top:1px solid var(--line); background:var(--panel); }
+.ccFoot[hidden]{ display:none; }
+.ccFoot .asErr{ flex:1; margin:0; text-align:start; font-size:0.8rem; min-width:0; }
+.ccFoot .pillBtn{ min-width:88px; padding:9px 18px; }
+.ccFoot .pillBtn.primary{ box-shadow:0 2px 0 color-mix(in srgb, var(--accent) 70%, #000); }
+/* the older Settings sections, now living inside a pane: same card look as the account cards */
+.ccPane .setSec{ border:1px solid var(--line); border-radius:14px; background:var(--field); padding:14px 16px; margin:0; }
+.ccPane .setSec:first-of-type{ padding-top:14px; }
+.ccPane .setSec h4{ margin:0 0 8px; }
+.ccPane .setSec.danger{ border-color:color-mix(in srgb, var(--danger) 45%, var(--line)); }
+.ccPointer{ border:1px solid var(--line); border-radius:14px; background:var(--field); }
+.ccRange{ width:min(220px, 100%); accent-color:var(--accent-strong); }
+.asItem.off{ opacity:0.55; }
+.ccLegalList{ display:flex; flex-direction:column; gap:2px; }
+.ccLink{ text-decoration:none; color:var(--ink); }
+.ccLink .t{ display:block; font-weight:600; }
+.ccAbout{ margin:0; font-size:0.86rem; line-height:1.5; color:var(--ink-soft); }
+.sr-only{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+/* shortcuts: small paper key caps, searchable */
+.kbdSearch{ display:flex; align-items:center; gap:12px; position:sticky; top:-8px; z-index:2; background:var(--panel); padding:8px 0 6px; }
+.kbdSearch .asIn{ flex:1; }
+.kbdCount{ margin:0; font-size:0.74rem; color:var(--ink-soft); white-space:nowrap; }
+.kbdGroups{ display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:14px; align-items:start; }
+.kbdGroup{ margin:0; }
+.kbdGroup[hidden], .kbdRow[hidden], .kbdNone[hidden]{ display:none; }
+.kbdRow{ display:flex; align-items:center; gap:12px; padding:6px 0; border-top:1px dashed var(--line); }
+.kbdRow:first-of-type{ border-top:0; }
+.kbdKeys{ flex:none; width:50%; display:flex; flex-wrap:wrap; align-items:center; gap:3px; }
+.kbdKeys kbd{ font:600 0.72rem 'Sora',sans-serif; color:var(--ink); background:linear-gradient(#fffdf3, #f3ecd2); border:1px solid rgba(90,74,28,0.35); border-bottom-width:2px; border-radius:6px; padding:2px 7px; box-shadow:0 1px 0 rgba(255,255,255,0.7) inset; white-space:nowrap; }
+body.dark .kbdKeys kbd{ background:linear-gradient(#3a3424, #2f2a1c); border-color:rgba(242,234,219,0.3); }
+.kbdPlus{ font-size:0.7rem; color:var(--ink-soft); }
+.kbdDesc{ flex:1; min-width:0; font-size:0.8rem; line-height:1.35; color:var(--ink-soft); }
+@media (max-width:720px){
+  .acctCard.acctWide.ccCard{ width:100vw; height:100%; max-height:100%; border-radius:0; }
+  .ccBackdrop{ padding:0; align-items:stretch; }
+  .ccHead{ padding:14px 56px 4px 16px; }
+  .ccLayout{ flex-direction:column; }
+  .ccNav{ width:auto; flex-direction:row; border-inline-end:0; border-bottom:1px solid var(--line); padding:4px 10px; overflow-x:auto; overflow-y:hidden; gap:4px; }
+  .ccTab{ flex:none; padding:8px 12px; border-radius:10px; box-shadow:none !important; }
+  .ccTab[aria-selected="true"]{ box-shadow:inset 0 -3px 0 var(--accent-strong) !important; border-radius:10px 10px 4px 4px; }
+  .ccTab .ccIc{ display:none; }
+  .ccPanes{ padding:10px 14px 18px; }
+  .ccFoot{ padding:10px 14px calc(10px + env(safe-area-inset-bottom)); }
+  .ccFoot .pillBtn{ flex:1; min-width:0; }
+  .ccFoot .asErr{ flex:1 1 100%; order:-1; }
+  .ccFoot{ flex-wrap:wrap; }
+  .kbdGroups{ grid-template-columns:1fr; }
+  .kbdKeys{ width:44%; }
+}
+@media (prefers-reduced-motion: reduce){ .ccTab{ transition:none; } }
+.asField .help.checking{ display:flex; align-items:center; gap:6px; }
+.asField .help .slMini{ margin:0; width:14px; height:14px; }
+
+/* the crown, wherever an avatar is big enough to carry one */
+.avCrownWrap{ position:relative; flex:none; display:block; }
+.avCrownWrap .crown{ position:absolute; top:-15px; left:50%; width:36px; height:23px; transform:translateX(-50%) rotate(-8deg); pointer-events:none; filter:drop-shadow(0 1px 1px rgba(0,0,0,.35)); z-index:2; }
+.avCrownWrap .crown svg{ width:100%; height:100%; display:block; }

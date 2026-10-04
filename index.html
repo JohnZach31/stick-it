@@ -64,10 +64,7 @@
 
 <div class="acctBackdrop" id="settingsModal" hidden>
   <div class="acctCard modalCard" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <button class="acctClose" id="settingsClose" aria-label="Close settings"></button>
-    <h3 id="settingsTitle">Settings</h3>
-
-    <section class="setSec">
+    <section class="setSec" id="secAppearance">
       <h4>Appearance</h4>
       <div class="setRow">
         <label class="lbl" for="lockToggle">Keep new notes in one font<small>Otherwise each new note picks its own handwriting.</small></label>
@@ -92,7 +89,7 @@
       <p class="setHelp">If you sign in with Google, your Google name is used instead.</p>
     </section>
 
-    <section class="setSec">
+    <section class="setSec" id="secBoardData">
       <h4>Board data</h4>
       <div class="setBtns">
         <button class="pillBtn" id="exportBtn">Export board…</button>
@@ -100,23 +97,13 @@
       </div>
     </section>
 
-    <section class="setSec">
-      <h4>Legal</h4>
-      <div class="legalLinks" id="settingsLegal"></div>
-    </section>
-
-    <section class="setSec danger">
+    <section class="setSec danger" id="secDanger">
       <h4>Danger zone</h4>
       <div class="setRow">
         <span class="lbl">Clear this board<small id="count"></small></span>
         <button class="pillBtn danger" id="clearBtn">Clear board</button>
       </div>
     </section>
-
-    <div class="modalActions" style="margin-top:6px;">
-      <button class="pillBtn" id="settingsCancel">Cancel</button>
-      <button class="pillBtn primary" id="settingsSave">Save</button>
-    </div>
   </div>
 </div>
 

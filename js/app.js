@@ -512,6 +512,8 @@
   var settings = safeGet(SETTINGS_KEY) || { lockFont:false, fontName:FONTS[0].name, displayName:"", account:null, guestConfirmed:false, theme:"light" };
   if(settings.displayName === undefined) settings.displayName = "";
   if(settings.account === undefined) settings.account = null;
+  if(settings.soundOn === undefined) settings.soundOn = true;
+  if(settings.soundVolume === undefined) settings.soundVolume = 60;
   if(settings.guestConfirmed === undefined) settings.guestConfirmed = false;
   if(settings.theme === undefined) settings.theme = "light";
   if(settings.cleanupEmpty === undefined) settings.cleanupEmpty = true;
@@ -6061,7 +6063,7 @@
   // Preferences changed in Settings are previewed live but only kept on Save;
   // Cancel (or closing the dialog) puts back what was there when it opened.
   // Clear board and Import are separate, immediate actions with their own confirmation.
-  var STAGED_KEYS = ["lockFont","fontName","theme","cleanupEmpty","displayName"];
+  var STAGED_KEYS = ["lockFont","fontName","theme","cleanupEmpty","displayName","soundOn","soundVolume"];
   var settingsSnapshot = null;
   function applySettingsUI(){
     document.body.classList.toggle("dark", settings.theme === "dark");
@@ -6077,21 +6079,7 @@
     displayNameInput.hidden = moved;
     displayNameInput.nextElementSibling.hidden = moved;
   }
-  function openSettings(){
-    closeOtherPanels(panel);
-    closeFloatingPopovers();
-    updateCount();
-    settingsSnapshot = {};
-    STAGED_KEYS.forEach(function(k){ settingsSnapshot[k] = settings[k]; });
-    applySettingsUI();
-    panel.hidden = false;
-  }
-  function saveSettingsAndClose(){
-    saveSettings();
-    settingsSnapshot = null;
-    panel.hidden = true;
-    toast("Settings saved.");
-  }
+  function openSettings(section){ openControlCenter(section || "appearance"); }
   function cancelSettings(){
     if(settingsSnapshot){
       STAGED_KEYS.forEach(function(k){ settings[k] = settingsSnapshot[k]; });
@@ -6100,21 +6088,273 @@
     }
     panel.hidden = true;
   }
-  function closeSettings(){ cancelSettings(); }
-  document.getElementById("settingsSave").addEventListener("click", saveSettingsAndClose);
-  document.getElementById("settingsCancel").addEventListener("click", cancelSettings);
+  function closeSettings(){ if(CC) closeAccountModal(); else cancelSettings(); }
   gearBtn.addEventListener("click", function(){
-    if(panel.hidden) openSettings(); else closeSettings();
+    if(CC) closeAccountModal(); else openControlCenter("appearance");
     gearBtn.classList.remove("spin");
     void gearBtn.offsetWidth;
     gearBtn.classList.add("spin");
   });
-  document.getElementById("settingsClose").innerHTML = ICONS.close;
-  document.getElementById("settingsClose").addEventListener("click", closeSettings);
-  panel.addEventListener("mousedown", function(e){ if(e.target === panel) closeSettings(); });
-  document.addEventListener("keydown", function(e){
-    if(e.key === "Escape" && !panel.hidden && !document.querySelector(".acctBackdrop:not(#settingsModal)")) closeSettings();
-  });
+  panel.hidden = true;                      // the old Settings dialog is only a holder now: its sections are shown inside the Control Center
+  // ---------- Control Center: one place for account, appearance, sharing, privacy & data, sounds, shortcuts and legal ----------
+  // One dialog, one footer. Sections are described in CC_SECTIONS; a section may build itself lazily the first time it is shown.
+  // Changes to settings and to the profile are staged: Save keeps them, Cancel (or closing) drops them. Export, Sign out, Delete
+  // account and the like stay immediate and never wait for Save.
+  var CC = null;
+  var CC_SECTIONS = [
+    {id: "account", label: "Account", icon: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/>'},
+    {id: "appearance", label: "Appearance", icon: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/>'},
+    {id: "sharing", label: "Sharing", icon: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/>'},
+    {id: "privacy", label: "Privacy & Data", icon: '<path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/>'},
+    {id: "sounds", label: "Sounds", icon: '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>', build: buildSoundsPane},
+    {id: "shortcuts", label: "Shortcuts", icon: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7 14h10"/>', footer: false, build: buildShortcutsPane},
+    {id: "legal", label: "Legal & About", icon: '<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>', footer: false, build: buildLegalPane}
+  ];
+  function ccSignedIn(){ return !!(settings.account && CLOUD && window.Stick && Stick.account); }
+  function openControlCenter(section){
+    var want = CC_SECTIONS.some(function(x){ return x.id === section; }) ? section : "account";
+    if(CC && acctBackdrop && acctBackdrop === CC.backdrop){ CC.show(want); return CC; }
+    var opener = document.activeElement;
+    closeOtherPanels(null); closeFloatingPopovers(); closeAccountModal();
+    acctOpener = opener;
+    var backdrop = makeDiv("acctBackdrop ccBackdrop"), card = makeDiv("acctCard acctWide ccCard");
+    card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-labelledby", "ccTitle"); card.tabIndex = -1;
+    backdrop.appendChild(card); acctBackdrop = backdrop;
+    backdrop.addEventListener("mousedown", function(e){ if(e.target === backdrop) closeAccountModal(); });
+    card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close settings">' + ICONS.close + '</button>' +
+      '<header class="ccHead"><h3 id="ccTitle">Settings</h3></header>' +
+      '<div class="ccLayout"><nav class="ccNav" role="tablist" aria-orientation="vertical" aria-label="Settings sections"></nav><div class="ccPanes"></div></div>' +
+      '<div class="ccFoot" id="ccFoot"><p class="asErr" id="asErr" role="alert"></p><button type="button" class="pillBtn" id="asCancel">Cancel</button><button type="button" class="pillBtn primary" id="asSave">Save</button></div>';
+    document.body.appendChild(backdrop);
+    document.addEventListener("keydown", acctEscHandler);
+    acctTrapKey = function(e){ if(acctBackdrop === backdrop) trapTab(e, backdrop, card); };
+    document.addEventListener("keydown", acctTrapKey, true);
+
+    var nav = card.querySelector(".ccNav"), panesBox = card.querySelector(".ccPanes"), foot = card.querySelector("#ccFoot"), closers = [], moved = [], built = {}, saved = false;
+    var cc = CC = {backdrop: backdrop, card: card, panes: {}, tabs: {}, active: null, accountSave: null, focusProfile: null,
+      onClose: function(fn){ closers.push(fn); },
+      markSaved: function(){ saved = true; saveSettings(); settingsSnapshot = null; },
+      adopt: function(el, pane){ if(!el) return; moved.push({el: el, home: el.parentNode}); pane.appendChild(el); },
+      show: show,
+      teardown: function(){
+        closers.forEach(function(fn){ try{ fn(); }catch(e){} });
+        if(!saved && settingsSnapshot){ STAGED_KEYS.forEach(function(k){ settings[k] = settingsSnapshot[k]; }); settingsSnapshot = null; applySettingsUI(); }
+        moved.forEach(function(m){ if(m.home) m.home.appendChild(m.el); });
+        CC = null;
+      }};
+    CC_SECTIONS.forEach(function(sec){
+      var t = document.createElement("button"); t.type = "button"; t.className = "ccTab"; t.id = "cct-" + sec.id; t.setAttribute("role", "tab"); t.setAttribute("aria-controls", "ccp-" + sec.id); t.setAttribute("aria-selected", "false"); t.tabIndex = -1;
+      t.innerHTML = '<svg class="ccIc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + sec.icon + '</svg><span></span>';
+      t.querySelector("span").textContent = sec.label;
+      t.addEventListener("click", function(){ show(sec.id); });
+      nav.appendChild(t); cc.tabs[sec.id] = t;
+      var p = makeDiv("ccPane"); p.id = "ccp-" + sec.id; p.setAttribute("role", "tabpanel"); p.setAttribute("aria-labelledby", "cct-" + sec.id); p.hidden = true; p.tabIndex = -1;
+      panesBox.appendChild(p); cc.panes[sec.id] = p;
+    });
+    nav.addEventListener("keydown", function(e){
+      var ids = CC_SECTIONS.map(function(x){ return x.id; }), i = ids.indexOf(cc.active), j = i;
+      if(e.key === "ArrowDown" || e.key === "ArrowRight") j = (i + 1) % ids.length;
+      else if(e.key === "ArrowUp" || e.key === "ArrowLeft") j = (i + ids.length - 1) % ids.length;
+      else if(e.key === "Home") j = 0; else if(e.key === "End") j = ids.length - 1; else return;
+      e.preventDefault(); show(ids[j]); cc.tabs[ids[j]].focus();
+    });
+    function show(id){
+      var sec = CC_SECTIONS.filter(function(x){ return x.id === id; })[0]; if(!sec) return;
+      cc.active = id;
+      CC_SECTIONS.forEach(function(x){ var on = x.id === id; cc.tabs[x.id].setAttribute("aria-selected", String(on)); cc.tabs[x.id].tabIndex = on ? 0 : -1; cc.panes[x.id].hidden = !on; });
+      if(sec.build && !built[id]){ built[id] = true; sec.build(cc, cc.panes[id]); }
+      foot.hidden = sec.footer === false; card.dataset.section = id;
+      var er = card.querySelector("#asErr"); if(er) er.textContent = "";
+      panesBox.scrollTop = 0;
+    }
+    card.querySelector("#acctCloseBtn").addEventListener("click", function(){ closeAccountModal(); });
+    card.querySelector("#asCancel").addEventListener("click", function(){ closeAccountModal(); });
+    card.querySelector("#asSave").addEventListener("click", function(){
+      if(cc.accountSave) return cc.accountSave();
+      cc.markSaved(); closeAccountModal(); toast("Settings saved.");
+    });
+
+    // ---- fill the sections. The older Settings panel's controls keep their elements (and listeners); they simply move in here.
+    settingsSnapshot = {}; STAGED_KEYS.forEach(function(k){ settingsSnapshot[k] = settings[k]; });
+    updateCount(); applySettingsUI();
+    var signedIn = ccSignedIn();
+    cc.adopt(document.getElementById("secAppearance"), cc.panes.appearance);
+    if(!signedIn) cc.adopt(document.getElementById("sharingSec"), cc.panes.sharing);
+    if(signedIn) buildAccountParts(cc); else buildGuestAccount(cc, cc.panes.account);
+    cc.adopt(document.getElementById("secBoardData"), cc.panes.privacy);
+    cc.adopt(document.getElementById("secDanger"), cc.panes.privacy);
+    if(!signedIn) cc.panes.privacy.insertBefore(legalPointer(), cc.panes.privacy.firstChild);
+    show(want);
+    setTimeout(function(){ var t = cc.tabs[cc.active]; if(t && acctBackdrop === backdrop && !card.contains(document.activeElement)) t.focus(); }, 60);
+    return cc;
+  }
+  function legalPointer(){
+    var b = document.createElement("button"); b.type = "button"; b.className = "asAction ccPointer";
+    b.innerHTML = '<span class="lbl">Privacy Policy, Terms and notices<small>What Stick-It collects, why, and your choices.</small></span><span class="go" aria-hidden="true">›</span>';
+    b.addEventListener("click", function(){ if(CC) CC.show("legal"); });
+    return b;
+  }
+  // the Account section for someone who is not signed in (or has only the older local sign-in)
+  function buildGuestAccount(cc, pane){
+    var acc = settings.account;
+    pane.innerHTML = '<section class="asHero" aria-label="Your profile"><div class="acctAv pic" id="ccGuestPic" role="img" aria-label="Profile picture"></div><div class="asHeroText"><h3 class="asHeroName" id="ccGuestName"></h3><p class="asHeroHandle" id="ccGuestSub"></p></div></section>' +
+      '<section class="asCard"><h4>' + (acc ? "Signed in" : "Sign in") + '</h4><p class="asHint" id="ccGuestHint" style="margin-top:0;"></p><div class="setBtns" id="ccGuestBtns"></div></section>';
+    var pic = pane.querySelector("#ccGuestPic");
+    if(acc && acc.picture){ paintAvatar(pic, {name: acc.name, source: "none", url: acc.picture}); }
+    else paintAvatar(pic, {name: acc ? acc.name : getDisplayName(), source: "none"});
+    pane.querySelector("#ccGuestName").textContent = acc ? acc.name : "You’re using Stick-It as a guest";
+    pane.querySelector("#ccGuestSub").textContent = acc ? (acc.email || "") : "";
+    pane.querySelector("#ccGuestSub").hidden = !(acc && acc.email);
+    pane.querySelector("#ccGuestHint").textContent = acc ? "Your name and photo show up on anything you share. Your notes themselves live in this browser."
+      : (CLOUD_OK ? "Your boards live on this device. Sign in to keep them in your account and use them on your other devices." : "Your boards live on this device.");
+    var btns = pane.querySelector("#ccGuestBtns"), b = document.createElement("button"); b.type = "button";
+    if(acc){ b.className = "pillBtn danger"; b.textContent = "Sign out"; b.addEventListener("click", function(){ closeAccountModal(); signOut(); }); btns.appendChild(b); }
+    else if(CLOUD_OK){ b.className = "pillBtn primary"; b.textContent = "Sign in"; b.addEventListener("click", function(){ closeAccountModal(); openAccountModal(); }); btns.appendChild(b); }
+    else pane.querySelector("section.asCard").hidden = true;
+  }
+
+  // ---- Sounds: the preference lives here now; the sound library itself comes later
+  var SoundFx = (function(){
+    var ctx = null;
+    function audio(){ if(ctx) return ctx; var C = window.AudioContext || window.webkitAudioContext; if(!C) return null; try{ ctx = new C(); }catch(e){ ctx = null; } return ctx; }
+    // one soft paper tap (filtered noise, 90 ms): enough to hear the volume, not a sound design
+    function tap(vol){
+      var c = audio(); if(!c) return false;
+      if(c.state === "suspended") try{ c.resume(); }catch(e){}
+      var n = Math.floor(c.sampleRate * 0.09), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for(var i = 0; i < n; i++){ d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2.4); }
+      var src = c.createBufferSource(); src.buffer = buf;
+      var f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = 1900;
+      var g = c.createGain(); g.gain.value = Math.max(0, Math.min(1, vol / 100)) * 0.7;
+      src.connect(f); f.connect(g); g.connect(c.destination); src.start();
+      return true;
+    }
+    return {
+      enabled: function(){ return settings.soundOn !== false; },
+      volume: function(){ return Math.max(0, Math.min(100, Number(settings.soundVolume == null ? 60 : settings.soundVolume))); },
+      preview: function(){ return tap(this.volume()); },
+      play: function(){ return this.enabled() && this.volume() > 0 ? tap(this.volume()) : false; }
+    };
+  })();
+  function buildSoundsPane(cc, pane){
+    pane.innerHTML = '<section class="asCard" aria-labelledby="ccSndH"><h4 id="ccSndH">Sounds</h4>' +
+      '<div class="asItem"><label class="lbl" for="sndOn">Sound effects<small>Soft paper sounds for the things you do.</small></label><input type="checkbox" class="asSw" id="sndOn" role="switch"></div>' +
+      '<div class="asItem" id="sndVolRow"><label class="lbl" for="sndVol">Volume<small id="sndVolVal"></small></label><input type="range" class="ccRange" id="sndVol" min="0" max="100" step="5"></div>' +
+      '<div class="setBtns"><button type="button" class="pillBtn" id="sndPreview">Play a preview</button></div>' +
+      '<p class="asHint">Stick-It doesn’t play sounds yet. This remembers your choice for when it does.</p></section>';
+    var on = pane.querySelector("#sndOn"), vol = pane.querySelector("#sndVol"), val = pane.querySelector("#sndVolVal"), prev = pane.querySelector("#sndPreview"), row = pane.querySelector("#sndVolRow");
+    function paint(){ on.checked = SoundFx.enabled(); vol.value = String(SoundFx.volume()); vol.disabled = !on.checked; prev.disabled = !on.checked; row.classList.toggle("off", !on.checked); val.textContent = SoundFx.volume() + "%"; vol.setAttribute("aria-valuetext", SoundFx.volume() + " percent"); }
+    on.addEventListener("change", function(){ settings.soundOn = on.checked; paint(); if(on.checked) SoundFx.preview(); });
+    vol.addEventListener("input", function(){ settings.soundVolume = Number(vol.value); val.textContent = vol.value + "%"; });
+    vol.addEventListener("change", function(){ SoundFx.preview(); });
+    prev.addEventListener("click", function(){ if(!SoundFx.preview()) toast("This browser can’t play sounds."); });
+    paint();
+  }
+
+  // ---- Shortcuts: a small searchable cheat-sheet
+  var SHORTCUT_GROUPS = [
+    {title: "Selecting & moving", items: [
+      ["Click", "Select a note or object"],
+      [MOD + " + Click", "Add or remove from the selection"],
+      ["Drag on empty board", "Select everything inside the box"],
+      ["Arrow keys", "Nudge the selection (hold Shift for bigger steps)"],
+      [MOD + " + A", "Select everything"],
+      [MOD + " + D", "Duplicate"],
+      ["Delete", "Delete the selection (when you’re not typing)"],
+      ["N", "New note in the middle of the screen"]
+    ]},
+    {title: "Editing", items: [
+      ["Double-click a note", "Open it large (Focus Mode)"],
+      ["Enter", "Finish editing · in a list, add an item"],
+      ["Shift + Enter", "New line"],
+      [MOD + " + B", "Bold"],
+      [MOD + " + I", "Italic"],
+      [MOD + " + Click a link", "Open it"],
+      [MOD + " + Enter", "Add a comment"],
+      ["Esc", "Close a menu or stop editing"]
+    ]},
+    {title: "Board", items: [
+      [MOD + " + Z", "Undo"],
+      [MOD + " + Shift + Z", "Redo"],
+      [MOD + " + C", "Copy (notes can be pasted onto another board)"],
+      [MOD + " + V", "Paste"],
+      [MOD + " + +", "Make the selection bigger, or zoom the board"],
+      [MOD + " + −", "Make the selection smaller, or zoom the board"],
+      [MOD + " + 0", "Reset size or zoom"],
+      ["Right-click", "Add something at that spot"],
+      ["Shift + Right-click", "Your browser’s own menu"],
+      ["Menu / Shift + F10", "Open the menu of the selected object"]
+    ]},
+    {title: "Media", items: [
+      ["Click ▶", "Play (videos play right on the board)"],
+      ["Click the waveform", "Jump to that point in a recording"],
+      ["Click a playing video", "Pause or resume"],
+      ["Expand button", "Open a video large"]
+    ]},
+    {title: "Navigation", items: [
+      ["Mouse wheel", "Scroll the board sideways"],
+      ["Click the minimap", "Jump there"],
+      ["Drag the minimap window", "Pan the board"]
+    ]},
+    {title: "Cutout Maker", items: [
+      ["E / R", "Erase / Restore"],
+      ["H", "Move the picture"],
+      ["F / 0", "Fit the subject / the whole photo"],
+      ["[ and ]", "Smaller and bigger brush"],
+      ["Space + drag", "Pan"],
+      [MOD + " + Z", "Undo a stroke"]
+    ]}
+  ];
+  function buildShortcutsPane(cc, pane){
+    pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
+    var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
+    SHORTCUT_GROUPS.forEach(function(g){
+      var sec = document.createElement("section"); sec.className = "asCard kbdGroup"; var h = document.createElement("h4"); h.textContent = g.title; sec.appendChild(h);
+      var rows = [];
+      g.items.forEach(function(it){
+        var row = makeDiv("kbdRow"), keys = makeDiv("kbdKeys"), desc = makeDiv("kbdDesc");
+        it[0].split(" + ").forEach(function(part, i){ if(i){ var plus = document.createElement("span"); plus.className = "kbdPlus"; plus.setAttribute("aria-hidden", "true"); plus.textContent = "+"; keys.appendChild(plus); } var k = document.createElement("kbd"); k.textContent = part; keys.appendChild(k); });
+        keys.setAttribute("aria-label", it[0].replace(/ \+ /g, " plus "));
+        desc.textContent = it[1]; row.appendChild(keys); row.appendChild(desc); sec.appendChild(row);
+        rows.push({el: row, text: (g.title + " " + it[0] + " " + it[1]).toLowerCase()});
+      });
+      box.appendChild(sec); groups.push({el: sec, rows: rows});
+    });
+    function filter(){
+      var v = q.value.trim().toLowerCase(), shown = 0;
+      groups.forEach(function(g){ var any = 0; g.rows.forEach(function(r){ var hit = !v || v.split(/\s+/).every(function(w){ return r.text.indexOf(w) !== -1; }); r.el.hidden = !hit; if(hit){ any++; shown++; } }); g.el.hidden = !any; });
+      none.hidden = !!shown; count.textContent = v ? shown + (shown === 1 ? " shortcut" : " shortcuts") : "";
+    }
+    q.addEventListener("input", filter);
+    q.addEventListener("keydown", function(e){ if(e.key === "Escape" && q.value){ e.stopPropagation(); q.value = ""; filter(); } });
+  }
+
+  // ---- Legal & About
+  var LEGAL_ABOUT = [
+    ["Privacy Policy", "legal/privacy.html", "What Stick-It collects, why, and your choices."],
+    ["Terms", "legal/terms.html", "The rules for using Stick-It."],
+    ["Young people & parents", "legal/young-people.html", "What under-18s and parents can expect."],
+    ["Storage", "legal/storage.html", "What is kept on your device."],
+    ["Accessibility", "legal/accessibility.html", "How Stick-It aims to work for everyone."],
+    ["Copyright / DMCA", "legal/copyright.html", "Report content or send a notice."],
+    ["עברית", "legal/he/privacy.html", "מדיניות הפרטיות בעברית."]
+  ];
+  function buildLegalPane(cc, pane){
+    pane.innerHTML = '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
+      '<section class="asCard" aria-labelledby="ccAbH"><h4 id="ccAbH">About Stick-It</h4><p class="ccAbout" id="ccAbout"></p></section>';
+    var list = pane.querySelector(".ccLegalList");
+    LEGAL_ABOUT.forEach(function(l){
+      var a = document.createElement("a"); a.className = "asAction ccLink"; a.href = l[1]; a.target = "_blank"; a.rel = "noopener";
+      a.innerHTML = '<span class="lbl"><span class="t"></span><small></small></span><span class="go" aria-hidden="true">›</span>';
+      a.querySelector(".t").textContent = l[0]; a.querySelector("small").textContent = l[2];
+      if(/[\u0590-\u05ff]/.test(l[0])){ a.querySelector(".lbl").dir = "auto"; }
+      list.appendChild(a);
+    });
+    var c = (Stick.config || {});
+    pane.querySelector("#ccAbout").textContent = "Stick-It " + (c.APP_VERSION ? "v" + c.APP_VERSION : "") + (c.APP_CODENAME ? " · " + c.APP_CODENAME : "") + (c.APP_STATUS === "development" ? " (in development)" : "") + ". A corkboard for notes, pictures and small things, kept simple.";
+    var dev = document.getElementById("devSection"); if(dev) cc.adopt(dev, pane);
+  }
+
   shareBtn.addEventListener("click", function(){
     var willOpen = sharePanel.hidden;
     closeOtherPanels(willOpen ? sharePanel : null);
@@ -6232,6 +6472,7 @@
   var acctBackdrop = null;
   var acctOpener = null, acctTrapKey = null;
   function closeAccountModal(){
+    if(CC && acctBackdrop === CC.backdrop){ try{ CC.teardown(); }catch(e){ CC = null; } }
     if(acctBackdrop){ acctBackdrop.remove(); acctBackdrop = null; }
     document.removeEventListener("keydown", acctEscHandler);
     if(acctTrapKey){ document.removeEventListener("keydown", acctTrapKey, true); acctTrapKey = null; }
@@ -6239,6 +6480,7 @@
     acctOpener = null;
   }
   function openAccountModal(){
+    if(ccSignedIn()){ openControlCenter("account"); return; }
     var opener = document.activeElement;
     closeOtherPanels(null);
     closeAccountModal();
@@ -6369,7 +6611,7 @@
     var closeBtnHtml = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>';
 
     if(state === "signedIn" && settings.account && CLOUD && window.Stick && Stick.account){
-      renderAccountSettings(card);
+      closeAccountModal(); openControlCenter("account");
       return;
     }
     if(state === "signedIn" && settings.account){
@@ -6730,9 +6972,12 @@
     var first = items()[0]; if(first) first.focus();
   }
 
-  function renderAccountSettings(card){
+  // The signed-in parts of the Control Center. Their markup is dropped into the Account, Appearance, Sharing and Privacy & Data
+  // sections; one closure wires all of it (every element is found through the shared dialog card), so a keystroke in the Bio
+  // field only touches the text it changes. cc: {card, panes, show(id), onClose(fn), accountSave}
+  function buildAccountParts(cc){
+    var card = cc.card, P = cc.panes;
     closeMenu();
-    card.className = "acctCard acctWide";
     var acc = settings.account, user = Stick.auth.user() || {};
     var pf = acc.prof || {};
     var pr = Object.assign({}, Stick.account.DEFAULTS, settings.accountPrefs || {});
@@ -6747,10 +6992,8 @@
     var stage = {action: "keep", blob: null, url: null};
     var handleStatus = "idle", avSig = "", pvSig = "", pvEls = null;
 
-    card.innerHTML = '<button class="acctClose" id="acctCloseBtn" aria-label="Close">' + ICONS.close + '</button>' +
-      '<div class="acctScroll" id="asScroll">' +
-
-        // ---------- who I am
+    P.account.insertAdjacentHTML("beforeend",
+// ---------- who I am
         '<section class="asHero" aria-label="Your profile">' +
           '<div class="acctAv pic" id="asPic" role="img" aria-label="Your profile photo"></div>' +
           '<div class="asHeroText">' +
@@ -6760,8 +7003,7 @@
             '<div class="asHeroActions"><div class="asMenuWrap"><button type="button" class="asPhotoBtn" id="asPhotoBtn" aria-haspopup="menu" aria-expanded="false">' + CAMERA_ICON + '<span id="asPhotoLbl">Change photo</span></button></div></div>' +
           '</div>' +
         '</section>' +
-
-        // ---------- edit profile
+// ---------- edit profile
         '<section class="asCard asEdit" aria-labelledby="asH1">' +
           '<h4 id="asH1">Edit profile</h4>' +
           '<div class="asField" id="asNameF"><label class="l" for="asName">Display name</label><input class="asIn" type="text" id="asName" maxlength="60" autocomplete="nickname" dir="auto"></div>' +
@@ -6773,9 +7015,9 @@
             '<div class="asSwatches" id="asSwatches" role="group" aria-label="Fallback colour"></div>' +
             '<div id="asEmojiBox" hidden><label class="l" for="asEmoji" style="font-size:0.76rem;font-weight:600;color:var(--ink-soft);">Emoji</label><input class="asIn" type="text" id="asEmoji" maxlength="8" placeholder="Pick one or type your own" dir="auto" style="max-width:240px;margin-top:4px;"><div class="asEmojis" id="asEmojiList"></div></div>' +
           '</div>' +
-        '</section>' +
-
-        // ---------- sharing
+        '</section>');
+    P.sharing.insertAdjacentHTML("beforeend",
+// ---------- sharing
         '<section class="asCard" aria-labelledby="asH2">' +
           '<h4 id="asH2">Sharing</h4>' +
           '<div class="asItem"><label class="lbl" for="asIdent">Share as</label><span class="asSel"><select class="asSelect" id="asIdent"></select></span></div>' +
@@ -6783,17 +7025,17 @@
           '<div class="asItem" id="asBioRow"><label class="lbl" for="asShowBio">Show bio</label><input type="checkbox" class="asSw" id="asShowBio" role="switch"></div>' +
           '<div class="asItem"><label class="lbl" for="asBoardMode">New board links<small>Nothing is shared until you make a link.</small></label><span class="asSel"><select class="asSelect" id="asBoardMode"><option value="view">Read only</option><option value="ask">Ask every time</option></select></span></div>' +
           '<div class="asPreview" id="asPreview" aria-live="polite"></div>' +
-        '</section>' +
-
-        // ---------- personalization
+        '</section>');
+    P.appearance.insertAdjacentHTML("beforeend",
+// ---------- personalization
         '<section class="asCard" aria-labelledby="asH3">' +
           '<h4 id="asH3">Personalization</h4>' +
           '<div class="asItem"><label class="lbl" for="asFont">Preferred handwriting</label><span class="asSel"><select class="asSelect" id="asFont"></select></span></div>' +
           '<div class="asItem"><span class="lbl" id="asNoteLbl">Default note colour</span><div class="asMenuWrap"><button type="button" class="asAction" id="asNoteBtn" style="width:auto;border:0;padding:6px 8px;" aria-haspopup="menu" aria-expanded="false" aria-labelledby="asNoteLbl asNoteVal"><span class="go" id="asNoteVal"></span></button></div></div>' +
           '<p class="asHint">A preference, not a rule: text a font can\u2019t draw gets a suitable one instead.</p>' +
-        '</section>' +
-
-        // ---------- account
+        '</section>');
+    P.account.insertAdjacentHTML("beforeend",
+// ---------- account
         '<section class="asCard" aria-labelledby="asH4">' +
           '<h4 id="asH4">Account</h4>' +
           '<div class="asItem"><span class="lbl">E-mail<small>Only you can see this.</small></span><span class="val">' + escapeHtml(acc.email || "") + '</span></div>' +
@@ -6802,12 +7044,12 @@
           '<h5>Connected accounts</h5>' +
           '<div id="asProviders"></div>' +
           '<button type="button" class="asAction" id="asSignOut"><span class="lbl">Sign out<small>On this device only.</small></span></button>' +
-        '</section>' +
-
-        // ---------- data & privacy
+        '</section>');
+    P.privacy.insertAdjacentHTML("beforeend",
+// ---------- data & privacy
         '<section class="asCard" aria-labelledby="asH5">' +
           '<h4 id="asH5">Data &amp; privacy</h4>' +
-          '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by e-mail<small>Off unless you turn it on. Stick-It doesn\u2019t send any yet; this records your choice for when it does. Every such message will have an unsubscribe link. Security and account messages are separate and aren\u2019t affected.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
+          '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by email<small>Occasional Stick-It news and feature updates. You can unsubscribe anytime.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
           '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
@@ -6815,18 +7057,20 @@
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
           '<div id="asLegal" style="padding-bottom:12px;"></div>' +
-        '</section>' +
-
-        // ---------- danger
+        '</section>');
+    P.account.insertAdjacentHTML("beforeend",
+// ---------- danger
         '<section class="asDanger" aria-labelledby="asH6">' +
           '<div class="lbl"><span class="k" id="asH6">Danger zone</span>Delete account<small>Permanently deletes your account and cloud data. Your public shares will stop working.</small></div>' +
           '<button type="button" class="pillBtn danger" id="asDelete">Delete account\u2026</button>' +
-        '</section>' +
-      '</div>' +
-      '<div class="asFoot"><p class="asErr" id="asErr" role="alert"></p><button type="button" class="pillBtn" id="asCancel">Cancel</button><button type="button" class="pillBtn primary" id="asSave">Save</button></div>';
+        '</section>');
 
     var $ = function(id){ return card.querySelector("#" + id); };
     var picEl = $("asPic");
+    (function(){                                    // Premium is shown the same way everywhere: a crown sitting on the head of the avatar, never as a word beside it
+      var wrap = makeDiv("avCrownWrap"); picEl.parentNode.insertBefore(wrap, picEl); wrap.appendChild(picEl);
+      if(isPremium()){ var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium"; wrap.appendChild(c); }
+    })();
 
     // ---------- avatar
     function effSource(){
@@ -6920,7 +7164,7 @@
       var v = draft.handle;
       if(!v || v === savedHandle){ help.textContent = "Used as your Stick-It handle. Letters, numbers and _ (3\u201320)."; return; }
       if(!Stick.account.HANDLE_RE.test(v)){ help.textContent = "Use 3\u201320 letters, numbers or _."; help.classList.add("bad"); return; }
-      if(handleStatus === "checking") help.textContent = "Checking\u2026";
+      if(handleStatus === "checking"){ help.innerHTML = miniLoaderHtml() + "<span>Checking\u2026</span>"; help.classList.add("checking"); }
       else if(handleStatus === "ok"){ help.textContent = "\u2713 Available"; help.classList.add("good"); }
       else if(handleStatus === "taken"){ help.textContent = "That username is taken."; help.classList.add("bad"); }
       else help.textContent = "Used as your Stick-It handle. Letters, numbers and _ (3\u201320).";
@@ -7098,13 +7342,13 @@
     $("asMarketing").addEventListener("change", function(){ draft.marketingOptIn = $("asMarketing").checked; });
     if((pf.ageBand || "adult") !== "adult"){      // promotional e-mail is only for adult accounts (policy choice, flagged for legal review)
       draft.marketingOptIn = false; $("asMarketing").checked = false; $("asMarketing").disabled = true; $("asMktRow").classList.add("off");
-      $("asMktRow").querySelector("small").textContent = "Promotional e-mail isn\u2019t available for this account. Security and account messages are separate.";
+      $("asMktRow").querySelector("small").textContent = "Not available for this account.";
     }
     // ---------- privacy requests + legal links
     var lg = Stick.legal || {};
-    $("asPrivacyHint").textContent = "To see, correct or delete your data, use Export, Correct and Delete account here: they work straight away. The export doesn\u2019t yet include voice-memo and video files. " +
-      (lg.privacyEmail ? "For anything else, or to ask for something this page can\u2019t do, write to " + lg.privacyEmail + "." : "A contact address for privacy requests hasn\u2019t been published yet.");
-    $("asLegal").appendChild(legalLinksEl("legalLinks"));
+    $("asPrivacyHint").textContent = "Export, correct and delete work straight away from this page. Voice memos and videos aren" + "\u2019t in the export yet. " +
+      (lg.privacyEmail ? "Anything else: " + lg.privacyEmail + "." : "");
+    $("asLegal").appendChild(legalPointer());
 
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
@@ -7123,14 +7367,13 @@
       if(go) cloudSignOut("global");
     });
     $("asSignOut").addEventListener("click", function(){ cloudSignOut("local"); });
-    $("asCorrect").addEventListener("click", function(){ var sc = $("asScroll"); if(sc) sc.scrollTop = 0; $("asName").focus(); });
+    $("asCorrect").addEventListener("click", function(){ cc.show("account"); setTimeout(function(){ $("asName").focus(); }, 30); });
     $("asDelete").addEventListener("click", openDeleteAccount);
 
     // ---------- Cancel discards (nothing was uploaded); Save validates and persists everything staged
     function cleanup(){ closeMenu(); clearTimeout(hTimer); if(stage.url) URL.revokeObjectURL(stage.url); }
-    $("asCancel").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
-    $("acctCloseBtn").addEventListener("click", function(){ cleanup(); closeAccountModal(); });
-    $("asSave").addEventListener("click", async function(){
+    cc.onClose(cleanup);
+    cc.accountSave = async function(){
       clearErr();
       var bad = Stick.account.validate(draft);
       if(bad){ showErr(bad.message, bad.field); return; }
@@ -7139,9 +7382,10 @@
       try{
         var res = await Stick.account.save(draft, stage);
         applyAccountData(res);
+        cc.markSaved();
         cleanup();
         closeAccountModal();
-        toast("Account updated.");
+        toast("Settings saved.");
       }catch(e){
         var er = Stick.errors.parse(e);
         btn.disabled = false; btn.textContent = "Save";
@@ -7149,9 +7393,9 @@
         if(taken){ handleStatus = "taken"; paintHandleHelp(); }
         showErr(er.code === "INVALID" ? e.message : Stick.errors.friendly(er), e.field || (taken ? "handle" : null));   // everything typed is still here
       }
-    });
+    };
+    cc.focusProfile = function(){ var n = $("asName"); if(n) n.focus({preventScroll: true}); };
     refreshHero();
-    setTimeout(function(){ var n = $("asName"); if(n && !("ontouchstart" in window) && window.innerWidth > 560) n.focus({preventScroll: true}); }, 60);
   }
 
   var GITHUB_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.1.79-.25.79-.56v-2c-3.2.7-3.87-1.36-3.87-1.36-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.69 1.25 3.35.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.42-2.7 5.4-5.27 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"/></svg>';
@@ -7196,7 +7440,6 @@
   accountBtn.addEventListener("click", openAccountModal);
   var quickOut = document.getElementById("quickSignOut");
   if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } });
-  document.getElementById("settingsLegal").replaceWith(legalLinksEl("legalLinks"));
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};
     Stick.dev.presenceDemo = function(on){ try{ if(on) localStorage.setItem("stickit.dev.presence", "bc"); else localStorage.removeItem("stickit.dev.presence"); }catch(e){} return on ? "Presence demo on: reload two tabs" : "Presence demo off"; };
@@ -7209,7 +7452,7 @@
     Stick.dev.ui = {                // local only: open the new dialogs without setting up a board for each (used in the polish pass tests)
       cleanUp: function(){ openCleanUp(); }, activeShares: function(){ openManageShares(function(){}); },
       foot: {start: function(t, d){ busyStart('dev', t || 'Loading board…', {delay: d == null ? 0 : d}); }, done: function(t){ busyDone('dev', t || 'Done.'); }, fail: function(t){ busyFail('dev', t || 'Couldn’t load photos.', function(){}); }, end: function(){ busyEnd('dev'); }},
-      stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
+      controlCenter: function(sec){ openControlCenter(sec); }, stripNeedsMore: function(n){ stripNeedsMore(n == null ? 1 : n, function(){}); }, stripPicker: function(){ openStripPicker([]); }, doneTray: function(){ openDoneTray(); },
       askReason: function(){ return Stick.collab.askReason({modal: openModal}, null, function(){}); }
     };
     Stick.dev.setPremium = function(on){ try{ if(on === null || on === undefined) localStorage.removeItem("stickit.dev.premium"); else localStorage.setItem("stickit.dev.premium", on ? "1" : "0"); }catch(e){} return on ? "Premium on (this browser only)" : "Premium off (this browser only)"; };
@@ -7224,10 +7467,10 @@
     devSec.className = "setSec";
     devSec.innerHTML = '<h4>Developer (local only)</h4><div class="setBtns"><button class="pillBtn" id="devResetAge">Reset age/consent test state</button><button class="pillBtn" id="devShowAge">Show age flow</button></div>' +
       '<p class="setHelp">Clears only this browser\u2019s local state. Server records are not changed.</p>';
-    var legalSec = document.querySelector("#settingsModal .setSec:has(.legalLinks)") || document.querySelector(".legalLinks").closest("section");
-    legalSec.insertAdjacentElement("afterend", devSec);
+    devSec.id = "devSection";                                       // shown inside Legal & About (the Control Center adopts it there)
+    document.querySelector("#settingsModal .acctCard").appendChild(devSec);
     devSec.querySelector("#devResetAge").addEventListener("click", function(){ Stick.dev.resetAgeGate(); Stick.dev.resetConsent(); toast("Age and consent test state cleared."); });
-    devSec.querySelector("#devShowAge").addEventListener("click", function(){ cancelSettings(); Stick.dev.showAgeFlow(); });
+    devSec.querySelector("#devShowAge").addEventListener("click", function(){ closeAccountModal(); cancelSettings(); Stick.dev.showAgeFlow(); });
   }
   document.getElementById("openAcctFromSettings").addEventListener("click", function(e){ e.preventDefault(); cancelSettings(); openAccountModal(); });
   updateAccountIcon();
@@ -8038,59 +8281,7 @@
   }
   helpBtn.addEventListener("click", startTour);
 
-  var SHORTCUT_GROUPS = [
-    { title: "Selecting & moving", items: [
-      ["Click a note", "Select it &middot; " + MOD + "+click adds or removes more"],
-      ["Drag on empty board", "Select every note inside the box"],
-      ["Arrow keys", "Nudge the selection &middot; hold Shift for bigger steps"],
-      ["Delete / Backspace", "Delete the selection (when you're not typing)"],
-      ["N", "New note in the middle of the screen (no mouse needed)"]
-    ]},
-    { title: "Board actions", items: [
-      [MOD + " + Z", "Undo &middot; " + MOD + "+Shift+Z to redo"],
-      [MOD + " + D", "Duplicate"],
-      [MOD + " + C / V", "Copy and paste notes, even onto another board"],
-      [MOD + " + A", "Select every note"]
-    ]},
-    { title: "Resizing & zoom", items: [
-      [MOD + " + / -", "Resize the selected notes, or zoom the board if nothing's selected"],
-      [MOD + " + 0", "Reset their size, or the board zoom"]
-    ]},
-    { title: "Typing in a note", items: [
-      ["Enter", "Finish editing &middot; in a list, adds an item"],
-      ["Shift + Enter", "New line"],
-      [MOD + " + B / I", "Bold / italic"],
-      [MOD + " + click a link", "Open it"],
-      ["Esc", "Close a popover, or stop editing"]
-    ]}
-  ];
-  function showShortcutsPopover(){
-    if(openPopoverTrigger === kbdBtn) return;
-    var pop = openFloatingPopover(kbdBtn, "kbdPop");
-    if(!pop) return;
-    pop.innerHTML = "<h4>Keyboard shortcuts</h4>" + SHORTCUT_GROUPS.map(function(g, gi){
-      return (gi > 0 ? '<div class="kbdSep"></div>' : "") +
-        '<div class="kbdGroupTitle">' + g.title + "</div><dl>" +
-        g.items.map(function(s){ return "<dt>" + s[0] + "</dt><dd>" + s[1] + "</dd>"; }).join("") +
-        "</dl>";
-    }).join("");
-    pop.addEventListener("mouseleave", function(){
-      if(openPopoverTrigger === kbdBtn) closeFloatingPopovers();
-    });
-  }
-  kbdBtn.addEventListener("mouseenter", showShortcutsPopover);
-  kbdBtn.addEventListener("mouseleave", function(){
-    setTimeout(function(){
-      if(openPopoverTrigger === kbdBtn && openPopover && !openPopover.matches(":hover")){
-        closeFloatingPopovers();
-      }
-    }, 150);
-  });
-  kbdBtn.addEventListener("click", function(e){
-    e.stopPropagation();
-    if(openPopoverTrigger === kbdBtn){ closeFloatingPopovers(); return; }
-    showShortcutsPopover();
-  });
+  kbdBtn.addEventListener("click", function(e){ e.stopPropagation(); openControlCenter("shortcuts"); });
 
   // ---------- board thumbnails ----------
   // Drawn straight from note data onto a small canvas (no DOM capture), so menus,
