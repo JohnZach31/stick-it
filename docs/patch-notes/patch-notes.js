@@ -59,7 +59,11 @@ export const patchNotes = [
       "Legal pages: reading options (text size, high contrast, reduce motion, beige or dark) and a globe Language chooser that lists only complete languages.",
       "Delete a comment: its author can delete their own, the board owner can delete any, and the database enforces it (new migration).",
       "Mark several selected notes done at once (selection bar, right-click menu or Shift+D): one step, one Undo.",
-      "Collaborate (Premium): a button under Publish in the share panel, shown only to a signed-in Premium owner, to create invite links (editor or viewer, optionally for one e-mail). Opening an invite link joins the board."
+      "Collaborate (Premium): a button under Publish in the share panel, shown only to a signed-in Premium owner, to create invite links (editor or viewer, optionally for one e-mail). Opening an invite link joins the board.",
+      "Underline (Ctrl/Cmd+U and a U button), and links now look different from underlined words: coloured, dotted, with a small arrow.",
+      "A branded toolbar over highlighted words in a note: Bold, Italic, Underline, Highlight, Link.",
+      "Checklist titles: a first line ending in a colon (\"Flight checklist:\") becomes a title with no checkbox, and any line can be switched with the Title line button.",
+      "Pull the bottom or right edge of a note to make it longer or wider; on touch screens a grab bar appears on the selected note."
     ],
     "improved": [
       "Clean up counts, moves and undoes the same list of notes, leaves pinned notes and notes inside a zone alone, and tidies around them. The button is a broom.",
@@ -78,7 +82,7 @@ export const patchNotes = [
       "Select-all and the new-note key keep working after the shortcut rewrite (fixed within the patch).",
       "Deleting a voice memo or video left its file in memory until the page reloaded; it is now released (and comes back with Undo).",
       "A shared link that can't be opened now says why (no connection, server problem, not found, turned off, invited-only) with Try again and Open Stick-It, instead of one generic \"Couldn't reach the server\".",
-      "Ctrl+U inside a note opened the browser's view-source page on non-English keyboards (it was already blocked on English ones). Keyboard shortcuts now follow the key's place on the keyboard, so Hebrew and other layouts work."
+      "Ctrl+U opened the browser's view-source page on non-English keyboards. It is now Underline, on every layout."
     ],
     "limitations": [
       "The two new migrations are applied to the real project, but signed-in behaviour against it (comment delete rules, shortcut sync) has not been tested with real accounts.",
@@ -90,7 +94,7 @@ export const patchNotes = [
       "Not tested on a physical phone, with a screen reader, or against real Realtime with two accounts.",
       "The memory audit covered notes, zones, photos, video, voice memos, the palette, Settings and the tour; cutouts and live collaboration were not measured.",
       "A report of a shared board link failing in a private window on the live site could not be reproduced; the new error codes should identify the cause if it recurs.",
-      "Collaborate can create and accept invites but cannot yet list or remove members; the server does not yet require Premium to create an invite (the button is the only gate). Underline is intentionally not available in notes, so Ctrl+U does nothing."
+      "Collaborate can create and accept invites but cannot yet list or remove members, and the server does not yet require Premium to create an invite (the button is the only gate)."
     ]
   },
   {

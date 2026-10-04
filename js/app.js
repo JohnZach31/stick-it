@@ -187,6 +187,8 @@
     wheel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5" fill="currentColor" stroke="none"></circle></svg>',
     bold: '<span class="fB">B</span>',
     italic: '<span class="fI">I</span>',
+    underline: '<span class="fU">U</span>',
+    titleLine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"></path><rect x="4" y="12" width="4" height="4" rx="1"></rect><path d="M11 14h9"></path><rect x="4" y="18" width="4" height="3" rx="1" opacity="0.4"></rect></svg>',
     ol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="20" y2="6"></line><line x1="10" y1="12" x2="20" y2="12"></line><line x1="10" y1="18" x2="20" y2="18"></line><path d="M4 4.5h1.5V9M3.6 9h3" stroke-width="1.6"></path><path d="M3.6 14.2c.4-.6 1-.9 1.6-.8.7.1 1.1.7.9 1.3-.3.8-1.6 1.6-2.5 2.6h2.8" stroke-width="1.6"></path></svg>',
     checklist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 4.6c1.9-.2 3.9-.3 5.9-.1.1 1.9.2 3.8 0 5.8-2 .2-3.9.2-5.9 0-.2-1.9-.2-3.8 0-5.7z" stroke-width="1.6"></path><path d="M4.8 7.2l1.3 1.4 2.9-3.4"></path><path d="M3.5 14.6c1.9-.2 3.9-.3 5.9-.1.1 1.9.2 3.8 0 5.8-2 .2-3.9.2-5.9 0-.2-1.9-.2-3.8 0-5.7z" stroke-width="1.6"></path><line x1="13" y1="7.5" x2="21" y2="7.5"></line><line x1="13" y1="17.5" x2="21" y2="17.5"></line></svg>',
     link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg>',
@@ -879,13 +881,14 @@
     saveNotes(); rerenderNote(n); ensureWidth(); updateMinimap();
     recordSnapshots("Restore full paper", [n.id], before);
   }
-  function startNoteResize(e, n){
+  function startNoteResize(e, n, axis){
     e.preventDefault(); e.stopPropagation();
+    try{ if(e.target && e.target.setPointerCapture && e.pointerId !== undefined) e.target.setPointerCapture(e.pointerId); }catch(err){}
     var el = n.el, before = captureState([n.id]), sx = e.clientX, sy = e.clientY, w0 = n.w || NOTE_W, h0 = el.offsetHeight, w = w0, h = h0;
-    document.body.style.cursor = "nwse-resize"; el.classList.add("resizing");
+    document.body.style.cursor = axis === "y" ? "ns-resize" : axis === "x" ? "ew-resize" : "nwse-resize"; el.classList.add("resizing");
     function move(ev){
-      w = Math.round(Math.min(PAPER_MAX_W, Math.max(PAPER_MIN_W, w0 + (ev.clientX - sx) / boardZoom)));
-      h = Math.round(Math.min(900, Math.max(PAPER_MIN_H, h0 + (ev.clientY - sy) / boardZoom)));
+      if(axis !== "y") w = Math.round(Math.min(PAPER_MAX_W, Math.max(PAPER_MIN_W, w0 + (ev.clientX - sx) / boardZoom)));
+      if(axis !== "x") h = Math.round(Math.min(900, Math.max(PAPER_MIN_H, h0 + (ev.clientY - sy) / boardZoom)));
       el.style.width = w + "px"; el.style.minHeight = h + "px";
     }
     function up(){
@@ -899,7 +902,7 @@
   }
 
   // ---------- sanitising anything that arrives from outside (links, imports, pastes) ----------
-  var ALLOWED_TAGS = {DIV:1,P:1,BR:1,B:1,STRONG:1,I:1,EM:1,H1:1,H2:1,H3:1,UL:1,OL:1,LI:1,A:1,MARK:1,SPAN:1};
+  var ALLOWED_TAGS = {DIV:1,P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,H1:1,H2:1,H3:1,UL:1,OL:1,LI:1,A:1,MARK:1,SPAN:1};
   var DROP_TAGS = /^(SCRIPT|STYLE|IFRAME|FRAME|OBJECT|EMBED|TEMPLATE|SVG|MATH|NOSCRIPT|FORM|INPUT|TEXTAREA|BUTTON|SELECT|LINK|META|IMG|PICTURE|VIDEO|AUDIO|CANVAS|HEAD|TITLE)$/;
   // The old highlighter wrote inline background colours. Browsers also write `background-color: rgba(0, 0, 0, 0)` on everything they
   // copy; that is "no background", not a highlight.
@@ -973,7 +976,7 @@
           keep.href = h;
         }
         if(tag === "UL" && ch.classList.contains("checklist")) keep["class"] = "checklist";
-        if(tag === "LI"){ var dc = ch.getAttribute("data-checked"); if(dc === "true" || dc === "false") keep["data-checked"] = dc; }
+        if(tag === "LI"){ var dc = ch.getAttribute("data-checked"); if(dc === "true" || dc === "false") keep["data-checked"] = dc; if(ch.getAttribute("data-title") === "true") keep["data-title"] = "true"; }
         if(tag === "MARK") keep["class"] = "hl";
         Array.prototype.slice.call(ch.attributes).forEach(function(at){ ch.removeAttribute(at.name); });
         Object.keys(keep).forEach(function(k){ ch.setAttribute(k, keep[k]); });
@@ -2175,6 +2178,64 @@
     execIn(textEl, "formatBlock", cur === "h" + level ? "<div>" : "<h" + level + ">");
   }
 
+  // ---------- selection tip: a small Stick-It toolbar over the words you highlight ----------
+  // Appears above selected text inside the note you are editing (Bold, Italic, Underline, Highlight, Link, Title line). The browser's own
+  // selection menu stays out of the way on desktop; this one carries the same actions the note's ... menu has.
+  var selTip = null, selTipRaf = 0, selTipText = null;
+  var selTipLayer = OV.layer("selection-tip", function(){ hideSelTip(); }, function(){ return !!selTip; });
+  function hideSelTip(){ if(selTip){ selTip.remove(); selTip = null; selTipText = null; selTipLayer.close(); } }
+  function selTipTarget(){
+    if(readOnly || singleNoteMode || focusState) return null;
+    var sel = window.getSelection(); if(!sel || sel.isCollapsed || !sel.rangeCount || !String(sel).trim()) return null;
+    var ae = document.activeElement; if(!ae || !ae.isContentEditable || !ae.classList.contains("text")) return null;
+    var r = sel.getRangeAt(0); if(!ae.contains(r.commonAncestorContainer)) return null;
+    var rect = r.getBoundingClientRect(); if(!rect.width && !rect.height) return null;
+    return {text: ae, rect: rect};
+  }
+  function showSelTip(t){
+    var fresh = !selTip || selTipText !== t.text;
+    if(fresh){
+      hideSelTip();
+      var bar = makeDiv("selTip"); bar.setAttribute("role", "toolbar"); bar.setAttribute("aria-label", "Format the selected words");
+      function add(html, label, run, key){
+        var b = document.createElement("button"); b.type = "button"; b.className = "stBtn"; b.innerHTML = html; b.title = label; b.setAttribute("aria-label", label); if(key) b.dataset.k = key;
+        b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        b.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+        b.addEventListener("click", function(e){ e.stopPropagation(); run(b); setTimeout(paintSelTip, 0); });
+        bar.appendChild(b); return b;
+      }
+      var tx = t.text;
+      add(ICONS.bold, "Bold (" + MOD + "+B)", function(){ execIn(tx, "bold"); }, "bold");
+      add(ICONS.italic, "Italic (" + MOD + "+I)", function(){ execIn(tx, "italic"); }, "italic");
+      add(ICONS.underline, "Underline (" + MOD + "+U)", function(){ execIn(tx, "underline"); }, "underline");
+      add(ICONS.highlighter, "Highlight", function(){ toggleHighlight(tx); }, "mark");
+      add(ICONS.link, "Link", function(b){ openLinkPopover(tx, b); }, "link");
+      var arrow = makeDiv("stArrow"); arrow.setAttribute("aria-hidden", "true"); bar.appendChild(arrow);
+      document.body.appendChild(bar); selTip = bar; selTipText = t.text; selTipLayer.open();
+    }
+    paintSelTip(t);
+  }
+  function paintSelTip(t){
+    if(!selTip) return;
+    t = t || selTipTarget(); if(!t){ hideSelTip(); return; }
+    var bar = selTip, bw = bar.offsetWidth, bh = bar.offsetHeight, vw = window.innerWidth;
+    var left = Math.min(Math.max(8, t.rect.left + t.rect.width / 2 - bw / 2), vw - bw - 8);
+    var top = t.rect.top - bh - 10, below = false;
+    if(top < 8){ top = t.rect.bottom + 10; below = true; }
+    bar.style.left = left + "px"; bar.style.top = top + "px"; bar.classList.toggle("below", below);
+    var arrow = bar.querySelector(".stArrow"); if(arrow) arrow.style.left = Math.min(Math.max(14, t.rect.left + t.rect.width / 2 - left), bw - 14) + "px";
+    var st = {};
+    try{ st.bold = document.queryCommandState("bold"); st.italic = document.queryCommandState("italic"); st.underline = document.queryCommandState("underline"); }catch(e){}
+    var r = selectionIn(t.text); st.mark = !!(r && closestIn(r.startContainer, "mark", t.text)); st.link = !!(r && closestIn(r.startContainer, "a", t.text));
+    Array.prototype.forEach.call(bar.querySelectorAll(".stBtn"), function(b){ var on = !!st[b.dataset.k]; b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(on)); });
+  }
+  document.addEventListener("selectionchange", function(){
+    cancelAnimationFrame(selTipRaf);
+    selTipRaf = requestAnimationFrame(function(){ var t = selTipTarget(); if(t) showSelTip(t); else hideSelTip(); });
+  });
+  window.addEventListener("scroll", function(){ if(selTip) paintSelTip(); }, true);
+  window.addEventListener("resize", function(){ if(selTip) paintSelTip(); });
+
   // ---------- lists and checklists ----------
   function saveCaret(){
     var sel = window.getSelection();
@@ -2210,9 +2271,14 @@
       list.parentNode.replaceChild(target, list);
     }
     if(kind === "check") target.className = "checklist"; else target.removeAttribute("class");
-    Array.prototype.forEach.call(target.children, function(li){
-      if(kind === "check"){ if(li.getAttribute("data-checked") !== "true") li.setAttribute("data-checked", "false"); }
-      else li.removeAttribute("data-checked");
+    Array.prototype.forEach.call(target.children, function(li, i){
+      if(kind === "check"){
+        // a first line that ends with a colon ("Flight checklist:") is a title, not something to tick
+        if(i === 0 && li.getAttribute("data-title") !== "true" && /[:\uff1a]\s*$/.test(li.textContent) && target.children.length > 1) li.setAttribute("data-title", "true");
+        if(li.getAttribute("data-title") === "true") li.removeAttribute("data-checked");
+        else if(li.getAttribute("data-checked") !== "true") li.setAttribute("data-checked", "false");
+      }
+      else { li.removeAttribute("data-checked"); li.removeAttribute("data-title"); }
     });
     return target;
   }
@@ -2235,6 +2301,15 @@
         if(made){ var c2 = saveCaret(); retagList(made, "check"); restoreCaret(c2); }
       }
     }
+    notifyInput(textEl);
+  }
+  // A checklist line can be a title: no box, bold, never ticked. Toggle it for the line the cursor is on.
+  function toggleChecklistTitle(textEl){
+    ensureCaret(textEl);
+    var r = selectionIn(textEl), li = r && closestIn(r.startContainer, "li", textEl);
+    if(!li || !li.parentElement.classList.contains("checklist")){ toast("Put the cursor on a checklist line first."); return; }
+    if(li.getAttribute("data-title") === "true"){ li.removeAttribute("data-title"); li.setAttribute("data-checked", "false"); }
+    else { li.setAttribute("data-title", "true"); li.removeAttribute("data-checked"); }
     notifyInput(textEl);
   }
   // Enter inside a checklist adds another item; Enter on an empty item leaves the list.
@@ -4479,6 +4554,7 @@
     function sep(){ var s = makeDiv("fbSep"); s.setAttribute("aria-hidden", "true"); bar.appendChild(s); }
     add("bold", ICONS.bold, "Bold (" + MOD + "+B)", function(){ execIn(text, "bold"); });
     add("italic", ICONS.italic, "Italic (" + MOD + "+I)", function(){ execIn(text, "italic"); });
+    add("underline", ICONS.underline, "Underline (" + MOD + "+U)", function(){ execIn(text, "underline"); });
     sep();
     [1, 2, 3].forEach(function(lv){ add("h" + lv, "H" + lv, "Heading " + lv, function(){ toggleHeading(text, lv); }, "fbText"); });
     sep();
@@ -4486,6 +4562,7 @@
     add("ul", ICONS.ul, "Bullet list", function(){ setListKind(text, "ul"); });
     add("ol", ICONS.ol, "Numbered list", function(){ setListKind(text, "ol"); });
     add("check", ICONS.checklist, "Checklist", function(){ setListKind(text, "check"); });
+    add("title", ICONS.titleLine, "Title line (no checkbox)", function(){ toggleChecklistTitle(text); });
     add("link", ICONS.link, "Link", function(b){ openLinkPopover(text, b); });
     bar.addEventListener("keydown", function(e){
       var i = items.indexOf(document.activeElement);
@@ -4504,7 +4581,8 @@
     if(!focusBar || !focusState) return;
     var text = focusState.n.textEl, r = selectionIn(text), st = {};
     if(r){
-      try{ st.bold = document.queryCommandState("bold"); st.italic = document.queryCommandState("italic"); }catch(e){}
+      try{ st.bold = document.queryCommandState("bold"); st.italic = document.queryCommandState("italic"); st.underline = document.queryCommandState("underline"); }catch(e){}
+      var tli = closestIn(r.startContainer, "li", text); st.title = !!(tli && tli.getAttribute("data-title") === "true");
       var node = r.startContainer, h = closestIn(node, "h1", text) ? 1 : closestIn(node, "h2", text) ? 2 : closestIn(node, "h3", text) ? 3 : 0;
       st.h1 = h === 1; st.h2 = h === 2; st.h3 = h === 3;
       st.mark = !!closestIn(node, "mark", text);
@@ -4650,6 +4728,12 @@
     if(!readOnly && !n.type){
       var grip = document.createElement("button"); grip.type = "button"; grip.className = "pCtl pHandle noteHandle"; grip.title = "Drag to resize"; grip.setAttribute("aria-label", "Resize note");
       grip.addEventListener("pointerdown", function(e){ startNoteResize(e, n); }); grip.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      // pull the bottom or right edge to make the note longer or wider (a wide, always-visible tab on touch screens)
+      var edgeB = document.createElement("div"); edgeB.className = "noteEdge noteEdgeB"; edgeB.title = "Pull to make the note longer"; edgeB.setAttribute("aria-hidden", "true");
+      edgeB.addEventListener("pointerdown", function(e){ startNoteResize(e, n, "y"); });
+      var edgeR = document.createElement("div"); edgeR.className = "noteEdge noteEdgeR"; edgeR.title = "Pull to make the note wider"; edgeR.setAttribute("aria-hidden", "true");
+      edgeR.addEventListener("pointerdown", function(e){ startNoteResize(e, n, "x"); });
+      el.appendChild(edgeB); el.appendChild(edgeR);
       el.appendChild(grip);                                           // a quick "done" tick beside the x (notes and checklists; hidden on soup)
       qd = document.createElement("button");
       qd.type = "button"; qd.className = "quickDone"; qd.title = "Mark done"; qd.setAttribute("aria-label", "Mark done");
@@ -4844,7 +4928,7 @@
         }, 450);
       });
       text.addEventListener("keydown", function(e){
-        if((e.ctrlKey || e.metaKey) && !e.altKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); return; } // no underline, and never the browser’s view-source (also on a Hebrew keyboard, where the key is not "u")
+        if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); execIn(text, "underline"); return; }   // underline, never the browser's view-source (also on a Hebrew keyboard, where the key is not "u")
         if(e.key === "Enter" && !e.shiftKey){
           if(handleListEnter(text, e)) return;
           if(focusState && focusState.n === n) return;
@@ -4854,7 +4938,7 @@
       });
       text.addEventListener("mousedown", function(e){
         var li = e.target.closest && e.target.closest("ul.checklist > li");
-        if(li && text.contains(li) && checkboxHit(li, e.clientX)){
+        if(li && text.contains(li) && li.getAttribute("data-title") !== "true" && checkboxHit(li, e.clientX)){
           e.preventDefault();
           li.setAttribute("data-checked", li.getAttribute("data-checked") === "true" ? "false" : "true");
           notifyInput(text);
@@ -5408,10 +5492,12 @@
     [1,2,3].forEach(function(lv){ grid.appendChild(fmt("H" + lv, "Heading " + lv, function(){ toggleHeading(text, lv); })); });
     grid.appendChild(fmt(ICONS.bold, "Bold (" + MOD + "+B)", function(){ execIn(text, "bold"); }));
     grid.appendChild(fmt(ICONS.italic, "Italic (" + MOD + "+I)", function(){ execIn(text, "italic"); }));
+    grid.appendChild(fmt(ICONS.underline, "Underline (" + MOD + "+U)", function(){ execIn(text, "underline"); }));
     grid.appendChild(fmt(ICONS.highlighter, "Highlight selected text", function(){ toggleHighlight(text); }));
     grid.appendChild(fmt(ICONS.ul, "Bullet list", function(){ setListKind(text, "ul"); }));
     grid.appendChild(fmt(ICONS.ol, "Numbered list", function(){ setListKind(text, "ol"); }));
     grid.appendChild(fmt(ICONS.checklist, "Checklist", function(){ setListKind(text, "check"); }));
+    grid.appendChild(fmt(ICONS.titleLine, "Title line (no checkbox)", function(){ toggleChecklistTitle(text); }));
     grid.appendChild(fmt(ICONS.link, "Link", function(){ openLinkPopover(text, anchor); }));
     pop.appendChild(grid);
     pop.appendChild(makeDiv("menuSep"));
@@ -5790,7 +5876,7 @@
   // a checklist with everything ticked: offer the pile, never act on its own
   function offerDoneForChecklist(n){
     if(readOnly || !n || !n.textEl || n.type) return;
-    var items = n.textEl.querySelectorAll("ul.checklist > li");
+    var items = n.textEl.querySelectorAll('ul.checklist > li:not([data-title="true"])');
     if(!items.length) return;
     for(var i = 0; i < items.length; i++){ if(items[i].getAttribute("data-checked") !== "true") return; }
     toast("Everything\u2019s checked off. Move this note to Done?", "Move to Done", function(){ markDone(n); });
@@ -8623,7 +8709,7 @@
     var BOX = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 5.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/></svg>'));
     var TICK = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 28 28" fill="none" stroke="#33301f" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="1.6" d="M5.2 7.1c4.9-.6 10.1-.9 15.3-.4.4 4.8.5 9.6.1 14.6-5 .5-10.1.6-15.1.2-.6-4.7-.7-9.5-.3-14.4z"/><path stroke-width="2.6" d="M8.4 14.6c1.4 1.2 2.6 2.7 3.6 4.4 2.9-5.6 6.6-10.4 11.6-14.6"/></svg>'));
     var STRIKE = "data:image/svg+xml," + encodeURIComponent(inkSwap('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80" viewBox="0 0 100 20" preserveAspectRatio="none"><path d="M1 11.6C18 10.2 34 12.4 52 10.9S84 10.3 99 9.9" fill="none" stroke="#33301f" stroke-opacity="0.85" stroke-width="1.7" stroke-linecap="round"/></svg>'));
-    Array.prototype.forEach.call(stage.querySelectorAll("ul.checklist > li"), function(li){
+    Array.prototype.forEach.call(stage.querySelectorAll('ul.checklist > li:not([data-title="true"])'), function(li){
       var fs = parseFloat(getComputedStyle(li).fontSize) || 18;
       var rtl = getComputedStyle(li).direction === "rtl";
       var done = li.getAttribute("data-checked") === "true";

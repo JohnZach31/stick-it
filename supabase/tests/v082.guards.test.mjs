@@ -62,6 +62,15 @@ ok(/function canShowCollab\(\)\{[\s\S]*?!CLOUD[\s\S]*?Stick\.auth\.user\(\)[\s\S
 ok(/collabBtn\.hidden = !canShowCollab\(\)/.test(app) && /if\(willOpen\) updateCollabButton\(\)/.test(app), 'the button is re-checked every time the share panel opens');
 ok(/Stick\.repo\.createInvite\(activeBoardId, email, role\)/.test(app) && /Stick\.repo\.acceptInvite\(t\)/.test(app) && /#invite=\(\[a-f0-9\]\{64\}\)/.test(app), 'invites are created and accepted through the existing server functions');
 
+// ---- underline, link look, checklist titles, selection tip, pulling a note
+ok(/ALLOWED_TAGS = \{DIV:1,P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,/.test(app) && /execIn\(text, "underline"\)/.test(app), 'underline is kept by the sanitiser and works from the key and every format control');
+ok(/\.text a\{ color:var\(--link/.test(css) && /\.text a::after\{ content:"\\2197"/.test(css) && /\.text u\{ text-decoration:underline/.test(css), 'links are coloured with a dotted line and an arrow, so they never look like underlined text');
+ok(/function toggleChecklistTitle\(textEl\)/.test(app) && /li\.setAttribute\("data-title", "true"\)/.test(app) && /ul\.checklist > li\[data-title="true"\]::before/.test(css), 'a checklist line can be a title with no checkbox');
+ok(/\[:\\uff1a\]\\s\*\$/.test(app), 'a first line ending in a colon becomes the title when a list is made a checklist');
+ok(/li:not\(\[data-title="true"\]\)/.test(app) && /li\.getAttribute\("data-title"\) !== "true" && checkboxHit/.test(app), 'a title is never counted, ticked or clicked as a checkbox');
+ok(/var selTip = null/.test(app) && /role", "toolbar"\); bar\.setAttribute\("aria-label", "Format the selected words"/.test(app) && /\.selTip\{ position:fixed/.test(css), 'highlighting words shows a branded toolbar over them');
+ok(/function startNoteResize\(e, n, axis\)/.test(app) && /noteEdgeB/.test(app) && /@media \(pointer:coarse\)\{[\s\S]*?noteEdgeB/.test(css), 'a note can be pulled longer or wider by its edge, with a finger-sized grab bar on touch screens');
+
 // ---- patch tour data
 {
   const pd = read('js/patch-data.js');

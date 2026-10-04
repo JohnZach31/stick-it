@@ -2310,3 +2310,43 @@ html[data-a11y-motion="reduce"] :where(.pillBtn, .gearBtn, .menuItem, .asAction,
 .collabDlg{ display:flex; flex-direction:column; gap:6px; }
 .collabDlg select, .collabDlg input{ width:100%; }
 .collabOut{ display:flex; flex-direction:column; gap:8px; margin-top:6px; min-height:1.2em; font-size:0.84rem; }
+
+/* ---------- underline, links, checklist titles, selection tip, pulling a note (v0.8.2) ---------- */
+.text u{ text-decoration:underline; text-decoration-thickness:1.5px; text-underline-offset:3px; text-decoration-color:currentColor; }
+.fmtGrid .fU, .fbBtn .fU, .stBtn .fU{ text-decoration:underline; font-weight:700; font-size:0.9rem; }
+/* a link looks like a link and never like underlined text: its own colour, a dotted line, a small arrow */
+.text a{ color:var(--link, #1d4fb8); text-decoration:none; border-bottom:1.5px dotted currentColor; padding-bottom:0.5px; cursor:text; }
+.text a::after{ content:"\2197"; font-size:0.72em; margin-inline-start:0.18em; opacity:0.75; text-decoration:none; display:inline-block; }
+.text a:hover{ background:color-mix(in srgb, currentColor 10%, transparent); border-radius:3px; }
+body.dark .text a{ color:var(--link, #8fb4ff); }
+.text u a, .text a u{ text-decoration:underline; }
+/* a checklist title: no box, bold */
+.text ul.checklist > li[data-title="true"]{ padding-inline-start:0; font-weight:700; opacity:1; }
+.text ul.checklist > li[data-title="true"]::before, .text ul.checklist > li[data-title="true"]::after{ display:none; }
+.fbBtn.on, .stBtn.on{ background:rgba(0,0,0,0.12); }
+.selTip{ position:fixed; z-index:9400; display:flex; align-items:center; gap:2px; padding:4px; background:#33301f; color:#fffdf3; border-radius:10px; box-shadow:0 6px 18px rgba(0,0,0,0.3); animation:selTipIn .12s ease-out; }
+.selTip .stBtn{ width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:0; border-radius:7px; background:transparent; color:inherit; cursor:pointer; font:600 0.88rem Georgia, serif; }
+.selTip .stBtn svg{ width:16px; height:16px; }
+.selTip .stBtn:hover{ background:rgba(255,255,255,0.16); }
+.selTip .stBtn.on{ background:var(--accent, #c9871f); color:#fff; }
+.selTip .stBtn:focus-visible{ outline:2px solid #ffd27a; outline-offset:1px; }
+.selTip .stArrow{ position:absolute; bottom:-5px; width:10px; height:10px; background:#33301f; transform:translateX(-50%) rotate(45deg); border-radius:2px; }
+.selTip.below .stArrow{ bottom:auto; top:-5px; }
+body.dark .selTip{ background:#f4eedf; color:#33301f; } body.dark .selTip .stArrow{ background:#f4eedf; }
+body.dark .selTip .stBtn:hover{ background:rgba(0,0,0,0.12); }
+@keyframes selTipIn{ from{ opacity:0; transform:translateY(4px); } }
+@media (prefers-reduced-motion: reduce){ .selTip{ animation:none; } }
+html[data-a11y-motion="reduce"] .selTip{ animation:none; }
+/* pull the edge of a note */
+.note .noteEdge{ position:absolute; z-index:4; touch-action:none; }
+.note .noteEdgeB{ left:14px; right:14px; bottom:-6px; height:12px; cursor:ns-resize; }
+.note .noteEdgeR{ top:14px; bottom:14px; right:-6px; width:12px; cursor:ew-resize; }
+.note.focused .noteEdge, .note.soup .noteEdge{ display:none; }
+.note.selected .noteEdgeB::after{ content:""; position:absolute; left:50%; bottom:3px; width:34px; height:4px; border-radius:3px; background:rgba(0,0,0,0.28); transform:translateX(-50%); }
+@media (pointer:coarse){
+  /* on a touch screen the pull tab is a visible, finger-sized grab bar, shown on the selected note */
+  .note .noteEdgeB{ left:0; right:0; bottom:-16px; height:32px; }
+  .note .noteEdgeR{ right:-16px; width:32px; }
+  .note:not(.selected) .noteEdge{ display:none; }
+  .note.selected .noteEdgeB::after{ width:52px; height:6px; bottom:10px; background:rgba(0,0,0,0.38); }
+}
