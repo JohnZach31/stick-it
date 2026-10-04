@@ -1,6 +1,6 @@
 # Incident 2026-10-04: opening a share link soft-deleted a board
 
-Status: hotfix deployed (see "Fix"); recovery of the affected rows tracked at the end of this note. **Referenced by the pre-beta data-safety review** (`docs/dev/DATA-SAFETY-FOLLOWUP.md`).
+Status: **hotfix deployed (d5a0bfc) and verified; the 15 incident rows were restored on 2026-10-04.** Not yet confirmed by the owner in the live app (see "Recovery"). **Referenced by the pre-beta data-safety review** (`docs/dev/DATA-SAFETY-FOLLOWUP.md`).
 
 ## Trigger
 A signed-in person opened a share link (`#s=<token>`, or the legacy `#sb=`). In the reported case: the owner shared one note, then opened the link in the same signed-in browser, and the Main Board then looked completely empty (the board name and "Saved" still showed).
@@ -47,6 +47,27 @@ Any signed-in user whose cached board contained a **zone** crashed at page load 
 - incident: opening someone else's share link never touches the visitor's own board
 
 `supabase/tests/v082.guards.test.mjs` (source guards): share page identified once; share page never starts the sync; the sync layer refuses to attach from a share page; no cache overwrite; zone constants before boot sanitising and declared once; per-object sanitising; unreadable objects protected; per-object drawing isolated; the old all-or-nothing sanitising is gone.
+
+## Verification of the deployed hotfix
+The files served by GitHub Pages were byte-identical to commit `d5a0bfc` (app.js, sync.js, index.html, app.css). Because the real project needs a Google sign-in, the share-route matrix was run against **that exact build** on a local Supabase test double with two signed-in test accounts (owner "Alice", unrelated "Bob") and one signed-out origin. Every row below also checked: no board attached, no sync calls (only `resolve-share`), the cached board unchanged, no object soft-deleted on the server (Alice 7 active / Bob 3 active throughout), and returning to the app loaded the normal board.
+
+| Case | Result |
+| --- | --- |
+| A signed-out visitor, single-note link | shows the note; no account calls |
+| B owner opens own single-note link | safe; back to the app shows 7 objects, "Saved"; another open owner tab unaffected |
+| C unrelated signed-in user opens someone's single-note link | safe |
+| D owner opens own board-wide link | safe |
+| E unrelated signed-in user opens a board-wide link | safe |
+| malformed token | "looks broken", no request at all |
+| revoked link | "no longer available" (410), no sync |
+| legacy `#sb=` / `#sg=` / `#sn=` | shown, no sync, cache unchanged |
+
+Not done by the assistant (needs the owner's Google account): a signed-in check on the real live site with a test board. Checklist for the owner: create a test board with a few objects, note the count, open a share link of it while signed in (new tab), return to the app, reload; the count must not change.
+
+## Recovery
+Only the two incident batches were restored, in one `UPDATE ... WHERE deleted_at IN ('2026-10-04 22:50:43.242044+00', '2026-10-04 22:51:15.837038+00')` on board `71cf4e91-2fee-4a3b-8d28-cb87921f7715`, after a SELECT showed exactly the expected 15 rows (6 notes incl. the Done note, 3 photos, 6 shopping lists).
+- Board afterwards: 15 active, 57 still soft-deleted (older, left alone on purpose, including the lone note deleted at 22:42:35 and the earlier Shopping List test lists).
+- The Done note kept its `doneAt`; the 5 assets referenced by the restored objects are `ready`; all 6 shopping rows are structurally valid; all 15 rows rendered with no errors in the deployed build (local guest page fed with the real rows).
 
 ## Still open
 The architectural hazard behind it (deletion inferred from absence) is tracked in `docs/dev/DATA-SAFETY-FOLLOWUP.md` and is a **pre-public-beta blocker**.
