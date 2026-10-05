@@ -6625,6 +6625,10 @@
     function toggle(force){
       var open = force != null ? force : body.hidden;
       body.hidden = !open; head.setAttribute("aria-expanded", open ? "true" : "false");
+      if(open){          // only one submenu is open at a time: opening this one closes the others
+        Array.prototype.forEach.call(document.querySelectorAll(".menuSubBody"), function(o){ if(o !== body && !o.hidden){ o.hidden = true; if(o._head) o._head.setAttribute("aria-expanded", "false"); } });
+        body._head = head;
+      }
       if(open){ if(body.parentNode !== document.body) document.body.appendChild(body); placeFlyout(head, body); }          // lives on the page (not inside the scrolling menu) so nothing clips it
       if(open){ var f = body.querySelector("button.menuItem"); if(f && force === true) f.focus(); }
     }
