@@ -11,6 +11,283 @@
   ],
   "versions": [
     {
+      "version": "0.8.3.3",
+      "slug": "v0-8-3-3",
+      "codename": "Sand the Edges",
+      "title": "Stick-It v0.8.3.3 — Sand the Edges",
+      "status": "development",
+      "date": null,
+      "summary": "A focused hotfix for tutorial bugs, piles, zones, reactions, legal pages, editing, system-space UI and the little interactions that still felt unfinished.",
+      "tags": [
+        "Canvas",
+        "Nodes",
+        "Media",
+        "Mobile"
+      ],
+      "highlights": [
+        "Things stopped overlapping: pile controls, modals and Zone chrome got a cleanup pass.",
+        "Tutorials behave again: keyboard navigation and patch-history replay were repaired.",
+        "Paper feels smarter: empty notes skip Trash, trimming is automatic with Undo, and Newspaper editing behaves consistently.",
+        "Same Stick-It, fewer weird bits: reactions, Settings, Legal pages, Video creation and profile controls got polished."
+      ],
+      "notes": [
+        {
+          "heading": "Tutorial fixes",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Enter/arrow navigation works reliably",
+                "Skip no longer leaves the app behind a dark overlay",
+                "Patch tours can be replayed safely"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Patch history is easier to find",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Browse the full release history",
+                "Read every patch",
+                "Replay supported update tours"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Done feels better",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Completion sound is warmer and more satisfying"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Reactions got redesigned",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Cleaner physical reaction UI",
+                "Better spacing",
+                "Full emoji picker remains available"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Collaboration polish",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Better email-pill spacing and wrapping"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Zones cleaned up",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Shorter menu",
+                "Material and Colour submenus",
+                "Better title visibility",
+                "Clickable object count",
+                "Improved title fonts and cursor behavior"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Empty means empty",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Closing a brand-new empty note no longer sends junk to Trash"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Newspaper fixes",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Copy/paste behaves consistently",
+                "Styles are more visually distinct",
+                "Cleaner style/picture menus"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Smarter paper trimming",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Obvious unused paper trims automatically",
+                "Undo remains immediately available"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Piles rebuilt visually",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Cleaner physical browsing",
+                "No overlapping controls",
+                "Mixed node types behave better",
+                "Visible pile member can be edited"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Legal pages caught up",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Standalone legal pages now use the updated visual system too",
+                "Legal text still comes from one canonical source"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Cleaner account/settings UI",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Redundant Change Photo button removed",
+                "Settings rows finally use one interaction system",
+                "Guests no longer see Sign out"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Better Video creation",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Upload",
+                "Paste video link",
+                "Record with camera"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Modal layering fixed",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Confirmations always appear above Done/Trash/system spaces"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Cutout errors make more sense",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Screenshots/documents now get a more useful failure explanation"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Clean Up understands Zones",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Optionally tidy inside Zones without pulling objects out"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Smaller system-space controls",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Done and Trash stay quickly accessible without stealing canvas space"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Better board creation",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "New Board belongs with your boards, not underneath system spaces"
+              ]
+            }
+          ]
+        }
+      ],
+      "tour": {
+        "mode": "full",
+        "cards": [
+          {
+            "title": "Sand the Edges",
+            "body": "A small hotfix for the things that worked but still felt wrong. This takes about thirty seconds."
+          },
+          {
+            "title": "Things stopped overlapping",
+            "body": "Pile controls, modals and Zone chrome got a cleanup pass. Confirmations now always appear above Done and Trash.",
+            "feature": "layers"
+          },
+          {
+            "title": "Tutorials behave again",
+            "body": "Enter and the arrow keys move through a tour, Skip always works, and every old patch tour can be replayed from What’s New.",
+            "feature": "patchNotes",
+            "action": "openPatchNotes"
+          },
+          {
+            "title": "Paper feels smarter",
+            "body": "Closing a brand-new empty note skips Trash, spare paper trims itself (with Undo), and Newspaper copy and paste behaves consistently.",
+            "feature": "paper"
+          },
+          {
+            "title": "Same Stick-It, fewer weird bits",
+            "body": "Reactions, Settings rows, the Legal pages, Add video and the profile photo control all got polished.",
+            "feature": "polish",
+            "action": "openShortcuts"
+          }
+        ]
+      },
+      "media": [],
+      "notesFile": "0.8.3.3.md",
+      "newer": null,
+      "older": "0.8.3.2"
+    },
+    {
       "version": "0.8.3.2",
       "slug": "v0-8-3-2",
       "codename": "Finish the Flow",
@@ -270,7 +547,7 @@
       },
       "media": [],
       "notesFile": "0.8.3.2.md",
-      "newer": null,
+      "newer": "0.8.3.3",
       "older": "0.8.3.1"
     },
     {

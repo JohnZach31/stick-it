@@ -14,7 +14,7 @@ let many = {}; RR.MORE.flatMap((g) => g.items).slice(0, 20).forEach((e) => { man
 ok(Object.keys(many).length === RR.MAX_KINDS, 'an object keeps at most ' + RR.MAX_KINDS + ' kinds of reaction');
 ok(RR.SET.length === 6 && RR.MORE.length >= 4 && RR.MORE.every((g) => g.items.length > 5 && g.items.every(RR.isEmoji)), 'the quick six plus a broader palette of real emoji');
 const sm = RR.summary({ '🎉': ['a'], '👍': ['a', 'b'] }, 'a'); ok(sm[0].emoji === '👍' && sm[1].emoji === '🎉', 'quick emoji first, then the others');
-ok(/reactQuick/.test(fn('reactionPicker')) && /reactPlus/.test(fn('reactionPicker')) && /Stick\.reactions\.MORE/.test(fn('reactionPicker')), 'the picker shows the quick six with a "+" for more');
+ok(/reactQuick/.test(fn('reactionPicker')) && /reactMoreBtn/.test(fn('reactionPicker')) && /Stick\.reactions\.MORE/.test(fn('reactionPicker')), 'the picker shows the quick six with a "+" for more');
 ok(!/React/.test(fn('openObjectMenu')) && !/reaction/i.test(fn('paperMenu')), 'reactions are not an item in the "..." menu');
 ok(/min-width:44px|width:44px; height:44px/.test(css), 'reaction buttons are 44px');
 

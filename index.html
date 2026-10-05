@@ -69,14 +69,17 @@
 <div class="panel" id="boardPanel" hidden style="width:290px; right:auto; left:18px;">
   <h3>Your boards</h3>
   <div id="boardList"></div>
+  <div class="addBoardRow" id="addBoardRow">
+    <button type="button" class="newBoardOpen" id="newBoardOpen" aria-expanded="false">+ New board</button>
+    <div class="newBoardSlip" id="newBoardSlip" hidden>
+      <input type="text" id="newBoardName" placeholder="Name your board" maxlength="40" aria-label="New board name">
+      <button type="button" id="addBoardBtn" aria-label="Create board" title="Create board (Enter)">Create</button>
+    </div>
+  </div>
   <div class="sysSpaces" id="sysSpaces">
     <h3>System</h3>
     <button type="button" class="sysRow" id="openDoneSpace"><span class="sysIco" aria-hidden="true"></span><span class="sysName">Done</span><span class="sysCount" id="spaceDoneCount">0</span></button>
     <button type="button" class="sysRow" id="openTrashSpace"><span class="sysIco" aria-hidden="true"></span><span class="sysName">Trash</span><span class="sysCount" id="spaceTrashCount">0</span></button>
-  </div>
-  <div class="addBoardRow">
-    <input type="text" id="newBoardName" placeholder="New board name" maxlength="40">
-    <button id="addBoardBtn" aria-label="Add board" title="Add board">+</button>
   </div>
 </div>
 

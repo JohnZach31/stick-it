@@ -10,7 +10,7 @@ ok(S.patchReader.versions().join() === idx.map((e) => e.version).join(), 'the re
 ok(H.versions.every((v) => v.notes && v.notes.length && v.title && v.version), 'every patch has readable sections');
 ok(H.versions.every((v) => v.tour && Array.isArray(v.tour.cards) && v.tour.cards.length >= 1), 'every patch has a tour (its own, or one derived from its notes)');
 ok(pn.every((e) => H.versions.some((v) => v.version === e.version)), 'patch-notes.json and the history agree');
-const latest = H.versions[0]; ok(latest.version === '0.8.3.2' && latest.status === 'development' && latest.date == null, 'the newest patch is v0.8.3.2, still development, no release date');
+const latest = H.versions[0]; ok(latest.version === '0.8.3.3' && latest.status === 'development' && latest.date == null, 'the newest patch is v0.8.3.3, still development, no release date');
 ok(S.patchReader.matches(latest, 'zones', '') && !S.patchReader.matches(latest, 'zzzzqq', ''), 'search matches notes text');
 ok(S.patchReader.matches(latest, '', latest.tags[0]) && !S.patchReader.matches(latest, '', 'NoSuchTag'), 'category filter works');
 const reader = read('js/patch-reader.js');

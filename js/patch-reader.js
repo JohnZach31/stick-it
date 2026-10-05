@@ -111,9 +111,25 @@
       chips.appendChild(b);
     });
     sheet.appendChild(chips);
+    state.map = mk("nav", "prMap"); state.map.setAttribute("aria-label", "Release timeline"); sheet.appendChild(state.map); paintMap();
     var main = mk("div", "prMain"); state.list = mk("nav", "prList"); state.list.setAttribute("aria-label", "Versions"); state.detail = mk("article", "prDetail"); state.detail.tabIndex = 0;
     main.appendChild(state.list); main.appendChild(state.detail); sheet.appendChild(main);
     paintList(); paintDetail();
+  }
+  // the release map: every version pinned on one string, oldest to newest. The one you are reading is raised; the one you are running is marked.
+  function paintMap() {
+    var map = state.map; if (!map) return; map.textContent = "";
+    var line = mk("div", "prString"); line.setAttribute("aria-hidden", "true"); map.appendChild(line);
+    var row = mk("ol", "prPins");
+    H().versions.slice().reverse().forEach(function (v) {
+      var li = mk("li", "prPinItem"), b = mk("button", "prPin" + (v.version === state.version ? " on" : "") + (v.version === host.current ? " now" : "")); b.type = "button";
+      b.setAttribute("aria-label", "v" + v.version + " " + v.codename + (v.version === host.current ? ", this version" : "")); if (v.version === state.version) b.setAttribute("aria-current", "true");
+      b.appendChild(mk("span", "prPinDot")); b.appendChild(mk("span", "prPinV", v.version)); b.appendChild(mk("span", "prPinName", v.codename));
+      b.addEventListener("click", function () { select(v.version, true); });
+      li.appendChild(b); row.appendChild(li);
+    });
+    map.appendChild(row);
+    var on = row.querySelector(".prPin.on"); if (on && on.scrollIntoView) { try { on.scrollIntoView({ block: "nearest", inline: "center" }); } catch (e) { /* older browsers */ } }
   }
   function paintList() {
     var list = state.list; list.textContent = "";
@@ -129,7 +145,7 @@
       list.appendChild(b);
     });
   }
-  function select(version, detail) { if (!state || !byVersion(version)) return; state.version = version; if (detail) state.mobileDetail = true; state.sheet.classList.toggle("detail", !!state.mobileDetail); paintList(); paintDetail(); }
+  function select(version, detail) { if (!state || !byVersion(version)) return; state.version = version; if (detail) state.mobileDetail = true; state.sheet.classList.toggle("detail", !!state.mobileDetail); paintList(); paintMap(); paintDetail(); }
   function paintDetail() {
     var v = byVersion(state.version), d = state.detail; d.textContent = "";
     if (!v) return;

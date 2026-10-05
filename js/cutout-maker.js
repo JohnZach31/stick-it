@@ -297,6 +297,13 @@
       });
 
       // ---------------------------------------------------------------- automatic cutout
+      // Two honest explanations: the picture has no single clear subject (a screenshot, a document, a card, a news photo), or something simply went wrong this time.
+      function setFailText(noSubject) {
+        failTitle.textContent = noSubject ? "Couldn’t find one clear subject" : "Couldn’t make a clean cutout";
+        failMsg.textContent = noSubject
+          ? "This looks more like a screenshot, a document or a card than a single object in the foreground, and a cutout needs one clear subject to lift out. Your original photo is unchanged: you can try again, keep the plain photo, or cancel."
+          : "Your original photo is unchanged. You can try again, keep the plain photo, or cancel.";
+      }
       function showFail(on) { fail.hidden = !on; foot.hidden = on; shelf.hidden = on; stage.classList.toggle("dim", on); if (on) { try { fRetry.focus(); } catch (e) {} } }
       function run(engineId) {
         showFail(false); setBusyUI(true); if (!gRefine.hidden) { closeRefine(false); state.tool = "erase"; }
@@ -323,8 +330,10 @@
           if (!hintSeen) { hintSeen = true; try { root.localStorage.setItem(HINT_KEY, "1"); } catch (e) {} setTimeout(function () { hint.hidden = true; }, 12000); }
         }).catch(function (err) {
           UI.loader.hide(); setBusyUI(false);
+          var noSubject = !!(err && err.message === "NO_SUBJECT");
+          setFailText(noSubject);
           if (!state.hasMask) { showFail(true); say(""); }
-          else { say("Couldn’t make a clean cutout this time. The previous cutout is still here."); UI.toast("Couldn’t make a clean cutout. Your original photo is unchanged."); }
+          else { say(noSubject ? "No single clear subject found. The previous cutout is still here." : "Couldn’t make a clean cutout this time. The previous cutout is still here."); UI.toast(noSubject ? "Couldn’t find one clear subject. Your original photo is unchanged." : "Couldn’t make a clean cutout. Your original photo is unchanged."); }
           updateButtons();
         });
       }

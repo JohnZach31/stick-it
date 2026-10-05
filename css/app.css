@@ -1020,7 +1020,7 @@
 
   /* account modal */
   .acctBackdrop{
-    position:fixed; inset:0; z-index:10030;
+    position:fixed; inset:0; z-index:var(--z-modal);
     background:var(--scrim);
     display:flex; align-items:center; justify-content:center;
     padding:20px;
@@ -2731,3 +2731,9 @@ body.dark .embedObj::before{ background:rgba(242,234,219,0.22); border-color:rgb
 .pillField .pillX:hover{ background:rgba(0,0,0,0.1); }
 .collabDlg .inviteRow{ display:flex; flex-direction:column; gap:4px; margin-top:8px; }
 .collabDlg .asHint.err{ color:#b3261e; }
+
+/* ===== Central layer scale (v0.8.3.3). Every full-screen surface takes its z-index from here, so a dialog can never again sit under a system space.
+   canvas < zones < objects < object chrome < selection < floating board controls < toasts / status pills < system-space chrome (Done, Trash, pile browser, readers)
+   < modal backdrop + modal (Settings, share, collaboration, confirmations) < tutorial < critical confirmation */
+:root{ --z-toast:10029; --z-system:10045; --z-reader:10075; --z-modal:10070; --z-tutorial:10080; --z-critical:10090; }
+.acctBackdrop.critical{ z-index:var(--z-critical); }

@@ -187,3 +187,34 @@ article h3{ line-height:var(--ln); padding-top:var(--ln); }
 article h1:first-child{ padding-top:0; }
 article h1{ background-image:none; }
 article blockquote p{ background-image:none; padding:0; }
+
+/* ======================================================================================================================
+   v0.8.3.3: the standalone pages now share the in-app reader's design system: the same header hierarchy, coloured paper tabs,
+   a compact taped Draft slip and a calmer sheet. Only looks; the text comes from the same Markdown as the in-app reader.
+   ====================================================================================================================== */
+.top{ align-items:flex-end; gap:8px 16px; padding:14px 20px 0; }
+.topMain{ display:flex; align-items:baseline; gap:12px; min-width:0; flex:1 1 auto; }
+.brand{ font-size:1.1rem; }
+.topTitle{ font:1.5rem/1.1 var(--headfont); color:var(--ink); }
+html[dir="rtl"] .topTitle{ font-family:'Alef','Heebo',sans-serif; font-weight:700; font-size:1.3rem; }
+.top nav{ gap:2px; align-items:flex-end; width:100%; order:3; overflow-x:auto; padding-top:6px; }
+.top nav a.langSwitch{ margin-inline-start:auto; align-self:center; border-radius:999px; }
+.top nav a[data-tab]{ --tabc:#f6e7a8; flex:none; padding:7px 14px 6px; border:1px solid color-mix(in srgb, var(--tabc) 60%, #000 18%); border-bottom:0; border-radius:9px 9px 0 0; background:color-mix(in srgb, var(--tabc) 78%, var(--desk)); color:#4a3a00; font-weight:600; font-size:0.86rem; transform:translateY(3px); box-shadow:inset 0 -6px 8px -8px rgba(60,45,10,0.4); }
+.top nav a[data-tab="1"]{ --tabc:#cfe6cf; } .top nav a[data-tab="2"]{ --tabc:#cfe0f5; } .top nav a[data-tab="3"]{ --tabc:#f5d2cb; } .top nav a[data-tab="4"]{ --tabc:#e3d6f3; }
+html[data-a11y-theme="dark"] .top nav a[data-tab]{ --tabc:#5a4f26; color:#f2eadb; } html[data-a11y-theme="dark"] .top nav a[data-tab="1"]{ --tabc:#2f4a35; } html[data-a11y-theme="dark"] .top nav a[data-tab="2"]{ --tabc:#2f4160; } html[data-a11y-theme="dark"] .top nav a[data-tab="3"]{ --tabc:#5a3030; } html[data-a11y-theme="dark"] .top nav a[data-tab="4"]{ --tabc:#47345f; }
+.top nav a[data-tab]:hover{ transform:translateY(1px); color:#33301f; }
+.top nav a[data-tab][aria-current="page"]{ transform:none; background:var(--sheet); color:var(--ink); border-color:var(--line); border-top:3px solid color-mix(in srgb, var(--tabc) 80%, #000 12%); padding-bottom:9px; box-shadow:none; font-weight:700; text-decoration:none; }
+.top nav a.langSwitch{ transform:none; box-shadow:none; background:transparent; border:1px solid var(--edge); color:var(--ink); padding:4px 12px; }
+/* the draft notice: a small taped slip */
+.draftBanner{ display:flex; align-items:baseline; gap:8px; max-width:560px; margin:16px auto 0; padding:7px 14px; font-size:0.82rem; line-height:1.4; transform:rotate(-0.4deg); }
+.draftBanner::before{ width:54px; height:14px; top:-8px; }
+.draftBanner::after{ content:"Draft"; order:-1; flex:none; font:700 0.66rem var(--bodyfont); letter-spacing:0.08em; text-transform:uppercase; padding:1px 7px; border-radius:999px; border:1px solid currentColor; }
+html[lang="he"] .draftBanner::after{ content:"טיוטה"; letter-spacing:0; }
+.draftBanner[hidden]{ display:none; }
+/* the sheet: a little more room, a quieter shadow */
+article{ border-radius:3px 8px 8px 3px; padding-top:calc(var(--ln) * 1.5); box-shadow:0 1px 1px rgba(60,45,10,0.2), 0 12px 28px rgba(60,45,10,0.12); }
+@media (max-width:640px){
+  .top{ padding:10px 10px 0; } .topTitle{ font-size:1.2rem; } .brand{ font-size:1rem; }
+  .top nav a[data-tab]{ min-height:44px; display:inline-flex; align-items:center; padding:8px 12px 6px; font-size:0.82rem; }
+  .draftBanner{ margin:12px 8px 0; font-size:0.78rem; }
+}

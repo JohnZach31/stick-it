@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.3.3",
+    "codename": "Sand the Edges",
+    "title": "Stick-It v0.8.3.3 — Sand the Edges",
+    "date": null,
+    "status": "development",
+    "tldr": "A focused hotfix for tutorial bugs, piles, zones, reactions, legal pages, editing, system-space UI and the little interactions that still felt unfinished.",
+    "file": "0.8.3.3.md"
+  },
+  {
     "version": "0.8.3.2",
     "codename": "Finish the Flow",
     "title": "Stick-It v0.8.3.2 — Finish the Flow",

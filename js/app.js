@@ -840,7 +840,12 @@
     var mb = meaningfulBottom(n); if(!mb) return;
     if(n.el.offsetHeight - (mb + PAPER_BOTTOM) < 110) return;
     n._trimAsked = true;
-    toast("Trim empty paper?", "Trim", function(){ var cur = findNote(n.id); if(cur) trimPaper(cur, "rip"); });
+    // v0.8.3.3: obvious unused paper is trimmed straight away (no question), and Undo is right there. Never for a note with a picture, a task row or a size the person set
+    // themselves, and never when something is still being typed. Reduced motion: no tearing animation (trimPaper already skips it).
+    if(n.image || n.assetId || n.isTask || n.attachedAssetId || (n.textEl && n.textEl.querySelector("img, video, iframe, audio"))) return;
+    var cur = findNote(n.id); if(!cur || !cur.el || document.activeElement === cur.textEl || cur.el.classList.contains("editing")) return;
+    var depth = undoStack.length; trimPaper(cur, "rip", {auto: true});
+    if(undoStack.length === depth + 1){ var act = undoStack[undoStack.length - 1]; toast("Paper trimmed", "Undo", function(){ undoIfTop(act); }); }
   }
   // blank lines at the very end of the writing (Enter or Shift+Enter pressed and never used, empty blocks, filler breaks) are not
   // content: fitting or ripping the paper removes them, so the paper can really end where the words end
@@ -874,9 +879,10 @@
     }
     pushHistory({label: label, custom: true, t: Date.now(), undo: function(){ return put(before); }, redo: function(){ return put(after); }});
   }
-  function trimPaper(n, mode){
+  function trimPaper(n, mode, opts){
+    var quiet = !!(opts && opts.auto);
     if(readOnly || !n || n.type || !n.el) return;
-    if(n.cosmetic === "soup"){ toast("A soup bowl keeps its own shape."); return; }
+    if(n.cosmetic === "soup"){ if(!quiet) toast("A soup bowl keeps its own shape."); return; }
     endEditing(); closeFloatingPopovers();
     if(n.textEl) n.html = n.textEl.innerHTML;
     var el = n.el, before = captureState([n.id]), oldH = el.offsetHeight, oldW = n.w || NOTE_W, newW = oldW, prevW = el.style.width;
@@ -887,10 +893,10 @@
     }
     el.style.width = newW + "px";
     var mb = meaningfulBottom(n);
-    if(!mb){ el.style.width = prevW; if(changedWords && n.textEl) n.textEl.innerHTML = before[n.id].html; toast("Write something first, then trim the paper."); return; }
+    if(!mb){ el.style.width = prevW; if(changedWords && n.textEl) n.textEl.innerHTML = before[n.id].html; if(!quiet) toast("Write something first, then trim the paper."); return; }
     var newH = Math.max(PAPER_MIN_H, Math.ceil(mb + PAPER_BOTTOM));
     el.style.width = prevW;
-    if(oldH - newH < 18 && oldW - newW < 12 && !changedWords){ if(n.textEl && changedWords) n.textEl.innerHTML = before[n.id].html; toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
+    if(oldH - newH < 18 && oldW - newW < 12 && !changedWords){ if(n.textEl && changedWords) n.textEl.innerHTML = before[n.id].html; if(!quiet) toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
     var ripChip = null;
     if(mode === "rip"){
       n.rip = n.rip || ripStyleFor(n);
@@ -1172,8 +1178,11 @@
   // (declared here, above everything that runs while the page loads: the cached board is sanitised during boot, long before the zone code below)
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
+  // five locally hosted title faces for a zone's name (Latin; Hebrew falls through to Alef/Heebo). A zone keeps the one it was given: it comes from its id unless one is chosen.
+  var ZONE_TITLE_FONTS = [["Caveat Brush", "Marker"], ["Amatic SC", "Tall"], ["Architects Daughter", "Drafting"], ["Fredoka", "Round"], ["Gloria Hallelujah", "Hand"]];
+  function zoneTitleFont(n){ var i = n && n.tf != null ? Number(n.tf) : -1; if(!(i >= 0 && i < ZONE_TITLE_FONTS.length)) i = hashStr(String(n && n.id || "z")) % ZONE_TITLE_FONTS.length; return i; }
   var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","tf"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1243,6 +1252,7 @@
       if(!ZONE_MATERIALS.some(function(m){ return m[0] === c.variant; })) c.variant = "paper";
       c.bg = safeColor(c.bg) || ZONE_TINTS[0];
       if(c.carry !== true) delete c.carry;
+      if(c.tf !== undefined){ var tfi = Math.round(Number(c.tf)); if(tfi >= 0 && tfi < 5) c.tf = tfi; else delete c.tf; }
       if(c.min === true && Array.isArray(c.hold)){ c.hold = c.hold.filter(function(x){ return typeof x === "string" && x.length <= 64; }).slice(0, 5000); } else { delete c.min; delete c.hold; }
       if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
       delete c.html;
@@ -2098,7 +2108,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","tf"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2277,6 +2287,18 @@
     if(/<ul[^>]*checklist/i.test(html)) return true;
     var t = n.textEl ? n.textEl.textContent : htmlToText(html);
     return !!t.replace(/[\s\u200b\u00a0]/g, "");
+  }
+  // "empty" in the strict sense used by close (X) and Delete: a sticky or checklist with no words at all, or a paper object whose every text field is empty, with
+  // nothing attached or marked on it. Anything with an image, a due date, a pin, reactions, a share or any words at all is NOT throwaway and goes to Trash as before.
+  function isThrowaway(n){
+    if(!n || n.pinned || n.image || n.assetId || n.attachedAssetId || n.mediaId || n.due || n.cutoutKey || (n.reactions && Object.keys(n.reactions).length)) return false;
+    if(n.type === "zone" || n.type === "pile" || n.type === "embed" || isPileObj(n) || isAV(n) || isPhoto(n) || n.cosmetic) return false;
+    if(n.type === "shopping" || n.type === "photo_strip" || n.type === "postcard") return false;
+    if(isPaper(n)){ var t = ""; try{ t = Stick.objects.text(n); }catch(e){ return false; } return !String(t || "").replace(/[\s\u200b\u00a0]/g, ""); }
+    var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
+    if(/<(a|img|video|iframe|audio)\b/i.test(html)) return false;
+    var tx = n.textEl ? n.textEl.textContent : htmlToText(html);
+    return !tx.replace(/[\s\u200b\u00a0]/g, "");          // a checklist of empty rows has no text either
   }
   function focusNoScroll(el){ try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); } }
   function selectionIn(textEl){
@@ -3271,7 +3293,7 @@
       if(!res || !live) return;
       if(res.useOriginal){ toast("Kept your original photo."); return; }
       applyCutout(live, res, style && style !== "polaroid" ? style : "cutout");
-    }, function(){ cutoutBusy = false; toast("Couldn't make a clean cutout. Your original photo is unchanged."); });
+    }, function(err){ cutoutBusy = false; toast(err && err.message === "NO_SUBJECT" ? "Couldn't find one clear subject (this looks like a screenshot, document or card). Your original photo is unchanged." : "Couldn't make a clean cutout. Your original photo is unchanged."); });
   }
   function applyCutout(n, res, style){
     var before = captureState([n.id]);
@@ -4086,7 +4108,9 @@
     });
     menuSub(pop, ICONS.paper || ICONS.sticky, "Style", function(body){
     Stick.objects.VARIANTS[n.type].forEach(function(v){
-      body.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }))
+      var vit = menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); });
+      if(n.type === "newspaper"){ var sw = document.createElement("span"); sw.className = "po-newspaper npSw v-" + v; sw.setAttribute("aria-hidden", "true"); sw.innerHTML = "<i></i><i></i><i></i>"; vit.appendChild(sw); }
+      body.appendChild(vit);
     });
     });
 
@@ -5133,7 +5157,7 @@
     {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
     {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
     {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
-    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"},
+    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main", run: function(bx, by){ openAddVideo(bx, by); }},
     {id: "zone", group: "Add", label: "Zone", icon: ICONS.zone, touch: "more", run: function(bx, by){ createZone(bx, by); }},
     {id: "soup", group: "Premium", label: "Alphabet Soup", icon: ICONS.soup, touch: "more", run: function(bx, by){ createSoup(bx, by); }}
   ];
@@ -5227,7 +5251,36 @@
     pop.appendChild(menuItem(ICONS.share, "Share selection\u2026", function(){ closeFloatingPopovers(); openShareModal(selectedNotes()); }));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes(ids); }, {cls: "danger"}));
   }
-  function captureAction(kind, bx, by){
+  // "Add video" asks HOW first: nothing opens a file picker, a camera or a network request until one of the three is chosen.
+  function openAddVideo(bx, by){
+    var wrap = makeDiv("addVideoDlg"), list = makeDiv("vidOpts"), form = makeDiv("vidLink"); form.hidden = true;
+    var m;
+    function opt(icon, title, sub, fn){
+      var b = document.createElement("button"); b.type = "button"; b.className = "vidOpt";
+      b.innerHTML = '<span class="vIc" aria-hidden="true">' + icon + '</span><span class="vTx"><b></b><small></small></span>';
+      b.querySelector("b").textContent = title; b.querySelector("small").textContent = sub;
+      b.addEventListener("click", fn); list.appendChild(b); return b;
+    }
+    opt(ICONS.film, "Upload video", "Choose a video file from this device.", function(){ m.close(false); captureAction("video", bx, by, {direct: true}); });
+    opt(ICONS.link, "Paste video link", "A YouTube or Vimeo link, shown as a video you can play here.", function(){ list.hidden = true; form.hidden = false; var i = form.querySelector("input"); if(i) i.focus(); });
+    opt(ICONS.camera, "Record with camera", "Opens your camera only now. You can cancel there.", function(){ m.close(false); captureAction("video", bx, by, {direct: true, camera: true}); });
+    var inp = document.createElement("input"); inp.type = "url"; inp.className = "asIn"; inp.placeholder = "https://\u2026"; inp.setAttribute("aria-label", "Video link"); inp.autocomplete = "off"; inp.spellcheck = false;
+    var msg = document.createElement("p"); msg.className = "asHint"; msg.setAttribute("role", "status");
+    var row = makeDiv("vidLinkRow"), go = document.createElement("button"); go.type = "button"; go.className = "pillBtn primary"; go.textContent = "Add video"; var bk = document.createElement("button"); bk.type = "button"; bk.className = "pillBtn"; bk.textContent = "Back";
+    row.appendChild(bk); row.appendChild(go); form.appendChild(inp); form.appendChild(msg); form.appendChild(row);
+    function submit(){
+      var raw = inp.value.trim(); if(!raw){ msg.textContent = "Paste a link first."; return; }
+      var url = normalizeUrl(raw), info = url && window.Stick && Stick.embed ? Stick.embed.parse(url) : null;
+      if(!info){ msg.textContent = "Stick-It can show YouTube and Vimeo links as videos. That one isn\u2019t supported, so nothing was added."; return; }
+      m.close(false); createEmbedAt(info, bx - 170, by - 100);
+    }
+    go.addEventListener("click", submit); bk.addEventListener("click", function(){ form.hidden = true; list.hidden = false; msg.textContent = ""; var f = list.querySelector("button"); if(f) f.focus(); });
+    inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); submit(); } });
+    wrap.appendChild(list); wrap.appendChild(form);
+    m = openModal({title: "Add video", content: wrap, width: 400, actions: [{label: "Cancel", value: false}]});
+  }
+  function captureAction(kind, bx, by, opts){
+    if(kind === "video" && !(opts && opts.direct)){ openAddVideo(bx, by); return; }
     if(kind === "sticky"){ addNoteAt(bx, by); return; }
     if(kind === "record"){ startRecording(bx, by); return; }
     if(kind === "cutout"){
@@ -5242,6 +5295,7 @@
     }
     var inp = captureInput(kind);
     inp.value = "";
+    if(kind === "video"){ if(opts && opts.camera) inp.setAttribute("capture", "environment"); else inp.removeAttribute("capture"); }          // only "Record with camera" asks the phone for its camera
     inp.onchange = function(){
       var f = inp.files && inp.files[0];
       if(!f) return;
@@ -5540,6 +5594,7 @@
       var p = byId[n.pileId];
       if(p && isPileObj(p) && live[p.id] >= Stick.pile.MIN_MEMBERS && (p.members || []).indexOf(n.id) !== -1) hiddenIds[n.id] = true;
     });
+    if(pileFocus && hiddenIds[pileFocus.id]) delete hiddenIds[pileFocus.id];
     zoneHolder = {};
     notes.forEach(function(z){
       if(!isZone(z) || z.min !== true || !Array.isArray(z.hold)) return;
@@ -5579,11 +5634,27 @@
     if(txt){ txt.textContent = pileSnippet(top); txt.style.fontFamily = top && top.font && FONT_BY_NAME[top.font] ? '"' + top.font + '", cursive' : ""; }
     if(topEl){ var bg = top && !top.type && top.bg ? top.bg : "#fffdf5"; topEl.style.background = document.body.classList.contains("dark") && top && !top.type && top.bg ? dimPaperColor(top.bg) : bg; }
     if(badge) badge.textContent = i ? (i + 1) + " / " + live.length : String(live.length);
-    paintPileKind(el, top); paintPileTabs(n, el, live, i);
+    paintPileKind(el, top); paintPileTabs(n, el, live, i); fitPileTop(n, el, live[i]);
     el.setAttribute("aria-label", Stick.pile.label(n, live.length) + ". Showing " + (i + 1) + " of " + live.length + ": " + pileSnippet(top).slice(0, 60));
   }
   // v0.8.3.2: a pile shows what is on top as a paper (a small tab says what kind of thing it is), and a row of paper tabs along the bottom is its index:
   // one tab per paper (the one showing is raised), so a pile of mixed papers still reads as one pile. Display only; nothing is stored.
+  // The paper on top is drawn as itself (a note stays a note, a receipt a receipt, a newspaper a newspaper), shrunk to the pile's footprint when it is wider. Only this ONE paper is
+  // mounted: the papers behind it are still just the cheap edges, and the members themselves stay unmounted. Recordings and videos keep the plain snippet card.
+  function fitPileTop(n, el, top){
+    var tp = el && el.querySelector(".pileTop"); if(!tp || !top || isAV(top) || top.type === "pile" || top.type === "embed") return;
+    var old = tp.querySelector(".pileMember"); if(old) old.remove();
+    var paper = null; try{ paper = buildStaticNote(top); }catch(err){ paper = null; }
+    if(!paper){ tp.classList.remove("live"); return; }
+    paper.classList.add("pbPaper"); paper.style.cssText += ";position:absolute;left:0;top:0;transform:none;margin:0;pointer-events:none;";
+    var host = makeDiv("pileMember"); host.setAttribute("aria-hidden", "true"); host.appendChild(paper);
+    var txt = tp.querySelector(".pileText"); if(txt) txt.hidden = true;
+    tp.classList.add("live"); tp.appendChild(host);
+    var pw = n.w || Stick.pile.WIDTH[2], mw = top.w || (top.type && Stick.objects ? Stick.objects.defaultW(top.type) : NOTE_W) || NOTE_W;
+    var sc = Math.min(1, pw / Math.max(60, mw)); paper.style.width = mw + "px"; paper.style.transformOrigin = "0 0"; paper.style.transform = "scale(" + sc + ")";
+    var h = Math.max(60, Math.round(paper.offsetHeight * sc)); host.style.height = h + "px"; host.style.width = Math.round(mw * sc) + "px";
+    host.style.marginInline = "auto"; tp.style.minHeight = h + "px";
+  }
   function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
   function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
   var PILE_TABS_MAX = 7;
@@ -5625,8 +5696,12 @@
     txt.textContent = pileSnippet(top); txt.dir = "auto";
     if(top && top.font && FONT_BY_NAME[top.font]) txt.style.fontFamily = '"' + top.font + '", cursive';
     topEl.appendChild(txt); el.appendChild(topEl);
+    el._pileN = n;
     var kind = makeDiv("pileKind"); kind.setAttribute("aria-hidden", "true"); kind.textContent = pileKindName(top); el.appendChild(kind);
     var tabs = makeDiv("pileTabs"); tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Papers in this pile"); el.appendChild(tabs); paintPileTabs(n, el, live, browseIdx(n, live));
+    var openB = document.createElement("button"); openB.type = "button"; openB.className = "pileOpen"; openB.title = "Browse the papers in this pile"; openB.setAttribute("aria-label", "Browse the papers in this pile"); openB.textContent = "Browse";
+    openB.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); openB.addEventListener("mousedown", function(e){ e.preventDefault(); }); openB.addEventListener("click", function(e){ e.stopPropagation(); openPileBrowser(n); });
+    el.appendChild(openB);
     var badge = makeDiv("pileCount"); badge.textContent = browseIdx(n, live) ? (browseIdx(n, live) + 1) + " / " + live.length : String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
     return el;
   }
@@ -5640,6 +5715,7 @@
     if(selected.has(n.id)) el.classList.add("selected");
     n.el = el; n.textEl = null; n.captionEl = null;
     boardInner.appendChild(el);
+    fitPileTop(n, el, live[browseIdx(n, live)]);
     if(!readOnly){
       var more = document.createElement("button"); more.type = "button"; more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options for this pile"; more.setAttribute("aria-label", "Options for this pile");
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
@@ -5653,7 +5729,7 @@
         el.appendChild(nb);
       });
       var pileDownAt = null;
-      el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))) openPileBrowser(n); });
+      el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))){ var lv = pileLive(n), tm = lv[browseIdx(n, lv)]; if(tm) focusPileMember(n, tm.id); } });
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest("button")) return;
@@ -5868,6 +5944,7 @@
     prev.textContent = "‹"; next.textContent = "›"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
     function tool(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", fn); return b; }
+    var editB = tool("Edit this paper", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) focusPileMember(pile, m.id); });
     var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
     var shuf = tool("Shuffle", function(){ shufflePile(pile); paint(); });
     var earlier = tool("← Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); });
@@ -5876,7 +5953,7 @@
     bar.appendChild(prev); bar.appendChild(idx); bar.appendChild(next);
     var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
     card.appendChild(stage); card.appendChild(bar); card.appendChild(tools);
-    var foot = makeDiv("pbFoot"); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
+    var foot = makeDiv("pbFoot"); foot.appendChild(editB); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
     root.appendChild(card); document.body.appendChild(root);
     pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
     pileBrowserLayer.open();
@@ -5905,7 +5982,7 @@
         stage.appendChild(fanEl);
       } else stage.appendChild(paperOf(live[i]));
       idx.textContent = (i + 1) + " / " + live.length;
-      take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
+      editB.hidden = readOnly || isAV(live[i]) || live[i].type === "embed"; take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
       earlier.disabled = i === 0; later.disabled = i === live.length - 1;
     }
     function step(d){ var live = pileLive(pile); if(live.length < 2) return; pileBrowse[pile.id] = (browseIdx(pile, live) + d + live.length) % live.length; paint(); }
@@ -5926,10 +6003,39 @@
     paint(); next.focus();
   }
 
+  // ---- editing the paper that is showing (member focus mode)
+  // The paper stays a member of its pile (nothing moves, nothing is removed). For as long as it is being edited it is simply drawn, over the pile, as the real thing, so every
+  // editor that note or object already has works unchanged. Esc, or a click anywhere else, puts it back.
+  var pileFocus = null;
+  function focusPileMember(pile, memberId){
+    if(readOnly || !pile || !isPileObj(pile)) return;
+    var m = findNote(memberId); if(!m || (pile.members || []).indexOf(memberId) === -1) return;
+    if(isAV(m) || m.type === "embed"){ openPileBrowser(pile); return; }
+    endPileFocus(); closeFloatingPopovers();
+    pileFocus = {pileId: pile.id, id: memberId}; rebuildHidden(); syncPileVisibility();
+    var cur = findNote(memberId); if(!cur || !cur.el){ pileFocus = null; syncPileVisibility(); return; }
+    var p = findNote(pile.id); cur.el.classList.add("pileFocused");
+    cur.el.style.left = (p ? p.x : cur.x) + "px"; cur.el.style.top = (p ? p.y : cur.y) + "px"; cur.el.style.zIndex = String(((p && p.z) || 1) + 2);
+    setSelection([memberId]);
+    var first = cur.el.querySelector(".poF");
+    setTimeout(function(){ if(cur.textEl) focusNoScroll(cur.textEl); else if(first) editPaperField(cur, first); }, 30);
+    pileFocus.out = function(e){ var t = e.target; if(cur.el && cur.el.contains(t)) return; if(t.closest && t.closest(".floatPop, .noteMenu, .acctBackdrop, .menuSubBody")) return; endPileFocus(); };
+    pileFocus.key = function(e){ if(e.key === "Escape"){ e.stopPropagation(); e.preventDefault(); endPileFocus(); } };
+    window.addEventListener("pointerdown", pileFocus.out, true); window.addEventListener("keydown", pileFocus.key, true);
+  }
+  function endPileFocus(){
+    if(!pileFocus) return;
+    var f = pileFocus; pileFocus = null;
+    window.removeEventListener("pointerdown", f.out, true); window.removeEventListener("keydown", f.key, true);
+    endEditing(); var m = findNote(f.id); if(m && m.el) m.el.classList.remove("pileFocused");
+    rebuildHidden(); syncPileVisibility();
+    var p = findNote(f.pileId); if(p && p.el) paintPileShown(p, p.el);
+  }
   // ---- menus
   function pileMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
     var live = pileLive(n), h = makeDiv("menuHint"); h.textContent = Stick.pile.label(n, live.length); pop.appendChild(h);
+    pop.appendChild(menuItem(ICONS.pencil, "Edit this paper", function(){ closeFloatingPopovers(); var lv = pileLive(n), tm = lv[browseIdx(n, lv)]; if(tm) focusPileMember(n, tm.id); }, {title: "Bring the paper on top out to edit it. It stays in the pile."}));
     pop.appendChild(menuItem(ICONS.search || ICONS.more, "Browse the papers\u2026", function(){ closeFloatingPopovers(); openPileBrowser(n); }, {title: "Look through the pile one paper at a time. Nothing changes."}));
     pop.appendChild(menuItem(ICONS.move, "Shuffle the pile", function(){ closeFloatingPopovers(); shufflePile(n); }, {title: "Mix up the order. Nothing is removed."}));
     pop.appendChild(menuItem(ICONS.move, "Unpile (put them back)", function(){ closeFloatingPopovers(); unpilePile(n); }, {title: "Spreads the papers back out where they were. Nothing is deleted."}));
@@ -6357,6 +6463,7 @@
   var draggingIds = null;
   function startDrag(e, primary, group){
     var everyone = group;
+    if(pileFocus && group.some(function(g){ return g.id === pileFocus.id; })) return;          // a paper being edited out of its pile does not move
     group = group.filter(function(g){ return !isPinned(g); });               // pinned items stay put, even in a group
     if(!group.length){ pendingFront = null; everyone.forEach(pinTug); return; }
     var startX = e.clientX, startY = e.clientY;
@@ -6447,6 +6554,7 @@
       list = list.filter(function(n){ return !isPileObj(n); });
     }
     if(!list.length) return;
+    if(!opts.silent && !opts.force && list.every(isThrowaway)){ deleteNotes(ids, {silent: true}); return; }          // closing an empty, never-used note just makes it disappear: Trash is for things that meant something
     if(!opts.silent){ trashNotes(list); return; }          // an explicit delete goes to Trash first; only a quiet clean-up of an unused blank note is deleted outright
     var hadContent = list.some(noteHasContent);
     var before = opts.silent ? null : captureState(list.map(function(n){ return n.id; }));
@@ -6982,7 +7090,7 @@
     if(!canReact() || selected.size !== 1) return;
     var n = findNote(Array.from(selected)[0]); if(!n || !n.el || isZone(n)) return;
     var b = document.createElement("button"); b.type = "button"; b.className = "reactAdd"; b.title = "React"; b.setAttribute("aria-label", "Add a reaction"); b.setAttribute("aria-haspopup", "true");
-    b.textContent = "+ ☺";
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.3 2 1.9 3.5 1.9s2.6-.6 3.5-1.9"/><circle cx="9" cy="9.8" r="0.6" fill="currentColor"/><circle cx="15" cy="9.8" r="0.6" fill="currentColor"/></svg>';
     b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("mousedown", function(e){ e.preventDefault(); });
     b.addEventListener("click", function(e){ e.stopPropagation(); reactionPicker(n, b); });
     n.el.appendChild(b); reactAddEl = b;
@@ -6999,18 +7107,28 @@
       return b;
     }
     var quick = makeDiv("reactQuick"); Stick.reactions.SET.forEach(function(e){ quick.appendChild(pick(e)); });
-    var more = makeDiv("reactMore"); more.hidden = true; more.setAttribute("aria-label", "More emoji");
-    Stick.reactions.MORE.forEach(function(g){
-      var h = makeDiv("reactGroup"); h.textContent = g.name; more.appendChild(h);
-      var row = makeDiv("reactGrid"); g.items.forEach(function(e){ row.appendChild(pick(e)); }); more.appendChild(row);
-    });
-    var plus = document.createElement("button"); plus.type = "button"; plus.className = "reactPick reactPlus"; plus.textContent = "+"; plus.setAttribute("aria-label", "More emoji"); plus.setAttribute("aria-expanded", "false");
+    var more = makeDiv("reactMore"); more.hidden = true;
+    var search = document.createElement("input"); search.type = "search"; search.className = "reactSearch"; search.placeholder = "Search emoji"; search.setAttribute("aria-label", "Search emoji"); search.autocomplete = "off";
+    var groups = makeDiv("reactGroups"); more.appendChild(search); more.appendChild(groups);
+    var built = false;
+    function build(q){                                  // the broader set is only drawn when "More" is opened (nothing is mounted for objects that never open it)
+      groups.textContent = ""; q = (q || "").trim().toLowerCase(); var any = false;
+      Stick.reactions.MORE.forEach(function(g){
+        if(q && g.name.toLowerCase().indexOf(q) === -1 && (g.words || "").indexOf(q) === -1) return;
+        any = true; var h = makeDiv("reactGroup"); h.textContent = g.name; groups.appendChild(h);
+        var row = makeDiv("reactGrid"); g.items.forEach(function(e){ row.appendChild(pick(e)); }); groups.appendChild(row);
+      });
+      if(!any){ var none = makeDiv("reactNone"); none.textContent = "No emoji match."; groups.appendChild(none); }
+    }
+    search.addEventListener("input", function(){ build(search.value); });
+    search.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape"){ e.preventDefault(); closeFloatingPopovers(); } });
+    var plus = document.createElement("button"); plus.type = "button"; plus.className = "reactMoreBtn"; plus.textContent = "More"; plus.setAttribute("aria-label", "More emoji"); plus.setAttribute("aria-expanded", "false");
     plus.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
     plus.addEventListener("click", function(ev){
-      ev.stopPropagation(); var open = more.hidden; more.hidden = !open; plus.setAttribute("aria-expanded", open ? "true" : "false"); plus.textContent = open ? "\u2212" : "+";
-      if(open){ var f = more.querySelector("button"); if(f) f.focus(); }
+      ev.stopPropagation(); var open = more.hidden; more.hidden = !open; plus.setAttribute("aria-expanded", open ? "true" : "false"); plus.classList.toggle("on", open);
+      if(open){ if(!built){ build(""); built = true; } search.focus(); }
     });
-    quick.appendChild(plus); pop.appendChild(quick); pop.appendChild(more);
+    pop.appendChild(quick); quick.appendChild(plus); pop.appendChild(more);
     var first = quick.querySelector("button"); if(first) first.focus();
   }
 
@@ -7261,15 +7379,20 @@
   function renderZone(n, isNew){
     var el = document.createElement("div");
     el.className = "zone mat-" + zoneMaterial(n) + (isNew ? " new" : "");
-    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.width = (n.w || 360) + "px"; el.style.height = (n.h || 240) + "px"; el.style.zIndex = 0;
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.width = (n.w || 360) + "px"; el.style.height = (n.h || 240) + "px";
     el.style.setProperty("--zone", safeColor(n.bg) || ZONE_TINTS[0]);
     el.setAttribute("aria-label", zoneLabel(n)); el.setAttribute("role", "group");
     if(selected.has(n.id)) el.classList.add("selected");
     n.el = el; n.textEl = null; n.captionEl = null;
     var bar = makeDiv("zoneBar"), title = makeDiv("zoneTitle");
     title.textContent = n.title || ""; title.setAttribute("data-ph", "Name this zone");
+    if(!readOnly) title.classList.add("editable");
+    title.style.fontFamily = '"' + ZONE_TITLE_FONTS[zoneTitleFont(n)][0] + '", "Alef", "Heebo", sans-serif';
     bar.appendChild(title);
-    var cnt = document.createElement("span"); cnt.className = "zoneCount"; cnt.setAttribute("aria-live", "off"); bar.appendChild(cnt);
+    var cnt = document.createElement("button"); cnt.type = "button"; cnt.className = "zoneCount";
+    cnt.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    cnt.addEventListener("click", function(e){ e.stopPropagation(); selectZoneMembers(n); });
+    bar.appendChild(cnt);
     el.appendChild(bar);
     if(!readOnly){
       var mn = document.createElement("button"); mn.type = "button"; mn.className = "zoneMin";
@@ -7319,7 +7442,9 @@
     var el = n && n.el; if(!el || !isZone(n)) return;
     var min = n.min === true, c = zoneMemberCount(n);
     el.classList.toggle("zoneMinimized", min);
-    var cnt = el.querySelector(".zoneCount"); if(cnt) cnt.textContent = c ? c + (c === 1 ? " object" : " objects") : "";
+    var cnt = el.querySelector(".zoneCount");
+    if(cnt){ cnt.textContent = ""; cnt.hidden = !c; if(c){ var b = document.createElement("b"); b.textContent = String(c); cnt.appendChild(b); cnt.appendChild(document.createTextNode(c === 1 ? " object" : " objects")); }
+      cnt.title = min ? "Restore the zone and select what is on it" : "Select everything on this zone"; cnt.setAttribute("aria-label", c + (c === 1 ? " object" : " objects") + ". " + (min ? "Restore and select" : "Select them")); }
     var b = el.querySelector(".zoneMin");
     if(b){ b.innerHTML = min ? ICONS.expand || "+" : ICONS.minus || "\u2212"; b.title = min ? "Restore this zone and everything on it" : "Minimize this zone"; b.setAttribute("aria-label", min ? "Restore this zone" : "Minimize this zone"); b.setAttribute("aria-expanded", min ? "false" : "true"); }
     el.setAttribute("aria-label", zoneLabel(n) + (min ? " (minimized, " + c + (c === 1 ? " object)" : " objects)") : ""));
@@ -7339,6 +7464,14 @@
   }
   var zonePaintT = null;
   function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; syncZoneMembership(); }, 120); }
+  // the count is a handle on the zone's contents: select them all (a minimized zone is restored first so there is something to see)
+  function selectZoneMembers(z){
+    if(!isZone(z)) return;
+    if(z.min === true){ var held = (z.hold || []).slice(); restoreZone(z); setSelection(held.filter(function(id){ return !!findNote(id); })); return; }
+    var ids = zoneContents(z).map(function(o){ return o.id; });
+    if(!ids.length){ toast("Nothing is on this zone yet."); return; }
+    setSelection(ids);
+  }
   function minimizeZone(n){
     if(readOnly || !isZone(n) || n.min === true) return;
     var members = zoneContents(n); closeFloatingPopovers(); endEditing();
@@ -7397,6 +7530,7 @@
     var vc = viewCenter();
     var x = bx != null ? bx : vc.x, y = by != null ? by : Math.min(vc.y, 260);
     var z = {id: newId(), type: "zone", x: Math.max(0, Math.round(x - 180)), y: Math.max(0, Math.round(y - 120)), w: 360, h: 240, title: "", variant: "paper", bg: ZONE_TINTS[Math.floor(Math.random() * 3)], rot: 0, z: 0, phys: {}, createdAt: Date.now()};
+    z.tf = hashStr(z.id) % ZONE_TITLE_FONTS.length;
     z.y = Math.min(z.y, Math.max(0, boardHeight() - z.h - 8));
     insertNotes([z], "Add zone");
     setTimeout(function(){ editZoneTitle(z); }, 60);
@@ -7404,28 +7538,46 @@
   }
   function zoneMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
+    pop.classList.add("zoneMenuPop");
     var count = zoneMemberCount(n);
-    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " object on this zone" : " objects on this zone"); pop.appendChild(hint);
+    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " object in this zone" : " objects in this zone"); pop.appendChild(hint);
     pop.appendChild(menuItem(ICONS.pencil, "Rename", function(){ closeFloatingPopovers(); editZoneTitle(n); }));
     pop.appendChild(menuItem(ICONS.minus || ICONS.tick, n.min === true ? "Restore zone" : "Minimize zone", function(){ closeFloatingPopovers(); if(n.min === true) restoreZone(n); else minimizeZone(n); }, {title: "Collapse the zone to its title and count; everything on it comes back when you restore"}));
-    var mh = makeDiv("menuHint"); mh.textContent = "Material"; pop.appendChild(mh);
-    ZONE_MATERIALS.forEach(function(m){
-      pop.appendChild(menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
-        closeFloatingPopovers(); var before = captureState([n.id]); n.variant = m[0]; saveNotes(); rerenderNote(n); recordChange("Zone material", before);
-      }, {cls: zoneMaterial(n) === m[0] ? "on" : ""}));
+    pop.appendChild(makeDiv("menuSep"));
+    menuSub(pop, ICONS.paper || ICONS.sticky, "Material", function(body){
+      ZONE_MATERIALS.forEach(function(m){
+        var it = menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
+          closeFloatingPopovers(); var before = captureState([n.id]); n.variant = m[0]; saveNotes(); rerenderNote(n); recordChange("Zone material", before);
+        }, {cls: zoneMaterial(n) === m[0] ? "on" : ""});
+        var sw = document.createElement("span"); sw.className = "zoneMatSw mat-" + m[0]; sw.setAttribute("aria-hidden", "true"); sw.style.setProperty("--zone", safeColor(n.bg) || ZONE_TINTS[0]); it.appendChild(sw);
+        body.appendChild(it);
+      });
     });
-    var ch = makeDiv("menuHint"); ch.textContent = "Colour"; pop.appendChild(ch);
-    var sw = makeDiv("zoneSwatches");
-    ZONE_TINTS.forEach(function(c){
-      var b = document.createElement("button"); b.type = "button"; b.className = "zoneSw" + ((safeColor(n.bg) || ZONE_TINTS[0]) === c ? " on" : ""); b.style.background = c; b.setAttribute("aria-label", "Colour " + c);
-      b.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.bg = c; saveNotes(); rerenderNote(n); recordChange("Zone colour", before); });
-      sw.appendChild(b);
+    menuSub(pop, ICONS.palette || ICONS.sticky, "Colour", function(body){
+      var sw = makeDiv("zoneSwatches");
+      ZONE_TINTS.forEach(function(c){
+        var b = document.createElement("button"); b.type = "button"; b.className = "zoneSw" + ((safeColor(n.bg) || ZONE_TINTS[0]) === c ? " on" : ""); b.style.background = c; b.setAttribute("aria-label", "Colour " + c); b.setAttribute("aria-pressed", (safeColor(n.bg) || ZONE_TINTS[0]) === c ? "true" : "false");
+        b.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.bg = c; saveNotes(); rerenderNote(n); recordChange("Zone colour", before); });
+        sw.appendChild(b);
+      });
+      body.appendChild(sw);
     });
-    pop.appendChild(sw);
-    pop.appendChild(menuItem(n.carry === true ? ICONS.tick : '<span class="menuGap"></span>', "Move with its notes", function(){
-      closeFloatingPopovers(); var before = captureState([n.id]); if(n.carry === true) delete n.carry; else n.carry = true; saveNotes(); recordChange("Zone moves with its notes", before);
-    }, {cls: n.carry === true ? "on" : "", title: "When on, dragging the zone carries the notes lying on it"}));
+    menuSub(pop, ICONS.pencil, "Title style", function(body){
+      ZONE_TITLE_FONTS.forEach(function(f, i){
+        var it = menuItem(zoneTitleFont(n) === i ? ICONS.tick : '<span class="menuGap"></span>', f[1], function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.tf = i; saveNotes(); rerenderNote(n); recordChange("Zone title style", before); }, {cls: zoneTitleFont(n) === i ? "on" : ""});
+        var lab = it.querySelector(".t, span:last-child") || it; lab.style.fontFamily = '"' + f[0] + '", "Alef", sans-serif'; lab.style.fontSize = "1.05rem";
+        body.appendChild(it);
+      });
+    });
+    // "Move with notes" is a switch row: one line, label left, switch right
+    var row = document.createElement("button"); row.type = "button"; row.className = "menuItem menuToggle"; row.setAttribute("role", "menuitemcheckbox"); row.setAttribute("aria-checked", n.carry === true ? "true" : "false");
+    row.title = "When on, dragging the zone carries the notes lying on it";
+    var lbl = document.createElement("span"); lbl.className = "mtLabel"; lbl.textContent = "Move with notes"; var sw2 = document.createElement("span"); sw2.className = "mtSwitch" + (n.carry === true ? " on" : ""); sw2.setAttribute("aria-hidden", "true");
+    row.appendChild(lbl); row.appendChild(sw2);
+    row.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); if(n.carry === true) delete n.carry; else n.carry = true; saveNotes(); recordChange("Zone moves with its notes", before); });
+    pop.appendChild(row);
     pop.appendChild(pinMenuItem(n));
+    pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.trash, "Delete zone", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger", title: "Only the paper goes; notes on it stay"}));
   }
   OBJECT_MENUS.zone = zoneMenu;
@@ -7569,20 +7721,28 @@
   }
   function pileWhen(o){ try{ return new Date(o.doneAt).toLocaleDateString(undefined, {day:"numeric", month:"short"}); }catch(e){ return ""; } }
   var pileBtn = null;
+  // The two system spaces people reach for, as one small dock in the corner: a tick and a bin, each with a count, shown only when it holds something. (Other system spaces do not belong here.)
+  var spaceDock = null, trashBtn = null;
   function ensurePileBtn(){
     if(pileBtn) return pileBtn;
-    pileBtn = document.createElement("button");
-    pileBtn.type = "button"; pileBtn.className = "donePile"; pileBtn.hidden = true;
-    pileBtn.innerHTML = '<span class="dpStack" aria-hidden="true"><i></i><i></i><i></i></span><span class="dpLabel"></span>';
+    spaceDock = makeDiv("spaceDock"); spaceDock.setAttribute("role", "group"); spaceDock.setAttribute("aria-label", "Done and Trash"); spaceDock.hidden = true;
+    pileBtn = document.createElement("button"); pileBtn.type = "button"; pileBtn.className = "donePile dockBtn"; pileBtn.hidden = true;
+    pileBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="dpLabel"></span>';
     pileBtn.addEventListener("click", openDoneTray);
-    document.body.appendChild(pileBtn);
+    trashBtn = document.createElement("button"); trashBtn.type = "button"; trashBtn.className = "trashDock dockBtn"; trashBtn.hidden = true;
+    trashBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg><span class="dpLabel"></span>';
+    trashBtn.addEventListener("click", function(){ openSpace("trash"); });
+    spaceDock.appendChild(pileBtn); spaceDock.appendChild(trashBtn);
+    document.body.appendChild(spaceDock);
     return pileBtn;
   }
   function updateDonePile(bump){
-    var b = ensurePileBtn(), k = donePile.length;
-    b.hidden = !k || singleNoteMode || readOnly;
-    b.querySelector(".dpLabel").textContent = "Done \u00b7 " + k;
-    b.setAttribute("aria-label", "Done pile: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it.");
+    var b = ensurePileBtn(), k = donePile.length, t = trashPile.length, off = singleNoteMode || readOnly;
+    b.hidden = !k || off; trashBtn.hidden = !t || off; spaceDock.hidden = b.hidden && trashBtn.hidden;
+    b.querySelector(".dpLabel").textContent = String(k);
+    b.setAttribute("aria-label", "Done: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it."); b.title = "Done (" + k + ")";
+    trashBtn.querySelector(".dpLabel").textContent = String(t);
+    trashBtn.setAttribute("aria-label", "Trash: " + t + (t === 1 ? " item" : " items") + ". Open it."); trashBtn.title = "Trash (" + t + ")";
     if(bump && !b.hidden){ b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); }
   }
   // a small, quick "finished" moment: a DONE stamp lands and a few paper scraps pop (about 0.45 s, removed afterwards). Nothing at all under reduced motion.
@@ -7998,7 +8158,7 @@
   var dialogSeq = 0;
   function openModal(o){
     var opener = document.activeElement;
-    var backdrop = makeDiv("acctBackdrop");
+    var backdrop = makeDiv("acctBackdrop" + (document.querySelector(".prBackdrop, .lrBackdrop, .ptrBackdrop, .pbBackdrop, .spBackdrop") ? " critical" : ""));          // a dialog opened from a reader or a system space always sits above it
     var card = makeDiv("acctCard modalCard" + (o.slip ? " slipCard" : ""));
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
@@ -8951,24 +9111,42 @@
       src.connect(f); f.connect(g); g.connect(c.destination); src.start();
       return true;
     }
+    // a thump of filtered noise (the stamp) and/or soft sine partials with a quick attack and a short decay (the chime). All low, all short.
+    function thump(c, t0, v, dur, cutoff){
+      var n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for(var i = 0; i < n; i++){ d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+      var src = c.createBufferSource(); src.buffer = buf; var f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff;
+      var g = c.createGain(); g.gain.value = v; src.connect(f); f.connect(g); g.connect(c.destination); src.start(t0);
+    }
+    function partial(c, t0, freq, v, attack, decay, type){
+      var o = c.createOscillator(), g = c.createGain(); o.type = type || "sine"; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + attack); g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
+      o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + attack + decay + 0.03);
+    }
+    function playCue(name, volume){
+      var c = audio(); if(!c) return false;
+      if(c.state === "suspended") try{ c.resume(); }catch(e){}
+      var v = Math.max(0, Math.min(1, volume / 100)), t0 = c.currentTime + 0.005;
+      if(name === "done"){                                   // stamp: a soft low thump, then two warm chime partials a fifth apart, gently rounded off
+        thump(c, t0, 0.55 * v, 0.07, 700);
+        partial(c, t0 + 0.035, 523.25, 0.16 * v, 0.012, 0.26);
+        partial(c, t0 + 0.075, 784.0, 0.12 * v, 0.012, 0.3);
+        partial(c, t0 + 0.035, 1046.5, 0.035 * v, 0.01, 0.16);
+      } else if(name === "trash"){ thump(c, t0, 0.5 * v, 0.1, 500); partial(c, t0, 150, 0.1 * v, 0.008, 0.12, "triangle"); }
+      else if(name === "restore"){ partial(c, t0, 392, 0.12 * v, 0.01, 0.1); partial(c, t0 + 0.06, 587.33, 0.12 * v, 0.01, 0.16); }
+      else return false;
+      return true;
+    }
     return {
       enabled: function(){ return settings.soundOn !== false; },
       volume: function(){ return Math.max(0, Math.min(100, Number(settings.soundVolume == null ? 60 : settings.soundVolume))); },
-      preview: function(){ return tap(this.volume()); },
+      preview: function(){ return playCue("done", this.volume()) || tap(this.volume()); },
       play: function(){ return this.enabled() && this.volume() > 0 ? tap(this.volume()) : false; },
-      // short cues for Done (rising two-note chime), Trash (low soft thud), Restore (quick upward blip). Only ever from a user's own action; respects the Sounds setting; never before the first gesture (the context stays suspended).
+      // short cues for Done (a paper stamp with a tiny soft chime), Trash (a low soft thud) and Restore (a quick upward blip). Only ever from a user's own action; respects the Sounds setting; never before the first gesture.
       cue: function(name){
         if(!this.enabled() || this.volume() <= 0) return false;
-        var c = audio(); if(!c || c.state === "suspended" && !navigator.userActivation) return false;
-        if(c.state === "suspended") try{ c.resume(); }catch(e){}
-        var notes = {done: [[660, 0, 0.11], [990, 0.09, 0.16]], trash: [[180, 0, 0.14], [120, 0.06, 0.12]], restore: [[420, 0, 0.09], [630, 0.07, 0.12]]}[name]; if(!notes) return false;
-        var v = this.volume() / 100 * 0.22, t0 = c.currentTime;
-        notes.forEach(function(nt){
-          var o = c.createOscillator(), g = c.createGain(); o.type = name === "trash" ? "triangle" : "sine"; o.frequency.value = nt[0];
-          g.gain.setValueAtTime(0.0001, t0 + nt[1]); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + nt[1] + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + nt[1] + nt[2]);
-          o.connect(g); g.connect(c.destination); o.start(t0 + nt[1]); o.stop(t0 + nt[1] + nt[2] + 0.02);
-        });
-        return true;
+        var c = audio(); if(!c || (c.state === "suspended" && !(navigator.userActivation && navigator.userActivation.hasBeenActive))) return false;
+        return playCue(name, this.volume());
       }
     };
   })();
@@ -9213,14 +9391,27 @@
     ["Copyright / DMCA", "legal/copyright.html", "Report content or send a notice."]
   ];
   function buildLegalPane(cc, pane){
-    pane.innerHTML = '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
+    pane.innerHTML = '<section class="asCard wnCard" aria-labelledby="ccWnH"><h4 id="ccWnH">What’s New</h4><div class="wnBody"></div></section>' +
+      '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
       '<section class="asCard" aria-labelledby="ccAbH"><h4 id="ccAbH">About Stick-It</h4><p class="ccAbout" id="ccAbout"></p></section>';
     var list = pane.querySelector(".ccLegalList");
-    var wn = document.createElement("button"); wn.type = "button"; wn.className = "asAction ccLink"; wn.id = "ccWhatsNew";
-    wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>Every patch note, and a replayable tour for each.</small></span><span class="go" aria-hidden="true">›</span>';
-    wn.addEventListener("click", function(){ if(window.Stick && Stick.patchReader && Stick.patchHistory) Stick.patchReader.open(); else openWhatsNew(); });
-    var wnIco = legalIconEl("whatsNew"); if(wnIco){ wn.insertBefore(wnIco, wn.firstChild); wn.classList.add("hasIco"); }
-    list.appendChild(wn);
+    // What's New: the latest update with its two actions, and an obvious door to every update. (The history, the full notes and the tour replay all live behind these.)
+    (function(){
+      var box = pane.querySelector(".wnBody"), H = window.Stick && Stick.patchHistory, hasReader = !!(window.Stick && Stick.patchReader && H && H.versions && H.versions.length);
+      if(!hasReader){ var fb = document.createElement("button"); fb.type = "button"; fb.className = "asAction ccLink"; fb.id = "ccWhatsNew"; fb.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version.</small></span><span class="go" aria-hidden="true">›</span>'; fb.addEventListener("click", function(){ openWhatsNew(); }); box.appendChild(fb); return; }
+      var v = H.versions[0], latest = makeDiv("wnLatest");
+      var tag = document.createElement("span"); tag.className = "wnSticker"; tag.textContent = "Latest · v" + v.version;
+      var nm = document.createElement("b"); nm.className = "wnName"; nm.textContent = v.codename; var tl = document.createElement("p"); tl.className = "wnTldr"; tl.textContent = v.summary || "";
+      var acts = makeDiv("wnActs"), r1 = document.createElement("button"), r2 = document.createElement("button");
+      r1.type = r2.type = "button"; r1.className = "pillBtn primary"; r2.className = "pillBtn"; r1.textContent = "Read the notes"; r2.textContent = "Replay the update tour";
+      r1.addEventListener("click", function(){ Stick.patchReader.open({version: v.version}); }); r2.addEventListener("click", function(){ Stick.patchReader.openTour(v.version); });
+      acts.appendChild(r1); acts.appendChild(r2); latest.appendChild(tag); latest.appendChild(nm); latest.appendChild(tl); latest.appendChild(acts); box.appendChild(latest);
+      var all = document.createElement("button"); all.type = "button"; all.className = "asAction ccLink wnAll"; all.id = "ccWhatsNew";
+      all.innerHTML = '<span class="lbl"><span class="t">All updates</span><small>The whole patch history, every note, and a replayable tour for each update.</small></span><span class="go"><span class="wnCount"></span><span aria-hidden="true">›</span></span>';
+      all.querySelector(".wnCount").textContent = H.versions.length + " updates";
+      all.addEventListener("click", function(){ Stick.patchReader.open(); });
+      box.appendChild(all);
+    })();
     // the globe: only languages whose legal pages are complete are listed (js/lang.js); the same registry will serve the app later
     var langs = window.Stick && Stick.lang ? Stick.lang.complete("legal") : [];
     if(langs.length > 1){
@@ -10009,10 +10200,11 @@
     var picEl = $("asPic");
     (function(){                                    // Premium is shown the same way everywhere: a crown sitting on the head of the avatar, never as a word beside it
       var wrap = makeDiv("avCrownWrap"); picEl.parentNode.insertBefore(wrap, picEl); wrap.appendChild(picEl);
-      var pen = document.createElement("button"); pen.type = "button"; pen.className = "asPicEdit"; pen.setAttribute("aria-label", "Edit profile photo"); pen.title = "Edit photo";
-      pen.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
-      pen.addEventListener("click", function(){ $("asPhotoBtn").click(); });
-      wrap.style.position = "relative"; wrap.appendChild(pen);
+      // ONE way to change the photo: the pencil on the avatar (it is the same button that used to be the "Change photo" pill; its words stay for screen readers)
+      var pen = $("asPhotoBtn"), act = pen.closest(".asHeroActions");
+      pen.className = "asPicEdit"; pen.setAttribute("aria-label", "Change profile photo"); pen.title = "Change profile photo";
+      pen.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span id="asPhotoLbl" class="sr-only"></span>';
+      wrap.style.position = "relative"; wrap.appendChild(pen); if(act) act.remove();
       if(isPremium()){ var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium"; wrap.appendChild(c); }
     })();
 
@@ -10759,6 +10951,21 @@
     }
     return {items: items, placed: placed, pages: pageNo};
   }
+  // v0.8.3.3: each zone is its own small page. "Also tidy inside zones" sets what lies on a zone down again INSIDE that zone's bounds only; whatever does not fit stays exactly
+  // where it is, so nothing is ever pulled out of the zone it belongs to. A minimized zone is left alone (its objects are not drawn).
+  function cleanZonePlans(){
+    var out = [];
+    notes.forEach(function(z){
+      if(!isZone(z) || z.min === true || !z.el || !z.el.isConnected) return;
+      var members = zoneContents(z).filter(function(o){ return !isPinned(o); }); if(!members.length) return;
+      var items = members.map(cleanItem), M = 16, bar = 40, page = {x0: z.x + M, x1: z.x + (z.w || 360) - M, y0: z.y + bar + M, y1: z.y + (z.h || 240) - M};
+      if(page.x1 - page.x0 < 60 || page.y1 - page.y0 < 40) return;
+      var res = cleanPack(cleanOrder(items), page, 18, []), keep = [];
+      res.placed.forEach(function(p){ var t = cleanTarget(p), fits = t.x >= page.x0 - 1 && t.y >= page.y0 - 1 && t.x + p.it.w <= page.x1 + 1 && t.y + p.it.h <= page.y1 + 1; if(fits) keep.push(p); });
+      out.push({z: z, total: members.length, placed: keep, moving: cleanMoving({placed: keep}).length});
+    });
+    return out;
+  }
   function cleanTarget(p){ return {x: Math.max(0, Math.round(p.cx - p.it.w / 2)), y: Math.max(8, Math.round(p.cy - p.it.h / 2))}; }
   // the objects that would really change place (this is the number the person sees)
   function cleanMoving(plan){ return plan.placed.filter(function(p){ var t = cleanTarget(p); return t.x !== Math.round(p.it.n.x) || t.y !== Math.round(p.it.n.y); }); }
@@ -10770,14 +10977,18 @@
       var items = ids.map(findNote).filter(Boolean).map(cleanItem), plan = cleanPlan(items);
       return {ids: ids, plan: plan, moving: cleanMoving(plan).length};
     }
-    var pinnedOnScreen = pinnedHere.filter(onScreen).length;
-    return {screen: build(screenIds), board: build(allIds), pinned: {screen: pinnedOnScreen, board: pinnedHere.length}};
+    var pinnedOnScreen = pinnedHere.filter(onScreen).length, zp = cleanZonePlans();
+    return {screen: build(screenIds), board: build(allIds), pinned: {screen: pinnedOnScreen, board: pinnedHere.length},
+      zones: {plans: zp, moving: zp.reduce(function(t, x){ return t + x.moving; }, 0), objects: zp.reduce(function(t, x){ return t + x.total; }, 0), count: zp.length}};
   }
-  function applyClean(snap, scope){
+  function applyClean(snap, scope, inside){
     var part = scope === "screen" ? snap.screen : snap.board;
     var plan = cleanPlan(part.ids.map(findNote).filter(Boolean).map(cleanItem)), moving = cleanMoving(plan);
-    if(!moving.length) return 0;
-    var before = captureState(part.ids);
+    var zonePlans = inside ? cleanZonePlans() : [], zoneMoving = [];
+    zonePlans.forEach(function(zp){ zoneMoving = zoneMoving.concat(cleanMoving({placed: zp.placed})); });
+    if(!moving.length && !zoneMoving.length) return 0;
+    moving = moving.concat(zoneMoving);
+    var before = captureState(part.ids.concat(zoneMoving.map(function(p){ return p.it.n.id; })));
     moving.forEach(function(p){
       var n = p.it.n, t = cleanTarget(p);
       n.x = t.x; n.y = t.y;
@@ -10793,7 +11004,8 @@
     closeFloatingPopovers(); endEditing();
     var snap = cleanSnapshot();
     if(!snap.board.ids.length){ toast(snap.pinned.board ? "Everything on this board is pinned in place." : "The board is empty, so there is nothing to tidy."); return; }
-    function run(scope){ setTimeout(function(){ var moved = applyClean(snap, scope); toast(moved ? "Tidied " + moved + (moved === 1 ? " item." : " items.") : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }
+    function run(scope, inside){ setTimeout(function(){ var moved = applyClean(snap, scope, !!inside); toast(moved ? "Tidied " + moved + (moved === 1 ? " item." : " items.") : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }
+    var insideBox = null;
     if(preset === "screen" || preset === "board"){ run(preset); return; }       // from the command palette
     var vis = snap.screen.moving, total = snap.board.moving, scope = snap.screen.ids.length ? "screen" : "board", content = makeDiv("cleanBox"), group = makeDiv("cleanOpts"), summary = makeDiv("cleanSum"), go = null;
     group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "What to tidy"); summary.setAttribute("role", "status");
@@ -10812,8 +11024,11 @@
       Array.prototype.forEach.call(group.children, function(b){ var on = b.dataset.scope === scope; b.setAttribute("aria-checked", String(on)); b.classList.toggle("on", on); b.tabIndex = on ? 0 : -1; });
       var n = scope === "screen" ? vis : total;
       summary.textContent = n ? (scope === "screen" ? "Tidy " + plural(n) + " on your screen" : "Tidy " + plural(n) + " across the board") : "Everything here is already tidy";
-      note.textContent = "Nothing is deleted. Items keep their size and tilt, and you can undo it right after." + pinNote();
-      if(go) go.disabled = !n;
+      var zi = snap.zones, inside = !!(insideBox && insideBox.checked);
+      zonesLine.textContent = snap.board.ids.length + (snap.board.ids.length === 1 ? " object" : " objects") + " on the board" + (zi.count ? " \u00b7 " + zi.objects + (zi.objects === 1 ? " object" : " objects") + " inside " + zi.count + (zi.count === 1 ? " zone" : " zones") + (inside ? " (will be tidied)" : " (left as they are)") : "");
+      if(inside && zi.moving) summary.textContent += " + " + plural(zi.moving) + " inside zones";
+      note.textContent = "Nothing is deleted. Items keep their size and tilt, and you can undo it right after." + pinNote() + (zi.count ? " Objects on a zone are never pulled off it." : "");
+      if(go) go.disabled = !(n || (inside && zi.moving));
     }
     group.addEventListener("keydown", function(e){
       if(e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft"){
@@ -10824,11 +11039,17 @@
       }
     });
     if(!vis && total) scope = "board";
-    var note = makeDiv("cleanNote");
-    content.appendChild(group); content.appendChild(summary); content.appendChild(note);
+    var note = makeDiv("cleanNote"), zonesLine = makeDiv("cleanZones");
+    content.appendChild(group); content.appendChild(summary); content.appendChild(zonesLine);
+    if(snap.zones.count){
+      var lab = document.createElement("label"); lab.className = "cleanInside"; insideBox = document.createElement("input"); insideBox.type = "checkbox"; insideBox.id = "cleanInside";
+      lab.appendChild(insideBox); lab.appendChild(document.createTextNode(" Also tidy inside zones")); content.appendChild(lab);
+      insideBox.addEventListener("change", function(){ paint(); });
+    }
+    content.appendChild(note);
     var m = openModal({title: "Clean up canvas", sub: "Put things back in order, like straightening up a desk.", content: content, width: 440,
       actions: [{label: "Cancel", value: false}, {label: "Tidy up", kind: "primary", value: true, id: "cleanGo"}],
-      onClose: function(v){ if(v) run(scope); }});
+      onClose: function(v){ if(v) run(scope, !!(insideBox && insideBox.checked)); }});
     go = m.card.querySelector("#cleanGo"); paint();
     setTimeout(function(){ var cur = group.querySelector(".cleanOpt.on"); if(cur) cur.focus(); }, 60);
   }
@@ -11221,6 +11442,7 @@
   }
 
   function startTour(custom){
+    if(tourRoot) endTour();                   // only ever one tutorial and one backdrop (a second start used to leave the first one stuck on screen)
     if(!panel.hidden) cancelSettings();
     sharePanel.hidden = true;
     closeFloatingPopovers();
@@ -11246,8 +11468,11 @@
   function tourKeys(e){
     if(!tourRoot || e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target; if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); endTour(); return; }
+    // a button inside the tour card keeps its own Enter (Skip skips, Previous goes back); anywhere else Enter is "Next" and is NOT passed on, so it can never press a control underneath (the "?" button used to start a second tutorial on top of this one)
+    if(e.key === "Enter" && t && t.tagName === "BUTTON" && tourRoot.contains(t)) return;
     var next = tourRoot.querySelector("#tourNext"), back = tourRoot.querySelector("#tourBack");
-    if(e.key === "ArrowRight" || (e.key === "Enter" && !(t && t.tagName === "BUTTON" && t !== next))){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(next) next.click(); }
+    if(e.key === "ArrowRight" || e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(next) next.click(); }
     else if(e.key === "ArrowLeft" || e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(back) back.click(); }
   }
   function endTour(){
@@ -11273,6 +11498,7 @@
       "</div>";
     if(tourKeyUsed){ var kh = document.createElement("p"); kh.className = "tourKeys"; kh.textContent = "Enter \u2192 Next \u00b7 Backspace \u2190 Previous \u00b7 Esc closes"; card.appendChild(kh); }
     card.querySelector("#tourSkip").addEventListener("click", endTour);
+    try{ card.querySelector("#tourNext").focus({preventScroll: true}); }catch(e){}          // focus lives in the card, so keys go to the tutorial, not the page underneath
     var backBtn = card.querySelector("#tourBack");
     if(backBtn) backBtn.addEventListener("click", function(){ tourIndex--; renderTourStep(); });
     card.querySelector("#tourNext").addEventListener("click", function(){
@@ -11322,7 +11548,7 @@
     card.style.top = top + "px";
     card.style.left = left + "px";
   }
-  helpBtn.addEventListener("click", function(){ startTour(); });
+  helpBtn.addEventListener("click", function(){ if(tourRoot) return; startTour(); });
 
   kbdBtn.addEventListener("click", function(e){ e.stopPropagation(); openControlCenter("shortcuts"); });
 
@@ -11804,6 +12030,14 @@
       location.hash = "";
       location.reload();
     });
+    // "+ New board" lives with the boards (above the System spaces); it opens a small naming slip. Enter creates, Esc cancels.
+    (function(){
+      var open = document.getElementById("newBoardOpen"), slip = document.getElementById("newBoardSlip");
+      function show(on){ slip.hidden = !on; open.hidden = on; open.setAttribute("aria-expanded", on ? "true" : "false"); if(on){ newBoardName.value = ""; newBoardName.focus(); } else { try{ open.focus(); }catch(e){} } }
+      open.addEventListener("click", function(e){ e.stopPropagation(); show(true); });
+      newBoardName.addEventListener("keydown", function(e){ if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); show(false); } });
+      var prev = boardPanel; if(prev) new MutationObserver(function(){ if(prev.hidden && !slip.hidden){ slip.hidden = true; open.hidden = false; open.setAttribute("aria-expanded", "false"); } }).observe(prev, {attributes: true, attributeFilter: ["hidden"]});
+    })();
     newBoardName.addEventListener("keydown", function(e){
       if(e.key === "Enter") addBoardBtn.click();
     });
@@ -12238,9 +12472,16 @@
       return !!(s && !s.isCollapsed && String(s).trim());
     }
     var pendingPasteT = null;
+    // A click on a paper's text selects the paper AND puts a caret in that text. With only a caret (no selected words) there is nothing to copy as text, so Ctrl/Cmd+C
+    // copies the selected paper itself (this was why Copy on a Newspaper "sometimes worked": it depended on where you had clicked). Selected words still copy as words.
+    function paperCaretOnly(){
+      var ae = document.activeElement, sel = window.getSelection();
+      return !!(ae && ae.isContentEditable && ae.closest && ae.closest(".paperObj") && selected.size === 1 && (!sel || sel.isCollapsed));
+    }
     document.addEventListener("keydown", function(e){
-      if(!(e.ctrlKey || e.metaKey) || e.altKey || isTyping() || modalOpen()) return;
+      if(!(e.ctrlKey || e.metaKey) || e.altKey || modalOpen()) return;
       var k = e.key.toLowerCase();
+      if(isTyping() && !(k === "c" && paperCaretOnly())) return;
       if((k === "c" || k === "x") && selected.size && !pageTextSelected()){
         var ids = Array.from(selected);
         copyNotesToClipboard(null, k === "x");
@@ -12255,7 +12496,7 @@
       }
     });
     document.addEventListener("copy", function(e){
-      if(isTyping() || modalOpen() || pageTextSelected()) return;
+      if((isTyping() && !paperCaretOnly()) || modalOpen() || pageTextSelected()) return;
       copyNotesToClipboard(e, Date.now() - lastNoteCopy < 800);
     });
     document.addEventListener("cut", function(e){

@@ -1,6 +1,6 @@
 /* Patch Notes reader and patch tour (js/patch-reader.js). Release cards, version stickers on tape, a notebook page for the notes. */
-.prBackdrop, .ptrBackdrop{ position:fixed; inset:0; z-index:10050; background:rgba(40,32,12,0.5); display:flex; align-items:stretch; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
-.ptrBackdrop{ z-index:10060; align-items:center; }
+.prBackdrop, .ptrBackdrop{ position:fixed; inset:0; z-index:var(--z-reader, 10075); background:rgba(40,32,12,0.5); display:flex; align-items:stretch; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.ptrBackdrop{ z-index:calc(var(--z-reader, 10075) + 1); align-items:center; }
 .prSheet, .ptrCard{ --sheet:#fffdf4; --desk:#efe7cd; --ink:#33301f; --soft:#5b5640; --line:#e4dbb9; --rule:rgba(92,134,184,0.18); --accent:#8a4f0d; --focus:#8f5710; --tape:rgba(255,226,120,0.85);
   position:relative; display:flex; flex-direction:column; background:var(--desk); color:var(--ink); border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.4); overflow:hidden; font-family:'Sora','Heebo',system-ui,sans-serif; outline:none; }
 body.dark .prSheet, body.dark .ptrCard{ --sheet:#27232f; --desk:#17131f; --ink:#ede9f7; --soft:#b9b1d3; --line:#3b3454; --rule:rgba(150,170,220,0.15); --accent:#ffb454; --focus:#ffb454; --tape:rgba(242,234,219,0.22); }
@@ -68,3 +68,23 @@ html[data-a11y-motion="reduce"] .ptrBody{ animation:none; }
   .prTitle{ display:none; } .prSearch{ max-width:none; margin-inline-start:0; } .prHead{ padding:8px 10px; gap:6px; } .prBtn, .prChip{ min-height:44px; } .prDTitle h2{ font-size:1.55rem; }
   .ptrBackdrop{ padding:0; align-items:flex-end; } .ptrCard{ width:100%; border-radius:16px 16px 0 0; }
 }
+
+/* the release map (v0.8.3.3): versions pinned on one string, oldest to newest */
+.prMap{ position:relative; padding:6px 14px 4px; background:var(--desk); overflow-x:auto; scrollbar-width:thin; }
+.prString{ position:absolute; left:14px; right:14px; top:23px; height:0; border-top:2px dashed color-mix(in srgb, var(--ink) 35%, transparent); pointer-events:none; }
+.prPins{ list-style:none; margin:0; padding:0; display:flex; gap:6px; min-width:max-content; position:relative; }
+.prPinItem{ flex:none; }
+.prPin{ all:unset; box-sizing:border-box; display:flex; flex-direction:column; align-items:center; gap:2px; min-width:76px; padding:0 6px 4px; cursor:pointer; border-radius:8px; }
+.prPinDot{ width:14px; height:14px; border-radius:50%; background:var(--sheet); border:3px solid var(--ink); box-shadow:0 1px 2px rgba(0,0,0,0.3); margin-top:3px; }
+.prPinV{ font:700 0.72rem 'Sora',sans-serif; color:var(--ink); background:var(--tape); padding:1px 7px; border-radius:3px; transform:rotate(-2deg); }
+.prPinName{ font:0.7rem 'Sora',sans-serif; color:var(--soft); text-align:center; max-width:90px; line-height:1.2; }
+.prPin:hover .prPinDot{ border-color:var(--accent); }
+.prPin.on .prPinDot{ background:var(--accent); border-color:var(--ink); transform:scale(1.25); } .prPin.on .prPinV{ background:var(--ink); color:var(--sheet); }
+.prPin.now .prPinName::after{ content:" \2022 here"; color:var(--accent); font-weight:700; }
+.prPin:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+@media (max-width:700px){ .prPin{ min-width:84px; min-height:44px; } }
+.wnLatest{ display:flex; flex-direction:column; gap:6px; padding:12px 14px; margin-bottom:8px; border-radius:12px; background:var(--accent-soft, #fff3c4); border:1px solid var(--line, #e4dbb9); }
+.wnSticker{ align-self:flex-start; padding:2px 10px; border-radius:3px; background:rgba(255,226,120,0.9); color:#4a3a00; font:700 0.72rem 'Sora',sans-serif; transform:rotate(-1.5deg); box-shadow:0 1px 2px rgba(60,45,10,0.2); }
+.wnName{ font:1.25rem 'Patrick Hand','Alef',sans-serif; } .wnTldr{ margin:0; font-size:0.84rem; line-height:1.45; opacity:0.85; }
+.wnActs{ display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
+.wnCount{ font-size:0.78rem; opacity:0.7; margin-inline-end:6px; }
