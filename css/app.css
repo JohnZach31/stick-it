@@ -2521,3 +2521,16 @@ body.dark .shopObj .shLink{ color:#8fb4ff; }
 .shopObj.v-b .shCart{ bottom:-8px; }
 .shopObj.v-c .shPaper{ padding-bottom:22px; }
 .shopObj.v-c .shHead{ min-height:34px; margin-bottom:12px; }
+
+/* ---- piles (a collapsed pile is a top paper, three decorative edges and a count: the same cost however many papers it holds) ---- */
+.pileObj{ min-height:112px; }
+.pileObj .pileEdge{ position:absolute; inset:0; background:#f4ecd6; border-radius:2px; box-shadow:0 1px 2px rgba(60,45,10,0.28); transform:translate(var(--ex, 0px), var(--ey, 4px)) rotate(var(--er, 0deg)); }
+.pileObj .pileTop{ position:relative; min-height:112px; padding:14px 16px 16px; border-radius:2px; box-shadow:0 2px 5px rgba(60,45,10,0.3); overflow:hidden; color:#33301f; }
+.pileObj .pileText{ font-size:17px; line-height:1.35; max-height:6.6em; overflow:hidden; word-break:break-word; }
+.pileObj .pileCount{ position:absolute; right:-10px; bottom:-10px; min-width:28px; height:28px; padding:0 8px; border-radius:14px; background:#33301f; color:#fffdf5; font:700 14px/28px system-ui, sans-serif; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.35); }
+.pileObj.pileHit{ outline:2px solid #e0a000; outline-offset:6px; }
+.pileObj:focus-visible{ outline:2px solid var(--sel-ring); outline-offset:6px; }
+body.dark .pileObj .pileEdge{ background:#3a3550; }
+body.dark .pileObj .pileTop{ color:#f2eadb; }
+.pileObj.static{ pointer-events:none; }
+@media (prefers-reduced-motion: reduce){ .pileObj{ transition:none; } }

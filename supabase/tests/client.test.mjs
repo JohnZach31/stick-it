@@ -489,6 +489,65 @@ try {
     D.sync.stop();
   }
 
+  // ============================================================ piles: collapsed members are still on the board, in the database, and in every diff
+  {
+    const D = await device('pile.user@example.com');
+    const bd = await D.Stick.repo.createBoard('Piles', null);
+    D.open(bd.id); await D.sync.start();
+    const members = [note({ html: 'a' }), note({ html: 'b' }), note({ html: 'c' }), note({ html: 'd' })];
+    const loose = note({ html: 'loose' });
+    D.notes.push(...members, loose); D.sync.notesChanged(); await sleep(150); await D.sync.flush();
+    const live = async () => (await admin('select id, type, data from public.board_objects where board_id=$1 and deleted_at is null', [bd.id])).rows;
+    const dead = async () => (await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is not null', [bd.id])).rows[0].c;
+    ok((await live()).length === 5, 'pile: five plain notes to start with');
+
+    // collapse four into a pile: members keep their rows and gain pileId; the pile row references them; NOTHING leaves the object list
+    const pileId = crypto.randomUUID();
+    const pile = { id: pileId, type: 'pile', x: 10, y: 10, w: 200, rot: 0, z: 9, members: members.map((m) => m.id), ox: 10, oy: 10, edges: 7, phys: {} };
+    members.forEach((m) => { m.pileId = pileId; });
+    D.notes.push(pile); D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    let rows = await live();
+    ok(rows.length === 6 && (await dead()) === 0, 'pile: collapsing four notes adds one row (the pile) and deletes nothing');
+    const prow = rows.find((r) => r.type === 'pile');
+    ok(prow && Array.isArray(prow.data.members) && prow.data.members.length === 4, 'pile: the pile row stores its member ids, not their content');
+    ok(!('html' in prow.data), 'pile: the pile holds no copy of any member content');
+    ok(rows.filter((r) => r.data.pileId === pileId).length === 4, 'pile: every member row carries the pile id');
+
+    // a device that draws none of them (everything collapsed / nothing mounted) still reports every object: no deletes, ever
+    const snapIds = D.host.snapshot().map((o) => o.id);
+    ok(members.every((m) => snapIds.includes(m.id)) && snapIds.includes(pileId), 'pile: the sync snapshot lists collapsed members as well as the pile');
+    D.sync.notesChanged(); await sleep(150); await D.sync.flush();
+    ok((await live()).length === 6 && (await dead()) === 0, 'pile: an idle sync pass with a collapsed pile deletes nothing');
+
+    // a member finished (Done): it leaves the pile, stays in the stored list (the Done pile is part of the snapshot), the pile shrinks
+    const doneM = members[0];
+    D.notes.splice(D.notes.indexOf(doneM), 1); delete doneM.pileId; doneM.doneAt = Date.now();
+    D.donePile = (D.donePile || []).concat([doneM]);
+    pile.members = pile.members.filter((id) => id !== doneM.id);
+    const origSnap = D.host.snapshot;
+    D.host.snapshot = () => D.notes.concat(D.donePile).map((o) => Object.assign({}, o));
+    D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    rows = await live();
+    ok(rows.length === 6 && (await dead()) === 0, 'pile: marking a member done deletes nothing (it moves to the Done pile and stays stored)');
+    ok(rows.find((r) => r.id === doneM.id).data.doneAt > 0 && !rows.find((r) => r.id === doneM.id).data.pileId, 'pile: the finished member kept its content, is Done, and is no longer in the pile');
+    ok(rows.find((r) => r.id === pileId).data.members.length === 3, 'pile: the pile now lists three members');
+
+    // unpile: the pile object goes, every member stays alive and loses its pile id
+    D.notes.splice(D.notes.indexOf(pile), 1); members.slice(1).forEach((m) => { delete m.pileId; });
+    D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    rows = await live();
+    ok(rows.filter((r) => r.type !== 'pile').length === 5 && !rows.some((r) => r.type === 'pile'), 'pile: unpiling removes only the pile object; all five notes are still live');
+    ok(rows.every((r) => !r.data.pileId), 'pile: after unpiling no row points at a pile');
+
+    // negative control: an implementation that dropped collapsed members from the object list WOULD delete them
+    const pile2 = { id: crypto.randomUUID(), type: 'pile', x: 0, y: 0, w: 200, rot: 0, z: 10, members: members.slice(1).map((m) => m.id), ox: 0, oy: 0, edges: 1, phys: {} };
+    const keepNotes = D.notes.slice();
+    D.notes.splice(0, D.notes.length, loose, pile2);
+    D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    ok((await live()).filter((r) => r.type !== 'pile').length <= 2, 'control: if collapsed members were taken out of the list they WOULD be deleted (the test can see that bug)');
+    D.sync.stop();
+  }
+
   // ============================================================ INCIDENT REGRESSIONS (data safety)
   // 2026-10-04: opening a share link in a browser that is signed in soft-deleted the account's whole board. The share page's own objects (the
   // shared copies) were diffed against what the account already knew, and every real object read as "removed".

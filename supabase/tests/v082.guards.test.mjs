@@ -26,7 +26,7 @@ ok(/body\.dark \.kbdKeys kbd, body\.dark \.palKeys kbd/.test(css), 'shortcut key
 
 // ---- zones, pin, history, bookmarks
 ok(/function renderZone\(n, isNew\)/.test(app) && /OBJECT_MENUS\.zone = zoneMenu/.test(app), 'zones render and have a menu');
-ok(/if\(n && n\.type === "zone"\) return true;/.test(app), 'a zone is never treated as an empty note (clean-up-empty would delete it)');
+ok(/if\(n && \(n\.type === "zone" \|\| n\.type === "pile"\)\) return true;/.test(app), 'a zone is never treated as an empty note (clean-up-empty would delete it)');
 ok(/!insideAnyZone\(n\)/.test(app) && /isPinned\(n\) && !isZone\(n\)/.test(app), 'Clean up leaves pinned notes and notes inside a zone alone');
 ok(/var VH = \{list: \[\], i: -1/.test(app) && /CAP: 30/.test(app) && /def: "Alt\+\["/.test(app), 'spatial history is capped and bound to Alt+[ / Alt+]');
 ok(/BOOKMARK_MAX = 30/.test(app) && /function goToBookmark/.test(app), 'bookmarks are capped and navigable');

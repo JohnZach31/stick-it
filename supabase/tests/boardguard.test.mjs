@@ -69,6 +69,7 @@ function build() {
     paperCopy: (src) => ({ ...src, id: 'copy' + (++idSeq) }),
     insertNotes: (list, label) => { list.forEach((n) => { sb.notes.push(n); inserted.push(n); }); sb.labels.push(label); },
     labels: [], pasteSeq: 0, lastPasteTs: 0,
+    isPileObj: (n) => !!n && n.type === 'pile', logicalCount: () => sb.notes.filter((n) => n.type !== 'pile').length,
     activeBoardId: 'b1', centerGroup: () => {}, viewCenter: () => ({ x: 0, y: 0 }),
   };
   const ctx = vm.createContext(sb);
@@ -162,7 +163,7 @@ const flush = () => new Promise((r) => setImmediate(r));
 // ---------------------------------------------------------------- wiring in the app
 ok(/<script src="js\/boardguard\.js">/.test(read('index.html')), 'boardguard.js is loaded by the app');
 ok(app.includes('guardedMultiply(src.length, function(){ duplicateNow(ids); })') && app.includes('guardedMultiply(data.notes.length, function(){ pasteNow(data); })'), 'duplicate and paste both go through the guard (so Ctrl/Cmd+D spam, the menu and paste loops are covered)');
-ok(app.includes('if(typeof checkBoardSize === "function") checkBoardSize();') && app.includes('var lvl = G.level(notes.length);'), 'size warnings count active board objects (the notes list, not the Done pile)');
+ok(app.includes('if(typeof checkBoardSize === "function") checkBoardSize();') && app.includes('var logical = logicalCount(), lvl = G.level(logical);'), 'size warnings count active board objects (the notes list, a pile counting as its members, not the Done pile)');
 ok(!/G\.level\(donePile/.test(app) && !/notes\.concat\(donePile\)\.length[^;]*level/.test(app), 'the Done pile is not counted toward the warnings');
 ok(/Very large board|very large board/.test(app) && app.includes('Stick.guard.LEVELS.huge'), 'importing a huge board says so before replacing');
 ok(app.includes('Stick.dev.perf = function()') && app.includes('Stick.dev.stress = function(count)') && app.includes('if(CLOUD) return "Stress test is only for guest boards'), 'dev-only diagnostics exist, and the stress helper refuses signed-in boards');

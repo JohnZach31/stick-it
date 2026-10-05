@@ -80,3 +80,6 @@ Stick.dev.stress(500)     // add 500 simple notes (guest boards only; refuses si
 Stick.dev.stressClear()   // remove the stress notes
 ```
 `level` is the size warning level (0 below 500 objects, 1 from 500, 2 from 750, 3 from 1000). The safeguards themselves live in `js/boardguard.js` and are tested by `supabase/tests/boardguard.test.mjs`. Viewport rendering is a documented follow-up: `docs/dev/VIEWPORT-VIRTUALIZATION-FOLLOWUP.md`.
+
+## Piles
+`Stick.dev.stackAll()`, `Stick.dev.pileAll()`, `Stick.dev.unpileAll()` run the operation on everything drawn and return timings plus `Stick.dev.perf()` (now with `piles`, `collapsedMembers`, `renderedObjects`; `active` counts a pile as its members). See `docs/dev/PILES.md`.

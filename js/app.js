@@ -1030,6 +1030,8 @@
   // Anything from a file or a link is untrusted and never gets to reference stored media.
   function normalizeIncoming(item, opts){
     item = item || {};
+    if(item.type === "pile") return null;
+    if(item.pileId !== undefined){ item = Object.assign({}, item); delete item.pileId; }
     opts = opts || {};
     function cloudRefs(o){
       if(!opts.allowAssets) return o;
@@ -1130,7 +1132,7 @@
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
   var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1165,10 +1167,19 @@
     c.z = Math.round(clampNum(c.z, 0, 1e9, 1));
     if(c.font !== undefined && !FONT_BY_NAME[c.font]) c.font = pickFont();
     if(c.bg !== undefined && !safeColor(c.bg)) c.bg = randomColor();
+    if(c.pileId !== undefined && !/^[\w-]{1,64}$/.test(String(c.pileId))) delete c.pileId;
+    if(c.type === "pile"){                                       // a pile only references its members; it carries no content of its own
+      var pn = window.Stick && Stick.pile && Stick.pile.normalize(c); if(!pn) return null;
+      var po = {id: c.id, type: "pile", x: c.x, y: c.y, w: pn.w, rot: c.rot, z: c.z, members: pn.members, ox: pn.ox, oy: pn.oy, edges: pn.edges, phys: c.phys && typeof c.phys === "object" ? c.phys : {}};
+      if(c.pinned === true) po.pinned = true;
+      if(c.createdAt !== undefined) po.createdAt = clampNum(c.createdAt, 0, 1e14, Date.now());
+      return po;
+    }
     if(window.Stick && Stick.objects && Stick.objects.isKind(c.type)){
       var sp = Stick.objects.sanitize(c, paperHelpers());
       if(!sp) return null;
       if(c.pinned === true) sp.pinned = true;
+      if(c.pileId !== undefined) sp.pileId = String(c.pileId);
       if(c.type === "shopping"){ var dn = Number(c.doneAt); if(dn > 0 && dn < 1e14){ sp.doneAt = dn; if(c.doneBy !== undefined) sp.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60); } }
       sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
       if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
@@ -1493,14 +1504,14 @@
   var boardLevelSeen = 0;
   function checkBoardSize(){
     var G = window.Stick && Stick.guard; if(!G || readOnly) return;
-    var lvl = G.level(notes.length);
-    if(lvl > boardLevelSeen){ boardLevelSeen = lvl; toast(G.levelMessage(lvl, notes.length)); }
+    var logical = logicalCount(), lvl = G.level(logical);         // a pile counts as its members: it never hides how big the board really is
+    if(lvl > boardLevelSeen){ boardLevelSeen = lvl; toast(G.levelMessage(lvl, logical)); }
     else if(lvl < boardLevelSeen) boardLevelSeen = lvl;
   }
   function updateCount(){
     if(typeof updateDonePile === "function") updateDonePile(false);
     if(typeof checkBoardSize === "function") checkBoardSize();
-    countEl.textContent = notes.length + (notes.length === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
+    countEl.textContent = logicalCount() + (logicalCount() === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
   }
 
   function getPlainText(el){ return (el.textContent || "").trim(); }
@@ -1995,7 +2006,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2069,6 +2080,8 @@
           }
         } else if(n){
           SERIAL_FIELDS.forEach(function(k){ if(k in target) n[k] = target[k]; });
+          if(!("pileId" in target)) delete n.pileId;
+          if(n.members) n.members = n.members.slice();
           rerenderNote(n); changed = true;
         } else {
           var copy = Object.assign({}, target);
@@ -2082,6 +2095,7 @@
     return changed;
   }
   function afterHistoryApply(){
+    syncPileVisibility();
     ensureWidth(); saveNotes(); updateCount(); updateMinimap(); applySelection();
   }
   function lowerFirst(str){ return str.charAt(0).toLowerCase() + str.slice(1); }
@@ -2120,7 +2134,7 @@
   }
   function setSelection(ids){
     var prev = Array.from(selected);
-    selected = new Set(ids.filter(function(id){ return !!findNote(id); }));
+    selected = new Set(ids.filter(function(id){ return !!findNote(id) && !hiddenIds[id]; }));
     applySelection();
     if(window.Stick && Stick.collab) Stick.collab.setActive(selected.size === 1 ? Array.from(selected)[0] : null);
     prev.forEach(function(id){ if(!selected.has(id)){ var p = findNote(id); if(p) scheduleCleanup(p); } });
@@ -2141,13 +2155,13 @@
     return n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "").trim();
   }
   function itemWord(list){
-    function kind(n){ return n.type === "audio" ? "recording" : n.type === "video" ? "video" : isPhoto(n) ? "photo" : isPaper(n) ? Stick.objects.LABELS[n.type] : "note"; }
+    function kind(n){ return n.type === "pile" ? "pile" : n.type === "audio" ? "recording" : n.type === "video" ? "video" : isPhoto(n) ? "photo" : isPaper(n) ? Stick.objects.LABELS[n.type] : "note"; }
     var kinds = list.map(kind);
     if(list.length === 1) return kinds[0];
     return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
-    if(n && n.type === "zone") return true;                       // a zone is the user’s own layout, never "empty"
+    if(n && (n.type === "zone" || n.type === "pile")) return true;               // a zone is the user’s own layout, a pile holds other notes: never "empty"
     if(isPaper(n)) return Stick.objects.hasContent(n);
     if(isObj(n) || n.image) return true;
     if(n.isTask && n.due) return true;
@@ -3376,6 +3390,7 @@
   function fmtClock(sec){ sec = Math.max(0, Math.floor(sec || 0)); return pad2(Math.floor(sec / 60)) + ":" + pad2(sec % 60); }
   var AUDIO_W = 236, AUDIO_MIN_W = 190, AUDIO_MAX_W = 440, VIDEO_MIN_W = 120, VIDEO_MAX_W = 480;
   function objSize(n){
+    if(n && n.type === "pile") return {w: n.w || 200, h: (n.el && n.el.offsetHeight) || 150};
     if(isPhoto(n)) return photoFrameSize(n);
     if(isPaper(n)) return paperSize(n);
     if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
@@ -4311,10 +4326,16 @@
     // numbers for stress-testing big boards: Stick.dev.perf(), Stick.dev.perfRender(), Stick.dev.stress(500), Stick.dev.stressClear()
     Stick.dev.perf = function(){
       var q = function(sel){ return document.querySelectorAll(sel).length; };
-      return {active: notes.length, donePile: donePile.length, domNodes: document.getElementsByTagName("*").length, boardDomNodes: boardInner.getElementsByTagName("*").length,
+      var pc = Stick.pile.counts(notes, findNote);
+      return {active: pc.logical, piles: pc.piles, collapsedMembers: pc.collapsedMembers, renderedObjects: pc.rendered, donePile: donePile.length, domNodes: document.getElementsByTagName("*").length, boardDomNodes: boardInner.getElementsByTagName("*").length,
         mountedMedia: {img: q("img"), video: q("video"), audio: q("audio"), canvas: q("canvas")}, bootRenderMs: bootRenderMs,
-        heapMB: (window.performance && performance.memory) ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, level: Stick.guard ? Stick.guard.level(notes.length) : null};
+        heapMB: (window.performance && performance.memory) ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, level: Stick.guard ? Stick.guard.level(pc.logical) : null};
     };
+    // pile and stack timings: Stick.dev.stackAll(), Stick.dev.pileAll(), Stick.dev.unpileAll() act on everything drawn (confirmation-free, dev only)
+    function timedPile(label, run){ var t0 = performance.now(); run(); void boardInner.offsetHeight; return Object.assign({op: label, ms: Math.round(performance.now() - t0)}, Stick.dev.perf()); }
+    Stick.dev.stackAll = function(){ return timedPile("stack", function(){ stackNotes(notes.filter(function(n){ return n.el && !isPileObj(n); }).map(function(n){ return n.id; })); }); };
+    Stick.dev.pileAll = function(){ return timedPile("pile", function(){ makePile(notes.filter(function(n){ return n.el && !isPileObj(n); }).map(function(n){ return n.id; })); }); };
+    Stick.dev.unpileAll = function(){ return timedPile("unpile", function(){ notes.filter(isPileObj).forEach(unpilePile); }); };
     Stick.dev.perfRender = function(){            // redraw every object once and time it
       var t0 = performance.now();
       notes.slice().forEach(function(n){ if(n.el) n.el.remove(); try{ renderNote(n, false); }catch(e){} });
@@ -4882,6 +4903,10 @@
     var anyUnpinned = ids.some(function(id){ var q = findNote(id); return q && !isPinned(q); });
     if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDoneGroup(ids); }, {title: "Move the selected notes to the Done pile"}));
     pop.appendChild(menuItem(ICONS.pin, anyUnpinned ? "Pin in place" : "Unpin", function(){ closeFloatingPopovers(); setPinned(ids, anyUnpinned); }));
+    if(pileEligibleList(ids).length >= 2){
+      pop.appendChild(menuItem(ICONS.move, "Stack (arrange vertically)", function(){ closeFloatingPopovers(); stackNotes(ids); }, {title: "Lines the notes up one below another. Nothing else changes."}));
+      pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
+    }
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -5158,6 +5183,7 @@
 
   // Read-only note for share previews and public pages: same paper, tape, font and formatting.
   function buildStaticNote(item){
+    if(item && item.type === "pile") return buildPileStatic(item);
     if(isPhoto(item)) return buildStaticPhoto(item);
     if(isPaper(item)) return buildStaticPaper(item);
     if(isAV(item)){
@@ -5186,13 +5212,274 @@
     return el;
   }
 
+  // ---------- Piles and vertical stacks (phase 1) ----------
+  // A vertical stack is only an arrangement: the same objects, laid out a little below one another. A pile is a small object that REFERENCES
+  // its members (rules in js/pile.js). While collapsed, the members stay in `notes` (so sync, search, export and undo still see every one of
+  // them) and are simply not drawn: the page draws the top paper, a few paper edges and a count, whatever the size of the pile.
+  // NEVER treat "no element" as "does not exist": hiddenIds only says what is not drawn.
+  var hiddenIds = {};
+  function isPileObj(n){ return !!n && n.type === "pile"; }
+  function isHiddenMember(n){ return !!n && !!hiddenIds[n.id]; }
+  function rebuildHidden(){
+    var byId = {}, live = {};
+    notes.forEach(function(n){ byId[n.id] = n; });
+    notes.forEach(function(p){ if(isPileObj(p)){ var c = 0; (p.members || []).forEach(function(id){ if(byId[id]) c++; }); live[p.id] = c; } });
+    hiddenIds = {};
+    notes.forEach(function(n){
+      if(isPileObj(n) || !n.pileId) return;
+      var p = byId[n.pileId];
+      if(p && isPileObj(p) && live[p.id] >= Stick.pile.MIN_MEMBERS && (p.members || []).indexOf(n.id) !== -1) hiddenIds[n.id] = true;
+    });
+  }
+  function pileLive(p){ return (p.members || []).map(findNote).filter(Boolean); }          // top first
+  function logicalCount(){ return Stick.pile.logicalCount(notes); }
+  // draw what should be drawn and stop drawing what should not (after anything that changes who is in which pile)
+  function syncPileVisibility(){
+    rebuildHidden();
+    notes.forEach(function(n){
+      if(isPileObj(n)) return;
+      if(hiddenIds[n.id]){
+        if(n.el){ selected.delete(n.id); clearTimeout(n._cleanT); try{ n.el.remove(); }catch(e){} n.el = null; n.textEl = null; n.captionEl = null; n.badgeEl = null; clearDecorations(n.id); }
+      } else if(!n.el){ try{ renderNote(n, false, {focus: false}); }catch(err){} }
+    });
+    notes.filter(isPileObj).forEach(function(p){ if(p.el){ try{ p.el.remove(); }catch(e){} p.el = null; } try{ renderNote(p, false); }catch(err){} });
+    applySelection();
+  }
+
+  // ---- the pile on the board: top paper + a few edges + a count (about 8 elements however many papers it holds)
+  function pileSnippet(top){
+    var t = isPaper(top) ? Stick.objects.text(top) : htmlToText(top.html || "");
+    t = String(t || "").replace(/\s+/g, " ").trim();
+    return t.slice(0, 140) || (isPaper(top) ? Stick.objects.LABELS[top.type] : "Empty note");
+  }
+  function buildPileEl(n, live){
+    var top = live[0], P = Stick.pile;
+    var el = makeDiv("boardObj paperObj pileObj");
+    el.style.setProperty("--pw", (n.w || P.WIDTH[2]) + "px"); el.style.setProperty("--rot", (n.rot || 0) + "deg");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", P.label(n, live.length) + ". On top: " + pileSnippet(top).slice(0, 60)); el.tabIndex = 0;
+    var rng = seededRng(n.edges || 1);
+    for(var i = 3; i >= 1; i--){
+      var edge = makeDiv("pileEdge");
+      edge.style.setProperty("--er", ((rng() * 6 - 3) * (i % 2 ? 1 : -1)).toFixed(2) + "deg"); edge.style.setProperty("--ey", (i * 4) + "px"); edge.style.setProperty("--ex", ((rng() * 6 - 3)).toFixed(1) + "px");
+      el.appendChild(edge);
+    }
+    var topEl = makeDiv("pileTop"), txt = makeDiv("pileText");
+    var bg = top && !top.type && top.bg ? top.bg : "#fffdf5";
+    topEl.style.background = document.body.classList.contains("dark") && top && !top.type && top.bg ? dimPaperColor(top.bg) : bg;
+    txt.textContent = pileSnippet(top); txt.dir = "auto";
+    if(top && top.font && FONT_BY_NAME[top.font]) txt.style.fontFamily = '"' + top.font + '", cursive';
+    topEl.appendChild(txt); el.appendChild(topEl);
+    var badge = makeDiv("pileCount"); badge.textContent = String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
+    return el;
+  }
+  function buildPileStatic(item){ var live = pileLive(item); if(live.length < 2) return makeDiv(""); var el = buildPileEl(item, live); el.classList.add("static"); el.removeAttribute("tabindex"); return el; }
+  function renderPile(n, isNew){
+    var live = pileLive(n);
+    if(live.length < Stick.pile.MIN_MEMBERS){ n.el = null; return null; }          // a pile with fewer than two papers is not drawn; whatever is left shows as itself
+    var el = buildPileEl(n, live);
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = null;
+    boardInner.appendChild(el);
+    if(!readOnly){
+      var more = document.createElement("button"); more.type = "button"; more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options for this pile"; more.setAttribute("aria-label", "Options for this pile");
+      more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      more.addEventListener("click", function(e){ e.stopPropagation(); pileMenu(n, more); });
+      el.appendChild(more);
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(e.target.closest && e.target.closest("button")) return;
+        e.preventDefault(); endEditing(); closeCaptureMenu();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);          // only the pile moves: its members are not drawn and keep their place until it is opened
+      });
+      el.addEventListener("keydown", function(e){
+        if(e.target !== el) return;
+        if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "Enter"){ e.preventDefault(); var r0 = el.getBoundingClientRect(); openObjectContextMenu(n, r0.left + 24, r0.top + 24); }
+        else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
+        else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteNotes([n.id]); }     // the safe meaning: open the pile, delete nothing
+      });
+      el.addEventListener("focus", function(){ if(!selected.has(n.id)) setSelection([n.id]); });
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once: true});
+    }
+    return el;
+  }
+
+  // ---- what a person can do
+  function pileEligibleList(ids){ return ids.map(findNote).filter(function(n){ return n && n.el && !isHiddenMember(n) && Stick.pile.eligible(n); }); }
+  function pileTransactionIds(pile){ return pileLive(pile).map(function(m){ return m.id; }).concat([pile.id]); }
+
+  // take papers out of the pile object and put them back on the board (no history; callers wrap it)
+  function dissolveInto(pile, members){
+    var sh = Stick.pile.unpileShift(pile), dx = sh.dx, dy = sh.dy;
+    if(members.length){          // move the papers back as one piece, so their spacing survives the board's edges
+      dx = Math.max(dx, -Math.min.apply(null, members.map(function(m){ return m.x; })));
+      dy = Math.max(dy, -Math.min.apply(null, members.map(function(m){ return m.y; })));
+      dy = Math.min(dy, Math.min.apply(null, members.map(function(m){ return itemMaxY(m) - m.y; })));
+    }
+    members.slice().reverse().forEach(function(m){              // bottom of the pile first, so they land in their old order
+      delete m.pileId; m.x = Math.max(0, m.x + dx); m.y = Math.max(0, m.y + dy); zCounter += 1; m.z = zCounter;
+    });
+    var i = notes.indexOf(pile); if(i !== -1) notes.splice(i, 1);
+    selected.delete(pile.id); if(pile.el){ try{ pile.el.remove(); }catch(e){} pile.el = null; } clearDecorations(pile.id);
+  }
+  function finishPileChange(){ syncPileVisibility(); saveNotes(); ensureWidth(); updateCount(); updateMinimap(); }
+
+  function makePile(ids){
+    if(readOnly) return;
+    var list = pileEligibleList(ids), skipped = ids.length - list.length;
+    if(list.length < Stick.pile.MIN_MEMBERS){ toast("Select at least two notes (not pinned, not Done) to pile them."); return; }
+    if(list.length > Stick.pile.MAX_MEMBERS){ toast("A pile holds up to " + Stick.pile.MAX_MEMBERS + " papers."); return; }
+    endEditing(); closeFloatingPopovers();
+    var ordered = Stick.pile.order(list), top = ordered[0], before = captureState(ordered.map(function(m){ return m.id; }));
+    var anchor = ordered.filter(function(m){ try{ return m.el && onScreen(m); }catch(e){ return false; } })[0] || top;          // the pile appears where you can see it
+    zCounter += 1;
+    var pile = {id: newId(), type: "pile", x: anchor.x, y: anchor.y, w: Stick.pile.WIDTH[2], rot: rand(-2, 2), z: zCounter, members: ordered.map(function(m){ return m.id; }), ox: anchor.x, oy: anchor.y, edges: Math.floor(rand(1, 99999)), phys: {}, createdAt: Date.now()};
+    ordered.forEach(function(m){ m.pileId = pile.id; });
+    notes.push(pile);
+    finishPileChange();
+    setSelection([pile.id]);
+    var action = recordChange("Pile " + ordered.length + " papers", before, {newIds: [pile.id]});
+    toast("Piled " + ordered.length + " papers." + (skipped > 0 ? " (" + skipped + " left out: pinned, Done or not a note.)" : ""), "Undo", function(){ undoIfTop(action); });
+  }
+  function unpilePile(pile){
+    if(readOnly || !isPileObj(pile)) return;
+    endEditing(); closeFloatingPopovers();
+    var live = pileLive(pile), ids = live.map(function(m){ return m.id; }), before = captureState(ids.concat([pile.id]));
+    dissolveInto(pile, live);
+    finishPileChange();
+    setSelection(ids);
+    var action = recordChange("Unpile " + ids.length + " papers", before);
+    toast("Opened the pile: " + ids.length + " papers back on the board. Nothing was deleted.", "Undo", function(){ undoIfTop(action); });
+  }
+  function pileSendTopToBack(pile){
+    var before = captureState([pile.id]);
+    pile.members = Stick.pile.sendTopToBack(pile.members);
+    syncPileVisibility(); saveNotes();
+    recordChange("Send the top paper to the back", before);
+  }
+  function pileTakeTop(pile){
+    var live = pileLive(pile); if(live.length < Stick.pile.MIN_MEMBERS) return;
+    var top = live[0], before = captureState(pileTransactionIds(pile));
+    delete top.pileId; pile.members = Stick.pile.removeMember(pile.members, top.id);
+    var rest = pileLive(pile);
+    top.x = Math.max(0, pile.x + (pile.w || 200) + 24); top.y = clampY(pile.y, top); zCounter += 1; top.z = zCounter;
+    if(rest.length < Stick.pile.MIN_MEMBERS) dissolveInto(pile, rest);          // one paper left is just a paper again
+    finishPileChange();
+    setSelection([top.id]);
+    var action = recordChange(rest.length < Stick.pile.MIN_MEMBERS ? "Take the top paper out (pile closed)" : "Take the top paper out", before);
+    toast(rest.length < Stick.pile.MIN_MEMBERS ? "The pile is down to one paper, so it is open again." : "Took the top paper out of the pile.", "Undo", function(){ undoIfTop(action); });
+  }
+  // an explicit, separate, destructive action: the pile AND everything in it
+  function deletePileAndContents(pile){
+    var ids = pile.members.filter(function(id){ return !!findNote(id); });
+    confirmDialog({title: "Delete the pile and its " + ids.length + " papers?", body: "This deletes the pile and every paper in it. (To keep the papers, choose Unpile instead.) You can undo it right after.", confirm: "Delete everything", danger: true}).then(function(ok){
+      if(!ok) return;
+      deleteNotes(ids.concat([pile.id]), {force: true});
+    });
+  }
+  // a paper leaves the pile because it was marked Done (here or on another device): the pile shrinks, and with one paper left it opens again
+  function pileRelease(id, local){
+    var done = false;
+    notes.forEach(function(p){
+      if(!isPileObj(p) || (p.members || []).indexOf(id) === -1) return;
+      p.members = Stick.pile.removeMember(p.members, id); done = true;
+      var rest = pileLive(p).filter(function(m){ return m.id !== id; });
+      if(rest.length < Stick.pile.MIN_MEMBERS){
+        if(local){ dissolveInto(p, rest); }          // the user's own action: close the pile and put the last paper back
+        else { rest.forEach(function(m){ delete m.pileId; }); }        // from another device: never delete anything on inference; the leftover pile row is simply not drawn
+      }
+    });
+    var n = findNote(id); if(n) delete n.pileId;
+    return done;
+  }
+
+  // ---- a vertical stack: an arrangement, nothing else changes about the papers
+  function stackNotes(ids){
+    if(readOnly) return;
+    var list = pileEligibleList(ids), P = Stick.pile;
+    if(list.length < 2){ toast("Select at least two notes (not pinned, not Done) to stack them."); return; }
+    endEditing(); closeFloatingPopovers();
+    var before = captureState(list.map(function(n){ return n.id; }));
+    var items = list.map(function(n){ return {id: n.id, x: n.x, y: n.y}; }), y0 = Math.min.apply(null, items.map(function(i){ return i.y; }));
+    var lastH = estimateNoteH(list[list.length - 1]), maxRoom = boardHeight() - 12 - lastH;
+    var step = Math.max(2, Math.min(P.STACK_STEP, maxRoom / Math.max(1, list.length - 1)));          // a long stack tightens its steps rather than run off the board
+    var lay = P.stackLayout(items, step), dy = Math.max(0, Math.min(y0, maxRoom - step * (list.length - 1))) - y0;          // and starts higher if it has to
+    lay.forEach(function(l){
+      var n = findNote(l.id); n.x = l.x; n.y = Math.max(0, l.y + dy); zCounter += 1; n.z = zCounter;
+      if(n.el){ n.el.style.left = n.x + "px"; n.el.style.top = n.y + "px"; n.el.style.zIndex = n.z; }
+    });
+    ensureWidth(); saveNotes(); updateMinimap();
+    setSelection(list.map(function(n){ return n.id; }));
+    var action = recordChange("Stack " + list.length + " papers", before);
+    toast("Stacked " + list.length + " papers. Click a paper's top edge to bring it forward.", "Undo", function(){ undoIfTop(action); });
+  }
+
+  // put the listed objects back exactly as they were (used by the undo of a pile operation that also touches the Done pile)
+  function restoreStates(before){
+    Object.keys(before).forEach(function(id){
+      var s = before[id], cur = findNote(id);
+      if(!s) return;
+      if(cur){ SERIAL_FIELDS.forEach(function(k){ if(k in s) cur[k] = s[k]; else delete cur[k]; }); if(cur.members) cur.members = cur.members.slice(); }
+      else { var c = Object.assign({}, s); if(c.members) c.members = c.members.slice(); if(c.phys) c.phys = Object.assign({}, c.phys); notes.push(c); }
+    });
+  }
+  // the top paper is finished: it leaves the pile (state kept, count down by one, the pile opens when one paper is left) and goes to the Done pile
+  function pileMarkTopDone(pileId){
+    if(readOnly) return;
+    var pile = findNote(pileId); if(!pile || pileLive(pile).length < Stick.pile.MIN_MEMBERS) return;
+    closeFloatingPopovers();
+    var before = captureState(pileTransactionIds(pile)), topId = pileLive(pile)[0].id, by = whoAmI(), at = Date.now();
+    function take(){
+      var p = findNote(pileId); if(!p) return false;
+      var t = pileLive(p)[0]; if(!t) return false;
+      var snap = snapNote(t); delete snap.pileId; snap.doneAt = at; if(by) snap.doneBy = String(by).slice(0, 60);
+      pileRelease(t.id, true);
+      removeNoteEl(t, false); notes.splice(notes.indexOf(t), 1); selected.delete(t.id); clearDecorations(t.id);
+      donePile.push(snap);
+      finishPileChange(); updateDonePile(true);
+      return true;
+    }
+    function put(){
+      var pi = donePile.findIndex(function(x){ return x.id === topId; }); if(pi !== -1) donePile.splice(pi, 1);
+      restoreStates(before);
+      finishPileChange(); updateDonePile(false);
+    }
+    take();
+    var action = pushHistory({label: "Mark the top paper done", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
+    toast("Moved the top paper to Done.", "Undo", function(){ undoIfTop(action); });
+  }
+
+  // ---- menus
+  function pileMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
+    var live = pileLive(n), h = makeDiv("menuHint"); h.textContent = Stick.pile.label(n, live.length); pop.appendChild(h);
+    pop.appendChild(menuItem(ICONS.move, "Unpile (put them back)", function(){ closeFloatingPopovers(); unpilePile(n); }, {title: "Spreads the papers back out where they were. Nothing is deleted."}));
+    pop.appendChild(menuItem(ICONS.move, "Send the top paper to the back", function(){ closeFloatingPopovers(); pileSendTopToBack(n); }));
+    pop.appendChild(menuItem(ICONS.move, "Take the top paper out", function(){ closeFloatingPopovers(); pileTakeTop(n); }));
+    pop.appendChild(menuItem(ICONS.tick, "Mark the top paper done", function(){ pileMarkTopDone(n.id); }, {title: "Only the top paper goes to Done. A pile cannot be marked done."}));
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(pinMenuItem(n));
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.trash, "Delete the pile and its papers…", function(){ closeFloatingPopovers(); deletePileAndContents(n); }, {cls: "danger", title: "Deletes every paper in the pile. Unpile keeps them."}));
+  }
+  OBJECT_MENUS.pile = pileMenu;
+
   function renderNote(n, isNew, opts){
+    if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
     decoratePin(n);
-    if(window.Stick && Stick.collab && Stick.collab.active()) Stick.collab.decorate(n, n.el || made);
+    if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
     return made;
   }
   function renderNoteCore(n, isNew, opts){
+    if(isPileObj(n)) return renderPile(n, isNew);
     if(isZone(n)) return renderZone(n, isNew);
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
     if(isPaper(n)) return renderPaper(n, isNew, opts);
@@ -5659,6 +5946,10 @@
   function deleteNotes(ids, opts){
     opts = opts || {};
     var list = ids.map(findNote).filter(Boolean);
+    if(!opts.force && list.some(isPileObj)){          // deleting a pile means opening it: its papers are never deleted by accident
+      list.filter(isPileObj).forEach(unpilePile);
+      list = list.filter(function(n){ return !isPileObj(n); });
+    }
     if(!list.length) return;
     var hadContent = list.some(noteHasContent);
     var before = opts.silent ? null : captureState(list.map(function(n){ return n.id; }));
@@ -5692,6 +5983,7 @@
   function requestDelete(ids){
     var list = ids.map(findNote).filter(Boolean);
     if(!list.length) return;
+    if(list.some(isPileObj)){ deleteNotes(ids); return; }
     if(!list.some(noteHasContent)){ deleteNotes(ids); return; }
     confirmDialog({
       title: list.length > 1 ? "Delete " + list.length + " " + itemWord(list) + "?" : "Delete this " + itemWord(list) + "?",
@@ -5838,17 +6130,18 @@
       if(Date.now() - multiplyToastAt > 8000){ multiplyToastAt = Date.now(); toast("Lots of duplicates \u2014 slowing this down to protect performance."); }
       setTimeout(run, plan.delay);
     }
-    if(G && G.needsConfirm(notes.length, count)){
-      confirmDialog({title: "Add " + count + " objects?", body: G.confirmText(notes.length, count), confirm: "Add them"}).then(function(ok){ if(ok) go(); });
+    if(G && G.needsConfirm(logicalCount(), count)){
+      confirmDialog({title: "Add " + count + " objects?", body: G.confirmText(logicalCount(), count), confirm: "Add them"}).then(function(ok){ if(ok) go(); });
     } else go();
   }
   function duplicateNotes(ids){
-    var src = ids.map(findNote).filter(Boolean);
+    var src = ids.map(findNote).filter(function(n){ return n && !isPileObj(n); });
+    if(ids.some(function(id){ return isPileObj(findNote(id)); })) toast("A pile can't be duplicated yet. Open it first.");
     if(!src.length || readOnly) return;
     guardedMultiply(src.length, function(){ duplicateNow(ids); });
   }
   function duplicateNow(ids){
-    var src = ids.map(findNote).filter(Boolean);                 // resolved when it actually runs: a note deleted in the meantime is simply skipped
+    var src = ids.map(findNote).filter(function(n){ return n && !isPileObj(n); });          // phase 1: a pile is not duplicated (open it first)                 // resolved when it actually runs: a note deleted in the meantime is simply skipped
     if(!src.length) return;
     var copies = src.map(function(s){ var c = paperCopy(serializeNote(s)); if(c){ c.x = s.x + 26; c.y = s.y + 26; } return c; }).filter(Boolean);
     if(copies.length) insertNotes(copies, copies.length > 1 ? "Duplicate " + copies.length + " notes" : "Duplicate note");
@@ -5921,6 +6214,7 @@
   function moveNotesToBoard(ids, destId){
     var dest = boards.filter(function(b){ return b.id === destId; })[0];
     var list = ids.map(findNote).filter(Boolean);
+    if(list.some(isPileObj)){ toast("Open the pile first, then move its papers to another board."); return; }
     if(!dest || !list.length) return;
     var origSnaps = list.map(snapNote);
     var destNotes = safeGet(notesKeyFor(destId)) || [];
@@ -6425,6 +6719,10 @@
       return b;
     }
     if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) add(ICONS.tick, "Mark done", function(){ markDoneGroup(ids); });
+    if(pileEligibleList(ids).length >= 2){
+      add(ICONS.move, "Stack", function(){ stackNotes(ids); }).title = "Arrange these notes in a vertical stack";
+      add(ICONS.move, "Pile", function(){ makePile(ids); }).title = "Collapse these notes into one pile (nothing is deleted)";
+    }
     add(ICONS.copy, "Duplicate", function(){ duplicateNotes(ids); });
     add(ICONS.move, "Move " + ids.length + " to…", function(b){
       var pop = openFloatingPopover(b, "noteMenu");
@@ -6581,7 +6879,7 @@
     // Signed in (on a board you can edit): a short server link to a frozen copy. Guests: the link carries the content.
     var cloudShare = !!(CLOUD && cloudSync && !viewerMode && window.Stick && Stick.share);
     var avLeft = list.filter(isAV).length;
-    var shareable = list.filter(function(n){ return noteHasContent(n) && (cloudShare || !isAV(n)); });
+    var shareable = list.filter(function(n){ return !isPileObj(n) && noteHasContent(n) && (cloudShare || !isAV(n)); });
     if(!shareable.length && avLeft && !cloudShare){ toast("Voice memos and videos stay on this device for now, so they can't be shared by link yet. Sign in to share them."); return; }
     if(!shareable.length){
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
@@ -7021,10 +7319,23 @@
   board.addEventListener("scroll", function(){ if(board.scrollTop && boardZoom <= 1) board.scrollTop = 0; dismissHint(); closeCaptureMenu(); updateMinimapViewport(); closeFloatingPopovers(); hideLinkCard(); saveBoardView(); scheduleViewCheckpoint(); }, {passive:true});
 
   // ---------- search ----------
+  // search sees hidden members too: a pile lights up when any paper inside it matches
+  function pileSearchHits(q){
+    var hits = {};
+    notes.forEach(function(p){
+      if(!isPileObj(p)) return;
+      var c = 0;
+      pileLive(p).forEach(function(m){ if(String(itemText(m) || "").toLowerCase().indexOf(q) !== -1) c++; });
+      if(c) hits[p.id] = c;
+    });
+    return hits;
+  }
   function runSearch(){
     var q = searchInput.value.trim().toLowerCase();
     decor.search.clear();
+    var pileHits = q ? pileSearchHits(q) : {};
     notes.forEach(function(n){
+      if(isPileObj(n)){ if(n.el){ var hit = !q || !!pileHits[n.id]; n.el.style.opacity = hit ? "" : "0.15"; n.el.style.pointerEvents = hit ? "" : "none"; n.el.classList.toggle("pileHit", !!q && !!pileHits[n.id]); n.el.title = q && pileHits[n.id] ? pileHits[n.id] + " match" + (pileHits[n.id] > 1 ? "es" : "") + " inside this pile. Click to select it, or open it." : ""; } return; }
       if(!n.el) return;
       if(!q || isZone(n)){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
       if(isPaper(n) && !n.textEl){ var pHit = Stick.objects.text(n).toLowerCase().indexOf(q) !== -1; n.el.style.opacity = pHit ? "1" : "0.15"; n.el.style.pointerEvents = pHit ? "" : "none"; return; }
@@ -9112,7 +9423,7 @@
     miniRaf = requestAnimationFrame(function(){ miniRaf = 0; paintMinimap(); });
   }
   function paintMinimap(){
-    var boardWidth = ensureWidth(), trackWidth = minimapTrack.clientWidth || 1, list = notes;
+    var boardWidth = ensureWidth(), trackWidth = minimapTrack.clientWidth || 1, list = notes.filter(function(n){ return !hiddenIds[n.id]; });
     while(miniPills.length < list.length){ var m = document.createElement("div"); m.className = "miniNote"; minimapTrack.insertBefore(m, miniView); miniPills.push(m); }
     while(miniPills.length > list.length) miniPills.pop().remove();
     list.forEach(function(n, i){
@@ -9219,6 +9530,7 @@
     dots.style.cssText = "position:absolute;inset:0;background-image:radial-gradient(circle, var(--paper-dot) 1.6px, transparent 1.6px);background-size:26px 26px;background-position:" + (6 - region.x % 26) + "px 6px;";
     stage.appendChild(dots);
     notes.slice().sort(function(a, b){ return (a.z || 0) - (b.z || 0); }).forEach(function(n){
+      if(hiddenIds[n.id]) return;
       var h = (n.el && n.el.offsetHeight) || NOTE_H;
       var wReach = isObj(n) ? objSize(n).w : (n.w || NOTE_W);
       if(n.x + wReach < region.x - 40 || n.x > region.x + region.w + 40) return;
@@ -9613,7 +9925,9 @@
     g.fillStyle = cs.getPropertyValue("--paper").trim() || "#faf6e8";
     g.fillRect(0, 0, THUMB_W, THUMB_H);
     var pending = false;
-    var items = list.map(function(n){ return {n:n, w:isObj(n) ? objSize(n).w : (n.w || NOTE_W), h:estimateNoteH(n)}; });
+    var byId = {}; list.forEach(function(n){ byId[n.id] = n; });
+    list = list.filter(function(n){ return !(window.Stick && Stick.pile && Stick.pile.isHidden(n, function(id){ return byId[id] || null; })); });
+    var items = list.map(function(n){ return {n:n, w:isObj(n) ? objSize(n).w : (n.w || NOTE_W), h:n.type === "pile" ? 150 : estimateNoteH(n)}; });
     var x1 = 0, y1 = 0, x2 = 900, y2 = 560;
     if(items.length){
       x1 = Math.min.apply(null, items.map(function(i){ return i.n.x; })) - 40;
@@ -10130,6 +10444,12 @@
   defineAction({id: "done", label: "Mark selected as done", group: "Selection", keywords: "finish complete tick", def: "Shift+D", edit: true,
     when: function(){ return selIds().length > 0; },
     run: function(){ markDoneGroup(selIds()); }});
+  defineAction({id: "stack", label: "Stack selected notes vertically", group: "Selection", keywords: "arrange line up column heap", def: "", edit: true,
+    when: function(){ return pileEligibleList(selIds()).length >= 2; }, run: function(){ stackNotes(selIds()); }});
+  defineAction({id: "pile", label: "Collapse selected notes into a pile", group: "Selection", keywords: "stack group bundle heap collapse", def: "", edit: true,
+    when: function(){ return pileEligibleList(selIds()).length >= 2; }, run: function(){ makePile(selIds()); }});
+  defineAction({id: "unpile", label: "Unpile (open the selected pile)", group: "Selection", keywords: "spread expand open uncollapse", def: "", edit: true,
+    when: function(){ var ids = selIds(); return ids.length === 1 && isPileObj(findNote(ids[0])); }, run: function(){ unpilePile(findNote(selIds()[0])); }});
   defineAction({id: "focus", label: "Open selection in Focus Mode", group: "Selection", keywords: "large big full", def: "F",
     when: function(){ var ids = selIds(); return ids.length === 1 && !findNote(ids[0]).type; },
     run: function(){ enterFocus(findNote(selIds()[0])); }});
@@ -10691,6 +11011,7 @@
         var o = sanitizeSafely(raw); if(!o) return;
         var ex = findNote(o.id), inPile = donePile.findIndex(function(x){ return x.id === o.id; });
         if(isDoneItem(o)){                                          // finished on another device: it belongs in the pile
+          pileRelease(o.id, false);                                  // ...and it leaves any pile it was in (the pile shrinks, nothing else is touched)
           if(ex){ if(ex.el) ex.el.remove(); notes.splice(notes.indexOf(ex), 1); selected.delete(ex.id); clearDecorations(ex.id); }
           if(inPile !== -1) donePile[inPile] = o; else donePile.push(o);
           return;
@@ -10708,6 +11029,7 @@
           try{ renderNote(o, false, {focus:false}); }catch(err){ try{ console.warn("Stick-It: one object could not be drawn:", o && o.id, err); }catch(e2){} }
         }
       });
+      syncPileVisibility();
       ensureWidth(); updateCount(); updateMinimap(); applySelection(); updateDonePile(false);
       if(searchInput.value.trim()) runSearch();
       saveNotesCache();
@@ -11244,6 +11566,7 @@
     }
     syncNoteMaxHeight();
     ensureWidth();
+    rebuildHidden();                                  // which papers are tucked inside a pile: not drawn, still on the board
     var bootT0 = (window.performance && performance.now) ? performance.now() : 0;
     notes.forEach(function(n){ try{ renderNote(n, false); }catch(err){ try{ console.warn("Stick-It: one object could not be drawn:", n && n.id, err); }catch(e2){} } });
     void boardInner.offsetHeight;                // include the browser's layout work, not only creating the elements

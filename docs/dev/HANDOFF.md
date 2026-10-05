@@ -55,3 +55,5 @@ Owner saw "Couldn't reach the server" opening a shared board in a private window
 
 ## Next planned patch
 **v0.8.3 — Stick Around.** Not started. Do not start it until the owner says so.
+
+- Piles / vertical stacks phase 1 built (docs/dev/PILES.md). Needs owner/two-device verification; Fan view deliberately not started.
