@@ -121,12 +121,8 @@ body.dark .po-newspaper{ filter:brightness(0.9); }
 body.dark .po-clipping .poSheet{ filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6)) brightness(0.88); }
 @media print{ .po-clipping .poSheet{ clip-path:none; } }
 
-/* ---- shopping list: the Comment tab is part of the paper (tucked under its lower edge, wherever the cart is) ---- */
-.shopObj > .cmtTab{ z-index:0; left:14px; bottom:11px; transform:rotate(-1deg); border-radius:0 0 7px 7px; }
-.shopObj.v-a > .cmtTab{ bottom:11px; }
-.shopObj.v-b > .cmtTab{ bottom:41px; }
-.shopObj.v-c > .cmtTab{ bottom:-9px; }
-.shopObj > .cmtTab::before{ content:""; position:absolute; left:0; right:0; top:-5px; height:6px; background:inherit; border-radius:0; }
+/* ---- shopping list: the Comment tab is placed from the PAPER's own edge (js: placeShopTab), never from the node box that also holds the cart ---- */
+.shopObj > .cmtTab{ z-index:0; left:22px; bottom:auto; transform:rotate(-1deg); border-radius:0 0 7px 7px; }
 
 /* ---- pile browser, phase 2: tools, reorder, fan ---- */
 .pbTools{ display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
@@ -164,3 +160,41 @@ body.dark .po-clipping .poSheet{ filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6)) b
 .embedObj .embCtl button{ min-height:26px; padding:0 9px; border-radius:7px; border:0; background:rgba(20,16,10,0.72); color:#fff; font:600 0.68rem 'Sora',sans-serif; cursor:pointer; }
 .embedObj .embCtl button:hover, .embedObj .embCtl button:focus-visible{ background:#6a4a10; } .embedObj .embCtl button:focus-visible{ outline:2px solid #fff; outline-offset:1px; }
 @media (hover:none){ .embedObj .embCtl{ opacity:1; } }
+
+/* ======================================================================================================================
+   v0.8.3.1 Finish the Edges
+   ====================================================================================================================== */
+/* ---- Done and Trash: quiet background motifs (decoration only: no pointer events, no animation, 2-4% ink) ---- */
+.spDeco{ position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+.spDeco svg{ position:absolute; width:var(--w, 70px); height:var(--w, 70px); left:var(--x); top:var(--y); transform:rotate(var(--r, 0deg)); color:var(--sp-ink); opacity:calc(var(--o, 0.04) * 1.35); }
+.sp-done .spDeco svg{ color:var(--sp-accent); }
+.spSheet > .spHead, .spSheet > .spCanvas, .spSheet > .spNote{ position:relative; z-index:1; }
+.sp-done .spSheet{ background-image:radial-gradient(ellipse at 18% 12%, rgba(255,255,255,0.55), transparent 55%), radial-gradient(circle, rgba(47,125,70,0.11) 1.4px, transparent 1.6px), linear-gradient(180deg, #fffae8, #fff0c4); background-size:auto, 26px 26px, auto; }
+body.dark .sp-done .spSheet{ background-image:radial-gradient(ellipse at 18% 12%, rgba(255,235,170,0.07), transparent 55%), radial-gradient(circle, rgba(127,209,150,0.12) 1.4px, transparent 1.6px), linear-gradient(180deg, #2f2a1a, #242015); background-size:auto, 26px 26px, auto; }
+body.dark .sp-done .spDeco svg{ opacity:var(--od, 0.07); } body.dark .sp-trash .spDeco svg{ opacity:var(--od, 0.07); }
+@media print{ .spDeco{ display:none; } }
+
+/* ---- clippings: the source line ---- */
+.po-clipping .clMark{ position:relative; overflow:hidden; display:inline-block; }
+.po-clipping .clMark .clIcon{ position:absolute; inset:2px; width:20px; height:20px; border-radius:50%; background:#fff; object-fit:contain; }
+.po-clipping .clMark.known{ box-shadow:0 0 0 1.5px rgba(255,255,255,0.65), 0 0 0 2.5px rgba(60,45,10,0.18); }
+.po-clipping button.clDomain.none{ all:unset; box-sizing:border-box; cursor:pointer; font:0.7rem 'Sora',sans-serif; color:#6b5d3a; opacity:0.85; text-decoration:underline dotted; text-underline-offset:3px; padding:2px 4px; margin:-2px -4px; border-radius:5px; }
+.po-clipping button.clDomain.none:hover, .po-clipping button.clDomain.none:focus-visible{ opacity:1; background:rgba(160,100,40,0.14); color:#4a3a14; text-decoration:underline solid; }
+.po-clipping button.clDomain.none:focus-visible{ outline:2px solid var(--focus); outline-offset:1px; }
+.po-clipping button.clDomain.none:active{ background:rgba(160,100,40,0.26); }
+body.dark .po-clipping button.clDomain.none{ color:#d9c892; } body.dark .po-clipping button.clDomain.none:hover{ background:rgba(255,220,140,0.16); color:#f2e6c0; }
+@media (pointer:coarse){ .po-clipping button.clDomain.none{ min-height:36px; display:inline-flex; align-items:center; padding:4px 8px; margin:-4px -8px; } }
+
+/* ---- rows (settings, system, links): one hover / focus / pressed model: a warm tint, no underline, the arrow leans in ---- */
+.asAction.ccLink, .sysRow{ border-radius:10px; transition:background-color .12s ease; }
+.asAction.ccLink:hover, .asAction.ccLink:focus-visible, .sysRow:hover, .sysRow:focus-visible{ background-color:color-mix(in srgb, var(--accent-soft) 70%, transparent); }
+.asAction.ccLink:hover .lbl, .asAction.ccLink:focus-visible .lbl{ text-decoration:none; }
+.asAction.ccLink:hover .go, .asAction.ccLink:focus-visible .go{ color:var(--ink); transform:translateX(2px); }
+html[dir="rtl"] .asAction.ccLink:hover .go, [dir="rtl"] .asAction.ccLink:hover .go{ transform:translateX(-2px); }
+.asAction.ccLink .go{ transition:transform .12s ease, color .12s ease; }
+.asAction.ccLink:focus-visible, .sysRow:focus-visible{ outline:2px solid var(--focus); outline-offset:-2px; }
+.asAction.ccLink:active, .sysRow:active{ background-color:color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 12%); }
+body.dark .asAction.ccLink:hover, body.dark .asAction.ccLink:focus-visible, body.dark .sysRow:hover, body.dark .sysRow:focus-visible{ background-color:rgba(255,180,84,0.12); }
+body.dark .asAction.ccLink:active, body.dark .sysRow:active{ background-color:rgba(255,180,84,0.2); }
+@media (hover:none){ .asAction.ccLink:hover{ background-color:transparent; } .asAction.ccLink:active{ background-color:color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 12%); } }
+@media (prefers-reduced-motion: reduce){ .asAction.ccLink, .asAction.ccLink .go, .sysRow{ transition:none; } .asAction.ccLink:hover .go{ transform:none; } }

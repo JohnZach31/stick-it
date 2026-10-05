@@ -395,7 +395,9 @@
   /* while something is selected, the rest of the board stays still: no lift, no sway, no big controls; the selected object stays on top */
   body.hasSel .note:not(.selected):not(:focus-within):hover, body.hasSel .photoObj:not(.selected):hover, body.hasSel .boardObj:not(.selected):hover{ cursor:default; }
   body.hasSel .note:not(.selected):hover .del, body.hasSel .note:not(.selected):hover .moreBtn, body.hasSel .note:not(.selected):hover .taskDock{ opacity:0; pointer-events:none; }
-  .note.selected, .photoObj.selected, .boardObj.selected{ z-index:9996 !important; }
+  /* A selected object keeps its place in the stack (its z-index is its layer, nothing else). Its controls are reachable by pointing at it or tabbing to it: only then does it
+     rise, and only for as long as you are on it. (It used to be forced to 9996 while selected, which made "Send to back" look like it did nothing.) */
+  .note.selected:hover, .photoObj.selected:hover, .boardObj.selected:hover, .note.selected:has(:focus-visible), .photoObj.selected:has(:focus-visible), .boardObj.selected:has(:focus-visible){ z-index:9996 !important; }
   .note.focused{ z-index:10004 !important; }
   .boardObj.dragging{ cursor:grabbing; transition:none; z-index:9999 !important; transform:rotate(calc(var(--rot, 0deg) + var(--wob, 0deg))) !important; animation:wobbleSoft .8s ease-in-out infinite; }
   .boardObj.new{ animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both; }

@@ -93,9 +93,9 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
   ok(/"headline","sub","quote","sourceTitle","sourceUrl"/.test(app.match(/var SERIAL_FIELDS = \[[^\]]*\]/)[0]), 'the new fields are stored and synced');
   ok(!/innerHTML\s*=\s*[^;]*(headline|quote|sourceTitle|sourceUrl)/.test(fn('buildNewspaperSheet') + fn('buildClippingFoot')), 'clipping and newspaper text is never put on the page as HTML');
   ok(/safeHref\(item\.sourceUrl\)/.test(fn('buildClippingFoot')) && /noopener noreferrer/.test(fn('buildClippingFoot')), 'the source link goes through safeHref and opens safely');
-  ok(!/favicon|\.ico/.test(fn('siteMarkEl') + fn('buildClippingFoot')) && /textContent = d \? d\.charAt\(0\)/.test(fn('siteMarkEl')), 'the "site mark" is a letter drawn locally: the source site is never contacted');
+  ok(/m\.textContent = id\.letter/.test(fn('siteMarkEl')) && /iconPlan\(url\)\.indexOf\("favicon"\) !== -1/.test(fn('siteMarkEl')) && !/favicon\.ico/.test(fn('siteMarkEl') + fn('buildClippingFoot')), 'the "site mark" is a letter badge drawn locally; a favicon is only asked for when a service has been configured (none is by default)');
   const cm = fn('noteToClipping') + fn('clippingToNote') + fn('setClippingSource');
-  ok(/swapObject\(n, fresh, "Make clipping"\)/.test(cm) && /swapObject\(n, nn, "Clipping to note"\)/.test(cm) && /recordChange\(clean \? "Set clipping source" : "Remove clipping source"/.test(cm), 'make clipping, convert back to a note, change or remove the source: each one undo step');
+  ok(/swapObject\(n, fresh, "Make clipping"\)/.test(cm) && /swapObject\(n, nn, "Clipping to note"\)/.test(cm) && /"Set clipping source"/.test(cm) && /"Remove clipping source"/.test(cm) && /recordChange\(/.test(cm), 'make clipping, convert back to a note, change or remove the source: each one undo step');
   ok(/offerClipping\(pasted, text\)/.test(fn('pasteAsNewNote')) && /Make clipping/.test(fn('offerClipping')) && /< 60\) return/.test(fn('offerClipping')), 'pasting long text offers a clipping afterwards; the normal paste still happens');
   ok(/Open source/.test(app) && /Copy source/.test(app) && /Remove source/.test(app) && /Convert to a note/.test(app), 'a clipping menu has open, copy, remove source and convert to note');
   ok(read('js/pile.js').includes('"newspaper", "clipping"'), 'newspapers and clippings can be piled');
@@ -263,7 +263,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
   ok(/release\(\)/.test(tp) && /getTracks\(\)\.forEach\(function\(t\)\{ try\{ t\.stop\(\)/.test(tp) && /onClose: function\(v\)\{\s*release\(\);/.test(tp), 'Cancel, Esc and Take photo all switch the camera off');
   ok(/capture", "user"/.test(tp) && /Couldn\\u2019t open the camera/.test(tp), 'devices without a live camera API get the phone\'s camera picker; a refusal says so and offers upload');
   ok(/item\("Take photo", takePhoto\)/.test(app) && /item\("Cancel", function\(\)\{\}\)/.test(app) && /asPicEdit/.test(app) && /Edit profile photo/.test(app), 'the account photo has a pencil, and a menu: Upload, Take photo, Remove, Cancel');
-  ok(/\.shopObj > \.cmtTab\{ z-index:0; left:14px; bottom:11px;/.test(css) && /\.shopObj\.v-b > \.cmtTab\{ bottom:41px; \}/.test(css) && /\.shopObj\.v-c > \.cmtTab\{ bottom:-9px; \}/.test(css), 'the Comment tab is tucked under the shopping list\'s paper edge in all three looks');
+  ok(/\.shopObj > \.cmtTab\{ z-index:0; left:22px; bottom:auto;/.test(css) && /function placeShopTab/.test(app), 'the Comment tab hangs from the paper edge (placed by script from the paper, not the node box)');
   ok(!/\.shopObj > \.cmtTab[^{]*\{[^}]*position:fixed/.test(css), 'the tab is positioned inside the object, so it follows movement, rotation and resize');
   { // shopping state survives Done and restore
     const c = fresh(); load(c, 'js/shopping.js'); load(c, 'js/objects.js'); const S = c.Stick.shopping;
@@ -276,11 +276,12 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
 
 // ================================================================ versions, docs
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
-ok(pn[0].version === '0.8.3' && pn[0].codename === 'Stick Around' && pn[0].status === 'development' && pn[0].date === null && pn[0].title === 'Stick-It v0.8.3 — Stick Around', 'v0.8.3 "Stick Around" is recorded and not released');
-ok(/APP_VERSION: "0\.8\.3", APP_CODENAME: "Stick Around", APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.3, development');
-ok(JSON.parse(read('docs/patch-notes/index.json'))[0].file === '0.8.3.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.md')), 'patch notes and the index are in step');
-ok(pn[0].tour.length === 5 && ['Done has somewhere to go', 'Trash without panic', 'Scraps got richer', 'Your board remembers more'].every((t) => pn[0].tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
-const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.3"/.test(pd) && !/Touch the Paper/.test(pd), 'the shipped Spotlight data is v0.8.3 (no stale content)');
+const pn3 = pn.find((x) => x.version === '0.8.3');
+ok(pn3 && pn3.codename === 'Stick Around' && pn3.status === 'development' && pn3.date === null && pn3.title === 'Stick-It v0.8.3 — Stick Around', 'v0.8.3 "Stick Around" is recorded and not released');
+ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.3(?:\.\d)?"/.test(read('js/config.js')), 'the app is still in development');
+ok(JSON.parse(read('docs/patch-notes/index.json')).find((x) => x.version === '0.8.3').file === '0.8.3.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.md')), 'patch notes and the index are in step');
+ok(pn3.tour.length === 5 && ['Done has somewhere to go', 'Trash without panic', 'Scraps got richer', 'Your board remembers more'].every((t) => pn3.tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
+const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.\d(?:\.\d)?"/.test(pd) && !/Touch the Paper/.test(pd), 'the shipped Spotlight data has no stale content');
 const md = read('docs/patch-notes/0.8.3.md'); ok(['## Done has somewhere to go', '## Trash without panic', '## Shopping List finishing pass', '## Newspaper', '## Clippings', '## Reactions', '## Better layering', '## Search that actually takes you there', '## Better links and video', '## Piles grew up', '## Receipt polish'].every((h) => md.includes(h)), 'the patch note follows the agreed structure');
 ok(!/Nokia|VHS|cassette/i.test(JSON.stringify(Object.keys(JSON.parse(JSON.stringify({ k: read('js/objects.js').match(/O\.KINDS = \[[^\]]*\]/)[0] }))))), 'no Premium physical nodes were added (they are v0.8.4)');
 ok(/pre-beta/i.test(read('docs/dev/PRE-BETA-CHECKLIST.md')) || /Before the local beta/.test(read('docs/dev/PRE-BETA-CHECKLIST.md')), 'the pre-beta review checkpoint is still there');

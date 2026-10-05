@@ -18,7 +18,7 @@
 
   var cfg = {
     FINER_MODEL: false,          // experimental larger cutout model: off until its weights' origin is verified (see docs/cutout/provider-evaluation.md)
-    APP_VERSION: "0.8.3", APP_CODENAME: "Stick Around", APP_STATUS: "development",   // keep in step with docs/patch-notes/index.json
+    APP_VERSION: "0.8.3.1", APP_CODENAME: "Finish the Edges", APP_STATUS: "development",   // keep in step with docs/patch-notes/index.json
     SUPABASE_URL: "https://ndgybpkkjqydvttmiyot.supabase.co",
     SUPABASE_ANON_KEY: "sb_publishable_RMonorbZOjWuBgmNmXxjNw_O2wjbhq3",
 

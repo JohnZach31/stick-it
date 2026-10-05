@@ -2673,7 +2673,7 @@
     var card = document.createElement("div");
     card.className = "linkCard";
     var fav = document.createElement("div"); fav.className = "fav";
-    fav.appendChild(siteMarkEl(href));                                   // a letter drawn here: the site is never contacted just to show a preview
+    fav.appendChild(siteMarkEl(href));                                   // known-site badge, or a letter drawn here: the site is never contacted just to show a preview
     var meta = document.createElement("div"); meta.className = "meta";
     var dom = document.createElement("div"); dom.className = "dom";
     dom.textContent = u ? (u.hostname.replace(/^www\./, "") || href) : href;
@@ -4046,13 +4046,15 @@
       pop.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }));
     });
     if(n.type === "clipping"){
-      var cu = Stick.objects.clean.url(n.sourceUrl);
-      if(cu){
-        pop.appendChild(menuItem(ICONS.link, "Open source", function(){ closeFloatingPopovers(); var h = safeHref(cu); if(h) window.open(h, "_blank", "noopener,noreferrer"); }));
-        pop.appendChild(menuItem(ICONS.copy, "Copy source", function(){ closeFloatingPopovers(); copyText(cu).then(function(ok){ toast(ok ? "Source copied." : "Couldn\u2019t copy automatically."); }); }));
-      }
-      pop.appendChild(menuItem(ICONS.pencil, cu ? "Change source\u2026" : "Add source\u2026", function(){ closeFloatingPopovers(); askClippingSource(n); }));
-      if(cu) pop.appendChild(menuItem(ICONS.close, "Remove source", function(){ closeFloatingPopovers(); setClippingSource(n, ""); }));
+      menuSub(pop, ICONS.link, "Source", function(body){
+        var cu = Stick.objects.clean.url(n.sourceUrl);
+        if(cu){
+          body.appendChild(menuItem(ICONS.link, "Open source", function(){ closeFloatingPopovers(); var h = safeHref(cu); if(h) window.open(h, "_blank", "noopener,noreferrer"); }));
+          body.appendChild(menuItem(ICONS.copy, "Copy source", function(){ closeFloatingPopovers(); copyText(cu).then(function(ok){ toast(ok ? "Source copied." : "Couldn\u2019t copy automatically."); }); }));
+        }
+        body.appendChild(menuItem(ICONS.pencil, cu ? "Edit source link\u2026" : "Add source link\u2026", function(){ closeFloatingPopovers(); askClippingSource(n); }));
+        if(cu) body.appendChild(menuItem(ICONS.close, "Remove source link", function(){ closeFloatingPopovers(); setClippingSource(n, ""); }));
+      });
       pop.appendChild(menuItem(ICONS.sticky, "Convert to a note", function(){ closeFloatingPopovers(); clippingToNote(n); }, {title: "Back to a plain sticky note with the same words"}));
     }
     if(n.type === "ticket") pop.appendChild(menuItem(ICONS.move, n.orient === "portrait" ? "Make it landscape" : "Make it portrait", function(){ closeFloatingPopovers(); setPaperProp(n, "orient", n.orient === "portrait" ? "landscape" : "portrait", "Turn ticket"); }));
@@ -4537,15 +4539,28 @@
   // ---------- clippings (v0.8.3): a quote from somewhere, kept with where it came from ----------
   // The words are plain text. The source is a link that has been checked (http / https only, no credentials, no markup); a clipping never embeds anything from
   // the page it came from, and it never contacts that site (the "site mark" is a letter drawn here, not a downloaded icon).
-  var SITE_COLORS = ["#c0584a", "#4a7fc0", "#4a9a6a", "#a06ac0", "#c08a2e", "#4a9aa6", "#8a8a4a"];
+  var sourceIconCache = (window.Stick && Stick.sources) ? Stick.sources.createCache(window.localStorage) : null;
+  // The mark beside a source: a known site's colour and initial (A), a favicon only when a favicon service has been configured and has not failed before (B),
+  // else a letter badge from the domain (C). It never throws and never blocks drawing; a failed icon is remembered so it is not asked for again.
   function siteMarkEl(url){
-    var d = Stick.objects.clean.domain(url), m = makeDiv("clMark"); m.setAttribute("aria-hidden", "true");
-    m.textContent = d ? d.charAt(0).toUpperCase() : "?";
-    m.style.background = d ? SITE_COLORS[hashStr(d) % SITE_COLORS.length] : "#9a9484";
+    var S = window.Stick && Stick.sources, id = S ? S.identify(url) : {letter: "?", color: "#9a9484", label: "", known: null, host: ""};
+    var m = makeDiv("clMark" + (id.known ? " known" : "")); m.setAttribute("aria-hidden", "true");
+    m.textContent = id.letter; m.style.background = id.color; if(id.label) m.title = id.label;
+    if(S && id.host && S.iconPlan(url).indexOf("favicon") !== -1){
+      var seen = sourceIconCache && sourceIconCache.get(id.host);
+      if(!seen || seen.ok){
+        try{
+          var img = document.createElement("img"); img.alt = ""; img.width = 20; img.height = 20; img.referrerPolicy = "no-referrer"; img.decoding = "async"; img.className = "clIcon";
+          img.addEventListener("load", function(){ if(sourceIconCache) sourceIconCache.set(id.host, true); m.classList.add("hasIcon"); });
+          img.addEventListener("error", function(){ if(sourceIconCache) sourceIconCache.set(id.host, false); img.remove(); });
+          img.src = S.faviconUrl(id.host); m.appendChild(img);
+        }catch(e){ /* a failed icon never breaks the clipping */ }
+      }
+    }
     return m;
   }
   function buildClippingFoot(item){
-    var foot = makeDiv("clFoot"), src = makeDiv("clSrc"), dom = Stick.objects.clean.domain(item.sourceUrl);
+    var foot = makeDiv("clFoot"), src = makeDiv("clSrc"), dom = (window.Stick && Stick.sources) ? Stick.sources.domain(item.sourceUrl) : Stick.objects.clean.domain(item.sourceUrl);
     src.appendChild(siteMarkEl(item.sourceUrl));
     var meta = makeDiv("clMeta");
     meta.appendChild(paperField("clTitle", "sourceTitle", item, true));
@@ -4554,27 +4569,34 @@
       var href = safeHref(item.sourceUrl); if(href){ a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; }
       a.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
       meta.appendChild(a);
-    } else { var none = makeDiv("clDomain none"); none.textContent = "No source link"; meta.appendChild(none); }
+    } else if(!readOnly){                                           // "No source link" is a button: it opens the source editor
+      var none = document.createElement("button"); none.type = "button"; none.className = "clDomain none"; none.textContent = "No source link"; none.title = "Add a source link";
+      none.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      none.addEventListener("click", function(e){ e.stopPropagation(); var cur = findNote(item.id); if(cur) askClippingSource(cur); });
+      meta.appendChild(none);
+    } else { var none2 = makeDiv("clDomain none"); none2.textContent = "No source link"; meta.appendChild(none2); }
     src.appendChild(meta); foot.appendChild(src);
     return foot;
   }
-  function setClippingSource(n, url){
+  function setClippingSource(n, url, title){
     var clean = url ? Stick.objects.clean.url(url) : "";
-    if(url && !clean){ toast("That doesn’t look like a web address (it needs to start with http:// or https://)."); return false; }
-    if((n.sourceUrl || "") === clean) return true;
+    if(url && !clean){ toast("That doesn\u2019t look like a web address (it needs to start with http:// or https://)."); return false; }
+    var t = title == null ? (n.sourceTitle || "") : Stick.objects.clean.one(title, 100);
+    if((n.sourceUrl || "") === clean && (n.sourceTitle || "") === t) return true;
     var before = captureState([n.id]);
     if(clean) n.sourceUrl = clean; else delete n.sourceUrl;
-    saveNotes(); rerenderNote(n); recordChange(clean ? "Set clipping source" : "Remove clipping source", before);
+    if(t) n.sourceTitle = t; else delete n.sourceTitle;
+    saveNotes(); rerenderNote(n); recordChange(clean ? ((before[n.id] && before[n.id].sourceUrl) ? "Change clipping source" : "Set clipping source") : "Remove clipping source", before);
     return true;
   }
   function askClippingSource(n){
-    var wrap = makeDiv("nameDlg"), lab = document.createElement("label"), input = document.createElement("input"), id = "clSrcIn" + (++dialogSeq);
-    lab.textContent = "Link to the source"; lab.className = "asLbl"; lab.setAttribute("for", id);
-    input.type = "url"; input.className = "asIn"; input.id = id; input.maxLength = 500; input.value = n.sourceUrl || ""; input.placeholder = "https://…"; input.setAttribute("inputmode", "url");
-    wrap.appendChild(lab); wrap.appendChild(input);
-    var m = openModal({title: "Source", content: wrap, width: 380, actions: [{label: "Cancel", value: false}, {label: "Save", kind: "primary", value: true, onClick: function(close){ if(setClippingSource(n, input.value.trim())) return true; return false; }}]});
-    setTimeout(function(){ input.focus(); input.select(); }, 0);
-    input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); var ok = m.card.querySelector(".pillBtn.primary"); if(ok) ok.click(); } });
+    var wrap = makeDiv("nameDlg"), id = "clSrcIn" + (++dialogSeq);
+    function field(label, value, type, max, ph){ var l = document.createElement("label"), i = document.createElement("input"), fid = id + label.charAt(0); l.textContent = label; l.className = "asLbl"; l.setAttribute("for", fid); i.type = type; i.className = "asIn"; i.id = fid; i.maxLength = max; i.value = value || ""; if(ph) i.placeholder = ph; l.style.display = "block"; i.style.marginBottom = "10px"; wrap.appendChild(l); wrap.appendChild(i); return i; }
+    var url = field("Link to the source", n.sourceUrl, "url", 500, "https://\u2026"); url.setAttribute("inputmode", "url");
+    var title = field("Source title (optional)", n.sourceTitle, "text", 100, "Article, page or book"); title.setAttribute("dir", "auto");
+    var m = openModal({title: n.sourceUrl ? "Edit source" : "Add source", content: wrap, width: 380, actions: [{label: "Cancel", value: false}, {label: "Save", kind: "primary", value: true, onClick: function(){ return setClippingSource(n, url.value.trim(), title.value) ? true : false; }}]});
+    setTimeout(function(){ url.focus(); url.select(); }, 0);
+    wrap.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); var ok = m.card.querySelector(".pillBtn.primary"); if(ok) ok.click(); } });
   }
   // note <-> clipping (the words go across; each way is one undo step)
   function noteToClipping(n){
@@ -5819,12 +5841,28 @@
   }
   OBJECT_MENUS.pile = pileMenu;
 
+  // The Comment tab of a shopping list hangs from the PAPER's lower edge (not from the whole node, which also holds the cart): a few pixels tuck under the paper, a little in
+  // from the left, so it reads as part of the receipt. Re-placed whenever the paper changes size (items added, the list resized, text wrapping).
+  function placeShopTab(n){
+    var el = n && n.el; if(!el) return;
+    function place(){
+      var tab = el.querySelector(":scope > .cmtTab"), paper = el.querySelector(".shPaper"); if(!tab || !paper) return;
+      var v = shopVariant(n), notch = v === "b" ? 22 : v === "c" ? 3 : 0;          // the paper's visible lower edge on its left side (look B narrows to a tail; look C is torn)
+      tab.style.top = Math.round(paper.offsetTop + paper.offsetHeight - notch - 4) + "px"; tab.style.bottom = "auto";
+      var left = 22, cart = el.querySelector(".shCart");
+      if(cart && v === "b" && cart.offsetLeft){ left = Math.max(6, Math.min(22, cart.offsetLeft - (tab.offsetWidth || 76) - 6)); }          // look B's cart sits centred below: keep the tab clear of it on a narrow list
+      tab.style.left = left + "px";
+    }
+    place();
+    if(window.ResizeObserver && !el._tabRO){ el._tabRO = new ResizeObserver(place); var pp = el.querySelector(".shPaper"); if(pp) el._tabRO.observe(pp); }
+  }
   function renderNote(n, isNew, opts){
     if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
     decoratePin(n); decorateReactions(n);
     if(selected.size === 1 && selected.has(n.id)){ syncRotHandle(); syncReactAdd(); }
     if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
+    if(n.type === "shopping" && n.el) placeShopTab(n);
     return made;
   }
   function renderNoteCore(n, isNew, opts){
@@ -6203,10 +6241,14 @@
     setTimeout(function(){ elRef.remove(); }, 450);
   }
 
-  function bringToFront(n, el){
-    zCounter += 1;
-    n.z = zCounter;
-    el.style.zIndex = n.z;
+  // Picking something up raises it, but only once it is actually dragged: merely clicking or selecting an object never changes its layer (otherwise every click would undo
+  // a "Send to back"). The press is remembered here and applied by startDrag at the first real movement.
+  var pendingFront = null;
+  function bringToFront(n, el){ pendingFront = {n: n, el: el}; }
+  function commitFront(){
+    var p = pendingFront; pendingFront = null;
+    if(!p || !p.n || findNote(p.n.id) !== p.n) return;
+    zCounter += 1; p.n.z = zCounter; if(p.el) p.el.style.zIndex = p.n.z;
     saveNotes();
   }
 
@@ -6214,7 +6256,7 @@
   function startDrag(e, primary, group){
     var everyone = group;
     group = group.filter(function(g){ return !isPinned(g); });               // pinned items stay put, even in a group
-    if(!group.length){ everyone.forEach(pinTug); return; }
+    if(!group.length){ pendingFront = null; everyone.forEach(pinTug); return; }
     var startX = e.clientX, startY = e.clientY;
     var orig = group.map(function(g){ return {n:g, x:g.x, y:g.y}; });
     var before = captureState(group.map(function(g){ return g.id; }));
@@ -6230,6 +6272,7 @@
       var dx = (ev.clientX - startX) / boardZoom;
       var dy = (ev.clientY - startY) / boardZoom;
       if(!moved && Math.abs(dx) + Math.abs(dy) < 3) return;
+      if(!moved) commitFront();
       moved = true;
       // clamp the group as one piece so relative spacing survives the board edges
       dx = Math.max(-minX0, dx);
@@ -6245,7 +6288,7 @@
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
       group.forEach(function(g){ if(g.el) g.el.classList.remove("dragging"); });
-      draggingIds = null;
+      draggingIds = null; pendingFront = null;
       if(moved){
         ensureWidth();
         saveNotes();
@@ -7568,6 +7611,34 @@
     if(filter === "earlier") return ts < startToday - 6 * 86400000;
     return true;
   }
+  // ---------- background motifs for Done and Trash (v0.8.3.1): quiet, sparse, decoration only ----------
+  // A handful of small hand-drawn shapes at 2-4% ink, a little rotated, placed by hand (no grid). They never receive pointer events, never move, and hold no state.
+  var DECO_SVG = {
+    check: '<circle cx="12" cy="12" r="9.2"/><path d="M7.4 12.6l3.2 3.2 6-7"/>',
+    ribbon: '<circle cx="12" cy="9" r="5.6"/><path d="M8.6 13.4L6.8 21l5.2-2.6 5.2 2.6-1.8-7.6"/><path d="M9.8 9l1.6 1.7 3-3.4"/>',
+    seal: '<path d="M12 2.8l2 1.6 2.5-.4 1 2.3 2.4.9-.3 2.5 1.4 2.1-1.4 2.1.3 2.5-2.4.9-1 2.3-2.5-.4-2 1.6-2-1.6-2.5.4-1-2.3-2.4-.9.3-2.5L2.5 12l1.4-2.1-.3-2.5 2.4-.9 1-2.3 2.5.4z"/><path d="M8.4 12.2l2.4 2.4 4.6-5"/>',
+    star: '<path d="M12 3.2l2.5 5.2 5.6.7-4.1 3.9 1 5.6L12 15.9l-5 2.7 1-5.6L3.9 9.1l5.6-.7z"/>',
+    canA: '<path d="M5.4 7.4h13.2M9.4 7.4l.4-2.4h4.4l.4 2.4"/><path d="M6.6 7.8l1 12.2h8.8l1-12.2"/><path d="M10.2 11v6.4M13.8 11v6.4"/>',
+    canB: '<path d="M4.6 9.6l11.4-3.2M9.8 8l.8-2.4 3.8-1 .6 2.4"/><path d="M6.4 9.8l2.6 9.6 8-2.2-2.6-9.2"/><path d="M10.4 12.6l.9 3.4M13.2 11.8l.9 3.4"/>',
+    canC: '<path d="M5.8 8h12.4"/><path d="M6.8 8.4l.9 11.4h8.6l.9-11.4"/><path d="M8.6 8c.4-2.4 1.8-3.6 3.6-3 1.6-.8 3 .4 3.2 3"/><path d="M12 11.4v5.6"/>',
+    canD: '<rect x="6.2" y="7.6" width="11.6" height="12.4" rx="1.6"/><path d="M5 7.6h14M9.6 7.6V5.4h4.8v2.2"/><path d="M9.8 11.4h4.4M9.8 14.2h4.4M9.8 17h4.4"/>',
+    basket: '<path d="M5 8.6h14l-1.4 11.2H6.4z"/><path d="M8.2 8.6l.8-3 6 .2.8 2.8"/><path d="M9.4 12l.4 5.4M12 12v5.4M14.6 12l-.4 5.4"/>',
+    crumple: '<path d="M6.2 5.4l4-1.4 3.2 1.4 4.4-.8 1.6 4.6-1.4 3.6 1.2 4-4.2 1.8-3-1.2-4.4 1.2-1.8-4.2.8-3.8z"/><path d="M9.6 8.6l2.4 2.2-1.4 3.2 3 .6M14.2 7.4l-1.2 3.4"/>'
+  };
+  var DECO_PLAN = {
+    done: [["check", 6, 18, 74, -12, 0.035], ["ribbon", 71, 8, 62, 9, 0.03], ["seal", 84, 52, 88, -6, 0.034], ["star", 20, 64, 52, 14, 0.04], ["check", 52, 82, 66, 6, 0.03], ["seal", 38, 36, 56, -16, 0.025]],
+    trash: [["canA", 9, 22, 70, -8, 0.04], ["crumple", 63, 14, 60, 18, 0.035], ["canB", 80, 58, 76, 12, 0.04], ["canC", 24, 70, 64, -14, 0.035], ["crumple", 48, 52, 52, -22, 0.03], ["canD", 68, 84, 58, 5, 0.03], ["basket", 40, 12, 56, 10, 0.03]]
+  };
+  function spaceDeco(kind){
+    var d = makeDiv("spDeco"); d.setAttribute("aria-hidden", "true");
+    (DECO_PLAN[kind] || []).forEach(function(p){
+      var wrap = document.createElement("span");
+      wrap.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + (DECO_SVG[p[0]] || "") + "</svg>";
+      var svg = wrap.firstChild; svg.style.cssText = "--x:" + p[1] + "%;--y:" + p[2] + "%;--w:" + p[3] + "px;--r:" + p[4] + "deg;--o:" + p[5] + ";--od:" + Math.min(0.08, p[5] * 1.9);
+      d.appendChild(svg);
+    });
+    return d;
+  }
   var SPACE_PAGE = 48;
   function openSpace(kind, opts){
     var S = SPACES[kind]; if(!S) return;
@@ -7596,7 +7667,7 @@
     head.appendChild(bulk); head.appendChild(closeB);
     var canvas = makeDiv("spCanvas"); canvas.setAttribute("role", "list");
     var note = document.createElement("p"); note.className = "spNote"; note.setAttribute("role", "status");
-    sheet.appendChild(head); sheet.appendChild(canvas); sheet.appendChild(note); root.appendChild(sheet); document.body.appendChild(root);
+    sheet.appendChild(spaceDeco(kind)); sheet.appendChild(head); sheet.appendChild(canvas); sheet.appendChild(note); root.appendChild(sheet); document.body.appendChild(root);
     function bulkBtn(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "spBtn " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); bulk.appendChild(b); return b; }
     function selIds(){ return Object.keys(sel).filter(function(k){ return sel[k]; }); }
     function after(){ sel = {}; updateSpaceCounts(); paint(); }

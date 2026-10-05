@@ -204,7 +204,7 @@ ok(/box\.remove\(\);\s+document\.body\.style\.userSelect = "";\s+if\(selected\.s
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
 const pn2 = pn.find((x) => x.version === '0.8.2.2');
 ok(pn2 && pn2.codename === 'Touch the Paper' && pn2.status === 'development' && pn2.date === null && pn2.title === 'Stick-It v0.8.2.2 — Touch the Paper', 'v0.8.2.2 "Touch the Paper" is recorded and not released');
-ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.(?:2\.2|3)"/.test(read('js/config.js')), 'the app is still in development');
+ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.\d(?:\.\d)?"/.test(read('js/config.js')), 'the app is still in development');
 ok(JSON.parse(read('docs/patch-notes/index.json')).find((x) => x.version === '0.8.2.2').file === '0.8.2.2.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.2.2.md')), 'patch notes and the index are in step');
 ok(pn2.tour.length === 5 && ['Pin it for real', 'Turn things a little sideways', 'Links can become videos', 'Cleaner menus'].every((t) => pn2.tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
 const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.\d(?:\.\d)?"/.test(pd) && !/Room to Breathe/.test(pd), 'the shipped Spotlight data has no stale 0.8.2.1 content');

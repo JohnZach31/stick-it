@@ -1,5 +1,47 @@
 [
   {
+    "version": "0.8.3.1",
+    "codename": "Finish the Edges",
+    "title": "Stick-It v0.8.3.1 — Finish the Edges",
+    "date": null,
+    "status": "development",
+    "tldr": "Polish for Done, Trash, Clippings, layering, and Shopping List attachment.",
+    "highlights": [
+      "Done and Trash feel like places: a little more personality, kept quiet.",
+      "Sources finally look like sources: add, edit or remove a clipping's link, and familiar sites are recognised.",
+      "Layers mean layers: Bring forward/back now behaves the same for every kind of object.",
+      "The Shopping List Comment tab belongs to the receipt."
+    ],
+    "tourMode": "full",
+    "tour": [
+      {
+        "target": null,
+        "title": "Finish the Edges",
+        "body": "A polish pass for the new v0.8.3 surfaces. This takes about twenty seconds."
+      },
+      {
+        "target": "#brandBtn",
+        "title": "Done and Trash feel like places",
+        "body": "Open your boards list, then Done or Trash under System. They each have a little more personality now, kept quiet so your things stay the star."
+      },
+      {
+        "target": null,
+        "title": "Sources finally look like sources",
+        "body": "Open a clipping's ... menu, then Source, to add, edit or remove its link. 'No source link' is a button too. ChatGPT, Google, YouTube, BBC, GitHub, Reddit and Wikipedia are recognised."
+      },
+      {
+        "target": ".moreBtn",
+        "title": "Layers mean layers",
+        "body": "Arrange, then Bring forward or Send backward. A selected object now stays exactly where its layer says, whatever else is on the board."
+      },
+      {
+        "target": null,
+        "title": "Tiny fix, big annoyance gone",
+        "body": "The Shopping List Comment tab now hangs from the receipt itself instead of the cart's corner."
+      }
+    ]
+  },
+  {
     "version": "0.8.3",
     "codename": "Stick Around",
     "title": "Stick-It v0.8.3 — Stick Around",

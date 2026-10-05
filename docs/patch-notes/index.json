@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.3.1",
+    "codename": "Finish the Edges",
+    "title": "Stick-It v0.8.3.1 — Finish the Edges",
+    "date": null,
+    "status": "development",
+    "tldr": "Polish for Done, Trash, Clippings, layering, and Shopping List attachment.",
+    "file": "0.8.3.1.md"
+  },
+  {
     "version": "0.8.3",
     "codename": "Stick Around",
     "title": "Stick-It v0.8.3 — Stick Around",
