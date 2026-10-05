@@ -18,4 +18,20 @@ ok(/dblNode: "sticky", pasteText: "ask"/.test(app) && /createAtDoubleClick\(e\)/
 ok(/choosePasteKind\(plain\)/.test(app) && /Remember my choice/.test(app) && /if\(r\.remember\) setUiPref\("pasteText"/.test(app), 'paste asks and can remember');
 ok(/SoundFx\.cue\("done"\)/.test(app) && /SoundFx\.cue\("trash"\)/.test(app) && /SoundFx\.cue\("restore"\)/.test(app) && /if\(!this\.enabled\(\) \|\| this\.volume\(\) <= 0\) return false/.test(app), 'Done/Trash/Restore cues exist and respect Sounds');
 ok(/menuSub\(pop, ICONS\.paper \|\| ICONS\.sticky, "Style"/.test(app), 'paper Style choices live in a Style submenu');
+// ---- smart dates: Hebrew / English phrases
+import vm from 'node:vm';
+{
+  const code = app.slice(app.indexOf('var SmartDates = (function(){'), app.indexOf('  // ---------- text index: maps plain-text offsets'));
+  const ctx = vm.createContext({ navigator: { language: 'en-GB' }, Date, Math, Number, String, RegExp, Array, Object });
+  vm.runInContext(code, ctx); const D = vm.runInContext('SmartDates', ctx), now = new Date(2026, 9, 5, 10, 0, 0);
+  const hit = (t) => { const r = D.detect(t, now); return r.length ? { text: t.slice(r[0].index, r[0].index + r[0].length), d: r[0].date, allDay: r[0].allDay } : null; };
+  let h = hit('פגישה הראשון באוקטובר'); ok(h && h.d.getMonth() === 9 && h.d.getDate() === 1 && h.d.getFullYear() === 2027, '"הראשון באוקטובר" = 1 October (next one, as it has passed)');
+  h = hit('יום הולדת ב-15 בנובמבר'); ok(h && h.d.getMonth() === 10 && h.d.getDate() === 15, '"15 בנובמבר"');
+  h = hit('להגיש 3 במאי 2027'); ok(h && h.d.getFullYear() === 2027 && h.d.getMonth() === 4 && h.d.getDate() === 3, '"3 במאי 2027"');
+  h = hit('ביום שני בערב'); ok(h && h.d.getDay() === 1 && h.d.getHours() === 19, '"ביום שני בערב" = Monday 19:00');
+  h = hit('next Tuesday night'); ok(h && h.d.getDay() === 2 && h.d.getHours() === 21, '"next Tuesday night"');
+  h = hit('Friday evening'); ok(h && h.d.getDay() === 5 && h.d.getHours() === 19, '"Friday evening"');
+  ok(hit('שני פריטים') === null && hit('רביעי בשורה') === null, 'plain Hebrew words that are not dates stay plain');
+  ok(/dateSuggest|ask|chip/i.test(app) , 'detection only suggests (the chip still asks)');
+}
 console.log('v0.8.3.2: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

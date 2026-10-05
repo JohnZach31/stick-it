@@ -131,3 +131,47 @@ body.dark .lrSheet.lrContrast{ --ink:#fff; --soft:#f4f0ff; --rule:rgba(255,255,2
 .lrArticle h1:first-child{ padding-top:0; }
 .lrArticle h1{ background-image:none; }
 .lrArticle blockquote p, .lrArticle td p, .lrArticle th p{ background-image:none; padding:0; }
+
+/* ===== v0.8.3.2: a calmer, more physical reader ===== */
+/* header: the brand and what you are reading on the left, a few quiet tools on the right */
+.lrHead{ padding:10px 16px; gap:12px; border-bottom:0; box-shadow:0 1px 0 var(--line); }
+.lrHeadMain{ display:flex; align-items:center; gap:12px; min-width:0; flex:1 1 auto; }
+.lrBrand{ flex:none; }
+.lrTitle{ font-size:1.5rem; line-height:1.1; color:var(--ink); border-inline-start:0; padding-inline-start:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lrTools{ gap:4px; }
+.lrBtn{ border-color:transparent; background:transparent; }
+.lrBtn:hover{ border-color:var(--line); }
+.lrLinkBtn{ font-weight:500; color:var(--soft); }
+/* paper tabs: each document is a coloured index tab on the edge of the page; the open one is raised and joins the sheet */
+.lrNav{ gap:2px; padding:10px 16px 0; align-items:flex-end; mask-image:linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); -webkit-mask-image:linear-gradient(to right, transparent 0, #000 14px, #000 calc(100% - 22px), transparent 100%); }
+.lrDoc{ --tabc:#f6e7a8; border:1px solid color-mix(in srgb, var(--tabc) 60%, #000 18%); border-bottom:0; border-radius:9px 9px 0 0; background:color-mix(in srgb, var(--tabc) 78%, var(--desk)); color:#4a3a00; padding:7px 14px 6px; min-height:36px; box-shadow:inset 0 -6px 8px -8px rgba(60,45,10,0.4); transform:translateY(3px); transition:transform .12s ease; }
+.lrDoc[data-tab="1"]{ --tabc:#cfe6cf; } .lrDoc[data-tab="2"]{ --tabc:#cfe0f5; } .lrDoc[data-tab="3"]{ --tabc:#f5d2cb; } .lrDoc[data-tab="4"]{ --tabc:#e3d6f3; }
+body.dark .lrDoc{ --tabc:#5a4f26; color:#f2eadb; } body.dark .lrDoc[data-tab="1"]{ --tabc:#2f4a35; } body.dark .lrDoc[data-tab="2"]{ --tabc:#2f4160; } body.dark .lrDoc[data-tab="3"]{ --tabc:#5a3030; } body.dark .lrDoc[data-tab="4"]{ --tabc:#47345f; }
+.lrDoc:hover{ transform:translateY(1px); background:color-mix(in srgb, var(--tabc) 90%, var(--desk)); color:#33301f; }
+body.dark .lrDoc:hover{ color:#fff; }
+.lrDoc[aria-current="page"]{ transform:none; background:var(--sheet); color:var(--ink); border-color:var(--line); border-top:3px solid color-mix(in srgb, var(--tabc) 80%, #000 12%); padding-bottom:9px; box-shadow:none; font-weight:700; }
+/* the draft notice: a small taped slip, not a banner */
+.lrBanner{ display:flex; align-items:baseline; gap:8px; max-width:560px; margin:12px auto 4px; padding:6px 12px; font-size:0.8rem; line-height:1.4; transform:rotate(-0.4deg); }
+.lrBanner::before{ content:""; position:absolute; top:-7px; left:50%; width:54px; height:14px; margin-left:-27px; background:var(--tape); transform:rotate(-2deg); box-shadow:0 1px 2px rgba(60,45,10,0.2); }
+.lrSlipTag{ flex:none; font:700 0.66rem var(--bodyf); letter-spacing:0.08em; text-transform:uppercase; padding:1px 7px; border-radius:999px; border:1px solid currentColor; }
+.lrSlipText{ min-width:0; }
+/* the document: one clean sheet with a gentle margin rule and breathing room */
+.lrBody{ padding:14px 16px 26px; }
+.lrArticle{ max-width:780px; border-radius:3px 8px 8px 3px; box-shadow:0 1px 1px rgba(60,45,10,0.2), 0 12px 28px rgba(60,45,10,0.12); padding:calc(var(--ln) * 1.5) 44px calc(var(--ln) * 1.5) 72px; font-size:1.02rem; }
+.lrArticle[dir="rtl"]{ padding:calc(var(--ln) * 1.5) 72px calc(var(--ln) * 1.5) 44px; }
+.lrArticle::before{ inset-inline-start:54px; opacity:0.75; }
+.lrArticle h1{ font-size:2.3rem; }
+.lrArticle h2{ border-bottom:0; }
+/* phones (375 / 390 / 430): tabs scroll under the thumb, the sheet uses the width, tools keep 44px targets */
+@media (max-width:640px){
+  .lrHead{ padding:8px 10px; gap:6px; flex-wrap:nowrap; }
+  .lrHeadMain{ flex:1 1 auto; } .lrTitle{ display:block; font-size:1.2rem; }
+  .lrWord{ display:none; }
+  .lrNav{ padding:8px 10px 0; scroll-snap-type:x proximity; } .lrDoc{ scroll-snap-align:start; min-height:44px; padding:8px 12px 6px; font-size:0.84rem; }
+  .lrBody{ padding:10px 6px 18px; }
+  .lrBanner{ margin:10px 6px 2px; font-size:0.78rem; }
+  .lrArticle{ padding:var(--ln) 16px var(--ln) 44px; font-size:0.98rem; } .lrArticle[dir="rtl"]{ padding:var(--ln) 44px var(--ln) 16px; }
+  .lrArticle::before{ inset-inline-start:32px; }
+  .lrArticle h1{ font-size:1.65rem; } .lrArticle .tableWrap{ margin-inline:-4px; }
+}
+@media (max-width:380px){ .lrArticle{ padding-inline-start:38px; } .lrArticle::before{ inset-inline-start:27px; } .lrTitle{ font-size:1.1rem; } }

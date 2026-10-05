@@ -43,6 +43,8 @@ Share a board with a link that just *works*.
 
 ## 🆕 What's new
 
+**v0.8.3.2 — Finish the Flow** (in development): paste text as a sticky or a clipping (and remember the choice), choose what double-click creates, zones that collapse and show what belongs to them, Done / Trash / Restore sounds and a stronger Done moment, optional newspaper pictures, collab invites as e-mail pills, a broader reaction picker, a safer sign-out, smarter Hebrew/English dates, a calmer Legal reader, and **every patch note and tour inside the app** (one canonical source: [docs/dev/PATCH-DATA.md](docs/dev/PATCH-DATA.md)).
+
 **v0.8.2.2 — Touch the Paper** (in development): a physical tack, hand rotation, grouped *Paper* / *Arrange* menus, link-to-video for existing links, clearer delete, Legal & policies icons. Selecting several things with a drag box no longer leaves a text cursor in a note, so shortcuts like **P** act on the group instead of typing into it.
 Earlier: v0.8.2.1 *Room to Breathe* (in-app legal reader, compact phone shell, pile browsing, safe video embeds), v0.8.2 *Get a Grip*. Full notes: [docs/patch-notes/](docs/patch-notes/).
 

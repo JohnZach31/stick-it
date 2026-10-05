@@ -30,7 +30,7 @@ export const patchNotes = [
       {
         "target": null,
         "title": "Paste it your way",
-        "body": "Text can become a sticky or a clipping — and Stick-It can remember your choice. Change it any time in Settings, Shortcuts, Pasting.",
+        "body": "Text can become a sticky or a clipping — and Stick-It can remember your choice. Change it any time in Settings, Shortcuts, Input.",
         "feature": "paste",
         "action": "openShortcuts"
       },

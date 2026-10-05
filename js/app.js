@@ -1107,7 +1107,7 @@
       pc.id = newId(); pc.x = clampNum(item.x, 0, 1e6, 0); pc.y = clampNum(item.y, 0, 5000, 0);
       pc.rot = clampNum(item.rot, -12, 12, 0); pc.z = 1; pc.phys = {};
       pc.createdAt = clampNum(item.createdAt, 0, 1e14, Date.now());
-      if(opts.allowAssets && uuidOrNull(item.assetId) && pc.type === "postcard") pc.mediaState = item.mediaState === "failed" || item.mediaState === "uploading" ? item.mediaState : "ready";
+      if(opts.allowAssets && uuidOrNull(item.assetId) && (pc.type === "postcard" || pc.type === "newspaper")) pc.mediaState = item.mediaState === "failed" || item.mediaState === "uploading" ? item.mediaState : "ready";
       return pc;
     }
     if(item.type === "audio" || item.type === "video"){
@@ -1172,8 +1172,8 @@
   // (declared here, above everything that runs while the page loads: the cached board is sanitised during boot, long before the zone code below)
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
-  var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl"];
+  var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1243,6 +1243,7 @@
       if(!ZONE_MATERIALS.some(function(m){ return m[0] === c.variant; })) c.variant = "paper";
       c.bg = safeColor(c.bg) || ZONE_TINTS[0];
       if(c.carry !== true) delete c.carry;
+      if(c.min === true && Array.isArray(c.hold)){ c.hold = c.hold.filter(function(x){ return typeof x === "string" && x.length <= 64; }).slice(0, 5000); } else { delete c.min; delete c.hold; }
       if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
       delete c.html;
       return c;
@@ -1566,6 +1567,7 @@
   function updateCount(){
     if(typeof updateSpaceCounts === "function") updateSpaceCounts(); else if(typeof updateDonePile === "function") updateDonePile(false);
     if(typeof checkBoardSize === "function") checkBoardSize();
+    if(typeof scheduleZonePaint === "function") scheduleZonePaint();
     countEl.textContent = logicalCount() + (logicalCount() === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
   }
 
@@ -1869,6 +1871,16 @@
         var bdow = HE_WD[m[3]], bdelta = (bdow - today.getDay() + 7) % 7;
         push(m.index + m[1].length + m[2].length, m[3].length, addDays(today, bdelta === 0 ? 7 : bdelta), {sameDay: bdelta === 0});
       }
+      // Hebrew day + month: "1 באוקטובר", "ה-5 בנובמבר 2026", "הראשון באוקטובר", "ב-15 למאי"
+      var HE_ORD = {"ראשון":1,"שני":2,"שלישי":3,"רביעי":4,"חמישי":5,"שישי":6,"שביעי":7,"שמיני":8,"תשיעי":9,"עשירי":10};
+      var HE_MONTHS = {"ינואר":0,"פברואר":1,"מרץ":2,"מרס":2,"אפריל":3,"מאי":4,"יוני":5,"יולי":6,"אוגוסט":7,"ספטמבר":8,"אוקטובר":9,"נובמבר":10,"דצמבר":11};
+      var HE_MON_RE = "(ינואר|פברואר|מרץ|מרס|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)";
+      re = new RegExp("(^|[^\\u0590-\\u05FF\\d])(?:ה[-\\u05BE]?|ב[-\\u05BE]?)?(\\d{1,2}|ראשון|שני|שלישי|רביעי|חמישי|שישי|שביעי|שמיני|תשיעי|עשירי)\\s+[בל][-\\u05BE]?" + HE_MON_RE + "(?:\\s+(\\d{4}))?(?![\\u0590-\\u05FF])", "g");
+      while((m = re.exec(text))){
+        var hday = /^\d/.test(m[2]) ? +m[2] : HE_ORD[m[2]];
+        var hstart = m.index + m[1].length;
+        push(hstart, m[0].length - m[1].length, mkDate(m[4], HE_MONTHS[m[3]], hday, today));
+      }
       return out;
     }
 
@@ -2086,7 +2098,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2214,6 +2226,7 @@
     if(selected.size > 1) dropTextFocus();
     if(typeof syncRotHandle === "function") syncRotHandle();
     if(typeof syncReactAdd === "function") syncReactAdd();
+    if(typeof syncZoneMembership === "function") syncZoneMembership();
   }
   // With several things selected, keys are about the group (P pins them all, D marks them done...), never about the words inside one of them:
   // so no note keeps a text cursor or a text selection while a group is selected.
@@ -4008,7 +4021,7 @@
   function setPaperProp(n, prop, val, label){
     if(n[prop] === val) return;
     var before = captureState([n.id]);
-    n[prop] = val;
+    if(val === undefined) delete n[prop]; else n[prop] = val;
     if(prop === "orient"){ n.w = val === "portrait" ? 200 : 330; }
     saveNotes(); rerenderNote(n); recordChange(label, before);
   }
@@ -4032,6 +4045,27 @@
       }, function(){ toast("That image couldn't be read."); });
     };
     inp.click();
+  }
+
+  // a Newspaper can carry one optional picture. It is added, replaced and removed here; Color / Black & white and halftone are only how it is printed.
+  function pickNewspaperImage(n){
+    var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = function(){
+      var f = inp.files && inp.files[0]; if(!f) return;
+      if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a picture."); return; }
+      loadPhotoFile(f).then(function(l){
+        var before = captureState([n.id]), had = !!(n.image || n.assetId);
+        n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState; if(!n.imgMode) n.imgMode = "bw";
+        saveNotes(); rerenderNote(n); recordChange(had ? "Replace newspaper picture" : "Add newspaper picture", before);
+        if(cloudSync) cloudSync.notesChanged();
+      }, function(){ toast("That image couldn't be read."); });
+    };
+    inp.click();
+  }
+  function removeNewspaperImage(n){
+    var before = captureState([n.id]);
+    delete n.image; delete n.assetId; delete n.mediaState; delete n.imgRatio; delete n.imgMode; delete n.halftone;
+    saveNotes(); rerenderNote(n); recordChange("Remove newspaper picture", before);
   }
 
   // ---- the menu for every paper object
@@ -4067,6 +4101,18 @@
         if(cu) body.appendChild(menuItem(ICONS.close, "Remove source link", function(){ closeFloatingPopovers(); setClippingSource(n, ""); }));
       });
       pop.appendChild(menuItem(ICONS.sticky, "Convert to a note", function(){ closeFloatingPopovers(); clippingToNote(n); }, {title: "Back to a plain sticky note with the same words"}));
+    }
+    if(n.type === "newspaper"){
+      var hasPic = !!(n.image || n.assetId);
+      menuSub(pop, ICONS.image, "Picture", function(body){
+        body.appendChild(menuItem(ICONS.image, hasPic ? "Replace image\u2026" : "Add image\u2026", function(){ closeFloatingPopovers(); pickNewspaperImage(n); }));
+        if(hasPic){
+          body.appendChild(menuItem(n.imgMode === "color" ? ICONS.tick : '<span class="menuGap"></span>', "Color", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "color", "Newspaper picture: color"); }));
+          body.appendChild(menuItem(n.imgMode !== "color" ? ICONS.tick : '<span class="menuGap"></span>', "Black & white", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "bw", "Newspaper picture: black and white"); }));
+          body.appendChild(menuItem(n.halftone ? ICONS.tick : '<span class="menuGap"></span>', "Halftone print", function(){ closeFloatingPopovers(); setPaperProp(n, "halftone", n.halftone ? undefined : true, "Newspaper picture: halftone"); }, {title: "A printed-dot texture over the picture (the picture itself is unchanged)"}));
+          body.appendChild(menuItem(ICONS.close, "Remove image", function(){ closeFloatingPopovers(); removeNewspaperImage(n); }));
+        }
+      });
     }
     if(n.type === "ticket") pop.appendChild(menuItem(ICONS.move, n.orient === "portrait" ? "Make it landscape" : "Make it portrait", function(){ closeFloatingPopovers(); setPaperProp(n, "orient", n.orient === "portrait" ? "landscape" : "portrait", "Turn ticket"); }));
     if(n.type === "postcard"){
@@ -4638,6 +4684,12 @@
     sheet.appendChild(mast); sheet.appendChild(makeDiv("poRule"));
     sheet.appendChild(paperField("npHead", "headline", item, true));
     sheet.appendChild(paperField("npSub", "sub", item, true));
+    if(item.image || item.assetId){                                 // the optional picture: printed as the paper says (Color / Black & white, halftone); the file itself is never altered
+      var fig = makeDiv("npFig " + (item.imgMode === "color" ? "color" : "bw") + (item.halftone ? " ht" : "")); fig.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
+      if(item.image){ var pim = document.createElement("img"); PreviewCache.use(pim, item.image, item.w || 320); pim.alt = item.headline ? "Picture for: " + item.headline : "Newspaper picture"; pim.draggable = false; fig.appendChild(pim); }
+      else fig.classList.add("pending");
+      sheet.appendChild(fig);
+    }
     sheet.appendChild(makeDiv("poRule thin"));
     sheet.appendChild(paperField("npBody", "body", item, true));
   }
@@ -5488,7 +5540,13 @@
       var p = byId[n.pileId];
       if(p && isPileObj(p) && live[p.id] >= Stick.pile.MIN_MEMBERS && (p.members || []).indexOf(n.id) !== -1) hiddenIds[n.id] = true;
     });
+    zoneHolder = {};
+    notes.forEach(function(z){
+      if(!isZone(z) || z.min !== true || !Array.isArray(z.hold)) return;
+      z.hold.forEach(function(id){ var o = byId[id]; if(o && !isZone(o) && !hiddenIds[id]){ hiddenIds[id] = true; zoneHolder[id] = z.id; } });
+    });
   }
+  var zoneHolder = {};                                                  // object id -> the minimized zone keeping it out of sight
   function pileLive(p){ return (p.members || []).map(findNote).filter(Boolean); }          // top first
   function logicalCount(){ return Stick.pile.logicalCount(notes); }
   // draw what should be drawn and stop drawing what should not (after anything that changes who is in which pile)
@@ -5500,7 +5558,8 @@
         if(n.el){ selected.delete(n.id); clearTimeout(n._cleanT); try{ n.el.remove(); }catch(e){} n.el = null; n.textEl = null; n.captionEl = null; n.badgeEl = null; clearDecorations(n.id); }
       } else if(!n.el){ try{ renderNote(n, false, {focus: false}); }catch(err){} }
     });
-    notes.filter(isPileObj).forEach(function(p){ if(p.el){ try{ p.el.remove(); }catch(e){} p.el = null; } try{ renderNote(p, false); }catch(err){} });
+    notes.filter(isPileObj).forEach(function(p){ if(p.el){ try{ p.el.remove(); }catch(e){} p.el = null; } if(hiddenIds[p.id]){ selected.delete(p.id); clearDecorations(p.id); return; } try{ renderNote(p, false); }catch(err){} });
+    notes.filter(isZone).forEach(function(z){ paintZoneState(z); });
     applySelection();
   }
 
@@ -5520,7 +5579,29 @@
     if(txt){ txt.textContent = pileSnippet(top); txt.style.fontFamily = top && top.font && FONT_BY_NAME[top.font] ? '"' + top.font + '", cursive' : ""; }
     if(topEl){ var bg = top && !top.type && top.bg ? top.bg : "#fffdf5"; topEl.style.background = document.body.classList.contains("dark") && top && !top.type && top.bg ? dimPaperColor(top.bg) : bg; }
     if(badge) badge.textContent = i ? (i + 1) + " / " + live.length : String(live.length);
+    paintPileKind(el, top); paintPileTabs(n, el, live, i);
     el.setAttribute("aria-label", Stick.pile.label(n, live.length) + ". Showing " + (i + 1) + " of " + live.length + ": " + pileSnippet(top).slice(0, 60));
+  }
+  // v0.8.3.2: a pile shows what is on top as a paper (a small tab says what kind of thing it is), and a row of paper tabs along the bottom is its index:
+  // one tab per paper (the one showing is raised), so a pile of mixed papers still reads as one pile. Display only; nothing is stored.
+  function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
+  function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
+  var PILE_TABS_MAX = 7;
+  function paintPileTabs(n, el, live, at){
+    var row = el.querySelector(".pileTabs"); if(!row) return;
+    row.textContent = "";
+    var count = live.length, from = 0, to = count;
+    if(count > PILE_TABS_MAX){ from = Math.max(0, Math.min(count - PILE_TABS_MAX, at - Math.floor(PILE_TABS_MAX / 2))); to = from + PILE_TABS_MAX; }
+    for(var i = from; i < to; i++){
+      (function(i){
+        var t = document.createElement("button"); t.type = "button"; t.className = "pileTab" + (i === at ? " on" : ""); t.setAttribute("aria-label", "Paper " + (i + 1) + " of " + count + ": " + pileKindName(live[i]));
+        t.setAttribute("aria-current", i === at ? "true" : "false"); t.textContent = String(i + 1);
+        var top = live[i]; if(top && !top.type && top.bg) t.style.setProperty("--tab", document.body.classList.contains("dark") ? dimPaperColor(top.bg) : top.bg);
+        t.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); t.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        t.addEventListener("click", function(e){ e.stopPropagation(); pileBrowse[n.id] = i; paintPileShown(n, n.el); });
+        row.appendChild(t);
+      })(i);
+    }
   }
   function pileStep(n, dir){
     var live = pileLive(n); if(live.length < 2) return;
@@ -5544,6 +5625,8 @@
     txt.textContent = pileSnippet(top); txt.dir = "auto";
     if(top && top.font && FONT_BY_NAME[top.font]) txt.style.fontFamily = '"' + top.font + '", cursive';
     topEl.appendChild(txt); el.appendChild(topEl);
+    var kind = makeDiv("pileKind"); kind.setAttribute("aria-hidden", "true"); kind.textContent = pileKindName(top); el.appendChild(kind);
+    var tabs = makeDiv("pileTabs"); tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Papers in this pile"); el.appendChild(tabs); paintPileTabs(n, el, live, browseIdx(n, live));
     var badge = makeDiv("pileCount"); badge.textContent = browseIdx(n, live) ? (browseIdx(n, live) + 1) + " / " + live.length : String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
     return el;
   }
@@ -6904,17 +6987,31 @@
     b.addEventListener("click", function(e){ e.stopPropagation(); reactionPicker(n, b); });
     n.el.appendChild(b); reactAddEl = b;
   }
+  // The quick six, then "+" for a broader set of emoji (drawn by the device, so they look native). Every button is 44px; the broader set scrolls.
   function reactionPicker(n, anchor){
     var pop = openFloatingPopover(anchor, "reactPop"); if(!pop) return;
     pop.setAttribute("role", "group"); pop.setAttribute("aria-label", "Reactions");
     var me = myReactionId(), mine = Stick.reactions.summary(n.reactions, me).filter(function(x){ return x.mine; }).map(function(x){ return x.emoji; });
-    Stick.reactions.SET.forEach(function(e){
+    function pick(e){
       var b = document.createElement("button"); b.type = "button"; b.className = "reactPick" + (mine.indexOf(e) !== -1 ? " on" : ""); b.textContent = e; b.setAttribute("aria-label", "React " + e); b.setAttribute("aria-pressed", mine.indexOf(e) !== -1 ? "true" : "false");
       b.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
       b.addEventListener("click", function(ev){ ev.stopPropagation(); closeFloatingPopovers(); toggleReaction(n, e); });
-      pop.appendChild(b);
+      return b;
+    }
+    var quick = makeDiv("reactQuick"); Stick.reactions.SET.forEach(function(e){ quick.appendChild(pick(e)); });
+    var more = makeDiv("reactMore"); more.hidden = true; more.setAttribute("aria-label", "More emoji");
+    Stick.reactions.MORE.forEach(function(g){
+      var h = makeDiv("reactGroup"); h.textContent = g.name; more.appendChild(h);
+      var row = makeDiv("reactGrid"); g.items.forEach(function(e){ row.appendChild(pick(e)); }); more.appendChild(row);
     });
-    var first = pop.querySelector("button"); if(first) first.focus();
+    var plus = document.createElement("button"); plus.type = "button"; plus.className = "reactPick reactPlus"; plus.textContent = "+"; plus.setAttribute("aria-label", "More emoji"); plus.setAttribute("aria-expanded", "false");
+    plus.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+    plus.addEventListener("click", function(ev){
+      ev.stopPropagation(); var open = more.hidden; more.hidden = !open; plus.setAttribute("aria-expanded", open ? "true" : "false"); plus.textContent = open ? "\u2212" : "+";
+      if(open){ var f = more.querySelector("button"); if(f) f.focus(); }
+    });
+    quick.appendChild(plus); pop.appendChild(quick); pop.appendChild(more);
+    var first = quick.querySelector("button"); if(first) first.focus();
   }
 
   // ---------- layers (v0.8.3): only z changes; never a position, a pile membership or a zone ----------
@@ -7172,8 +7269,13 @@
     var bar = makeDiv("zoneBar"), title = makeDiv("zoneTitle");
     title.textContent = n.title || ""; title.setAttribute("data-ph", "Name this zone");
     bar.appendChild(title);
+    var cnt = document.createElement("span"); cnt.className = "zoneCount"; cnt.setAttribute("aria-live", "off"); bar.appendChild(cnt);
     el.appendChild(bar);
     if(!readOnly){
+      var mn = document.createElement("button"); mn.type = "button"; mn.className = "zoneMin";
+      mn.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      mn.addEventListener("click", function(e){ e.stopPropagation(); if(n.min === true) restoreZone(n); else minimizeZone(n); });
+      bar.appendChild(mn);
       var more = document.createElement("button"); more.type = "button"; more.className = "zoneMore"; more.innerHTML = ICONS.more; more.title = "Zone options"; more.setAttribute("aria-label", "Options for this zone");
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
       more.addEventListener("click", function(e){ e.stopPropagation(); zoneMenu(n, more); });
@@ -7191,7 +7293,7 @@
         if(!group) setSelection([n.id]);
         var base = group ? selectedNotes() : [n], seen = {}, all = [];
         base.forEach(function(b){ seen[b.id] = 1; all.push(b); });
-        base.forEach(function(b){ if(isZone(b) && b.carry === true) zoneContents(b).forEach(function(o){ if(!seen[o.id]){ seen[o.id] = 1; all.push(o); } }); });
+        base.forEach(function(b){ if(isZone(b) && (b.carry === true || b.min === true)) (b.min === true ? zoneHeld(b) : zoneContents(b)).forEach(function(o){ if(!seen[o.id]){ seen[o.id] = 1; all.push(o); } }); });
         startDrag(e, n, all);
       });
       bar.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
@@ -7205,7 +7307,55 @@
       el.addEventListener("contextmenu", function(e){ if(e.shiftKey || !e.target.closest(".zoneBar")) return; e.preventDefault(); openObjectContextMenu(n, e.clientX, e.clientY); });
     }
     boardInner.appendChild(el);
+    paintZoneState(n);
     return el;
+  }
+  // ---- zones as containers (v0.8.3.2): which objects belong, and minimize / restore ----
+  // "Belongs" is where an object's middle lies (the rule zones always had). Minimizing remembers WHO was on the zone (n.hold) and stops drawing them; nothing is
+  // moved, changed or removed from the board's object list, so sync, Done, Trash, undo and a view-only share all keep working on the real objects.
+  function zoneHeld(z){ return (z.hold || []).map(findNote).filter(Boolean); }
+  function zoneMemberCount(z){ return z.min === true ? zoneHeld(z).length : zoneContents(z).length; }
+  function paintZoneState(n){
+    var el = n && n.el; if(!el || !isZone(n)) return;
+    var min = n.min === true, c = zoneMemberCount(n);
+    el.classList.toggle("zoneMinimized", min);
+    var cnt = el.querySelector(".zoneCount"); if(cnt) cnt.textContent = c ? c + (c === 1 ? " object" : " objects") : "";
+    var b = el.querySelector(".zoneMin");
+    if(b){ b.innerHTML = min ? ICONS.expand || "+" : ICONS.minus || "\u2212"; b.title = min ? "Restore this zone and everything on it" : "Minimize this zone"; b.setAttribute("aria-label", min ? "Restore this zone" : "Minimize this zone"); b.setAttribute("aria-expanded", min ? "false" : "true"); }
+    el.setAttribute("aria-label", zoneLabel(n) + (min ? " (minimized, " + c + (c === 1 ? " object)" : " objects)") : ""));
+  }
+  // while an object or a zone is selected, show who belongs to whom: members get a soft outline, and a selected member lights its zone's strip
+  function syncZoneMembership(){
+    var zones = notes.filter(function(z){ return isZone(z) && z.el && z.el.isConnected; });
+    document.querySelectorAll(".zoneMember").forEach(function(e){ e.classList.remove("zoneMember"); });
+    document.querySelectorAll(".zoneOwns").forEach(function(e){ e.classList.remove("zoneOwns"); });
+    zones.forEach(function(z){
+      paintZoneState(z);
+      if(z.min === true) return;
+      var members = zoneContents(z);
+      if(selected.has(z.id)) members.forEach(function(o){ if(o.el) o.el.classList.add("zoneMember"); });
+      else if(members.some(function(o){ return selected.has(o.id); })) z.el.classList.add("zoneOwns");
+    });
+  }
+  var zonePaintT = null;
+  function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; syncZoneMembership(); }, 120); }
+  function minimizeZone(n){
+    if(readOnly || !isZone(n) || n.min === true) return;
+    var members = zoneContents(n); closeFloatingPopovers(); endEditing();
+    var before = captureState([n.id]);
+    n.min = true; n.hold = members.map(function(o){ return o.id; });
+    members.forEach(function(o){ selected.delete(o.id); });
+    saveNotes(); syncPileVisibility(); updateMinimap();
+    recordChange("Minimize zone", before);
+    toast(members.length ? "Zone minimized with " + members.length + (members.length === 1 ? " object." : " objects.") : "Zone minimized.", "Undo", function(){ undo(); });
+  }
+  function restoreZone(n, opts){
+    if(!isZone(n) || n.min !== true) return;
+    var before = captureState([n.id]);
+    delete n.min; delete n.hold;
+    saveNotes(); syncPileVisibility(); updateMinimap();
+    if(!(opts && opts.quiet)) recordChange("Restore zone", before);
+    else recordChange("Restore zone (search)", before);
   }
   function editZoneTitle(n){
     if(readOnly || !n.el) return;
@@ -7227,7 +7377,7 @@
     t.addEventListener("keydown", key); t.addEventListener("blur", onBlur); t.addEventListener("paste", paste);
   }
   function startZoneResize(e, n){
-    e.preventDefault(); e.stopPropagation();
+    e.preventDefault(); e.stopPropagation(); if(n.min === true) return;
     var el = n.el, before = captureState([n.id]), sx = e.clientX, sy = e.clientY, w0 = n.w || 360, h0 = n.h || 240, w = w0, h = h0;
     setSelection([n.id]);
     function move(ev){
@@ -7254,9 +7404,10 @@
   }
   function zoneMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
-    var count = zoneContents(n).length;
-    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " note on this zone" : " notes on this zone"); pop.appendChild(hint);
+    var count = zoneMemberCount(n);
+    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " object on this zone" : " objects on this zone"); pop.appendChild(hint);
     pop.appendChild(menuItem(ICONS.pencil, "Rename", function(){ closeFloatingPopovers(); editZoneTitle(n); }));
+    pop.appendChild(menuItem(ICONS.minus || ICONS.tick, n.min === true ? "Restore zone" : "Minimize zone", function(){ closeFloatingPopovers(); if(n.min === true) restoreZone(n); else minimizeZone(n); }, {title: "Collapse the zone to its title and count; everything on it comes back when you restore"}));
     var mh = makeDiv("menuHint"); mh.textContent = "Material"; pop.appendChild(mh);
     ZONE_MATERIALS.forEach(function(m){
       pop.appendChild(menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
@@ -8158,7 +8309,7 @@
     var c = cloudSanitize(o);
     if(!c) return null;
     if(typeof cu === "string" && /^https?:\/\//.test(cu)) c.cutout = cu;
-    if(c.type === "postcard" && typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;
+    if((c.type === "postcard" || c.type === "newspaper") && typeof img === "string" && /^https?:\/\//.test(img)) c.image = img;
     if(c.type === "photo_strip" && Array.isArray(o.frames) && Array.isArray(c.frames)){
       c.frames = c.frames.map(function(f){ var of = o.frames.filter(function(x){ return x && x.assetId === f.assetId; })[0], src = of && of.image; if(typeof src === "string" && /^https?:\/\//.test(src)) f.image = src; return f; });
     }
@@ -8470,7 +8621,7 @@
       if(isZone(n) || isPileObj(n)) return;
       var t = ""; try{ t = String(itemText(n) || ""); }catch(e){ t = ""; }
       if(t.toLowerCase().indexOf(q) === -1) return;
-      hits.push({id: n.id, pile: isHiddenMember(n) ? n.pileId : null, x: n.x, y: n.y});
+      hits.push({id: n.id, pile: isHiddenMember(n) && !zoneHolder[n.id] ? n.pileId : null, zone: zoneHolder[n.id] || null, x: n.x, y: n.y});
     });
     hits.sort(function(a, b){ return (a.y - b.y) || (a.x - b.x); });
     return hits;
@@ -8498,6 +8649,9 @@
     searchAt = searchAt < 0 ? (step < 0 ? searchHits.length - 1 : 0) : (searchAt + step + searchHits.length) % searchHits.length;
     var h = searchHits[searchAt], n = findNote(h.id); if(!n) return;
     document.getElementById("searchCount").textContent = (searchAt + 1) + " / " + searchHits.length;
+    if(h.zone){                                                            // on a minimized zone: restore the zone (one undo step), then go there
+      var zn = findNote(h.zone); if(zn){ restoreZone(zn, {quiet: true}); toast("Restored the zone to show this."); n = findNote(h.id) || n; h = Object.assign({}, h, {pile: n.pileId && isHiddenMember(n) ? n.pileId : null}); }
+    }
     if(h.pile){                                                            // inside a collapsed pile: open the pile at that paper
       var pile = findNote(h.pile), live = pile ? pileLive(pile) : [], i = live.indexOf(n);
       if(pile && i !== -1){ pileBrowse[pile.id] = i; if(pile.el) paintPileShown(pile, pile.el); openPileBrowser(pile); return; }
@@ -12285,7 +12439,7 @@
 
   // pictures coming down from the account: the foot slip says so while any are still on their way (checked twice a second, only then)
   var photoWatch = null;
-  function photosPending(){ return notes.some(function(n){ return (isPhoto(n) || n.type === "postcard") && (n.assetId) && !n.image && n.mediaState !== "failed" && n.mediaState !== "missing"; }); }
+  function photosPending(){ return notes.some(function(n){ return (isPhoto(n) || n.type === "postcard" || n.type === "newspaper") && (n.assetId) && !n.image && n.mediaState !== "failed" && n.mediaState !== "missing"; }); }
   function watchPhotoLoading(){
     if(photoWatch || !CLOUD) return;
     var t0 = Date.now();
@@ -12737,6 +12891,18 @@
   }
   function updateCollabButton(){ if(collabBtn) collabBtn.hidden = !canShowCollab(); }
   function inviteLink(token){ return location.origin + location.pathname + "#invite=" + token; }
+  // "a@x.com, b@y.com; c@z.com": split on comma, semicolon, whitespace and newlines. Syntax-only check (nothing is looked up, so no account can be discovered); duplicates ignored.
+  function parseInviteEmails(text, have){
+    var seen = {}, ok = [], bad = [], dup = 0;
+    (have || []).forEach(function(e){ seen[e.toLowerCase()] = true; });
+    String(text || "").split(/[,;\s]+/).forEach(function(raw){
+      var t = raw.replace(/^[<"']+|[>"']+$/g, "").trim(); if(!t) return;
+      if(!validEmail(t)){ bad.push(t); return; }
+      if(seen[t.toLowerCase()]){ dup++; return; }
+      seen[t.toLowerCase()] = true; ok.push(t);
+    });
+    return {ok: ok, bad: bad, dup: dup};
+  }
   function openCollabDialog(){
     if(!canShowCollab()){ updateCollabButton(); return; }
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {};
@@ -12744,30 +12910,61 @@
     wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. Each link works once and expires after 7 days.</p>' +
       '<label class="asLbl" for="cbRole">They can</label>' +
       '<select id="cbRole" class="asIn"><option value="editor">Add, move and edit notes</option><option value="viewer">Look, but not change anything</option></select>' +
-      '<label class="asLbl" for="cbEmail">Their e-mail (optional)</label>' +
-      '<input id="cbEmail" class="asIn" type="email" autocomplete="off" maxlength="254" placeholder="Leave empty to let anyone with the link join">' +
-      '<p class="asHint" id="cbHint">With an e-mail, only that account can use the link.</p>' +
+      '<label class="asLbl" for="cbEmail">E-mails (optional)</label>' +
+      '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails, or leave empty for a link anyone can use"></div>' +
+      '<p class="asHint" id="cbHint">Press Enter or comma after each address. With e-mails, each person gets their own link that only their account can use.</p>' +
       '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>';
     openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
       {label: "Close", value: false},
       {label: "Create invite link", kind: "primary", id: "cbCreate", onClick: function(close, btn){
-        var email = wrap.querySelector("#cbEmail").value.trim(), role = wrap.querySelector("#cbRole").value, out = wrap.querySelector("#cbOut");
-        if(email && !validEmail(email)){ out.textContent = "That e-mail doesn’t look right."; return false; }
-        setBusy(btn, true, "Creating…");
-        Stick.repo.createInvite(activeBoardId, email, role).then(function(r){
-          setBusy(btn, false);
-          var url = inviteLink(r.token);
-          out.innerHTML = "";
-          var inp = document.createElement("input"); inp.className = "asIn"; inp.readOnly = true; inp.value = url; inp.setAttribute("aria-label", "Invite link");
-          var copy = document.createElement("button"); copy.type = "button"; copy.className = "pillBtn"; copy.textContent = "Copy link";
-          copy.addEventListener("click", function(){ copyText(url).then(function(ok){ flashCopied(copy, ok ? "Copied!" : "Select and copy"); }); });
-          var note = document.createElement("p"); note.className = "asHint"; note.textContent = (role === "viewer" ? "Viewer" : "Editor") + " link" + (email ? " for " + email : "") + ". Send it only to the person you mean.";
-          out.appendChild(inp); out.appendChild(copy); out.appendChild(note);
-          inp.focus(); inp.select();
-        }, function(e){ setBusy(btn, false); out.textContent = Stick.errors.friendly(Stick.errors.parse(e)); });
+        var role = wrap.querySelector("#cbRole").value, out = wrap.querySelector("#cbOut");
+        if(!commitPending()){ out.textContent = "Fix or remove the marked e-mail first."; return false; }
+        var targets = emails.length ? emails.slice() : [""];                // no address: one open link
+        setBusy(btn, true, "Creating\u2026"); out.innerHTML = "";
+        var chain = Promise.resolve();
+        targets.forEach(function(email){
+          chain = chain.then(function(){ return Stick.repo.createInvite(activeBoardId, email, role).then(function(r){ showInviteResult(out, email, role, inviteLink(r.token)); }, function(e){ showInviteResult(out, email, role, "", Stick.errors.friendly(Stick.errors.parse(e))); }); });
+        });
+        chain.then(function(){ setBusy(btn, false); });
         return false;
       }}
     ]});
+    var emails = [], pills = wrap.querySelector("#cbPills"), input = wrap.querySelector("#cbEmail");
+    function addPill(addr){
+      emails.push(addr);
+      var pill = document.createElement("span"); pill.className = "pill"; pill.dataset.email = addr;
+      var t = document.createElement("span"); t.textContent = addr; pill.appendChild(t);
+      var x = document.createElement("button"); x.type = "button"; x.className = "pillX"; x.setAttribute("aria-label", "Remove " + addr); x.textContent = "\u00d7";
+      x.addEventListener("click", function(){ emails.splice(emails.indexOf(addr), 1); pill.remove(); input.focus(); });
+      pill.appendChild(x); pills.insertBefore(pill, input);
+    }
+    // what is typed or pasted becomes pills; anything that is not a valid address stays in the box (marked) so nothing is silently dropped
+    function commitPending(){
+      var r = parseInviteEmails(input.value, emails);
+      r.ok.forEach(addPill); input.value = r.bad.join(", ");
+      pills.classList.toggle("bad", r.bad.length > 0); input.setAttribute("aria-invalid", r.bad.length ? "true" : "false");
+      return !r.bad.length;
+    }
+    input.addEventListener("keydown", function(e){
+      if(e.key === "Enter" || e.key === "," || e.key === ";"){ if(input.value.trim() || e.key !== "Enter"){ e.preventDefault(); e.stopPropagation(); commitPending(); } }
+      else if(e.key === "Backspace" && !input.value && emails.length){      // Backspace on an empty box takes the last pill back into the box to edit
+        var addr = emails.pop(), pl = pills.querySelectorAll(".pill"); if(pl.length) pl[pl.length - 1].remove();
+        input.value = addr; try{ input.setSelectionRange(addr.length, addr.length); }catch(x){} e.preventDefault();
+      }
+    });
+    input.addEventListener("paste", function(e){ var d = e.clipboardData && e.clipboardData.getData("text"); if(d && /[,;\s]/.test(d.trim())){ e.preventDefault(); input.value = (input.value + " " + d).trim(); commitPending(); } });
+    input.addEventListener("blur", function(){ if(input.value.trim()) commitPending(); });
+    pills.addEventListener("click", function(e){ if(e.target === pills) input.focus(); });
+  }
+  // one row per address: its own link and its own Copy button
+  function showInviteResult(out, email, role, url, err){
+    var row = makeDiv("inviteRow"), who = document.createElement("div"); who.className = "asHint"; who.textContent = (role === "viewer" ? "Viewer" : "Editor") + " link" + (email ? " for " + email : "");
+    row.appendChild(who);
+    if(err){ var er = document.createElement("div"); er.className = "asHint err"; er.textContent = err; row.appendChild(er); out.appendChild(row); return; }
+    var inp = document.createElement("input"); inp.className = "asIn"; inp.readOnly = true; inp.value = url; inp.setAttribute("aria-label", "Invite link" + (email ? " for " + email : ""));
+    var copy = document.createElement("button"); copy.type = "button"; copy.className = "pillBtn"; copy.textContent = "Copy link";
+    copy.addEventListener("click", function(){ copyText(url).then(function(ok){ flashCopied(copy, ok ? "Copied!" : "Select and copy"); }); });
+    row.appendChild(inp); row.appendChild(copy); out.appendChild(row);
   }
   if(collabBtn) collabBtn.addEventListener("click", function(){ sharePanel.hidden = true; openCollabDialog(); });
   // opening someone's invite link (#invite=...): join once signed in; a signed-out visitor signs in first and is brought back to it

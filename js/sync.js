@@ -92,7 +92,7 @@
     // ------------------------------------------------------------ diff
     function needsUpload(o) {
       if (o.type === "photo") return (isDataUrl(o.image) && !o.assetId) || needsCutoutUpload(o);
-      if (o.type === "postcard") return isDataUrl(o.image) && !o.assetId;
+      if (o.type === "postcard" || o.type === "newspaper") return isDataUrl(o.image) && !o.assetId;
       if (o.type === "photo_strip") return frameToUpload(o) >= 0;
       if (o.type === "audio" || o.type === "video") return !!o.mediaId && !o.assetId && o.mediaState !== "failed";
       return isDataUrl(o.image) && !o.attachedAssetId;             // sticky note with an attached photo
@@ -248,7 +248,7 @@
     function scanMedia(snap) {
       snap.forEach(function (o) {
         if (!needsUpload(o)) return;
-        var field = o.type === "photo" ? ((isDataUrl(o.image) && !o.assetId) ? "image" : "cutout") : o.type === "postcard" ? "image" : o.type === "photo_strip" ? "frame:" + frameToUpload(o) : (o.type === "audio" || o.type === "video") ? "media" : "attached";
+        var field = o.type === "photo" ? ((isDataUrl(o.image) && !o.assetId) ? "image" : "cutout") : (o.type === "postcard" || o.type === "newspaper") ? "image" : o.type === "photo_strip" ? "frame:" + frameToUpload(o) : (o.type === "audio" || o.type === "video") ? "media" : "attached";
         if (field === "cutout" && isDataUrl(o.image) && !o.assetId) return;                // the original goes up first, so the cutout can point at it
         var key = o.id + ":" + field;
         if (jobs[key]) return;
@@ -362,7 +362,7 @@
     // load image assets for objects that reference them (runtime only; blob URLs are never persisted)
     function hydrate(o) {
       var want = [];
-      if ((o.type === "photo" || o.type === "postcard") && o.assetId && !o.image) want.push(["image", o.assetId]);
+      if ((o.type === "photo" || o.type === "postcard" || o.type === "newspaper") && o.assetId && !o.image) want.push(["image", o.assetId]);
       if (o.type === "photo_strip") (o.frames || []).forEach(function (f, i) { if (f.assetId && !f.image) want.push(["frame:" + i, f.assetId]); });
       if (!o.type && o.attachedAssetId && !o.image) want.push(["image", o.attachedAssetId]);
       want.forEach(function (w) {

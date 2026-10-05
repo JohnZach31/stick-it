@@ -2720,3 +2720,14 @@ body.dark .embedObj::before{ background:rgba(242,234,219,0.22); border-color:rgb
 .embedObj .embFoot{ padding:6px 2px 0; font-size:0.68rem; opacity:0.75; }
 .embedObj .embFoot:hover, .embedObj .embFoot:focus-within{ opacity:1; }
 .embedObj .pCtl.pMore{ top:-14px; right:-14px; } .embedObj .pHandle{ right:-10px; bottom:-10px; }
+/* v0.8.3.2: invite e-mails as pills */
+.pillField{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:6px 8px; border:1.5px solid var(--line, #d8cfa8); border-radius:10px; background:var(--card, #fffdf4); min-height:44px; cursor:text; }
+.pillField:focus-within{ outline:2px solid var(--sel-ring, #8f5710); outline-offset:1px; }
+.pillField.bad{ border-color:#b3261e; }
+.collabDlg .pillField input.pillIn{ flex:1 1 140px; width:auto; min-width:120px; border:0; outline:0; background:transparent; font:inherit; padding:4px 2px; color:inherit; }
+.pillField .pill{ display:inline-flex; align-items:center; gap:2px; max-width:100%; padding:2px 4px 2px 10px; border-radius:999px; background:color-mix(in srgb, var(--accent-soft, #f3e3b0) 80%, transparent); border:1px solid var(--line, #d8cfa8); font-size:0.82rem; }
+.pillField .pill > span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pillField .pillX{ width:28px; height:28px; border:0; border-radius:50%; background:transparent; color:inherit; cursor:pointer; font-size:1.1rem; line-height:1; }
+.pillField .pillX:hover{ background:rgba(0,0,0,0.1); }
+.collabDlg .inviteRow{ display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.collabDlg .asHint.err{ color:#b3261e; }

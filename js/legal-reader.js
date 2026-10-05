@@ -105,8 +105,9 @@
     var head = mk("div", "lrHead");
     var brand = mk("div", "lrBrand"); brand.setAttribute("role", "img"); brand.setAttribute("aria-label", "Stick-It");
     var mark = mk("span", "lrMark"); mark.innerHTML = host.logo ? host.logo() : ""; brand.appendChild(mark); brand.appendChild(mk("span", "lrWord", "Stick-It"));
-    head.appendChild(brand);
-    head.appendChild(mk("span", "lrTitle", T.title));
+    var main = mk("div", "lrHeadMain"); main.appendChild(brand);
+    main.appendChild(mk("span", "lrTitle", T.title));
+    head.appendChild(main);
     var tools = mk("div", "lrTools");
     var all = langs();
     if (all.length > 1) {
@@ -148,7 +149,7 @@
     // document navigation
     var nav = mk("nav", "lrNav"); nav.setAttribute("aria-label", T.nav);
     C.order.forEach(function (pid) {
-      var b = mk("button", "lrDoc", short[L][pid] || C.docs[L][pid].title); b.type = "button"; if (pid === id) b.setAttribute("aria-current", "page");
+      var b = mk("button", "lrDoc", short[L][pid] || C.docs[L][pid].title); b.type = "button"; b.setAttribute("data-tab", String(C.order.indexOf(pid) % 5)); if (pid === id) b.setAttribute("aria-current", "page");
       b.addEventListener("click", function () { show(pid, state.lang); var n = state.sheet.querySelector(".lrDoc[aria-current='page']"); if (n) n.focus(); });
       nav.appendChild(b);
     });
@@ -157,7 +158,7 @@
     // the document itself
     var body = mk("div", "lrBody"); body.tabIndex = 0; body.setAttribute("role", "region"); body.setAttribute("aria-label", d.title);
     var banner = Stick.legalFill ? Stick.legalFill.bannerText(id, L === "he") : "";
-    if (banner) { var bn = mk("div", "lrBanner", banner); bn.setAttribute("role", "note"); body.appendChild(bn); }
+    if (banner) { var bn = mk("div", "lrBanner"); var tag = mk("span", "lrSlipTag", L === "he" ? "טיוטה" : "Draft"); tag.setAttribute("aria-hidden", "true"); bn.appendChild(tag); bn.appendChild(mk("span", "lrSlipText", banner)); bn.setAttribute("role", "note"); body.appendChild(bn); }
     var art = mk("article", "lrArticle"); art.lang = L; art.dir = L === "he" ? "rtl" : "ltr"; art.innerHTML = d.html;
     if (Stick.legalFill) Stick.legalFill.apply(art, id);
     // links to the other legal documents open here; anything else behaves normally (mail and external links open outside)

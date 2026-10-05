@@ -1,0 +1,22 @@
+// v0.8.3.2: the patch system as a user would meet it (history, notes, tour replay), without a browser.
+import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm'; import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..'); const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
+let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; console.log('  FAIL  ' + m); } };
+const ctx = vm.createContext({ console }); ctx.window = ctx; ctx.globalThis = ctx;
+vm.runInContext(read('js/patch-history.js'), ctx); vm.runInContext(read('js/patch-reader.js'), ctx);
+const S = ctx.Stick, H = S.patchHistory, idx = JSON.parse(read('docs/patch-notes/index.json')), pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
+ok(H && Array.isArray(H.versions) && H.versions.length === idx.length, 'every version in the index is in the in-app history');
+ok(S.patchReader.versions().join() === idx.map((e) => e.version).join(), 'the reader lists versions newest first, in index order');
+ok(H.versions.every((v) => v.notes && v.notes.length && v.title && v.version), 'every patch has readable sections');
+ok(H.versions.every((v) => v.tour && Array.isArray(v.tour.cards) && v.tour.cards.length >= 1), 'every patch has a tour (its own, or one derived from its notes)');
+ok(pn.every((e) => H.versions.some((v) => v.version === e.version)), 'patch-notes.json and the history agree');
+const latest = H.versions[0]; ok(latest.version === '0.8.3.2' && latest.status === 'development' && latest.date == null, 'the newest patch is v0.8.3.2, still development, no release date');
+ok(S.patchReader.matches(latest, 'zones', '') && !S.patchReader.matches(latest, 'zzzzqq', ''), 'search matches notes text');
+ok(S.patchReader.matches(latest, '', latest.tags[0]) && !S.patchReader.matches(latest, '', 'NoSuchTag'), 'category filter works');
+const reader = read('js/patch-reader.js');
+ok(/openTour/.test(reader) && !/markSeen|ptMarkSeen|\.status\s*=[^=]/.test(reader), 'replaying a tour never marks a patch seen or changes its status');
+ok(/if \(!v \|\| !v\.tour|!tour|\.tour\.length/.test(reader), 'a patch with no tour is handled safely');
+ok(/Newer/.test(reader) && /Older/.test(reader), 'previous / next patch navigation exists');
+ok(!/innerHTML\s*=\s*[^;]*(notes|body|summary|title)/.test(reader), 'notes are rendered as text, never as HTML');
+ok(read('docs/dev/PATCH-DATA.md').includes('--check'), 'the patch data flow is documented');
+console.log('v0.8.3.2d: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

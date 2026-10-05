@@ -51,8 +51,8 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
   r = R.toggle(R.toggle(R.toggle({}, up, 'u1'), up, 'u2'), heart, 'u1'); ok(R.summary(r, 'u1').map((s) => s.emoji + s.count + (s.mine ? 'm' : '')).join() === up + '2m,' + heart + '1m', 'counts and "mine" are right per person');
   ok(R.summary(r, 'u2').find((s) => s.emoji === heart).mine === false, 'one person\'s reaction is never shown as another\'s');
   const before = JSON.stringify(r); R.toggle(r, up, 'u3'); ok(JSON.stringify(r) === before, 'toggling never changes its input');
-  ok(Object.keys(R.toggle({}, '💩', 'u1')).length === 0 && Object.keys(R.toggle({}, up, '')).length === 0 && Object.keys(R.toggle({}, up, 'bad id!')).length === 0, 'an emoji outside the set and a bad person id are ignored');
-  const dirty = R.normalize({ [up]: ['u1', 'u1', 'x y', 5, 'u2'], '💩': ['u9'], [heart]: 'nope' }); ok(JSON.stringify(dirty) === JSON.stringify({ [up]: ['u1', '5', 'u2'] }), 'incoming data is cleaned: unknown emoji, duplicates, bad ids and wrong shapes are dropped');
+  ok(Object.keys(R.toggle({}, '<b>x</b>', 'u1')).length === 0 && Object.keys(R.toggle({}, up, '')).length === 0 && Object.keys(R.toggle({}, up, 'bad id!')).length === 0, 'something that is not an emoji and a bad person id are ignored');
+  const dirty = R.normalize({ [up]: ['u1', 'u1', 'x y', 5, 'u2'], '<b>': ['u9'], [heart]: 'nope' }); ok(JSON.stringify(dirty) === JSON.stringify({ [up]: ['u1', '5', 'u2'] }), 'incoming data is cleaned: non-emoji keys, duplicates, bad ids and wrong shapes are dropped');
   ok(R.normalize(null) && R.normalize([]) && Object.keys(R.normalize('x')).length === 0, 'junk never throws');
   let big = {}; for (let i = 0; i < 80; i++) big = R.toggle(big, up, 'u' + i); ok(big[up].length === R.MAX_PER, 'one object keeps at most ' + R.MAX_PER + ' people per emoji');
   ok(R.isEmpty({}) && !R.isEmpty(r) && R.total(r) === 3, 'empty / total helpers');
@@ -186,7 +186,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
 // ================================================================ SEARCH: count, next / previous, scope
 {
   const code = ['collectSearchHits'].map(fn).join('\n');
-  const sb = { Math, String, notes: [], isZone: (n) => n.type === 'zone', isPileObj: (n) => n.type === 'pile', isHiddenMember: (n) => !!n.hidden, itemText: (n) => n.t || '' };
+  const sb = { Math, String, notes: [], isZone: (n) => n.type === 'zone', isPileObj: (n) => n.type === 'pile', isHiddenMember: (n) => !!n.hidden, itemText: (n) => n.t || '', zoneHolder: {} };
   const ctx = vm.createContext(sb); vm.runInContext(code, ctx);
   sb.notes = [{ id: 'a', t: 'Milk and eggs', x: 300, y: 10 }, { id: 'b', t: 'Call mum', x: 10, y: 10 }, { id: 'p', type: 'pile', t: 'milk' }, { id: 'z', type: 'zone', t: 'milk' }, { id: 'h', t: 'oat MILK', hidden: true, pileId: 'P1', x: 5, y: 200 }];
   const hits = vm.runInContext('collectSearchHits("milk")', ctx);

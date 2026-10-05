@@ -72,6 +72,10 @@
       if (!item.w) out.w = out.orient === "portrait" ? 200 : rng[2];
     } else if (t === "newspaper") {
       out.headline = one(item.headline, 100); out.sub = one(item.sub, 80); out.body = lines(item.body, 900, 18);
+      // an optional picture (v0.8.3.2). The original is kept as it is; Color / Black & white and halftone are only how it is printed.
+      var npA = uuid(item.assetId), npI = item.image && h.safeImage ? h.safeImage(item.image) : null;
+      if (npI) out.image = npI; if (npA) out.assetId = npA;
+      if (npI || npA) { out.imgRatio = num(item.imgRatio, 0.4, 2.5, 0.667); out.imgMode = pick(item.imgMode, ["bw", "color"], "bw"); if (item.halftone === true) out.halftone = true; }
     } else if (t === "clipping") {
       out.quote = lines(item.quote, 900, 14); out.sourceTitle = one(item.sourceTitle, 100); out.sourceUrl = safeUrl(item.sourceUrl);
     } else if (t === "postcard") {
@@ -163,7 +167,7 @@
     var w = (o && o.w) || O.defaultW(o && o.type), t = o && o.type;
     if (t === "shopping" && Stick.shopping) return Stick.shopping.sizeEstimate(o);
     if (t === "receipt") { var n = ((o.body || "").split("\n").length || 1); return { w: w, h: Math.round(96 + n * 20 + (o.amount ? 28 : 0) + (o.variant === "torn" ? 14 : 0)) }; }
-    if (t === "newspaper") { var nl = Math.max(1, Math.ceil(((o.body || "").length || 60) / Math.max(18, w / 8.5))); return { w: w, h: Math.round(96 + (o.sub ? 20 : 0) + nl * 17) }; }
+    if (t === "newspaper") { var nl = Math.max(1, Math.ceil(((o.body || "").length || 60) / Math.max(18, w / 8.5))); return { w: w, h: Math.round(96 + (o.sub ? 20 : 0) + nl * 17 + (o.image || o.assetId ? Math.round((w - 28) * (o.imgRatio || 0.667)) + 8 : 0)) }; }
     if (t === "clipping") { var ql = Math.max(2, Math.ceil(((o.quote || "").length || 60) / Math.max(16, w / 9))); return { w: w, h: Math.round(74 + ql * 21) }; }
     if (t === "ticket") return o.orient === "portrait" ? { w: w, h: Math.round(w * 1.55) } : { w: w, h: Math.round(w * 0.46) };
     if (t === "postcard") return { w: w, h: Math.round(w * (o.imgRatio || 0.667)) + 8 };

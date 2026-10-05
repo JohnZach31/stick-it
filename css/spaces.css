@@ -206,3 +206,50 @@ html[data-a11y-motion="reduce"] .doneRingFx{ display:none; }
 /* paste chooser */
 .pasteAsDlg .pasteSnip{ max-height:5.6em; overflow:hidden; padding:8px 10px; border-radius:8px; background:color-mix(in srgb, var(--paper, #fff8c4) 70%, transparent); border:1px solid rgba(0,0,0,0.12); font-size:0.85rem; line-height:1.4; overflow-wrap:anywhere; white-space:pre-wrap; }
 .pasteAsDlg .pasteRem{ display:flex; align-items:center; gap:8px; margin-top:12px; min-height:36px; font-size:0.88rem; cursor:pointer; }
+/* v0.8.3.2: reactions: the quick six, and "+" for a broader set */
+.reactPop{ max-width:min(320px, calc(100vw - 24px)); }
+.reactQuick{ display:flex; flex-wrap:wrap; gap:2px; }
+.reactPlus{ font:600 1.3rem 'Sora',sans-serif; color:var(--ink-soft); border-color:var(--line); }
+.reactMore{ margin-top:6px; padding-top:6px; border-top:1px solid var(--line); max-height:min(260px, 40vh); overflow:auto; overscroll-behavior:contain; }
+.reactGroup{ font:700 0.68rem 'Sora',sans-serif; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.06em; margin:4px 4px 2px; }
+.reactGrid{ display:flex; flex-wrap:wrap; gap:2px; }
+.reactChip, .reactPick{ font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif; }
+.reactPlus{ font-family:'Sora',sans-serif; }
+.floatPop.reactPop{ flex-direction:column; gap:0; }
+/* v0.8.3.2: zones as containers: count, minimize / restore, who belongs */
+.zoneCount{ flex:none; font:600 0.7rem 'Sora',sans-serif; color:#33301f; opacity:0.7; padding:0 4px; white-space:nowrap; margin-inline-start:auto; }
+.zoneCount:empty{ display:none; }
+.zoneBar{ min-height:32px; }
+.zoneMin{ pointer-events:auto; flex:none; width:28px; height:28px; border:0; border-radius:6px; background:transparent; color:#33301f; display:flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.55; font-size:1.1rem; line-height:1; }
+.zoneMin svg{ width:16px; height:16px; }
+.zone:hover .zoneMin, .zone.selected .zoneMin, .zoneMin:focus-visible{ opacity:1; }
+.zoneMin:focus-visible, .zoneMore:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:1px; }
+@media (pointer:coarse){ .zoneMin, .zoneMore{ width:40px; height:40px; opacity:1; } .zoneBar{ min-height:44px; } }
+.zone.zoneMinimized{ height:auto !important; min-height:0; }
+.zone.zoneMinimized .zoneHandle{ display:none; }
+.zone.zoneMinimized .zoneBar{ border-bottom:0; border-radius:4px; }
+.zone.zoneMinimized .zoneTitle{ font-weight:700; }
+.zone.zoneOwns{ box-shadow:0 0 0 2px color-mix(in srgb, var(--accent, #8a4f0d) 70%, transparent); }
+.note.zoneMember, .paperObj.zoneMember, .zoneMember{ outline:2px dashed color-mix(in srgb, var(--accent, #8a4f0d) 65%, transparent); outline-offset:3px; }
+/* v0.8.3.2: an optional picture on a Newspaper. Black & white / halftone are print treatments only; the image itself is never changed. */
+.npFig{ position:relative; margin:6px 0 4px; overflow:hidden; background:#e9e4d3; border:1px solid rgba(0,0,0,0.25); }
+.npFig img{ display:block; width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none; }
+.npFig.bw img{ filter:grayscale(1) contrast(1.18) brightness(1.03); }
+.npFig.ht::after{ content:""; position:absolute; inset:0; pointer-events:none; background:radial-gradient(circle at 50% 50%, #000 0 34%, transparent 38%) 0 0 / 3px 3px; mix-blend-mode:multiply; opacity:0.38; }
+.npFig.ht img{ filter:grayscale(1) contrast(1.5) brightness(1.12); }
+.npFig.ht.color img{ filter:contrast(1.25) brightness(1.08) saturate(0.9); }
+.npFig.pending{ min-height:60px; background:repeating-linear-gradient(45deg, #e9e4d3 0 8px, #dfd9c4 8px 16px); }
+/* v0.8.3.2: piles feel like paper: paper-tab controls, a kind tab on top, a row of index tabs along the bottom */
+.pileObj .pileNav{ width:26px; height:52px; border-radius:2px 10px 10px 2px; background:#f4ecd6; color:#4a3a00; box-shadow:1px 1px 3px rgba(60,45,10,0.35); border:1px solid rgba(60,45,10,0.2); font-size:22px; }
+.pileObj .pilePrev{ left:-22px; border-radius:10px 2px 2px 10px; } .pileObj .pileNext{ right:-22px; }
+.pileObj .pileNav:hover, .pileObj .pileNav:focus-visible{ background:#ffe58a; color:#33301f; }
+body.dark .pileObj .pileNav{ background:#4a4228; color:#f2eadb; border-color:rgba(255,255,255,0.15); } body.dark .pileObj .pileNav:hover{ background:#6a5c30; }
+.pileObj .pileKind{ position:absolute; left:14px; top:-15px; z-index:1; padding:2px 10px 3px; border-radius:6px 6px 0 0; background:#f4ecd6; color:#4a3a00; font:700 0.64rem 'Sora',sans-serif; letter-spacing:0.05em; text-transform:uppercase; box-shadow:0 -1px 2px rgba(60,45,10,0.2); pointer-events:none; }
+body.dark .pileObj .pileKind{ background:#4a4228; color:#f2eadb; }
+.pileObj .pileTabs{ position:absolute; left:10px; right:46px; bottom:-17px; z-index:1; display:flex; gap:3px; justify-content:flex-start; opacity:0; transition:opacity .12s ease; }
+.pileObj:hover .pileTabs, .pileObj.selected .pileTabs, .pileObj:focus-within .pileTabs{ opacity:1; }
+.pileObj .pileTab{ min-width:22px; height:18px; padding:0 4px; border:1px solid rgba(60,45,10,0.25); border-top:0; border-radius:0 0 6px 6px; background:var(--tab, #f4ecd6); color:#4a3a00; font:600 0.62rem 'Sora',sans-serif; cursor:pointer; box-shadow:0 1px 2px rgba(60,45,10,0.25); }
+.pileObj .pileTab.on{ height:24px; background:#ffe58a; font-weight:800; }
+.pileObj .pileTab:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:1px; }
+@media (hover:none){ .pileObj .pileTabs{ display:none; } }              /* touch: a tap opens the pile and shows one paper at a time */
+body.multi-sel .pileObj .pileTabs, .pileObj.static .pileTabs{ display:none; }
