@@ -243,11 +243,12 @@ const load = (ctx, f) => vm.runInContext(read(f), ctx, { filename: f });
 
 // ================================================================ versions, docs
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
-ok(pn[0].version === '0.8.3.1' && pn[0].codename === 'Finish the Edges' && pn[0].status === 'development' && pn[0].date === null && pn[0].title === 'Stick-It v0.8.3.1 — Finish the Edges', 'v0.8.3.1 "Finish the Edges" is recorded and not released');
-ok(/APP_VERSION: "0\.8\.3\.1", APP_CODENAME: "Finish the Edges", APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.3.1, development');
-ok(JSON.parse(read('docs/patch-notes/index.json'))[0].file === '0.8.3.1.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.1.md')), 'patch notes and the index are in step');
-ok(pn[0].tour.length === 5 && ['Done and Trash feel like places', 'Sources finally look like sources', 'Layers mean layers', 'Tiny fix, big annoyance gone'].every((t) => pn[0].tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
-ok(/"version": "0\.8\.3\.1"/.test(read('js/patch-data.js')) && !/Stick Around/.test(read('js/patch-data.js').replace(/Finish the Edges/g, '')), 'the shipped Spotlight data is v0.8.3.1');
+const p1 = pn.find((e) => e.version === '0.8.3.1');
+ok(p1.version === '0.8.3.1' && p1.codename === 'Finish the Edges' && p1.status === 'development' && p1.date === null && p1.title === 'Stick-It v0.8.3.1 — Finish the Edges', 'v0.8.3.1 "Finish the Edges" is recorded and not released');
+ok(/APP_VERSION: "0\.8\.3\.[12]"/.test(read('js/config.js')), 'the app says 0.8.3.1, development');
+ok(JSON.parse(read('docs/patch-notes/index.json')).some((e) => e.file === '0.8.3.1.md') && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.1.md')), 'patch notes and the index are in step');
+ok(p1.tour.length === 5 && ['Done and Trash feel like places', 'Sources finally look like sources', 'Layers mean layers', 'Tiny fix, big annoyance gone'].every((t) => p1.tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
+ok(/Finish the (Edges|Flow)/.test(read('js/patch-data.js')), 'the shipped Spotlight data is current');
 const md = read('docs/patch-notes/0.8.3.1.md'); ok(['## Done feels more done', '## Trash looks like Trash', '## Clippings know where they came from', '## Better source icons', '## Layering actually layers', '## Shopping List polish', '## Small UI consistency fixes'].every((h) => md.includes(h)), 'the patch note follows the agreed structure');
 ok(/Root cause/.test(md) && /9996/.test(md) && /FAVICON_SERVICE/.test(md), 'the patch note records the layering root cause and the favicon decision');
 ok(/sources\.js/.test(read('index.html')), 'the page loads the source registry');

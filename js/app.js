@@ -53,6 +53,13 @@
     if(mark) mark.innerHTML = svg;
   }
   setLogo("loading");
+  if(window.Stick && Stick.patchReader) Stick.patchReader.init({layer: OV.layer, logo: function(){ return buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark); }, current: (window.Stick && Stick.config && Stick.config.APP_VERSION) || "",
+    toast: function(m){ toast(m); },
+    actions: {                                                // what a tour card's "Show me" may do: only things that are safe to open from anywhere
+      openDone: function(){ openSpace("done"); }, openTrash: function(){ openSpace("trash"); },
+      openLegal: function(){ if(Stick.legalReader) Stick.legalReader.open("privacy"); }, openShortcuts: function(){ openControlCenter("shortcuts"); },
+      openSounds: function(){ openControlCenter("sounds"); }, openPatchNotes: function(){ Stick.patchReader.open(); }, openPalette: function(){ openPalette(); }
+    }});
   if(window.Stick && Stick.legalReader) Stick.legalReader.init({layer: OV.layer, logo: function(){ return buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark); }});
 
   // Fonts are script-aware. `script` is the writing system a font is designed for;
@@ -2285,9 +2292,11 @@
     return el && el !== root && root.contains(el) ? el : null;
   }
   // dragging or building a selection means you've stopped typing, so board shortcuts apply again
-  function endEditing(){
+  // put away whatever text is being edited. `keep` = the field that has just been given focus: it must NOT be blurred (a focus handler that called this on its own
+  // field used to throw the cursor out the moment it arrived, which is why a shopping list's title and items could not be typed into).
+  function endEditing(keep){
     var ae = document.activeElement;
-    if(ae && ae.isContentEditable) ae.blur();
+    if(ae && ae !== keep && ae.isContentEditable) ae.blur();
   }
   function notifyInput(textEl){ textEl.dispatchEvent(new Event("input", {bubbles:true})); }
   // removing attributes never moves nodes, so the caret stays put
@@ -4041,10 +4050,12 @@
       var fe = n.el && n.el.querySelector('.poF[data-f="' + f + '"]'); if(!fe) return;
       pop.appendChild(menuItem(ICONS.pencil, fields[f].ph, function(){ closeFloatingPopovers(); editPaperField(n, fe); }));
     });
-    var vh = makeDiv("menuHint"); vh.textContent = "Style"; pop.appendChild(vh);
+    menuSub(pop, ICONS.paper || ICONS.sticky, "Style", function(body){
     Stick.objects.VARIANTS[n.type].forEach(function(v){
-      pop.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }));
+      body.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }))
     });
+    });
+
     if(n.type === "clipping"){
       menuSub(pop, ICONS.link, "Source", function(body){
         var cu = Stick.objects.clean.url(n.sourceUrl);
@@ -4217,7 +4228,7 @@
     span.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
     span.addEventListener("focus", function(){
       var h = holder(); if(h){ toast(h + " is editing this list."); span.blur(); return; }
-      endEditing(); before = captureState([n.id]); startText = it.t;
+      endEditing(span); before = captureState([n.id]); startText = it.t;
       if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
       if(!selected.has(n.id)) setSelection([n.id]);
     });
@@ -4378,7 +4389,7 @@
       var title = b.title; title.contentEditable = "true"; title.spellcheck = true; title.setAttribute("data-ph", "Shopping list");
       title.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
       var tBefore = null;
-      title.addEventListener("focus", function(){ endEditing(); tBefore = captureState([n.id]); if(!selected.has(n.id)) setSelection([n.id]); });
+      title.addEventListener("focus", function(){ endEditing(title); tBefore = captureState([n.id]); if(!selected.has(n.id)) setSelection([n.id]); });
       title.addEventListener("input", function(){ var t = title.textContent.replace(/[\r\n]+/g, " ").slice(0, Stick.shopping.LIMITS.title); if(title.textContent !== t) title.textContent = t; n.title = t.replace(/\s+/g, " ").trim(); saveNotesTyping(); });
       title.addEventListener("paste", function(e){ e.preventDefault(); var tx = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, tx.replace(/\s+/g, " ")); });
       title.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); title.blur(); } else e.stopPropagation(); });
@@ -4644,6 +4655,14 @@
     var sz = Stick.objects.sizeEstimate(n);
     n.x = Math.max(0, bx - sz.w / 2); n.y = Math.max(0, Math.min(boardHeight() - sz.h - 8, by - sz.h / 2));
     return n;
+  }
+  // instant-create kinds for the double-click choice (kinds that need a file first, such as a postcard or a photo strip, are not offered)
+  function createByKind(kind, bx, by){
+    if(kind === "checklist") return addNoteAt(bx, by, {html: '<ul class="checklist"><li data-checked="false"><br></li></ul>', focus: true, label: "Create checklist"});
+    if(kind === "shopping") return createShopping(bx, by);
+    if(kind === "receipt" || kind === "ticket" || kind === "clipping") return createPaper(kind, bx, by);
+    if(kind === "newspaper") return createPaper("newspaper", bx, by, {headline: "", body: ""});
+    return addNoteAt(bx, by);
   }
   function createPaper(kind, bx, by, extra){
     var n = newPaper(kind, bx, by, extra);
@@ -6765,9 +6784,26 @@
     }
     if(!htmlToText(content).trim()) return false;
     var vc = viewCenter();
-    var pasted = addNoteAt(vc.x, vc.y - 60, {html:content, focus:false});
-    offerClipping(pasted, text);
+    var mode = uiPref("pasteText"), plain = String(text || "").replace(/\s+$/, "");
+    function asSticky(){ addNoteAt(vc.x, vc.y - 60, {html: content, focus: false}); }
+    function asClipping(){ createPaper("clipping", vc.x, vc.y - 60, {quote: plain}); }
+    if(mode === "sticky" || !plain){ asSticky(); return true; }
+    if(mode === "clipping"){ asClipping(); return true; }
+    choosePasteKind(plain).then(function(r){ if(!r) return; if(r.remember) setUiPref("pasteText", r.kind); if(r.kind === "clipping") asClipping(); else asSticky(); });
     return true;
+  }
+  // "Paste as": Sticky note or Clipping, with a way to remember the answer. Cancel (or Esc) pastes nothing.
+  function choosePasteKind(text){
+    return new Promise(function(resolve){
+      var wrap = makeDiv("pasteAsDlg"), p = document.createElement("p"), snip = makeDiv("pasteSnip"), lab = document.createElement("label"), cb = document.createElement("input"), got = false;
+      p.className = "acctSub"; p.style.margin = "0 0 8px"; p.textContent = "What should this text become?";
+      snip.textContent = text.length > 140 ? text.slice(0, 140) + "\u2026" : text; snip.dir = "auto";
+      cb.type = "checkbox"; cb.id = "pasteRemember"; lab.setAttribute("for", cb.id); lab.className = "pasteRem"; lab.appendChild(cb); lab.appendChild(document.createTextNode(" Remember my choice"));
+      wrap.appendChild(p); wrap.appendChild(snip); wrap.appendChild(lab);
+      var m = openModal({title: "Paste as", content: wrap, width: 380, actions: [{label: "Cancel", value: false}, {label: "Clipping", value: "clipping"}, {label: "Sticky note", kind: "primary", value: "sticky"}],
+        onClose: function(v){ if(got) return; got = true; resolve(v === "sticky" || v === "clipping" ? {kind: v, remember: cb.checked} : null); }});
+      setTimeout(function(){ var b = m.card.querySelector(".pillBtn.primary"); if(b) b.focus(); }, 0);
+    });
   }
 
   function canEditBoard(b){ return !!b && !b.readOnly && (!b.access || b.access === "owner" || b.access === "editor" || b.access === "edit"); }
@@ -7403,14 +7439,15 @@
     if(!el || reducedMotion() || !el.getBoundingClientRect) return;
     var r = el.getBoundingClientRect(); if(!r.width) return;
     var cx = r.left + r.width / 2, cy = r.top + r.height / 2, bits = [], colors = ["#f6c945", "#7fcf8f", "#f08a7a", "#8bbcf0", "#c9a2f0"];
-    for(var i = 0; i < 12; i++){
+    var ring = document.createElement("div"); ring.className = "doneRingFx"; ring.style.cssText = "left:" + cx + "px;top:" + cy + "px"; document.body.appendChild(ring); bits.push(ring);
+    for(var i = 0; i < 18; i++){
       var p = document.createElement("span"); p.className = "doneBit";
-      var a = (i / 12) * Math.PI * 2 + (i % 2 ? 0.2 : 0), d = 40 + (i % 3) * 22;
+      var a = (i / 18) * Math.PI * 2 + (i % 2 ? 0.2 : 0), d = 50 + (i % 3) * 28;
       p.style.cssText = "left:" + cx + "px;top:" + cy + "px;background:" + colors[i % colors.length] + ";--dx:" + Math.round(Math.cos(a) * d) + "px;--dy:" + Math.round(Math.sin(a) * d - 18) + "px;--dr:" + (i * 47 % 360) + "deg";
       document.body.appendChild(p); bits.push(p);
     }
     var st = document.createElement("div"); st.className = "doneStampFx"; st.textContent = "DONE"; st.style.cssText = "left:" + cx + "px;top:" + cy + "px"; document.body.appendChild(st); bits.push(st);
-    setTimeout(function(){ bits.forEach(function(b){ b.remove(); }); }, 650);
+    setTimeout(function(){ bits.forEach(function(b){ b.remove(); }); }, 700);
   }
   function whoAmI(){ return (CLOUD && settings.account && settings.account.name) || ""; }       // only signed-in people are named (guests are not)
   // Mark done: the note shrinks and slides to the pile. Undo brings it back exactly where it was.
@@ -7432,7 +7469,7 @@
       updateDonePile(false);
     }
     var reduce = reducedMotion(), target = ensurePileBtn();
-    doneEffect(el);
+    doneEffect(el); try{ SoundFx.cue("done"); }catch(e){}
     if(el && !reduce && !target.hidden || (el && !reduce && donePile.length === 0)){
       var r = el.getBoundingClientRect(), t = target.hidden ? {left: 16, top: window.innerHeight - 60, width: 90, height: 40} : target.getBoundingClientRect();
       var dx = (t.left + t.width / 2 - (r.left + r.width / 2)) / boardZoom, dy = (t.top + t.height / 2 - (r.top + r.height / 2)) / boardZoom;
@@ -7451,7 +7488,7 @@
     var list = ids.map(findNote).filter(function(n){ return n && (!n.type || isPaper(n)) && !isDoneItem(n); });
     if(!list.length){ toast("Select some notes first. Photos and other objects can’t be marked done."); return; }
     if(list.length === 1){ markDone(list[0]); return; }
-    endEditing(); closeFloatingPopovers();
+    endEditing(); closeFloatingPopovers(); try{ SoundFx.cue("done"); }catch(e){}
     var by = whoAmI(), at = Date.now();
     var snaps = list.map(function(n){ var o = snapNote(n); o.doneAt = at; if(by) o.doneBy = String(by).slice(0, 60); return o; });
     function take(){
@@ -7476,7 +7513,7 @@
     toast("Moved " + list.length + " notes to Done.", "Undo", function(){ undoIfTop(action); });
   }
   function restoreFromPile(id){
-    var o = findPile(id); if(!o) return;
+    var o = findPile(id); if(!o) return; try{ SoundFx.cue("restore"); }catch(e){}
     var c = Object.assign({}, o); delete c.doneAt; delete c.doneBy; if(c.phys) c.phys = Object.assign({}, c.phys);
     zCounter += 1; c.z = zCounter; c.y = clampY(c.y);
     donePile.splice(donePile.indexOf(o), 1);
@@ -7542,7 +7579,7 @@
       origs.forEach(function(o){ if(!findNote(o.id)){ var c = Object.assign({}, o); if(c.phys) c.phys = Object.assign({}, c.phys); notes.push(c); renderNote(c, false, {focus: false}); } });
       syncPileVisibility(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
     }
-    take();
+    take(); try{ SoundFx.cue("trash"); }catch(e){}
     var word = itemWord(contents.length ? contents : pileObjs);
     var label = contents.length > 1 ? contents.length + " " + word + " moved to Trash." : (contents.length ? word.charAt(0).toUpperCase() + word.slice(1) + " moved to Trash." : "Pile removed.");
     var action = pushHistory({label: contents.length > 1 ? "Delete " + contents.length + " " + word : "Delete " + word, custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
@@ -7563,7 +7600,7 @@
       items.forEach(function(o){ if(trashPile.indexOf(o) === -1) trashPile.push(o); });
       applySelection(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
     }
-    put();
+    put(); try{ SoundFx.cue("restore"); }catch(e){}
     pushHistory({label: items.length > 1 ? "Restore " + items.length + " from Trash" : "Restore from Trash", custom: true, t: Date.now(), undo: function(){ take(); return true; }, redo: function(){ put(); return true; }});
     setSelection(restored.map(function(c){ return c.id; }));
     return items.length;
@@ -8227,6 +8264,12 @@
   if(!readOnly){
     var lastBoardPointer = "mouse";
     boardInner.addEventListener("pointerdown", function(e){ if(e.target === boardInner) lastBoardPointer = e.pointerType || "mouse"; }, true);
+    // what a double-click on the empty canvas creates (Settings > Shortcuts > Input). Sticky note stays the default for everyone who has not chosen.
+    function createAtDoubleClick(e){
+      var rect = boardInner.getBoundingClientRect(), bx = (e.clientX - rect.left) / boardZoom, by = (e.clientY - rect.top) / boardZoom, kind = uiPref("dblNode");
+      if(kind === "ask"){ openInsertMenu(e.clientX, e.clientY, bx, by); return; }
+      createByKind(kind, bx, by);
+    }
     function noteAtEvent(e){
       var rect = boardInner.getBoundingClientRect();
       addNoteAt((e.clientX - rect.left) / boardZoom, (e.clientY - rect.top) / boardZoom);
@@ -8307,7 +8350,7 @@
       if(e.target !== boardInner || suppressBoardClick) return;
       if(e.ctrlKey || e.metaKey || e.shiftKey) return;
       if(lastBoardPointer === "touch" || lastBoardPointer === "pen") return;
-      noteAtEvent(e);
+      createAtDoubleClick(e);
     });
     boardInner.addEventListener("pointerdown", function(e){
       if(e.target !== boardInner || e.button !== 0 || e.pointerType !== "mouse") return;
@@ -8733,7 +8776,7 @@
     pane.querySelector("#ccGuestHint").textContent = acc ? "Your name and photo show up on anything you share. Your notes themselves live in this browser."
       : (CLOUD_OK ? "Your boards live on this device. Sign in to keep them in your account and use them on your other devices." : "Your boards live on this device.");
     var btns = pane.querySelector("#ccGuestBtns"), b = document.createElement("button"); b.type = "button";
-    if(acc){ b.className = "pillBtn danger"; b.textContent = "Sign out"; b.addEventListener("click", function(){ closeAccountModal(); signOut(); }); btns.appendChild(b); }
+    if(acc){ b.className = "pillBtn danger"; b.textContent = "Sign out"; b.addEventListener("click", function(){ confirmSignOut(function(){ closeAccountModal(); signOut(); }); }); btns.appendChild(b); }
     else if(CLOUD_OK){ b.className = "pillBtn primary"; b.textContent = "Sign in"; b.addEventListener("click", function(){ closeAccountModal(); openAccountModal(); }); btns.appendChild(b); }
     else pane.querySelector("section.asCard").hidden = true;
   }
@@ -8758,7 +8801,21 @@
       enabled: function(){ return settings.soundOn !== false; },
       volume: function(){ return Math.max(0, Math.min(100, Number(settings.soundVolume == null ? 60 : settings.soundVolume))); },
       preview: function(){ return tap(this.volume()); },
-      play: function(){ return this.enabled() && this.volume() > 0 ? tap(this.volume()) : false; }
+      play: function(){ return this.enabled() && this.volume() > 0 ? tap(this.volume()) : false; },
+      // short cues for Done (rising two-note chime), Trash (low soft thud), Restore (quick upward blip). Only ever from a user's own action; respects the Sounds setting; never before the first gesture (the context stays suspended).
+      cue: function(name){
+        if(!this.enabled() || this.volume() <= 0) return false;
+        var c = audio(); if(!c || c.state === "suspended" && !navigator.userActivation) return false;
+        if(c.state === "suspended") try{ c.resume(); }catch(e){}
+        var notes = {done: [[660, 0, 0.11], [990, 0.09, 0.16]], trash: [[180, 0, 0.14], [120, 0.06, 0.12]], restore: [[420, 0, 0.09], [630, 0.07, 0.12]]}[name]; if(!notes) return false;
+        var v = this.volume() / 100 * 0.22, t0 = c.currentTime;
+        notes.forEach(function(nt){
+          var o = c.createOscillator(), g = c.createGain(); o.type = name === "trash" ? "triangle" : "sine"; o.frequency.value = nt[0];
+          g.gain.setValueAtTime(0.0001, t0 + nt[1]); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + nt[1] + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + nt[1] + nt[2]);
+          o.connect(g); g.connect(c.destination); o.start(t0 + nt[1]); o.stop(t0 + nt[1] + nt[2] + 0.02);
+        });
+        return true;
+      }
     };
   })();
   function buildSoundsPane(cc, pane){
@@ -8933,6 +8990,21 @@
   function buildShortcutsPane(cc, pane){
     pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
     var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
+    (function(){                                                          // "Input": two small choices, saved the moment they change
+      var card = document.createElement("section"); card.className = "asCard"; card.setAttribute("aria-labelledby", "ccInH");
+      card.innerHTML = '<h4 id="ccInH">Input</h4>';
+      function row(id, label, help, list, key){
+        var r = document.createElement("div"); r.className = "asItem";
+        var l = document.createElement("label"); l.className = "lbl"; l.setAttribute("for", id); l.textContent = label; var sm = document.createElement("small"); sm.textContent = help; l.appendChild(sm);
+        var sel = document.createElement("select"); sel.id = id; sel.className = "asSelect";
+        list.forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+        sel.value = uiPref(key); sel.addEventListener("change", function(){ setUiPref(key, sel.value); toast("Saved."); });
+        r.appendChild(l); r.appendChild(sel); card.appendChild(r);
+      }
+      row("inDbl", "Double-click the canvas creates", "What a double-click on empty board makes. Ask me each time opens the add menu where you clicked.", DBL_NODES, "dblNode");
+      row("inPaste", "Pasted text becomes", "When you paste plain text onto the board (not into a note you are editing).", PASTE_MODES, "pasteText");
+      pane.insertBefore(card, box);
+    })();
     if(KB) buildRebinder(box, groups);
     SHORTCUT_GROUPS.forEach(function(g){
       var sec = document.createElement("section"); sec.className = "asCard kbdGroup"; var h = document.createElement("h4"); h.textContent = g.title; sec.appendChild(h);
@@ -8991,8 +9063,8 @@
       '<section class="asCard" aria-labelledby="ccAbH"><h4 id="ccAbH">About Stick-It</h4><p class="ccAbout" id="ccAbout"></p></section>';
     var list = pane.querySelector(".ccLegalList");
     var wn = document.createElement("button"); wn.type = "button"; wn.className = "asAction ccLink"; wn.id = "ccWhatsNew";
-    wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version, with a short tour.</small></span><span class="go" aria-hidden="true">›</span>';
-    wn.addEventListener("click", function(){ openWhatsNew(); });
+    wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>Every patch note, and a replayable tour for each.</small></span><span class="go" aria-hidden="true">›</span>';
+    wn.addEventListener("click", function(){ if(window.Stick && Stick.patchReader && Stick.patchHistory) Stick.patchReader.open(); else openWhatsNew(); });
     var wnIco = legalIconEl("whatsNew"); if(wnIco){ wn.insertBefore(wnIco, wn.firstChild); wn.classList.add("hasIco"); }
     list.appendChild(wn);
     // the globe: only languages whose legal pages are complete are listed (js/lang.js); the same registry will serve the app later
@@ -9132,6 +9204,10 @@
     closeAccountModal();
   };
 
+  // Signing out always asks first. Nothing in the account is deleted: boards stay saved there, and this browser's signed-in session and cached copy are cleared.
+  function confirmSignOut(run){
+    return confirmDialog({title: "Sign out of Stick-It?", body: CLOUD ? "Your boards stay saved in your account. This browser\u2019s signed-in session and its cached copy of your boards are cleared; sign in again to get them back." : "Your boards on this device stay as they are. You can sign in again at any time.", confirm: "Sign out"}).then(function(ok){ if(ok) run(); return ok; });
+  }
   function signOut(){
     settings.account = null;
     saveSettings();
@@ -9304,7 +9380,7 @@
           : 'Your real name &amp; photo show up on anything you share: boards, notes, and any future collaboration features. Your notes themselves still only live in this browser.') + '</p></div>' +
         (localCount ? '<button class="guestBtn" id="importLocalBtn" style="margin-top:14px;">Import a board saved on this device (' + localCount + ')\u2026</button>' : '') +
         '<button class="guestBtn" id="signOutBtn" style="margin-top:14px;color:var(--danger);border-color:var(--danger);">Sign out</button>';
-      card.querySelector("#signOutBtn").addEventListener("click", CLOUD ? cloudSignOut : signOut);
+      card.querySelector("#signOutBtn").addEventListener("click", function(){ confirmSignOut(function(){ (CLOUD ? cloudSignOut : signOut)(); }); });
       var imp = card.querySelector("#importLocalBtn");
       if(imp) imp.addEventListener("click", function(){ closeAccountModal(); startManualImport(); });
 
@@ -10118,7 +10194,7 @@
       var go = await confirmDialog({title: "Sign out of all devices?", body: "You\u2019ll be signed out everywhere, including here. Your boards stay safe in your account.", confirm: "Sign out everywhere", danger: true});
       if(go) cloudSignOut("global");
     });
-    $("asSignOut").addEventListener("click", function(){ cloudSignOut("local"); });
+    $("asSignOut").addEventListener("click", function(){ confirmSignOut(function(){ cloudSignOut("local"); }); });
     $("asCorrect").addEventListener("click", function(){ cc.show("account"); setTimeout(function(){ $("asName").focus(); }, 30); });
     $("asDelete").addEventListener("click", openDeleteAccount);
 
@@ -10194,7 +10270,7 @@
   document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
   accountBtn.addEventListener("click", openAccountModal);
   var quickOut = document.getElementById("quickSignOut");
-  if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } });
+  if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); confirmSignOut(function(){ if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } }); });
   if(window.Stick && Stick.dev){        // local development only: this block is never built on any other hostname
     Stick.hooks = Stick.hooks || {};
     Stick.dev.presenceDemo = function(on){ try{ if(on) localStorage.setItem("stickit.dev.presence", "bc"); else localStorage.removeItem("stickit.dev.presence"); }catch(e){} return on ? "Presence demo on: reload two tabs" : "Presence demo off"; };
@@ -11009,10 +11085,20 @@
     document.body.appendChild(tourRoot); tourLayer.open();
     renderTourStep();
     window.addEventListener("resize", positionTourStep);
+    document.addEventListener("keydown", tourKeys, true);
+  }
+  // Enter / Right = next, Left / Backspace / Delete = previous. Never while typing in a field (Backspace and Delete must keep working there).
+  var tourKeyUsed = false;
+  function tourKeys(e){
+    if(!tourRoot || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target; if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    var next = tourRoot.querySelector("#tourNext"), back = tourRoot.querySelector("#tourBack");
+    if(e.key === "ArrowRight" || (e.key === "Enter" && !(t && t.tagName === "BUTTON" && t !== next))){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(next) next.click(); }
+    else if(e.key === "ArrowLeft" || e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(back) back.click(); }
   }
   function endTour(){
     if(!tourRoot) return;
-    window.removeEventListener("resize", positionTourStep);
+    window.removeEventListener("resize", positionTourStep); document.removeEventListener("keydown", tourKeys, true);
     tourRoot.remove();
     tourRoot = null;
   }
@@ -11031,6 +11117,7 @@
           '<button class="primary" id="tourNext">' + (tourIndex === tourSteps.length-1 ? "Done" : "Next") + "</button>" +
         "</div>" +
       "</div>";
+    if(tourKeyUsed){ var kh = document.createElement("p"); kh.className = "tourKeys"; kh.textContent = "Enter \u2192 Next \u00b7 Backspace \u2190 Previous \u00b7 Esc closes"; card.appendChild(kh); }
     card.querySelector("#tourSkip").addEventListener("click", endTour);
     var backBtn = card.querySelector("#tourBack");
     if(backBtn) backBtn.addEventListener("click", function(){ tourIndex--; renderTourStep(); });
@@ -11588,6 +11675,34 @@
   function keyOf(a){ if(a.rebind === false) return a.def || ""; var m = activeKeys(); return m[a.id] || ""; }
   function keyCaps(binding){ return KB && binding ? KB.format(binding, IS_MAC) : []; }
 
+  // Two small input preferences: what a double-click on the empty canvas creates, and what pasted text becomes. Saved here always; when signed in they also follow the account.
+  var UI_PREF_DEFAULTS = {dblNode: "sticky", pasteText: "ask"};
+  var DBL_NODES = [["sticky", "Sticky note"], ["checklist", "Checklist"], ["shopping", "Shopping List"], ["receipt", "Receipt"], ["ticket", "Ticket"], ["newspaper", "Newspaper"], ["clipping", "Clipping"], ["ask", "Ask me each time"]];
+  var PASTE_MODES = [["ask", "Ask every time"], ["sticky", "Sticky note"], ["clipping", "Clipping"]];
+  function uiPref(key){
+    var v = settings.inputPrefs && settings.inputPrefs[key], list = key === "dblNode" ? DBL_NODES : PASTE_MODES;
+    return list.some(function(o){ return o[0] === v; }) ? v : UI_PREF_DEFAULTS[key];
+  }
+  var uiPrefSyncT = null;
+  function setUiPref(key, val){
+    var list = key === "dblNode" ? DBL_NODES : PASTE_MODES;
+    if(!list.some(function(o){ return o[0] === val; })) return;
+    settings.inputPrefs = Object.assign({}, settings.inputPrefs || {}); settings.inputPrefs[key] = val; saveSettings();
+    clearTimeout(uiPrefSyncT);
+    if(CLOUD && window.Stick && Stick.auth && Stick.auth.user() && Stick.account && Stick.account.saveUiPrefs){
+      uiPrefSyncT = setTimeout(function(){
+        var cur = (Stick.account.cached() && Stick.account.cached().settings && Stick.account.cached().settings.uiPrefs) || {}, next = {};
+        Object.keys(cur).forEach(function(k){ next[k] = cur[k]; });
+        next.input = Object.assign({}, cur.input || {}, settings.inputPrefs);
+        Stick.account.saveUiPrefs(next).catch(function(){});
+      }, 700);
+    }
+  }
+  function adoptAccountInputPrefs(prefs){
+    var remote = prefs && prefs.input; if(!remote || typeof remote !== "object") return;
+    var ok = {}; ["dblNode", "pasteText"].forEach(function(k){ var list = k === "dblNode" ? DBL_NODES : PASTE_MODES; if(list.some(function(o){ return o[0] === remote[k]; })) ok[k] = remote[k]; });
+    if(Object.keys(ok).length && JSON.stringify(ok) !== JSON.stringify(settings.inputPrefs || {})){ settings.inputPrefs = Object.assign({}, settings.inputPrefs || {}, ok); saveSettings(); }
+  }
   var shortcutSyncT = null;
   function saveShortcuts(custom){
     if(Object.keys(custom).length) settings.shortcuts = custom; else delete settings.shortcuts;
@@ -11670,6 +11785,7 @@
     run: function(){ if(boardPanel.hidden) brandBtn.click(); }});
   defineAction({id: "shortcuts", label: "Keyboard shortcuts", group: "Go", keywords: "keys keyboard help rebind customize", def: "?", run: function(){ openControlCenter("shortcuts"); }});
   defineAction({id: "settings", label: "Open Settings", group: "Go", keywords: "preferences control center appearance", def: "", run: function(){ openControlCenter(); }});
+  defineAction({id: "patchNotes", label: "Patch notes", group: "Go", keywords: "whats new history versions changes tour replay", def: "", run: function(){ if(window.Stick && Stick.patchReader) Stick.patchReader.open(); }});
   defineAction({id: "whatsNew", label: "Show What’s New", group: "Go", keywords: "patch notes changes version tour update", def: "",
     when: function(){ return !!ptData(); }, run: function(){ openWhatsNew(); }});
   defineAction({id: "bookmarkHere", label: "Bookmark this spot", group: "Go", keywords: "save place view remember", def: "B", edit: true, run: function(){ bookmarkThisSpot(); }});
@@ -12301,7 +12417,7 @@
     settings.accountPrefs = res.settings;
     saveSettings();
     updateCollabButton();
-    if(typeof adoptAccountShortcuts === "function") { adoptAccountShortcuts(res.settings && res.settings.uiPrefs); if(typeof adoptAccountPatchTour === "function") adoptAccountPatchTour(res.settings && res.settings.uiPrefs); }
+    if(typeof adoptAccountShortcuts === "function") { adoptAccountInputPrefs(res.settings && res.settings.uiPrefs); adoptAccountShortcuts(res.settings && res.settings.uiPrefs); if(typeof adoptAccountPatchTour === "function") adoptAccountPatchTour(res.settings && res.settings.uiPrefs); }
   }
   function refreshAccountData(){
     if(!CLOUD || !window.Stick || !Stick.auth.user()) return Promise.resolve();
@@ -12736,6 +12852,7 @@
     var show = btn("Show me", "primary", function(){ ptMarkSeen(); closePatchCard(); startPatchTour(); });
     btn("Not now", "", function(){ ptDismiss(); });
     var a = document.createElement("a"); a.className = "ptLink"; a.href = patchNotesUrl(d); a.target = "_blank"; a.rel = "noopener"; a.textContent = "View patch notes";
+    a.addEventListener("click", function(e){ if(window.Stick && Stick.patchReader && Stick.patchHistory){ e.preventDefault(); Stick.patchReader.open({version: d.version}); } });
     card.appendChild(h); card.appendChild(p); card.appendChild(row); card.appendChild(a);
     document.body.appendChild(card); ptCard = card; ptLayer.open();
     var live = makeDiv("sr-only"); live.setAttribute("role", "status"); live.textContent = "Stick-It was updated. " + (d.tldr || ""); card.appendChild(live);

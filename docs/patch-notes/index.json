@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.3.2",
+    "codename": "Finish the Flow",
+    "title": "Stick-It v0.8.3.2 — Finish the Flow",
+    "date": null,
+    "status": "development",
+    "tldr": "More expressive newspapers, better system-space feedback, smarter paste behavior, stronger zones and piles, and the complete Stick-It patch history inside the app.",
+    "file": "0.8.3.2.md"
+  },
+  {
     "version": "0.8.3.1",
     "codename": "Finish the Edges",
     "title": "Stick-It v0.8.3.1 — Finish the Edges",

@@ -96,7 +96,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
   ok(/m\.textContent = id\.letter/.test(fn('siteMarkEl')) && /iconPlan\(url\)\.indexOf\("favicon"\) !== -1/.test(fn('siteMarkEl')) && !/favicon\.ico/.test(fn('siteMarkEl') + fn('buildClippingFoot')), 'the "site mark" is a letter badge drawn locally; a favicon is only asked for when a service has been configured (none is by default)');
   const cm = fn('noteToClipping') + fn('clippingToNote') + fn('setClippingSource');
   ok(/swapObject\(n, fresh, "Make clipping"\)/.test(cm) && /swapObject\(n, nn, "Clipping to note"\)/.test(cm) && /"Set clipping source"/.test(cm) && /"Remove clipping source"/.test(cm) && /recordChange\(/.test(cm), 'make clipping, convert back to a note, change or remove the source: each one undo step');
-  ok(/offerClipping\(pasted, text\)/.test(fn('pasteAsNewNote')) && /Make clipping/.test(fn('offerClipping')) && /< 60\) return/.test(fn('offerClipping')), 'pasting long text offers a clipping afterwards; the normal paste still happens');
+  ok(/choosePasteKind\(plain\)/.test(fn('pasteAsNewNote')) && /Make clipping/.test(fn('offerClipping')) && /< 60\) return/.test(fn('offerClipping')), 'pasting text now asks Sticky note or Clipping (v0.8.3.2); the old offer is still defined');
   ok(/Open source/.test(app) && /Copy source/.test(app) && /Remove source/.test(app) && /Convert to a note/.test(app), 'a clipping menu has open, copy, remove source and convert to note');
   ok(read('js/pile.js').includes('"newspaper", "clipping"'), 'newspapers and clippings can be piled');
 }
@@ -176,7 +176,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
 {
   const de = fn('doneEffect');
   ok(/reducedMotion\(\)/.test(de) && /return;/.test(de.slice(0, 120)), 'reduced motion: no confetti and no stamp animation (the move to Done is immediate)');
-  ok(/for\(var i = 0; i < 12; i\+\+\)/.test(de) && /setTimeout\(function\(\)\{ bits\.forEach/.test(de) && /650\)/.test(de), 'a few scraps and a stamp, all removed again after about half a second');
+  ok(/for\(var i = 0; i < 18; i\+\+\)/.test(de) && /setTimeout\(function\(\)\{ bits\.forEach/.test(de) && /700\)/.test(de), 'a few scraps and a stamp, all removed again after under 700 ms (v0.8.3.2)');
   ok(/doneEffect\(el\)/.test(fn('markDone')) && /doneEffect\(n\.el\)/.test(fn('markDoneGroup')), 'the effect runs when something is intentionally marked Done');
   ok(/@keyframes doneBit/.test(css) && /@keyframes doneStamp/.test(css) && /\.doneBit, \.doneStampFx\{ display:none; \}/.test(css) && !/infinite/.test(css.slice(css.indexOf('the completion moment'), css.indexOf('the completion moment') + 1400)), 'the CSS has no loops and switches off under both reduced-motion routes');
   ok(/restoreFromPile\(id\)/.test(fn('restoreFromDone')) && /zCounter \+= 1; c\.z = zCounter; c\.y = clampY\(c\.y\)/.test(fn('restoreFromPile')), 'Put back returns it to the board where it was (original position kept)');

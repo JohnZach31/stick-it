@@ -198,3 +198,11 @@ body.dark .asAction.ccLink:hover, body.dark .asAction.ccLink:focus-visible, body
 body.dark .asAction.ccLink:active, body.dark .sysRow:active{ background-color:rgba(255,180,84,0.2); }
 @media (hover:none){ .asAction.ccLink:hover{ background-color:transparent; } .asAction.ccLink:active{ background-color:color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 12%); } }
 @media (prefers-reduced-motion: reduce){ .asAction.ccLink, .asAction.ccLink .go, .sysRow{ transition:none; } .asAction.ccLink:hover .go{ transform:none; } }
+/* v0.8.3.2: a stronger Done moment (a ring, more confetti; all within 700 ms) */
+.doneRingFx{ position:fixed; z-index:10029; width:30px; height:30px; margin:-15px 0 0 -15px; border-radius:50%; border:3px solid #7fcf8f; pointer-events:none; animation:doneRing .62s ease-out forwards; }
+@keyframes doneRing{ 0%{ opacity:.9; transform:scale(.3); } 100%{ opacity:0; transform:scale(4.2); } }
+@media (prefers-reduced-motion: reduce){ .doneRingFx{ display:none; } }
+html[data-a11y-motion="reduce"] .doneRingFx{ display:none; }
+/* paste chooser */
+.pasteAsDlg .pasteSnip{ max-height:5.6em; overflow:hidden; padding:8px 10px; border-radius:8px; background:color-mix(in srgb, var(--paper, #fff8c4) 70%, transparent); border:1px solid rgba(0,0,0,0.12); font-size:0.85rem; line-height:1.4; overflow-wrap:anywhere; white-space:pre-wrap; }
+.pasteAsDlg .pasteRem{ display:flex; align-items:center; gap:8px; margin-top:12px; min-height:36px; font-size:0.88rem; cursor:pointer; }
