@@ -106,7 +106,7 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
   const code = ['makeDiv', 'menuItem', 'placeFlyout', 'menuSub', 'paperSubmenu', 'arrangeSubmenu'].map(fn).join('\n') + '\nvar ROT_STEP = 3;';
   const calls = [];
   const ctx = vm.createContext({ document, window: { innerWidth: 1000, innerHeight: 800 }, ICONS: { fit: '<svg></svg>', rip: '<svg></svg>', sticky: '<svg></svg>', move: '<svg></svg>' }, MOD: 'Ctrl', trimPaper: (n, how) => calls.push('trim:' + how), restorePaper: () => calls.push('restore'), closeFloatingPopovers: () => {},
-    rotatable: (n) => n.type !== 'zone', isPinned: (n) => !!n.pinned, rotateBy: (l, d) => calls.push('rot:' + d), straighten: () => calls.push('straighten') });
+    rotatable: (n) => n.type !== 'zone', isZone: (n) => n.type === 'zone', isHiddenMember: () => false, layerObjects: (ids, op) => calls.push('layer:' + op), isPinned: (n) => !!n.pinned, rotateBy: (l, d) => calls.push('rot:' + d), straighten: () => calls.push('straighten') });
   vm.runInContext(code, ctx);
   const pop = document.createElement('div'); document.body.appendChild(pop);
   vm.runInContext('paperSubmenu', ctx)(pop, { id: 'a' }); vm.runInContext('arrangeSubmenu', ctx)(pop, { id: 'a' });
@@ -114,7 +114,7 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
   ok(heads.join('|') === 'Paper|Arrange', 'the menu gets one Paper and one Arrange row');
   const inside = (label) => [...[...pop.querySelectorAll('.menuSub')].find((s) => s.querySelector('.menuItem').textContent.indexOf(label) === 0).querySelectorAll('.menuSubBody > .menuItem')].map((b) => b.textContent.trim());
   ok(inside('Paper').join('|') === 'Fit paper to content|Rip off empty paper|Restore full paper', 'Paper holds Fit, Rip off and Restore');
-  ok(inside('Arrange').join('|') === 'Rotate left|Rotate right|Straighten', 'Arrange holds Rotate left, Rotate right and Straighten');
+  ok(inside('Arrange').join('|') === 'Rotate left|Rotate right|Straighten|Bring to front|Bring forward|Send backward|Send to back', 'Arrange holds Rotate left / right, Straighten and the four Layer actions');
   ok(pop.querySelectorAll('.menuSubBody .menuSub').length === 0, 'submenus are one level deep, never nested');
   ok([...pop.querySelectorAll(':scope > .menuItem')].length === 0, 'the paper actions are not also top-level rows');
   const head = pop.querySelector('.menuSub > .menuItem'), body = pop.querySelector('.menuSubBody');
@@ -127,7 +127,7 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
   const arr = [...pop.querySelectorAll('.menuSub')][1]; arr.querySelector('.menuItem').click(); const aBody = [...document.querySelectorAll('.menuSubBody')].find((b) => b.getAttribute('aria-label') === 'Arrange'); ok(document.querySelector('.menuSubBody') && [...document.querySelectorAll('.menuSubBody')].filter((b) => !b.hidden).length === 1, 'opening Arrange closes Paper: only one submenu is open at a time'); ok(aBody.parentNode === document.body, 'an opened flyout lives on the page, so the scrolling menu cannot clip it'); [...aBody.querySelectorAll('.menuItem')][1].click(); [...aBody.querySelectorAll('.menuItem')][2].click();
   ok(calls.includes('rot:3') && calls.includes('straighten'), 'Arrange actions work without a pointer drag (rotate right, straighten)');
   const pinnedPop = document.createElement('div'); document.body.appendChild(pinnedPop); vm.runInContext('arrangeSubmenu', ctx)(pinnedPop, { id: 'p', pinned: true });
-  ok([...pinnedPop.querySelectorAll('.menuSubBody .menuItem')].every((b) => b.classList.contains('disabled')), 'a pinned item shows the Arrange actions as unavailable');
+  ok([...pinnedPop.querySelectorAll('.menuSubBody .menuItem')].slice(0, 3).every((b) => b.classList.contains('disabled')) && ![...pinnedPop.querySelectorAll('.menuSubBody .menuItem')].slice(3).some((b) => b.classList.contains('disabled')), 'a pinned item shows the turning actions as unavailable (layering still works: it moves nothing)');
   const zonePop = document.createElement('div'); document.body.appendChild(zonePop); vm.runInContext('arrangeSubmenu', ctx)(zonePop, { id: 'z', type: 'zone' });
   ok(zonePop.children.length === 0, 'an object that cannot turn gets no Arrange row');
   const sp = document.createElement('div'); document.body.appendChild(sp); vm.runInContext('paperSubmenu', ctx)(sp, { id: 's', cosmetic: 'soup' }); ok(sp.children.length === 0, 'Alphabet Soup keeps its own rules: no Paper submenu');
@@ -202,11 +202,12 @@ ok(/box\.remove\(\);\s+document\.body\.style\.userSelect = "";\s+if\(selected\.s
 
 // ================================================================ patch data
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
-ok(pn[0].version === '0.8.2.2' && pn[0].codename === 'Touch the Paper' && pn[0].status === 'development' && pn[0].date === null && pn[0].title === 'Stick-It v0.8.2.2 — Touch the Paper', 'v0.8.2.2 "Touch the Paper" is recorded and not released');
-ok(/APP_VERSION: "0\.8\.2\.2", APP_CODENAME: "Touch the Paper", APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.2.2, development');
-ok(JSON.parse(read('docs/patch-notes/index.json'))[0].file === '0.8.2.2.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.2.2.md')), 'patch notes and the index are in step');
-ok(pn[0].tour.length === 5 && ['Pin it for real', 'Turn things a little sideways', 'Links can become videos', 'Cleaner menus'].every((t) => pn[0].tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
-const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.2\.2"/.test(pd) && !/Room to Breathe/.test(pd), 'the shipped Spotlight data is v0.8.2.2 (no stale 0.8.2.1 content)');
+const pn2 = pn.find((x) => x.version === '0.8.2.2');
+ok(pn2 && pn2.codename === 'Touch the Paper' && pn2.status === 'development' && pn2.date === null && pn2.title === 'Stick-It v0.8.2.2 — Touch the Paper', 'v0.8.2.2 "Touch the Paper" is recorded and not released');
+ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.(?:2\.2|3)"/.test(read('js/config.js')), 'the app is still in development');
+ok(JSON.parse(read('docs/patch-notes/index.json')).find((x) => x.version === '0.8.2.2').file === '0.8.2.2.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.2.2.md')), 'patch notes and the index are in step');
+ok(pn2.tour.length === 5 && ['Pin it for real', 'Turn things a little sideways', 'Links can become videos', 'Cleaner menus'].every((t) => pn2.tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
+const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.\d(?:\.\d)?"/.test(pd) && !/Room to Breathe/.test(pd), 'the shipped Spotlight data has no stale 0.8.2.1 content');
 const md = read('docs/patch-notes/0.8.2.2.md'); ok(['## Pinning finally looks like pinning', '## Give things a little tilt', '## Video links become useful after paste', '## Paper controls got their own home', '## Delete looks like delete', '## Cleaner object menus', '## More Stick-It in Settings', '## Embedded video polish', '## Small tactile touches'].every((h) => md.includes(h)), 'the patch note follows the agreed structure');
 
 console.log('v0.8.2.2: ' + pass + ' passed, ' + fail + ' failed');

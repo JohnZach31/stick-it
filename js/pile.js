@@ -21,7 +21,7 @@
   P.MIN_MEMBERS = 2;
   P.WIDTH = [150, 260, 200];             // min, max, default (the footprint stays this size however many members there are)
   P.STACK_STEP = 28;                     // how far each paper in a vertical stack sits below the one before it
-  P.ELIGIBLE_TYPES = ["receipt", "ticket"];          // besides ordinary notes (which have no type)
+  P.ELIGIBLE_TYPES = ["receipt", "ticket", "newspaper", "clipping"];          // besides ordinary notes (which have no type)
 
   var ID_RE = /^[\w-]{1,64}$/;
   function num(v, lo, hi, d) { v = Number(v); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }

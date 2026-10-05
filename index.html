@@ -11,6 +11,7 @@
 <script src="js/vendor/html2canvas.min.js"></script>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/legal-reader.css">
+<link rel="stylesheet" href="css/spaces.css">
 </head>
 <body>
 <a class="skipLink" href="#board" id="skipLink">Skip to the board</a>
@@ -26,6 +27,12 @@
   <div class="searchWrap">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
     <input type="text" id="searchInput" aria-label="Search notes" placeholder="Search notes…" autocomplete="off">
+    <div class="searchNav" id="searchNav" hidden>
+      <span class="searchCount" id="searchCount" role="status" aria-live="polite">0</span>
+      <button type="button" class="searchStep" id="searchPrev" aria-label="Previous result" title="Previous result (Shift+Enter)">&#8593;</button>
+      <button type="button" class="searchStep" id="searchNext" aria-label="Next result" title="Next result (Enter)">&#8595;</button>
+      <select class="searchScope" id="searchScope" aria-label="Search in"><option value="board">Board</option><option value="done">Done</option><option value="trash">Trash</option></select>
+    </div>
   </div>
   <button class="gearBtn searchToggle" id="searchToggle" type="button" aria-label="Search notes" title="Search notes" aria-expanded="false">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
@@ -61,6 +68,11 @@
 <div class="panel" id="boardPanel" hidden style="width:290px; right:auto; left:18px;">
   <h3>Your boards</h3>
   <div id="boardList"></div>
+  <div class="sysSpaces" id="sysSpaces">
+    <h3>System</h3>
+    <button type="button" class="sysRow" id="openDoneSpace"><span class="sysIco" aria-hidden="true"></span><span class="sysName">Done</span><span class="sysCount" id="spaceDoneCount">0</span></button>
+    <button type="button" class="sysRow" id="openTrashSpace"><span class="sysIco" aria-hidden="true"></span><span class="sysName">Trash</span><span class="sysCount" id="spaceTrashCount">0</span></button>
+  </div>
   <div class="addBoardRow">
     <input type="text" id="newBoardName" placeholder="New board name" maxlength="40">
     <button id="addBoardBtn" aria-label="Add board" title="Add board">+</button>
@@ -164,6 +176,8 @@
 <script src="js/shopping.js"></script>
 <script src="js/boardguard.js"></script>
 <script src="js/pile.js"></script>
+<script src="js/layers.js"></script>
+<script src="js/reactions.js"></script>
 <script src="js/embed.js"></script>
 <script src="js/legal-fill.js"></script>
 <script src="js/legal-reader.js"></script>

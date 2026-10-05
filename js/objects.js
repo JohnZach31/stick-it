@@ -8,25 +8,29 @@
   var Stick = root.Stick = root.Stick || {};
   var O = Stick.objects = {};
 
-  O.KINDS = ["receipt", "ticket", "postcard", "photo_strip", "shopping"];       // "shopping" is a list, its rules live in js/shopping.js
+  O.KINDS = ["receipt", "ticket", "postcard", "photo_strip", "shopping", "newspaper", "clipping"];       // "shopping" is a list, its rules live in js/shopping.js
   O.isKind = function (t) { return O.KINDS.indexOf(t) !== -1; };
 
   var VARIANTS = {
     receipt: ["clean", "faded", "torn", "folded"],
     ticket: ["perforated", "rounded", "vintage", "stub"],
     postcard: ["classic", "airmail", "modern"],
-    photo_strip: ["vertical", "film"]
+    photo_strip: ["vertical", "film"],
+    newspaper: ["broadsheet", "tabloid", "gazette", "evening", "telegraph", "courier", "herald", "modern"],
+    clipping: ["web", "newspaper", "book"]
   };
   O.VARIANTS = VARIANTS;
   O.VARIANT_NAMES = {
     clean: "Clean thermal", faded: "Faded", torn: "Torn bottom", folded: "Fold crease",
     perforated: "Perforated", rounded: "Rounded", vintage: "Vintage", stub: "Event stub",
     classic: "Classic", airmail: "Airmail", modern: "Modern",
-    vertical: "White strip", film: "Instant film"
+    vertical: "White strip", film: "Instant film",
+    broadsheet: "Broadsheet", tabloid: "Tabloid", gazette: "Gazette", evening: "Evening paper", telegraph: "Telegraph", courier: "Typewritten", herald: "Herald", modern: "Modern",
+    web: "Web clipping", book: "Book page"
   };
-  O.LABELS = { receipt: "receipt", ticket: "ticket", postcard: "postcard", photo_strip: "photo strip", shopping: "shopping list" };
+  O.LABELS = { receipt: "receipt", ticket: "ticket", postcard: "postcard", photo_strip: "photo strip", shopping: "shopping list", newspaper: "newspaper", clipping: "clipping" };
   O.STRIP_MIN = 2; O.STRIP_MAX = 6;
-  O.WIDTH = { receipt: [170, 360, 230], ticket: [190, 480, 330], postcard: [220, 520, 320], photo_strip: [90, 460, 140], shopping: [230, 420, 290] };
+  O.WIDTH = { receipt: [170, 360, 260], ticket: [190, 480, 330], postcard: [220, 520, 320], photo_strip: [90, 460, 140], shopping: [230, 420, 290], newspaper: [220, 460, 310], clipping: [190, 420, 260] };
 
   // ---------------------------------------------------------------- text cleaning
   var CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f‪-‮⁦-⁩]/g;   // control characters and bidi overrides (text spoofing)
@@ -35,7 +39,14 @@
     return t.map(function (l) { return l.replace(/[ \t]+$/g, ""); }).join("\n").replace(/^\n+|\n+$/g, "");
   }
   function one(v, max) { return String(v == null ? "" : v).replace(CONTROL, "").replace(/\s+/g, " ").trim().slice(0, max); }
-  O.clean = { lines: lines, one: one };
+  // a link a clipping may point to: http(s) only, no credentials, no markup. Anything else is not stored.
+  function safeUrl(v) {
+    v = String(v == null ? "" : v).trim();
+    if (!v || v.length > 500 || /[\s<>"'\\]/.test(v)) return "";
+    try { var u = new URL(v); return (u.protocol === "https:" || u.protocol === "http:") && !u.username && !u.password ? u.href : ""; } catch (e) { return ""; }
+  }
+  function domainOf(v) { var u = safeUrl(v); if (!u) return ""; try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } }
+  O.clean = { lines: lines, one: one, url: safeUrl, domain: domainOf };
   function num(v, lo, hi, d) { v = Number(v); return isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
   function pick(v, list, d) { return list.indexOf(v) !== -1 ? v : d; }
   function uuid(v) { return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v.toLowerCase() : null; }
@@ -59,6 +70,10 @@
       out.title = one(item.title, 60); out.dateTime = one(item.dateTime, 40); out.place = one(item.place, 60); out.details = lines(item.details, 160, 4);
       out.orient = pick(item.orient, ["landscape", "portrait"], "landscape");
       if (!item.w) out.w = out.orient === "portrait" ? 200 : rng[2];
+    } else if (t === "newspaper") {
+      out.headline = one(item.headline, 100); out.sub = one(item.sub, 80); out.body = lines(item.body, 900, 18);
+    } else if (t === "clipping") {
+      out.quote = lines(item.quote, 900, 14); out.sourceTitle = one(item.sourceTitle, 100); out.sourceUrl = safeUrl(item.sourceUrl);
     } else if (t === "postcard") {
       out.location = one(item.location, 40); out.message = lines(item.message, 300, 8); out.recipient = one(item.recipient, 40);
       out.font = h.fontOk && h.fontOk(item.font) ? item.font : undefined;
@@ -99,6 +114,8 @@
     var parts;
     if (o.type === "receipt") parts = [o.title, o.date, o.body, o.amount];
     else if (o.type === "ticket") parts = [o.title, o.dateTime, o.place, o.details];
+    else if (o.type === "newspaper") parts = [o.headline, o.sub, o.body];
+    else if (o.type === "clipping") parts = [o.quote, o.sourceTitle, domainOf(o.sourceUrl)];
     else if (o.type === "postcard") parts = [o.location, o.message, o.recipient];
     else if (o.type === "photo_strip") parts = [o.caption].concat((o.frames || []).map(function (f) { return f.cap; }));
     else parts = [];
@@ -106,7 +123,7 @@
   };
   O.label = function (o) {
     if (o && o.type === "shopping") return Stick.shopping ? Stick.shopping.label(o) : "shopping list";
-    var l = O.LABELS[o && o.type] || "object", t = o && (o.title || o.location || o.caption);
+    var l = O.LABELS[o && o.type] || "object", t = o && (o.title || o.location || o.caption || o.headline || o.sourceTitle);
     return t ? l + ": " + t : l;
   };
   O.hasContent = function (o) {
@@ -116,6 +133,22 @@
     return true;
   };
   O.countAssets = function (o) { return o && o.type === "photo_strip" ? (o.frames || []).filter(function (f) { return f.assetId || f.image; }).length : (o && o.assetId ? 1 : 0); };
+
+  // playful, generic sample lines for a new receipt (never anyone's real data). Edit or delete them straight away.
+  O.SAMPLE_RECEIPTS = [
+    { title: "Corner Cafe", body: "Coffee 3.50\nCroissant 2.80\nOat milk 0.60", amount: "6.90" },
+    { title: "Fresh Bakery", body: "Bread 2.20\nRolls x4 3.00\nJam 2.40", amount: "7.60" },
+    { title: "Hardware Hut", body: "Batteries 4.50\nTape 1.90\nScrews 2.30", amount: "8.70" },
+    { title: "City Rail", body: "Train ticket 5.50\nSeat reservation 1.50", amount: "7.00" },
+    { title: "Late Show Cinema", body: "Film 9.00\nPopcorn 4.00\nSoda 2.50", amount: "15.50" },
+    { title: "Paper & Pen", body: "Notebook 3.80\nGel pens x3 4.50\nStickers 1.20", amount: "9.50" },
+    { title: "Green Market", body: "Apples 3.10\nLemons 1.60\nHerbs 1.00", amount: "5.70" },
+    { title: "Pizza Night", body: "Margherita 8.00\nGarlic bread 3.00\nLemonade 2.20", amount: "13.20" },
+    { title: "Book Nook", body: "Paperback 7.50\nBookmark 0.90", amount: "8.40" },
+    { title: "Laundry Lane", body: "Wash 4.00\nDry 3.00\nSoap 1.00", amount: "8.00" }
+  ];
+  O.sampleReceipt = function (rnd) { var l = O.SAMPLE_RECEIPTS; var r = l[Math.floor(((typeof rnd === "function" ? rnd() : Math.random()) % 1) * l.length)] || l[0]; return { title: r.title, body: r.body, amount: r.amount }; };
+  O.randomVariant = function (kind, rnd) { var v = VARIANTS[kind] || []; return v[Math.floor(((typeof rnd === "function" ? rnd() : Math.random()) % 1) * v.length)] || (v[0] || ""); };
 
   // decorative serial digits for a ticket/receipt: derived from the id, never scannable, never a real code
   O.serial = function (id, n) {
@@ -130,6 +163,8 @@
     var w = (o && o.w) || O.defaultW(o && o.type), t = o && o.type;
     if (t === "shopping" && Stick.shopping) return Stick.shopping.sizeEstimate(o);
     if (t === "receipt") { var n = ((o.body || "").split("\n").length || 1); return { w: w, h: Math.round(96 + n * 20 + (o.amount ? 28 : 0) + (o.variant === "torn" ? 14 : 0)) }; }
+    if (t === "newspaper") { var nl = Math.max(1, Math.ceil(((o.body || "").length || 60) / Math.max(18, w / 8.5))); return { w: w, h: Math.round(96 + (o.sub ? 20 : 0) + nl * 17) }; }
+    if (t === "clipping") { var ql = Math.max(2, Math.ceil(((o.quote || "").length || 60) / Math.max(16, w / 9))); return { w: w, h: Math.round(74 + ql * 21) }; }
     if (t === "ticket") return o.orient === "portrait" ? { w: w, h: Math.round(w * 1.55) } : { w: w, h: Math.round(w * 0.46) };
     if (t === "postcard") return { w: w, h: Math.round(w * (o.imgRatio || 0.667)) + 8 };
     if (t === "photo_strip") { var f = (o.frames || []).length || 3; return o.variant === "film" ? { w: w, h: Math.round(w / f * 0.9 + 44) } : { w: w, h: Math.round(f * (w * 0.78) + 40) }; }

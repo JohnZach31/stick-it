@@ -1166,7 +1166,7 @@
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
   var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1222,7 +1222,9 @@
       if(!sp) return null;
       if(c.pinned === true) sp.pinned = true;
       if(c.pileId !== undefined) sp.pileId = String(c.pileId);
-      if(c.type === "shopping"){ var dn = Number(c.doneAt); if(dn > 0 && dn < 1e14){ sp.doneAt = dn; if(c.doneBy !== undefined) sp.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60); } }
+      if(c.reactions !== undefined && window.Stick && Stick.reactions){ var rx2 = Stick.reactions.normalize(c.reactions); if(Object.keys(rx2).length) sp.reactions = rx2; }
+      var dn = Number(c.doneAt); if(dn > 0 && dn < 1e14){ sp.doneAt = dn; if(c.doneBy !== undefined) sp.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60); }
+      var tn = Number(c.trashedAt); if(tn > 0 && tn < 1e14){ sp.trashedAt = tn; if(c.trashedBy !== undefined) sp.trashedBy = String(c.trashedBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60); }
       sp.id = c.id; sp.x = c.x; sp.y = c.y; sp.z = c.z; sp.rot = c.rot; sp.phys = c.phys && typeof c.phys === "object" ? c.phys : {};
       if(c.w != null) sp.w = Math.round(clampNum(c.w, Stick.objects.WIDTH[c.type][0], Stick.objects.WIDTH[c.type][1], Stick.objects.defaultW(c)));
       if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) !== -1) sp.mediaState = c.mediaState;
@@ -1257,6 +1259,9 @@
     if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
     if(c.doneAt !== undefined){ c.doneAt = Number(c.doneAt); if(!(c.doneAt > 0 && c.doneAt < 1e14)) delete c.doneAt; }
     if(c.doneBy !== undefined) c.doneBy = String(c.doneBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60);
+    if(c.reactions !== undefined){ var rx = window.Stick && Stick.reactions ? Stick.reactions.normalize(c.reactions) : {}; if(Object.keys(rx).length) c.reactions = rx; else delete c.reactions; }
+    if(c.trashedAt !== undefined){ c.trashedAt = Number(c.trashedAt); if(!(c.trashedAt > 0 && c.trashedAt < 1e14)) delete c.trashedAt; }
+    if(c.trashedBy !== undefined) c.trashedBy = String(c.trashedBy).replace(/[\u0000-\u001f\u202a-\u202e\u2066-\u2069]/g, "").trim().slice(0, 60);
     if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
     if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
@@ -1405,6 +1410,7 @@
   var bootRenderMs = 0;                       // how long drawing the whole board took at page load (dev diagnostics)
   var notes = [];
   var donePile = [];                                 // finished notes (see the Done pile section); stored with the notes, not drawn on the board
+  var trashPile = [];                                // deleted things waiting in Trash (system spaces section); stored with the notes, not drawn on the board
   var firstRun = false;
   if((!readOnly || viewerMode) && !singleNoteMode){
     var stored = NOTES_KEY ? safeGet(NOTES_KEY) : null;
@@ -1425,7 +1431,7 @@
     }
   }
 
-  (function(){ var live = [], done = []; notes.forEach(function(o){ (Number(o.doneAt) > 0 ? done : live).push(o); }); notes = live; donePile = done; })();
+  (function(){ var live = [], done = [], trash = []; notes.forEach(function(o){ (Number(o.trashedAt) > 0 ? trash : Number(o.doneAt) > 0 ? done : live).push(o); }); notes = live; donePile = done; trashPile = trash; })();
   var zCounter = notes.reduce(function(m,n){ return Math.max(m, n.z||0); }, 10);
   if(typeof applyLook === "function") applyLook();
 
@@ -1449,14 +1455,14 @@
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
     clearTimeout(typingNotifyT); typingNotifyT = null; typingFirst = 0;
-    safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
+    safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
     if(cloudSync) cloudSync.notesChanged();
   }
   // write the cache without telling the sync layer (used when the change came from the server)
   function saveNotesCache(){
     if(SHARE_LINK_PAGE) return;                       // the shared copies on screen are never written over this account's own cached board
-    if(NOTES_KEY) safeSet(NOTES_KEY, notes.concat(donePile).map(persistForm));
+    if(NOTES_KEY) safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
   }
   function saveSettings(){ safeSet(SETTINGS_KEY, settings); }
@@ -1551,7 +1557,7 @@
     else if(lvl < boardLevelSeen) boardLevelSeen = lvl;
   }
   function updateCount(){
-    if(typeof updateDonePile === "function") updateDonePile(false);
+    if(typeof updateSpaceCounts === "function") updateSpaceCounts(); else if(typeof updateDonePile === "function") updateDonePile(false);
     if(typeof checkBoardSize === "function") checkBoardSize();
     countEl.textContent = logicalCount() + (logicalCount() === 1 ? " note" : " notes") + " on this board. You can undo it right after.";
   }
@@ -1580,7 +1586,7 @@
   var focusLayer = OV.layer("focus-mode", function(){ exitFocus(); }, function(){ return !!focusState; });
   var recLayer = OV.layer("recording", function(){ if(recording) recording.cancel(); }, function(){ return !!recording; });
   var menuLayer = OV.layer("menu", function(){ closeMenu(true); }, function(){ return !!openMenuState; });
-  var POP_WIDTHS = {cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
+  var POP_WIDTHS = {reactPop:236, cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
   function openFloatingPopoverAt(r, className, triggerBtn){
     closeFloatingPopovers();
     var pop = document.createElement("div");
@@ -1851,6 +1857,11 @@
         }
         push(idx, hw.length, hd);
       }
+      re = /(^|[^\u0590-\u05FF])([בול]?)(ראשון|שני|שלישי|רביעי|חמישי|שישי)(?=\s+(?:בבוקר|בצהריים|בצהרים|אחר\s+הצהריים|בערב|בלילה)(?![\u0590-\u05FF]))/g;
+      while((m = re.exec(text))){
+        var bdow = HE_WD[m[3]], bdelta = (bdow - today.getDay() + 7) % 7;
+        push(m.index + m[1].length + m[2].length, m[3].length, addDays(today, bdelta === 0 ? 7 : bdelta), {sameDay: bdelta === 0});
+      }
       return out;
     }
 
@@ -1869,6 +1880,15 @@
       }
       re = /\b(noon|midday|midnight)\b/gi;
       while((m = re.exec(text))) out.push({index:m.index, length:m[0].length, h:/night/i.test(m[1]) ? 0 : 12, min:0});
+      // parts of the day ("tomorrow evening", "Friday night", "מחר בבוקר", "שישי בערב"): a rough hour, and only ever used next to a date
+      var DAYPART = {morning: 9, afternoon: 15, evening: 19, night: 21};
+      re = /\b(morning|afternoon|evening|night)\b/gi;
+      while((m = re.exec(text))) out.push({index:m.index, length:m[0].length, h:DAYPART[m[1].toLowerCase()], min:0, part:true});
+      re = /(^|[^\u0590-\u05FF])(בבוקר|בצהריים|בצהרים|אחר\s+הצהריים|בערב|בלילה)(?![\u0590-\u05FF])/g;
+      while((m = re.exec(text))){
+        var hp = m[2], hh = hp === "בבוקר" ? 9 : /צהר/.test(hp) && !/אחר/.test(hp) ? 13 : /אחר/.test(hp) ? 16 : hp === "בערב" ? 19 : 21;
+        out.push({index:m.index + m[1].length, length:hp.length, h:hh, min:0, part:true});
+      }
       return out.sort(function(a, b){ return a.index - b.index; });
     }
 
@@ -1884,19 +1904,29 @@
       var GAP = /^[\s,]*(?:at|@|around|by|from|בשעה|ב[-\u05BE]?)?[\s-]*$/i;
       kept.forEach(function(d){
         var best = null;
-        times.forEach(function(t, ti){
-          if(used[ti] || best) return;
-          var gap = null;
-          if(t.index >= d.index + d.length) gap = text.slice(d.index + d.length, t.index);
-          else if(t.index + t.length <= d.index) gap = text.slice(t.index + t.length, d.index);
-          if(gap !== null && gap.length <= 9 && GAP.test(gap)) best = {t:t, ti:ti};
+        [false, true].forEach(function(wantPart){          // an exact time wins over a part of the day
+          times.forEach(function(t, ti){
+            if(used[ti] || best || !!t.part !== wantPart) return;
+            var gap = null;
+            if(t.index >= d.index + d.length) gap = text.slice(d.index + d.length, t.index);
+            else if(t.index + t.length <= d.index) gap = text.slice(t.index + t.length, d.index);
+            if(gap !== null && gap.length <= 9 && GAP.test(gap)) best = {t:t, ti:ti};
+          });
         });
+        if(best && best.t.part){                                          // "Friday evening 17:30": an exact time written after the part of the day wins
+          times.forEach(function(t2, ti2){
+            if(used[ti2] || t2.part || t2.index < best.t.index + best.t.length) return;
+            var between = text.slice(best.t.index + best.t.length, t2.index);
+            if(between.length <= 9 && GAP.test(between)){ best = {t: t2, ti: ti2, extra: best.t}; }
+          });
+        }
         if(d.meta.weak && !best) return;
         var start = d.index, end = d.index + d.length, date = new Date(d.date), allDay = true;
         if(best){
           used[best.ti] = true;
           start = Math.min(start, best.t.index);
           end = Math.max(end, best.t.index + best.t.length);
+          if(best.extra){ start = Math.min(start, best.extra.index); end = Math.max(end, best.extra.index + best.extra.length); }
           date.setHours(best.t.h, best.t.min, 0, 0);
           allDay = false;
           if(d.meta.sameDay){
@@ -1908,7 +1938,7 @@
         results.push({index:start, length:end - start, date:date, allDay:allDay});
       });
       times.forEach(function(t, ti){
-        if(used[ti] || results.some(function(r){ return overlaps(r, t); })) return;
+        if(t.part || used[ti] || results.some(function(r){ return overlaps(r, t); })) return;          // a part of the day alone ("good evening") is not a time
         var date = day0(now); date.setHours(t.h, t.min, 0, 0);
         if(date < now){ date = addDays(day0(now), 1); date.setHours(t.h, t.min, 0, 0); }
         results.push({index:t.index, length:t.length, date:date, allDay:false});
@@ -2049,7 +2079,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2176,6 +2206,7 @@
     renderSelBar();
     if(selected.size > 1) dropTextFocus();
     if(typeof syncRotHandle === "function") syncRotHandle();
+    if(typeof syncReactAdd === "function") syncReactAdd();
   }
   // With several things selected, keys are about the group (P pins them all, D marks them done...), never about the words inside one of them:
   // so no note keeps a text cursor or a text selection while a group is selected.
@@ -2642,13 +2673,7 @@
     var card = document.createElement("div");
     card.className = "linkCard";
     var fav = document.createElement("div"); fav.className = "fav";
-    if(u && /^https?:$/.test(u.protocol)){
-      var img = document.createElement("img");
-      img.alt = ""; img.referrerPolicy = "no-referrer";
-      img.src = u.origin + "/favicon.ico";
-      img.onerror = function(){ fav.innerHTML = ICONS.globe; };
-      fav.appendChild(img);
-    } else fav.innerHTML = ICONS.globe;
+    fav.appendChild(siteMarkEl(href));                                   // a letter drawn here: the site is never contacted just to show a preview
     var meta = document.createElement("div"); meta.className = "meta";
     var dom = document.createElement("div"); dom.className = "dom";
     dom.textContent = u ? (u.hostname.replace(/^www\./, "") || href) : href;
@@ -3770,7 +3795,9 @@
     receipt: {title:{max:60, ph:"Add a title"}, date:{max:24, ph:"Add a date"}, body:{max:600, multi:true, ph:"Add details"}, amount:{max:16, ph:"Add an amount"}},
     ticket: {title:{max:60, ph:"Add a title"}, dateTime:{max:40, ph:"Add date and time"}, place:{max:60, ph:"Add a place"}, details:{max:160, multi:true, ph:"Add details"}},
     postcard: {location:{max:40, ph:"Where?"}, message:{max:300, multi:true, ph:"Write a message"}, recipient:{max:40, ph:"To:"}},
-    photo_strip: {caption:{max:80, ph:"Add a caption"}}
+    photo_strip: {caption:{max:80, ph:"Add a caption"}},
+    newspaper: {headline:{max:100, ph:"Headline"}, sub:{max:80, ph:"Subheading or byline"}, body:{max:900, multi:true, ph:"Write the story"}},
+    clipping: {quote:{max:900, multi:true, ph:"Paste or write the quote"}, sourceTitle:{max:100, ph:"Where is it from?"}}
   };
   function paperField(cls, field, n, extra){
     var d = makeDiv(cls + " poF"); d.dataset.f = field; d.dataset.ph = PAPER_FIELDS[n.type][field].ph;
@@ -3806,6 +3833,12 @@
       stub.setAttribute("aria-hidden", "true");
       var sn = makeDiv("poSerial"); sn.textContent = Stick.objects.serial(item.id, 8); stub.appendChild(sn);
       sheet.appendChild(main); sheet.appendChild(stub);
+    } else if(t === "newspaper"){
+      buildNewspaperSheet(sheet, item);
+    } else if(t === "clipping"){
+      var qm = makeDiv("clQuoteMark"); qm.setAttribute("aria-hidden", "true"); qm.textContent = "\u201c"; sheet.appendChild(qm);
+      sheet.appendChild(paperField("clQuote", "quote", item, true));
+      sheet.appendChild(buildClippingFoot(item));
     } else if(t === "postcard"){
       var card = makeDiv("poCard"), front = makeDiv("poFace poFront"), back = makeDiv("poFace poBack");
       var pic = makeDiv("poPic"); pic.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
@@ -4012,6 +4045,16 @@
     Stick.objects.VARIANTS[n.type].forEach(function(v){
       pop.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }));
     });
+    if(n.type === "clipping"){
+      var cu = Stick.objects.clean.url(n.sourceUrl);
+      if(cu){
+        pop.appendChild(menuItem(ICONS.link, "Open source", function(){ closeFloatingPopovers(); var h = safeHref(cu); if(h) window.open(h, "_blank", "noopener,noreferrer"); }));
+        pop.appendChild(menuItem(ICONS.copy, "Copy source", function(){ closeFloatingPopovers(); copyText(cu).then(function(ok){ toast(ok ? "Source copied." : "Couldn\u2019t copy automatically."); }); }));
+      }
+      pop.appendChild(menuItem(ICONS.pencil, cu ? "Change source\u2026" : "Add source\u2026", function(){ closeFloatingPopovers(); askClippingSource(n); }));
+      if(cu) pop.appendChild(menuItem(ICONS.close, "Remove source", function(){ closeFloatingPopovers(); setClippingSource(n, ""); }));
+      pop.appendChild(menuItem(ICONS.sticky, "Convert to a note", function(){ closeFloatingPopovers(); clippingToNote(n); }, {title: "Back to a plain sticky note with the same words"}));
+    }
     if(n.type === "ticket") pop.appendChild(menuItem(ICONS.move, n.orient === "portrait" ? "Make it landscape" : "Make it portrait", function(){ closeFloatingPopovers(); setPaperProp(n, "orient", n.orient === "portrait" ? "landscape" : "portrait", "Turn ticket"); }));
     if(n.type === "postcard"){
       pop.appendChild(menuItem(ICONS.image, n.image || n.assetId ? "Change photo" : "Add a photo", function(){ closeFloatingPopovers(); pickPostcardPhoto(n); }));
@@ -4019,6 +4062,7 @@
     }
     if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
     pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this to Done"}));
     pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4414,7 +4458,7 @@
     Stick.dev.perf = function(){
       var q = function(sel){ return document.querySelectorAll(sel).length; };
       var pc = Stick.pile.counts(notes, findNote);
-      return {active: pc.logical, piles: pc.piles, collapsedMembers: pc.collapsedMembers, renderedObjects: pc.rendered, donePile: donePile.length, domNodes: document.getElementsByTagName("*").length, boardDomNodes: boardInner.getElementsByTagName("*").length,
+      return {active: pc.logical, piles: pc.piles, collapsedMembers: pc.collapsedMembers, renderedObjects: pc.rendered, donePile: donePile.length, trash: trashPile.length, domNodes: document.getElementsByTagName("*").length, boardDomNodes: boardInner.getElementsByTagName("*").length,
         mountedMedia: {img: q("img"), video: q("video"), audio: q("audio"), canvas: q("canvas")}, bootRenderMs: bootRenderMs,
         heapMB: (window.performance && performance.memory) ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, level: Stick.guard ? Stick.guard.level(pc.logical) : null};
     };
@@ -4423,6 +4467,7 @@
     Stick.dev.stackAll = function(){ return timedPile("stack", function(){ stackNotes(notes.filter(function(n){ return n.el && !isPileObj(n); }).map(function(n){ return n.id; })); }); };
     Stick.dev.pileAll = function(){ return timedPile("pile", function(){ makePile(notes.filter(function(n){ return n.el && !isPileObj(n); }).map(function(n){ return n.id; })); }); };
     Stick.dev.unpileAll = function(){ return timedPile("unpile", function(){ notes.filter(isPileObj).forEach(unpilePile); }); };
+    Stick.dev.makePaper = function(kind, extra){ var vc = viewCenter(); return createPaper(kind, vc.x, vc.y, extra); };          // Stick.dev.makePaper("newspaper")
     Stick.dev.perfRender = function(){            // redraw every object once and time it
       var t0 = performance.now();
       notes.slice().forEach(function(n){ if(n.el) n.el.remove(); try{ renderNote(n, false); }catch(e){} });
@@ -4489,12 +4534,89 @@
   }
 
   // ---- creating one
+  // ---------- clippings (v0.8.3): a quote from somewhere, kept with where it came from ----------
+  // The words are plain text. The source is a link that has been checked (http / https only, no credentials, no markup); a clipping never embeds anything from
+  // the page it came from, and it never contacts that site (the "site mark" is a letter drawn here, not a downloaded icon).
+  var SITE_COLORS = ["#c0584a", "#4a7fc0", "#4a9a6a", "#a06ac0", "#c08a2e", "#4a9aa6", "#8a8a4a"];
+  function siteMarkEl(url){
+    var d = Stick.objects.clean.domain(url), m = makeDiv("clMark"); m.setAttribute("aria-hidden", "true");
+    m.textContent = d ? d.charAt(0).toUpperCase() : "?";
+    m.style.background = d ? SITE_COLORS[hashStr(d) % SITE_COLORS.length] : "#9a9484";
+    return m;
+  }
+  function buildClippingFoot(item){
+    var foot = makeDiv("clFoot"), src = makeDiv("clSrc"), dom = Stick.objects.clean.domain(item.sourceUrl);
+    src.appendChild(siteMarkEl(item.sourceUrl));
+    var meta = makeDiv("clMeta");
+    meta.appendChild(paperField("clTitle", "sourceTitle", item, true));
+    if(dom){
+      var a = document.createElement("a"); a.className = "clDomain"; a.textContent = dom; a.title = "Open the source";
+      var href = safeHref(item.sourceUrl); if(href){ a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; }
+      a.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+      meta.appendChild(a);
+    } else { var none = makeDiv("clDomain none"); none.textContent = "No source link"; meta.appendChild(none); }
+    src.appendChild(meta); foot.appendChild(src);
+    return foot;
+  }
+  function setClippingSource(n, url){
+    var clean = url ? Stick.objects.clean.url(url) : "";
+    if(url && !clean){ toast("That doesn’t look like a web address (it needs to start with http:// or https://)."); return false; }
+    if((n.sourceUrl || "") === clean) return true;
+    var before = captureState([n.id]);
+    if(clean) n.sourceUrl = clean; else delete n.sourceUrl;
+    saveNotes(); rerenderNote(n); recordChange(clean ? "Set clipping source" : "Remove clipping source", before);
+    return true;
+  }
+  function askClippingSource(n){
+    var wrap = makeDiv("nameDlg"), lab = document.createElement("label"), input = document.createElement("input"), id = "clSrcIn" + (++dialogSeq);
+    lab.textContent = "Link to the source"; lab.className = "asLbl"; lab.setAttribute("for", id);
+    input.type = "url"; input.className = "asIn"; input.id = id; input.maxLength = 500; input.value = n.sourceUrl || ""; input.placeholder = "https://…"; input.setAttribute("inputmode", "url");
+    wrap.appendChild(lab); wrap.appendChild(input);
+    var m = openModal({title: "Source", content: wrap, width: 380, actions: [{label: "Cancel", value: false}, {label: "Save", kind: "primary", value: true, onClick: function(close){ if(setClippingSource(n, input.value.trim())) return true; return false; }}]});
+    setTimeout(function(){ input.focus(); input.select(); }, 0);
+    input.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); var ok = m.card.querySelector(".pillBtn.primary"); if(ok) ok.click(); } });
+  }
+  // note <-> clipping (the words go across; each way is one undo step)
+  function noteToClipping(n){
+    var text = htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).replace(/\s+\n/g, "\n").trim();
+    var c = {id: newId(), type: "clipping", x: n.x, y: n.y, w: 260, rot: n.rot || 0, z: 0, variant: "web", quote: text, phys: {}};
+    var norm = Stick.objects.normalize(c, paperHelpers()); if(!norm){ toast("Couldn’t make a clipping from this note."); return; }
+    var fresh = Object.assign({}, norm, {id: c.id, x: c.x, y: c.y, rot: c.rot, z: 0, phys: {}, createdAt: Date.now()});
+    var action = swapObject(n, fresh, "Make clipping");
+    toast("Made a clipping. Add where it came from in its ••• menu.", "Undo", function(){ undoIfTop(action); });
+  }
+  function clippingToNote(n){
+    var html = escapeHtml(n.quote || "").replace(/\n/g, "<br>");
+    if(n.sourceUrl){ var u = Stick.objects.clean.url(n.sourceUrl); if(u) html += "<br><br>" + '<a href="' + escapeAttr(u) + '">' + escapeHtml(Stick.objects.clean.domain(u) || u) + "</a>"; }
+    var nn = {id: newId(), x: n.x, y: n.y, html: html, bg: randomColor(), font: pickFont(), rot: n.rot || 0, z: 0, categoryIndex: 0, phys: makePhys()};
+    var action = swapObject(n, nn, "Clipping to note");
+    toast("Back to a plain note.", "Undo", function(){ undoIfTop(action); });
+  }
+  // a long piece of pasted text can be offered as a clipping afterwards; the normal paste has already happened and stays as it is
+  function offerClipping(n, text){
+    if(!n || readOnly || String(text || "").trim().length < 60) return;
+    toast("Pasted. Turn it into a clipping?", "Make clipping", function(){ var cur = findNote(n.id); if(cur && !cur.type) noteToClipping(cur); });
+  }
+
+  // ---------- newspaper (v0.8.3) ----------
+  var NP_MASTS = {broadsheet: "THE DAILY STICK", tabloid: "STICK-IT EXTRA!", gazette: "The Corkboard Gazette", evening: "EVENING STICK", telegraph: "THE TELEGRAPH · STICK", courier: "THE PAPER TRAIL", herald: "The Board Herald", modern: "STICK / NEWS"};
+  function buildNewspaperSheet(sheet, item){
+    var v = item.variant || "broadsheet", mast = makeDiv("npMast"); mast.setAttribute("aria-hidden", "true"); mast.textContent = NP_MASTS[v] || NP_MASTS.broadsheet;
+    sheet.appendChild(mast); sheet.appendChild(makeDiv("poRule"));
+    sheet.appendChild(paperField("npHead", "headline", item, true));
+    sheet.appendChild(paperField("npSub", "sub", item, true));
+    sheet.appendChild(makeDiv("poRule thin"));
+    sheet.appendChild(paperField("npBody", "body", item, true));
+  }
+
   function newPaper(kind, bx, by, extra){
     var d = Object.assign({type: kind, id: newId(), x: 0, y: 0, rot: rand(-3, 3), z: 1, createdAt: Date.now()}, extra || {});
     var base = Stick.objects.normalize(d, paperHelpers()) || {};
     var n = Object.assign({}, base, {id: d.id, x: 0, y: 0, rot: d.rot, z: 1, createdAt: d.createdAt, type: kind});
+    if(kind === "receipt" && !n.body && !(extra && (extra.title || extra.body))){ var smp = Stick.objects.sampleReceipt(); n.title = smp.title; n.body = smp.body; n.amount = smp.amount; }          // 2-3 playful sample lines, ready to edit or clear
     if(kind === "receipt" && !n.title) n.title = "Receipt";
     if(kind === "receipt" && !n.date) n.date = todayShort();
+    if(kind === "newspaper" && !(extra && extra.variant)) n.variant = Stick.objects.randomVariant("newspaper");          // each new newspaper picks one of eight looks (changeable in its menu)
     if(kind === "ticket" && !n.title) n.title = "Ticket";
     n.phys = {};
     var sz = Stick.objects.sizeEstimate(n);
@@ -4505,7 +4627,7 @@
     var n = newPaper(kind, bx, by, extra);
     insertNotes([n], "Add " + Stick.objects.LABELS[kind]);
     recoverVertical([n]); dismissHint();
-    if(kind === "receipt" || kind === "ticket"){ setTimeout(function(){ var t = n.el && n.el.querySelector(".poF"); if(t) editPaperField(n, t); }, 60); }
+    if(kind === "receipt" || kind === "ticket" || kind === "newspaper" || kind === "clipping"){ setTimeout(function(){ var t = n.el && n.el.querySelector(".poF"); if(t) editPaperField(n, t); }, 60); }
     return n;
   }
   // Photo -> postcard: a new postcard beside the photo (the photo stays). Note -> postcard: only when the words map safely
@@ -4904,6 +5026,8 @@
   }
   // Everything that can be put on the board from an empty spot. `touch: "main"` items are in the first touch menu; the rest sit under More.
   // New physical objects register themselves here (see the object packs) so the two menus never drift apart.
+  ICONS.newspaper = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 4.6l15.2-.6.4 14.6-15.4.8z"/><path d="M7.6 8h8.6M7.6 11.2h3.6M13 11.2h3.2M7.6 14.4h3.6M13 14.4h3.2"/></svg>';
+  ICONS.clipping = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5.2l3-.8 2.2 1.2 2.6-1 2.4 1.4 2.6-.6.4 12.4-3 1-2.4-1-2.4 1.2-2.4-1.2-3 .8z"/><path d="M8.6 10.4c0-1 .6-1.6 1.4-1.8M8.6 10.4h1.6v1.8H8.6zM13 10.4c0-1 .6-1.6 1.4-1.8M13 10.4h1.6v1.8H13z"/></svg>';
   var INSERT_ITEMS = [
     {id: "sticky", group: "Add", label: "Note", icon: ICONS.sticky, touch: "main"},
     {id: "photo", group: "Add", label: "Photo", icon: ICONS.camera, touch: "main"},
@@ -4911,6 +5035,8 @@
     {id: "shopping", group: "Add", label: "Shopping List", icon: ICONS.cart, touch: "more", run: function(bx, by){ createShopping(bx, by); }},
     {id: "receipt", group: "Add", label: "Receipt", icon: ICONS.receipt, touch: "more", run: function(bx, by){ createPaper("receipt", bx, by); }},
     {id: "ticket", group: "Add", label: "Ticket", icon: ICONS.ticket, touch: "more", run: function(bx, by){ createPaper("ticket", bx, by); }},
+    {id: "newspaper", group: "Add", label: "Newspaper", icon: ICONS.newspaper, touch: "more", run: function(bx, by){ createPaper("newspaper", bx, by, {headline: "", body: ""}); }},
+    {id: "clipping", group: "Add", label: "Clipping", icon: ICONS.clipping, touch: "more", run: function(bx, by){ createPaper("clipping", bx, by); }},
     {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
     {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
     {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
@@ -4989,13 +5115,15 @@
     var onlyPhotos = ids.every(function(id){ return isPhoto(findNote(id)); });
     if(onlyPhotos) pop.appendChild(menuItem(ICONS.strip, "Make photo strip", function(){ closeFloatingPopovers(); makeStripFromPhotos(ids); }));
     var anyUnpinned = ids.some(function(id){ var q = findNote(id); return q && !isPinned(q); });
-    if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDoneGroup(ids); }, {title: "Move the selected notes to the Done pile"}));
+    if(ids.some(function(id){ var q = findNote(id); return q && (!q.type || isPaper(q)); })) pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDoneGroup(ids); }, {title: "Move the selected notes to the Done pile"}));
     pop.appendChild(menuItem(ICONS.pin, anyUnpinned ? "Pin in place" : "Unpin", function(){ closeFloatingPopovers(); setPinned(ids, anyUnpinned); }));
     if(ids.some(function(id){ var q = findNote(id); return rotatable(q) && (q.rot || 0) !== 0 && !isPinned(q); })) pop.appendChild(menuItem(ICONS.move, "Straighten", function(){ closeFloatingPopovers(); straighten(ids.map(findNote).filter(Boolean)); }, {title: "Put the selected items back level"}));
     if(pileEligibleList(ids).length >= 2){
       pop.appendChild(menuItem(ICONS.move, "Stack (arrange vertically)", function(){ closeFloatingPopovers(); stackNotes(ids); }, {title: "Lines the notes up one below another. Nothing else changes."}));
       pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
     }
+    pop.appendChild(menuItem(ICONS.move, "Bring to front", function(){ closeFloatingPopovers(); layerObjects(ids, "front"); }));
+    pop.appendChild(menuItem(ICONS.move, "Send to back", function(){ closeFloatingPopovers(); layerObjects(ids, "back"); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -5586,40 +5714,85 @@
     var n = findNote(st.id); if(n && n.el) paintPileShown(n, n.el);
     if(st.opener && st.opener.focus && document.contains(st.opener)){ try{ st.opener.focus(); }catch(e){} }
   }
+  // ---- pile phase 2: shuffle, reorder, and a fan to leaf through (v0.8.3). Everything here only changes the ORDER of the member list (or takes one paper out
+  // by the existing, undoable route); no member is ever removed from the board's object list by browsing.
+  function shufflePile(pile){
+    var live = pileLive(pile); if(live.length < 2) return;
+    var before = captureState([pile.id]);
+    pile.members = Stick.pile.shuffle(pile.members, Math.random); pileBrowse[pile.id] = 0;
+    saveNotes(); if(pile.el) paintPileShown(pile, pile.el);
+    recordChange("Shuffle pile", before);
+  }
+  function movePileMember(pile, id, dir){
+    var i = pile.members.indexOf(id), j = i + dir;
+    if(i === -1 || j < 0 || j >= pile.members.length) return false;
+    var before = captureState([pile.id]), m = pile.members.slice(), t = m[i]; m[i] = m[j]; m[j] = t; pile.members = m;
+    var live = pileLive(pile); pileBrowse[pile.id] = Math.max(0, live.indexOf(findNote(id)));
+    saveNotes(); if(pile.el) paintPileShown(pile, pile.el);
+    recordChange("Reorder pile", before);
+    return true;
+  }
+  var FAN_MAX = 9;
   function openPileBrowser(pile){
     if(!pile || !isPileObj(pile) || pileLive(pile).length < Stick.pile.MIN_MEMBERS) return;
     closePileBrowser(); closeFloatingPopovers();
     var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar");
     card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Browse the pile"); card.tabIndex = -1;
+    var fanOK = !(window.matchMedia && matchMedia("(max-width: 700px), (pointer: coarse)").matches), fan = false;
     var prev = document.createElement("button"), next = document.createElement("button"), idx = makeDiv("pbIndex"), back = document.createElement("button");
     prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
-    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
+    prev.textContent = "‹"; next.textContent = "›"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
-    var take = document.createElement("button"); take.type = "button"; take.className = "pbTake"; take.textContent = "Take this one out";
+    function tool(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", fn); return b; }
+    var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
+    var shuf = tool("Shuffle", function(){ shufflePile(pile); paint(); });
+    var earlier = tool("← Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); });
+    var later = tool("Move later →", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); });
+    var fanBtn = tool("Fan", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.textContent = fan ? "Single" : "Fan"; paint(); }); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
     bar.appendChild(prev); bar.appendChild(idx); bar.appendChild(next);
-    card.appendChild(stage); card.appendChild(bar); var foot = makeDiv("pbFoot"); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
+    var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
+    card.appendChild(stage); card.appendChild(bar); card.appendChild(tools);
+    var foot = makeDiv("pbFoot"); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
     root.appendChild(card); document.body.appendChild(root);
     pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
     pileBrowserLayer.open();
+    function paperOf(m, small){
+      var paper = null;
+      try{ paper = buildStaticNote(m); }catch(err){ paper = null; }
+      if(paper){ paper.classList.add("pbPaper"); paper.style.cssText += ";position:relative;left:auto;top:auto;transform:none;margin:0 auto;"; return paper; }
+      var f = makeDiv("pbFallback"); f.textContent = pileSnippet(m); return f;
+    }
     function paint(){
       var live = pileLive(pile);
       if(live.length < Stick.pile.MIN_MEMBERS){ closePileBrowser(); return; }
-      var i = browseIdx(pile, live), m = live[i]; stage.textContent = "";
-      var paper = null;
-      try{ paper = buildStaticNote(m); }catch(err){ paper = null; }
-      if(paper){ paper.classList.add("pbPaper"); paper.style.cssText += ";position:relative;left:auto;top:auto;transform:none;margin:0 auto;"; stage.appendChild(paper); }
-      else { var f = makeDiv("pbFallback"); f.textContent = pileSnippet(m); stage.appendChild(f); }
+      var i = browseIdx(pile, live); stage.textContent = ""; stage.classList.toggle("fan", fan);
+      if(fan){
+        var half = Math.floor(FAN_MAX / 2), from = Math.max(0, Math.min(i - half, live.length - FAN_MAX)), to = Math.min(live.length, from + FAN_MAX);
+        var fanEl = makeDiv("pbFan");
+        for(var k = from; k < to; k++){
+          (function(k){
+            var slot = makeDiv("pbFanCard" + (k === i ? " current" : "")), off = k - i;
+            slot.style.setProperty("--fo", off); slot.setAttribute("role", "button"); slot.tabIndex = -1; slot.setAttribute("aria-label", "Paper " + (k + 1) + " of " + live.length + (k === i ? " (showing)" : ""));
+            slot.appendChild(paperOf(live[k]));
+            slot.addEventListener("click", function(){ pileBrowse[pile.id] = k; paint(); });
+            fanEl.appendChild(slot);
+          })(k);
+        }
+        stage.appendChild(fanEl);
+      } else stage.appendChild(paperOf(live[i]));
       idx.textContent = (i + 1) + " / " + live.length;
-      take.hidden = readOnly;
+      take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
+      earlier.disabled = i === 0; later.disabled = i === live.length - 1;
     }
     function step(d){ var live = pileLive(pile); if(live.length < 2) return; pileBrowse[pile.id] = (browseIdx(pile, live) + d + live.length) % live.length; paint(); }
     prev.addEventListener("click", function(){ step(-1); }); next.addEventListener("click", function(){ step(1); });
     back.addEventListener("click", closePileBrowser);
     root.addEventListener("mousedown", function(e){ if(e.target === root) closePileBrowser(); });
-    take.addEventListener("click", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
     card.addEventListener("keydown", function(e){
       if(e.key === "ArrowRight"){ e.preventDefault(); step(1); } else if(e.key === "ArrowLeft"){ e.preventDefault(); step(-1); }
-      else if(e.key === "Tab"){ var f = Array.prototype.filter.call(card.querySelectorAll("button"), function(b){ return !b.hidden; }); if(!f.length) return; var a = f[0], z = f[f.length - 1]; if(e.shiftKey && document.activeElement === a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey && document.activeElement === z){ e.preventDefault(); a.focus(); } }
+      else if(e.key === "Home"){ e.preventDefault(); pileBrowse[pile.id] = 0; paint(); }
+      else if(e.key === "End"){ e.preventDefault(); pileBrowse[pile.id] = Math.max(0, pileLive(pile).length - 1); paint(); }
+      else if(e.key === "Tab"){ var f = Array.prototype.filter.call(card.querySelectorAll("button"), function(b){ return !b.hidden && !b.disabled; }); if(!f.length) return; var a = f[0], z = f[f.length - 1]; if(e.shiftKey && document.activeElement === a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey && document.activeElement === z){ e.preventDefault(); a.focus(); } }
     });
     // swipe left / right on the paper
     var sx = null;
@@ -5634,12 +5807,13 @@
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
     var live = pileLive(n), h = makeDiv("menuHint"); h.textContent = Stick.pile.label(n, live.length); pop.appendChild(h);
     pop.appendChild(menuItem(ICONS.search || ICONS.more, "Browse the papers\u2026", function(){ closeFloatingPopovers(); openPileBrowser(n); }, {title: "Look through the pile one paper at a time. Nothing changes."}));
+    pop.appendChild(menuItem(ICONS.move, "Shuffle the pile", function(){ closeFloatingPopovers(); shufflePile(n); }, {title: "Mix up the order. Nothing is removed."}));
     pop.appendChild(menuItem(ICONS.move, "Unpile (put them back)", function(){ closeFloatingPopovers(); unpilePile(n); }, {title: "Spreads the papers back out where they were. Nothing is deleted."}));
     pop.appendChild(menuItem(ICONS.move, "Send the top paper to the back", function(){ closeFloatingPopovers(); pileSendTopToBack(n); }));
     pop.appendChild(menuItem(ICONS.move, "Take the top paper out", function(){ closeFloatingPopovers(); pileTakeTop(n); }));
     pop.appendChild(menuItem(ICONS.tick, "Mark the top paper done", function(){ pileMarkTopDone(n.id); }, {title: "Only the top paper goes to Done. A pile cannot be marked done."}));
     pop.appendChild(makeDiv("menuSep"));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.trash, "Delete the pile and its papers…", function(){ closeFloatingPopovers(); deletePileAndContents(n); }, {cls: "danger", title: "Deletes every paper in the pile. Unpile keeps them."}));
   }
@@ -5648,8 +5822,8 @@
   function renderNote(n, isNew, opts){
     if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
-    decoratePin(n);
-    if(selected.size === 1 && selected.has(n.id)) syncRotHandle();
+    decoratePin(n); decorateReactions(n);
+    if(selected.size === 1 && selected.has(n.id)){ syncRotHandle(); syncReactAdd(); }
     if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
     return made;
   }
@@ -5707,8 +5881,8 @@
       if(!readOnly){
         var rmImg = document.createElement("button");
         rmImg.className = "rmImg";
-        rmImg.innerHTML = ICONS.close;
-        rmImg.title = "Remove image";
+        rmImg.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="8.5" cy="9.5" r="1.4"></circle><path d="M21 16l-5.5-5.5L5 21"></path><path d="M4 4l16 16"></path></svg>';          // an image with a line through it: "remove the picture", not "delete the note"
+        rmImg.title = "Remove the image (the note stays)"; rmImg.setAttribute("aria-label", "Remove the image from this note. The note stays.");
         rmImg.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
         rmImg.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
         rmImg.addEventListener("click", function(e){
@@ -6128,6 +6302,7 @@
       list = list.filter(function(n){ return !isPileObj(n); });
     }
     if(!list.length) return;
+    if(!opts.silent){ trashNotes(list); return; }          // an explicit delete goes to Trash first; only a quiet clean-up of an unused blank note is deleted outright
     var hadContent = list.some(noteHasContent);
     var before = opts.silent ? null : captureState(list.map(function(n){ return n.id; }));
     list.forEach(function(n){
@@ -6164,7 +6339,7 @@
     if(!list.some(noteHasContent)){ deleteNotes(ids); return; }
     confirmDialog({
       title: list.length > 1 ? "Delete " + list.length + " " + itemWord(list) + "?" : "Delete this " + itemWord(list) + "?",
-      body: "You can bring " + (list.length > 1 ? "them" : "it") + " back with " + MOD + "+Z.",
+      body: (list.length > 1 ? "They go" : "It goes") + " to Trash, and you can bring " + (list.length > 1 ? "them" : "it") + " back (" + MOD + "+Z, or from Trash).",
       confirm: "Delete", danger: true
     }).then(function(ok){ if(ok) deleteNotes(ids); });
   }
@@ -6392,6 +6567,12 @@
     f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin"); f.setAttribute("loading", "lazy");
     f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox");
     frame.textContent = ""; frame.appendChild(f); frame.classList.add("playing"); embedWatch(n);
+    // Stick-It's own small controls around the provider's player (only what a page can really do: full screen, and stop = let the player go)
+    var bar = makeDiv("embCtl");
+    function cb(label, fn){ var b = document.createElement("button"); b.type = "button"; b.textContent = label; b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("click", function(e){ e.stopPropagation(); fn(); }); bar.appendChild(b); }
+    if(frame.requestFullscreen) cb("Full screen", function(){ try{ frame.requestFullscreen(); }catch(e){} });
+    cb("Stop", function(){ embedStop(n); });
+    frame.appendChild(bar);
   }
   function embedPoster(n){
     var info = embedInfo(n), label = info ? Stick.embed.PROVIDERS[info.provider].label : "Video";
@@ -6471,7 +6652,7 @@
     pop.appendChild(menuItem(ICONS.link, "Open the original link", function(){ closeFloatingPopovers(); var u = safeHref(n.url); if(u) window.open(u, "_blank", "noopener,noreferrer"); }));
     pop.appendChild(menuItem(ICONS.copy, "Copy link", function(){ closeFloatingPopovers(); copyText(n.url).then(function(ok){ toast(ok ? "Link copied." : "Couldn\u2019t copy automatically."); }); }));
     pop.appendChild(menuItem(ICONS.link, "Convert back to a link", function(){ closeFloatingPopovers(); embedToLink(n); }, {title: "Turns this back into a note with the link. The original address is kept."}));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
   }
@@ -6541,7 +6722,8 @@
     }
     if(!htmlToText(content).trim()) return false;
     var vc = viewCenter();
-    addNoteAt(vc.x, vc.y - 60, {html:content, focus:false});
+    var pasted = addNoteAt(vc.x, vc.y - 60, {html:content, focus:false});
+    offerClipping(pasted, text);
     return true;
   }
 
@@ -6603,6 +6785,73 @@
   }
 
   // ---------- menus ----------
+  // ---------- reactions (v0.8.3): a quick response without a comment ----------
+  // Nothing is drawn on an object that has no reactions. The chips (and the small "react" button) exist only on an object that has reactions or is selected.
+  function myReactionId(){ var u = window.Stick && Stick.auth && Stick.auth.user && Stick.auth.user(); return (CLOUD && u && u.id) ? String(u.id) : "me"; }
+  function canReact(){ return !readOnly && !singleNoteMode && !!(window.Stick && Stick.reactions); }
+  function toggleReaction(n, emoji){
+    if(!canReact() || !n) return;
+    var before = captureState([n.id]), next = Stick.reactions.toggle(n.reactions, emoji, myReactionId());
+    if(Stick.reactions.isEmpty(next)) delete n.reactions; else n.reactions = next;
+    saveNotes(); decorateReactions(n);
+    recordChange("React", before);
+  }
+  function decorateReactions(n){
+    var el = n && n.el; if(!el) return;
+    var old = el.querySelector(":scope > .reactChips"); if(old) old.remove();
+    var sum = window.Stick && Stick.reactions ? Stick.reactions.summary(n.reactions, myReactionId()) : [];
+    if(!sum.length) return;
+    var wrap = makeDiv("reactChips"); wrap.setAttribute("role", "group"); wrap.setAttribute("aria-label", "Reactions");
+    sum.forEach(function(sx){
+      var b = document.createElement("button"); b.type = "button"; b.className = "reactChip" + (sx.mine ? " mine" : ""); b.setAttribute("aria-pressed", sx.mine ? "true" : "false");
+      b.setAttribute("aria-label", sx.emoji + " " + sx.count + (sx.mine ? ", you reacted" : ""));
+      var em = document.createElement("span"); em.textContent = sx.emoji; var ct = document.createElement("span"); ct.className = "reactN"; ct.textContent = sx.count;
+      b.appendChild(em); b.appendChild(ct);
+      b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      b.addEventListener("click", function(e){ e.stopPropagation(); toggleReaction(n, sx.emoji); });
+      wrap.appendChild(b);
+    });
+    el.appendChild(wrap);
+  }
+  var reactAddEl = null;
+  function removeReactAdd(){ if(reactAddEl){ reactAddEl.remove(); reactAddEl = null; } }
+  function syncReactAdd(){
+    removeReactAdd();
+    if(!canReact() || selected.size !== 1) return;
+    var n = findNote(Array.from(selected)[0]); if(!n || !n.el || isZone(n)) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "reactAdd"; b.title = "React"; b.setAttribute("aria-label", "Add a reaction"); b.setAttribute("aria-haspopup", "true");
+    b.textContent = "+ ☺";
+    b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("mousedown", function(e){ e.preventDefault(); });
+    b.addEventListener("click", function(e){ e.stopPropagation(); reactionPicker(n, b); });
+    n.el.appendChild(b); reactAddEl = b;
+  }
+  function reactionPicker(n, anchor){
+    var pop = openFloatingPopover(anchor, "reactPop"); if(!pop) return;
+    pop.setAttribute("role", "group"); pop.setAttribute("aria-label", "Reactions");
+    var me = myReactionId(), mine = Stick.reactions.summary(n.reactions, me).filter(function(x){ return x.mine; }).map(function(x){ return x.emoji; });
+    Stick.reactions.SET.forEach(function(e){
+      var b = document.createElement("button"); b.type = "button"; b.className = "reactPick" + (mine.indexOf(e) !== -1 ? " on" : ""); b.textContent = e; b.setAttribute("aria-label", "React " + e); b.setAttribute("aria-pressed", mine.indexOf(e) !== -1 ? "true" : "false");
+      b.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
+      b.addEventListener("click", function(ev){ ev.stopPropagation(); closeFloatingPopovers(); toggleReaction(n, e); });
+      pop.appendChild(b);
+    });
+    var first = pop.querySelector("button"); if(first) first.focus();
+  }
+
+  // ---------- layers (v0.8.3): only z changes; never a position, a pile membership or a zone ----------
+  var LAYER_LABELS = {front: "Bring to front", back: "Send to back", forward: "Bring forward", backward: "Send backward"};
+  function layerObjects(ids, op){
+    if(readOnly || !window.Stick || !Stick.layers) return 0;
+    var targets = ids.map(findNote).filter(function(n){ return n && !isZone(n) && !isHiddenMember(n); });
+    if(!targets.length){ toast("Zones always stay at the back."); return 0; }
+    var items = notes.filter(function(n){ return !isZone(n) && !isHiddenMember(n); }).map(function(n){ return {id: n.id, z: n.z}; });
+    var plan = Stick.layers.plan(items, targets.map(function(n){ return n.id; }), op), changed = Object.keys(plan.changes);
+    if(!changed.length){ toast(op === "front" || op === "forward" ? "Already on top." : "Already at the back."); return 0; }
+    var before = captureState(changed);
+    changed.forEach(function(id){ var n = findNote(id); if(!n) return; n.z = plan.changes[id]; zCounter = Math.max(zCounter, n.z); if(n.el) n.el.style.zIndex = n.z; });
+    saveNotes(); recordChange(LAYER_LABELS[op], before);
+    return changed.length;
+  }
   // ---------- grouped menus (v0.8.2.2): one level of submenu, keyboard friendly ----------
   // Top level = actions on the object itself. A submenu = actions on one physical property (Paper, Arrange). Never nested deeper.
   // a submenu opens to the right of its row (to the left when there is no room), kept inside the screen
@@ -6661,15 +6910,22 @@
   }
   // Arrange > Rotate left, Rotate right, Straighten (keyboard / non-pointer way to turn things, and a home for layer actions later)
   function arrangeSubmenu(pop, n){
-    if(!rotatable(n)) return;
+    var turns = rotatable(n), layers = !isZone(n) && !isHiddenMember(n);
+    if(!turns && !layers) return;
     menuSub(pop, ICONS.move, "Arrange", function(body){
-      var pinned = isPinned(n);
-      var l = menuItem(ICONS.move, "Rotate left", function(){ rotateBy([n], -ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° anticlockwise"});
-      var r = menuItem(ICONS.move, "Rotate right", function(){ rotateBy([n], ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° clockwise"});
-      var s = menuItem(ICONS.move, "Straighten", function(){ closeFloatingPopovers(); straighten([n]); }, {title: "Put it back level"});
-      [l, r, s].forEach(function(b){ if(pinned){ b.classList.add("disabled"); b.title = "Pinned items stay exactly as they are. Unpin to turn it."; } body.appendChild(b); });
-      if(pinned) return;
-      l.addEventListener("click", function(){ if(l.isConnected) l.focus(); }); r.addEventListener("click", function(){ if(r.isConnected) r.focus(); });
+      if(turns){
+        var pinned = isPinned(n);
+        var l = menuItem(ICONS.move, "Rotate left", function(){ rotateBy([n], -ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° anticlockwise"});
+        var r = menuItem(ICONS.move, "Rotate right", function(){ rotateBy([n], ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° clockwise"});
+        var s2 = menuItem(ICONS.move, "Straighten", function(){ closeFloatingPopovers(); straighten([n]); }, {title: "Put it back level"});
+        [l, r, s2].forEach(function(b){ if(pinned){ b.classList.add("disabled"); b.title = "Pinned items stay exactly as they are. Unpin to turn it."; } body.appendChild(b); });
+      }
+      if(layers){
+        var h = makeDiv("menuHint"); h.textContent = "Layer"; body.appendChild(h);
+        [["front", "Bring to front", "Put it on top of everything"], ["forward", "Bring forward", "One step up"], ["backward", "Send backward", "One step down"], ["back", "Send to back", "Put it under everything"]].forEach(function(o){
+          body.appendChild(menuItem(ICONS.move, o[1], function(){ closeFloatingPopovers(); layerObjects([n.id], o[0]); }, {title: o[2]}));
+        });
+      }
     });
   }
   // the pin item, then Arrange (where the object can be turned)
@@ -6773,6 +7029,7 @@
     }));
     paperSubmenu(pop, n);
     var vOnly = window.Stick && Stick.embed && !n.image ? Stick.embed.parse(htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim()) : null;
+    if(!n.image && htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim().length >= 20) pop.appendChild(menuItem(ICONS.clipping, "Make clipping", function(){ closeFloatingPopovers(); noteToClipping(n); }, {title: "Keep these words as a clipping, with a place for where they came from"}));
     if(vOnly) pop.appendChild(menuItem(ICONS.video || ICONS.link, "Show link as video", function(){ closeFloatingPopovers(); linkToEmbed(n, vOnly); }, {title: "Shows this " + Stick.embed.PROVIDERS[vOnly.provider].label + " link as a video you can play here"}));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
     pinAndArrange(pop, n);
@@ -7098,10 +7355,24 @@
     b.setAttribute("aria-label", "Done pile: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it.");
     if(bump && !b.hidden){ b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); }
   }
+  // a small, quick "finished" moment: a DONE stamp lands and a few paper scraps pop (about 0.45 s, removed afterwards). Nothing at all under reduced motion.
+  function doneEffect(el){
+    if(!el || reducedMotion() || !el.getBoundingClientRect) return;
+    var r = el.getBoundingClientRect(); if(!r.width) return;
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2, bits = [], colors = ["#f6c945", "#7fcf8f", "#f08a7a", "#8bbcf0", "#c9a2f0"];
+    for(var i = 0; i < 12; i++){
+      var p = document.createElement("span"); p.className = "doneBit";
+      var a = (i / 12) * Math.PI * 2 + (i % 2 ? 0.2 : 0), d = 40 + (i % 3) * 22;
+      p.style.cssText = "left:" + cx + "px;top:" + cy + "px;background:" + colors[i % colors.length] + ";--dx:" + Math.round(Math.cos(a) * d) + "px;--dy:" + Math.round(Math.sin(a) * d - 18) + "px;--dr:" + (i * 47 % 360) + "deg";
+      document.body.appendChild(p); bits.push(p);
+    }
+    var st = document.createElement("div"); st.className = "doneStampFx"; st.textContent = "DONE"; st.style.cssText = "left:" + cx + "px;top:" + cy + "px"; document.body.appendChild(st); bits.push(st);
+    setTimeout(function(){ bits.forEach(function(b){ b.remove(); }); }, 650);
+  }
   function whoAmI(){ return (CLOUD && settings.account && settings.account.name) || ""; }       // only signed-in people are named (guests are not)
   // Mark done: the note shrinks and slides to the pile. Undo brings it back exactly where it was.
   function markDone(n){
-    if(readOnly || !n || isDoneItem(n) || (n.type && n.type !== "shopping")) return;       // notes and shopping lists can be marked done
+    if(readOnly || !n || isDoneItem(n) || (n.type && !isPaper(n))) return;       // notes and paper objects (lists, receipts, tickets, postcards) can be marked done
     endEditing(); closeFloatingPopovers();
     var snap = snapNote(n), el = n.el, id = n.id;
     snap.doneAt = Date.now(); var by = whoAmI(); if(by) snap.doneBy = String(by).slice(0, 60);
@@ -7118,6 +7389,7 @@
       updateDonePile(false);
     }
     var reduce = reducedMotion(), target = ensurePileBtn();
+    doneEffect(el);
     if(el && !reduce && !target.hidden || (el && !reduce && donePile.length === 0)){
       var r = el.getBoundingClientRect(), t = target.hidden ? {left: 16, top: window.innerHeight - 60, width: 90, height: 40} : target.getBoundingClientRect();
       var dx = (t.left + t.width / 2 - (r.left + r.width / 2)) / boardZoom, dy = (t.top + t.height / 2 - (r.top + r.height / 2)) / boardZoom;
@@ -7133,7 +7405,7 @@
   // (photos, recordings and other objects stay on the board).
   function markDoneGroup(ids){
     if(readOnly) return;
-    var list = ids.map(findNote).filter(function(n){ return n && (!n.type || n.type === "shopping") && !isDoneItem(n); });
+    var list = ids.map(findNote).filter(function(n){ return n && (!n.type || isPaper(n)) && !isDoneItem(n); });
     if(!list.length){ toast("Select some notes first. Photos and other objects can’t be marked done."); return; }
     if(list.length === 1){ markDone(list[0]); return; }
     endEditing(); closeFloatingPopovers();
@@ -7155,6 +7427,7 @@
       });
       ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateDonePile(false);
     }
+    list.slice(0, 3).forEach(function(n){ doneEffect(n.el); });
     take();
     var action = pushHistory({label: "Mark " + list.length + " done", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
     toast("Moved " + list.length + " notes to Done.", "Undo", function(){ undoIfTop(action); });
@@ -7179,29 +7452,226 @@
       saveNotes(); updateDonePile(false); return true;
     });
   }
-  function openDoneTray(){
-    var content = makeDiv("doneTray"), list = makeDiv("doneList"), modal = null;
-    content.appendChild(list);
-    function paint(){
-      list.innerHTML = "";
-      if(!donePile.length){ var e = document.createElement("p"); e.className = "acctSub"; e.textContent = "Nothing in the pile yet."; list.appendChild(e); return; }
-      donePile.slice().sort(function(a, b){ return b.doneAt - a.doneAt; }).forEach(function(o){
-        var row = makeDiv("doneRow"), chip = makeDiv("doneChip"), body = makeDiv("doneBody"), tt = makeDiv("doneTitle"), meta = makeDiv("doneMeta"), acts = makeDiv("doneActs"), full = makeDiv("doneFull");
-        chip.style.background = o.bg || "#f6e58a"; chip.setAttribute("aria-hidden", "true");
-        tt.textContent = pileTitle(o); tt.dir = "auto";
-        meta.textContent = "Done " + pileWhen(o) + (o.doneBy ? " \u00b7 " + o.doneBy : "");
-        full.hidden = true; full.dir = "auto"; full.textContent = pileTitle(o); full.style.fontFamily = o.font ? fontStack(o.font) : "";
-        function btn(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn cmtSmall " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); acts.appendChild(b); return b; }
-        var rd = btn("Read", "", function(){ full.hidden = !full.hidden; rd.textContent = full.hidden ? "Read" : "Hide"; rd.setAttribute("aria-expanded", String(!full.hidden)); }); rd.setAttribute("aria-expanded", "false");
-        btn("Put back", "primary", function(){ restoreFromPile(o.id); if(!donePile.length && modal) modal.close(true); else paint(); });
-        btn("Delete\u2026", "", function(){ deleteFromPile(o.id).then(function(ok){ if(ok){ if(!donePile.length && modal) modal.close(true); else paint(); } }); });
-        body.appendChild(tt); body.appendChild(meta); body.appendChild(full); body.appendChild(acts);
-        row.appendChild(chip); row.appendChild(body); list.appendChild(row);
-      });
-    }
-    paint();
-    modal = openModal({title: "Done", sub: "Finished notes wait here. Put one back, read it, or throw it away.", content: content, width: 460, actions: [{label: "Close", value: true}]});
+  // ---------- system spaces: Done and Trash (v0.8.3) ----------
+  // Two special places that belong to Stick-It, not to the user's list of boards. Everything in them is still an ordinary object, stored in the board's
+  // own list with a marker (doneAt / trashedAt), so it syncs, exports and survives a reload exactly like the rest, and it can never be confused with an
+  // object that is merely hidden, off screen, piled, filtered or not loaded yet: it is present in the canonical list and in every sync snapshot.
+  //   Done  = finished (doneAt)    Trash = discarded, can come back (trashedAt)    "Delete forever" removes the row for real (explicit intent).
+  // Both are views of THIS board's objects (cross-board aggregation is a follow-up). They are not shareable boards, and a public live share never shows them.
+  var SPACES = {
+    done: {key: "done", title: "Done", sub: "Finished things wait here. Put one back, or throw it away.", mark: "doneAt", empty: "Nothing finished yet."},
+    trash: {key: "trash", title: "Trash", sub: "Deleted things wait here until you delete them forever.", mark: "trashedAt", empty: "Trash is empty."}
+  };
+  function isTrashedItem(o){ return !!o && Number(o.trashedAt) > 0; }
+  function spaceList(kind){ return kind === "trash" ? trashPile : donePile; }
+  function findInSpace(kind, id){ var l = spaceList(kind); for(var i = 0; i < l.length; i++){ if(l[i].id === id) return l[i]; } return null; }
+  function spaceCounts(){ return {done: donePile.length, trash: trashPile.length}; }
+  function updateSpaceCounts(){
+    var c = spaceCounts();
+    var d = document.getElementById("spaceDoneCount"), t = document.getElementById("spaceTrashCount");
+    if(d) d.textContent = c.done; if(t) t.textContent = c.trash;
+    updateDonePile(false);
   }
+  function whenLabel(ts){ try{ return new Date(ts).toLocaleDateString(undefined, {day: "numeric", month: "short"}); }catch(e){ return ""; } }
+
+  // ---- to Trash: an explicit deletion by the user. The object leaves the board and waits in Trash with everything it had.
+  function trashNotes(list){
+    if(readOnly) return;
+    list = list.filter(Boolean); if(!list.length) return;
+    var at = Date.now(), by = whoAmI();
+    var contents = list.filter(function(n){ return !isPileObj(n); }), pileObjs = list.filter(isPileObj);
+    if(!contents.length && !pileObjs.length) return;
+    var origs = contents.map(snapNote), pileSnaps = pileObjs.map(function(p){ var o = snapNote(p); if(o.members) o.members = o.members.slice(); return o; });
+    var snaps = origs.map(function(o){ var c = Object.assign({}, o); delete c.pileId; c.trashedAt = at; if(by) c.trashedBy = String(by).slice(0, 60); if(c.phys) c.phys = Object.assign({}, c.phys); return c; });
+    var hadContent = contents.some(noteHasContent);
+    function take(){
+      snaps.forEach(function(sn){
+        var cur = findNote(sn.id);
+        if(cur){ clearTimeout(cur._cleanT); selected.delete(cur.id); removeNoteEl(cur, true); var i = notes.indexOf(cur); if(i !== -1) notes.splice(i, 1); clearDecorations(cur.id); }
+        if(!findInSpace("trash", sn.id)) trashPile.push(Object.assign({}, sn));
+      });
+      pileSnaps.forEach(function(ps){ var cur = findNote(ps.id); if(cur){ selected.delete(cur.id); if(cur.el){ try{ cur.el.remove(); }catch(e){} cur.el = null; } var i = notes.indexOf(cur); if(i !== -1) notes.splice(i, 1); clearDecorations(cur.id); } });
+      syncPileVisibility(); applySelection(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
+    }
+    function put(){
+      snaps.forEach(function(sn){ var i = trashPile.findIndex(function(x){ return x.id === sn.id; }); if(i !== -1) trashPile.splice(i, 1); });
+      pileSnaps.forEach(function(ps){ if(!findNote(ps.id)){ var c = Object.assign({}, ps); if(c.members) c.members = c.members.slice(); if(c.phys) c.phys = Object.assign({}, c.phys); notes.push(c); } });
+      origs.forEach(function(o){ if(!findNote(o.id)){ var c = Object.assign({}, o); if(c.phys) c.phys = Object.assign({}, c.phys); notes.push(c); renderNote(c, false, {focus: false}); } });
+      syncPileVisibility(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
+    }
+    take();
+    var word = itemWord(contents.length ? contents : pileObjs);
+    var label = contents.length > 1 ? contents.length + " " + word + " moved to Trash." : (contents.length ? word.charAt(0).toUpperCase() + word.slice(1) + " moved to Trash." : "Pile removed.");
+    var action = pushHistory({label: contents.length > 1 ? "Delete " + contents.length + " " + word : "Delete " + word, custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
+    if(hadContent || pileObjs.length) toast(label, "Undo", function(){ undoIfTop(action); }); else toast(label);
+  }
+  // ---- out of Trash: back to where it was (position kept), on top of the others
+  function restoreFromTrash(ids){
+    var items = ids.map(function(id){ return findInSpace("trash", id); }).filter(Boolean);
+    if(!items.length || readOnly) return 0;
+    var restored = items.map(function(o){ var c = Object.assign({}, o); delete c.trashedAt; delete c.trashedBy; if(c.phys) c.phys = Object.assign({}, c.phys); zCounter += 1; c.z = zCounter; c.y = clampY(c.y); return c; });
+    function put(){
+      items.forEach(function(o){ var i = trashPile.indexOf(o); if(i !== -1) trashPile.splice(i, 1); });
+      restored.forEach(function(c){ if(!findNote(c.id)){ notes.push(c); renderNote(c, true, {focus: false}); } });
+      ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
+    }
+    function take(){
+      restored.forEach(function(c){ var cur = findNote(c.id); if(cur){ removeNoteEl(cur, false); notes.splice(notes.indexOf(cur), 1); selected.delete(c.id); clearDecorations(c.id); } });
+      items.forEach(function(o){ if(trashPile.indexOf(o) === -1) trashPile.push(o); });
+      applySelection(); ensureWidth(); saveNotes(); updateCount(); updateMinimap(); updateSpaceCounts();
+    }
+    put();
+    pushHistory({label: items.length > 1 ? "Restore " + items.length + " from Trash" : "Restore from Trash", custom: true, t: Date.now(), undo: function(){ take(); return true; }, redo: function(){ put(); return true; }});
+    setSelection(restored.map(function(c){ return c.id; }));
+    return items.length;
+  }
+  // ---- forever: the only place a row is really let go. The caller has already asked.
+  function deleteForever(ids){
+    var n = 0;
+    ids.forEach(function(id){ var o = findInSpace("trash", id); if(o){ trashPile.splice(trashPile.indexOf(o), 1); n++; } });
+    if(n){ saveNotes(); updateSpaceCounts(); }
+    return n;
+  }
+  // ---- out of Done: put back on the board where it was (that is "Put back" in the tray)
+  function restoreFromDone(ids){
+    var n = 0; ids.forEach(function(id){ if(findPile(id)){ restoreFromPile(id); n++; } });
+    return n;
+  }
+  // from Done a thing can go to Trash (not straight to oblivion)
+  function doneToTrash(ids){
+    var items = ids.map(function(id){ return findInSpace("done", id); }).filter(Boolean);
+    if(!items.length) return 0;
+    var at = Date.now(), by = whoAmI();
+    var origs = items.map(function(o){ return Object.assign({}, o); });
+    var moved = items.map(function(o){ var c = Object.assign({}, o); delete c.doneAt; delete c.doneBy; c.trashedAt = at; if(by) c.trashedBy = String(by).slice(0, 60); return c; });
+    function take(){ items.forEach(function(o){ var i = donePile.indexOf(o); if(i !== -1) donePile.splice(i, 1); }); moved.forEach(function(c){ if(!findInSpace("trash", c.id)) trashPile.push(c); }); saveNotes(); updateSpaceCounts(); }
+    function put(){ moved.forEach(function(c){ var i = trashPile.findIndex(function(x){ return x.id === c.id; }); if(i !== -1) trashPile.splice(i, 1); }); items.forEach(function(o){ if(donePile.indexOf(o) === -1) donePile.push(o); }); saveNotes(); updateSpaceCounts(); }
+    take();
+    var action = pushHistory({label: "Move from Done to Trash", custom: true, t: Date.now(), undo: function(){ put(); return true; }, redo: function(){ take(); return true; }});
+    toast(items.length > 1 ? items.length + " moved to Trash." : "Moved to Trash.", "Undo", function(){ undoIfTop(action); });
+    return items.length;
+  }
+
+  // ---- the spaces themselves: a full-screen place with its own look, not a list in a dialog
+  var spaceState = null, spaceLayer = OV.layer("system-space", function(){ closeSpace(); }, function(){ return !!spaceState; });
+  function closeSpace(){
+    if(!spaceState) return;
+    var st = spaceState; spaceState = null; spaceLayer.close(); st.root.remove(); document.removeEventListener("keydown", st.onKey, true);
+    if(st.opener && st.opener.focus && document.contains(st.opener)){ try{ st.opener.focus(); }catch(e){} }
+  }
+  function spaceText(o){ return pileTitle(o).toLowerCase(); }
+  function inRange(o, filter, stamp){
+    if(filter === "all") return true;
+    var ts = Number(o[stamp]) || 0, now = new Date(), startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    if(filter === "today") return ts >= startToday;
+    if(filter === "week") return ts >= startToday - 6 * 86400000 && ts < startToday;
+    if(filter === "earlier") return ts < startToday - 6 * 86400000;
+    return true;
+  }
+  var SPACE_PAGE = 48;
+  function openSpace(kind, opts){
+    var S = SPACES[kind]; if(!S) return;
+    closeSpace(); closeFloatingPopovers(); endEditing();
+    var root = makeDiv("spBackdrop sp-" + kind), sheet = makeDiv("spSheet");
+    sheet.setAttribute("role", "dialog"); sheet.setAttribute("aria-modal", "true"); sheet.setAttribute("aria-label", S.title); sheet.tabIndex = -1;
+    var head = makeDiv("spHead"), title = document.createElement("h2"); title.className = "spTitle";
+    title.innerHTML = '<span class="spIco" aria-hidden="true">' + (kind === "done" ? SPACE_ICONS.done : SPACE_ICONS.trash) + '</span>';
+    var tt = document.createElement("span"); tt.textContent = S.title; title.appendChild(tt);
+    var count = document.createElement("span"); count.className = "spCount"; title.appendChild(count);
+    var closeB = document.createElement("button"); closeB.type = "button"; closeB.className = "spClose"; closeB.setAttribute("aria-label", "Close " + S.title); closeB.innerHTML = ICONS.close;
+    closeB.addEventListener("click", closeSpace);
+    head.appendChild(title);
+    var search = document.createElement("input"); search.type = "search"; search.className = "spSearch"; search.placeholder = "Search " + S.title; search.setAttribute("aria-label", "Search " + S.title); search.setAttribute("data-esc-clear", "1");
+    if(opts && opts.q) search.value = opts.q;
+    head.appendChild(search);
+    var filters = makeDiv("spFilters"); filters.setAttribute("role", "group"); filters.setAttribute("aria-label", "Show");
+    var filt = "all", sel = {}, shown = SPACE_PAGE;
+    [["all", "All"], ["today", "Today"], ["week", "This week"], ["earlier", "Earlier"]].forEach(function(f){
+      var b = document.createElement("button"); b.type = "button"; b.className = "spFilter"; b.textContent = f[1]; b.setAttribute("aria-pressed", f[0] === "all" ? "true" : "false");
+      b.addEventListener("click", function(){ filt = f[0]; shown = SPACE_PAGE; Array.prototype.forEach.call(filters.children, function(x){ x.setAttribute("aria-pressed", x === b ? "true" : "false"); }); paint(); });
+      filters.appendChild(b);
+    });
+    head.appendChild(filters);
+    var bulk = makeDiv("spBulk");
+    head.appendChild(bulk); head.appendChild(closeB);
+    var canvas = makeDiv("spCanvas"); canvas.setAttribute("role", "list");
+    var note = document.createElement("p"); note.className = "spNote"; note.setAttribute("role", "status");
+    sheet.appendChild(head); sheet.appendChild(canvas); sheet.appendChild(note); root.appendChild(sheet); document.body.appendChild(root);
+    function bulkBtn(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "spBtn " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); bulk.appendChild(b); return b; }
+    function selIds(){ return Object.keys(sel).filter(function(k){ return sel[k]; }); }
+    function after(){ sel = {}; updateSpaceCounts(); paint(); }
+    function confirmForever(ids, title, body){
+      return confirmDialog({title: title, body: body, confirm: "Delete forever", danger: true}).then(function(ok){ if(!ok) return; deleteForever(ids); toast(ids.length > 1 ? ids.length + " deleted forever." : "Deleted forever."); after(); });
+    }
+    function paint(){
+      var stamp = S.mark, all = spaceList(kind), q = search.value.trim().toLowerCase();
+      var items = all.filter(function(o){ return inRange(o, filt, stamp) && (!q || spaceText(o).indexOf(q) !== -1); }).sort(function(a, b){ return (b[stamp] || 0) - (a[stamp] || 0); });
+      count.textContent = all.length ? "· " + all.length : "";
+      canvas.textContent = "";
+      items.slice(0, shown).forEach(function(o, i){ canvas.appendChild(spaceCard(o, i)); });
+      note.textContent = !all.length ? S.empty : (!items.length ? "Nothing matches." : (items.length > shown ? "" : ""));
+      if(items.length > shown){ var more = document.createElement("button"); more.type = "button"; more.className = "spBtn"; more.textContent = "Show " + Math.min(SPACE_PAGE, items.length - shown) + " more (" + (items.length - shown) + " left)"; more.addEventListener("click", function(){ shown += SPACE_PAGE; paint(); }); canvas.appendChild(more); }
+      paintBulk();
+    }
+    function spaceCard(o, i){
+      var card = makeDiv("spCard"); card.setAttribute("role", "listitem"); card.style.setProperty("--spr", (((hashStr(String(o.id)) % 7) - 3) * 0.7) + "deg");
+      var tick = document.createElement("input"); tick.type = "checkbox"; tick.className = "spTick"; tick.checked = !!sel[o.id]; tick.setAttribute("aria-label", "Select: " + pileTitle(o).slice(0, 50));
+      tick.addEventListener("change", function(){ sel[o.id] = tick.checked; paintBulkOnly(); });
+      var paper = null; try{ paper = buildStaticNote(o); }catch(e){ paper = null; }
+      var holder = makeDiv("spPaper");
+      if(paper){ paper.style.cssText += ";position:relative;left:auto;top:auto;transform:none;margin:0;max-width:100%;"; paper.classList.add("spStatic"); holder.appendChild(paper); }
+      else { var fb = makeDiv("spFallback"); fb.textContent = pileTitle(o); holder.appendChild(fb); }
+      var stampEl = makeDiv("spStamp"); stampEl.textContent = (kind === "done" ? "DONE · " : "DELETED · ") + whenLabel(o[S.mark]); stampEl.setAttribute("aria-hidden", "true");
+      var acts = makeDiv("spActs");
+      function act(label, cls, fn){ var b = document.createElement("button"); b.type = "button"; b.className = "spBtn " + (cls || ""); b.textContent = label; b.addEventListener("click", fn); acts.appendChild(b); }
+      if(kind === "done"){
+        act("Put back", "primary", function(){ restoreFromDone([o.id]); after(); });
+        act("Trash", "", function(){ doneToTrash([o.id]); after(); });
+      } else {
+        act("Restore", "primary", function(){ restoreFromTrash([o.id]); toast("Restored to the board."); after(); });
+        act("Delete forever…", "danger", function(){ confirmForever([o.id], "Delete this forever?", "“" + pileTitle(o).slice(0, 60) + "” will be gone for good. This can’t be undone."); });
+      }
+      card.appendChild(tick); card.appendChild(holder); card.appendChild(stampEl); card.appendChild(acts);
+      return card;
+    }
+    function paintBulkOnly(){ paintBulk(); }
+    function paintBulk(){
+      bulk.textContent = ""; var ids = selIds(), all = spaceList(kind);
+      if(kind === "trash"){
+        if(ids.length){ bulkBtn("Restore selected (" + ids.length + ")", "primary", function(){ var n = restoreFromTrash(ids); toast(n + " restored to the board."); after(); });
+          bulkBtn("Delete selected forever", "danger", function(){ confirmForever(ids, "Delete " + ids.length + " forever?", "They will be gone for good. This can’t be undone."); }); }
+        if(all.length) bulkBtn("Empty Trash…", "danger", function(){ confirmDialog({title: "Empty the Trash?", body: "All " + all.length + (all.length === 1 ? " thing" : " things") + " in Trash will be deleted forever. This can’t be undone.", confirm: "Empty Trash", danger: true}).then(function(ok){ if(!ok) return; var n = deleteForever(all.map(function(o){ return o.id; })); toast("Trash emptied (" + n + ")."); after(); }); });
+      } else if(ids.length){
+        bulkBtn("Put back selected (" + ids.length + ")", "primary", function(){ var n = restoreFromDone(ids); toast(n + " put back on the board."); after(); });
+        bulkBtn("Move selected to Trash", "", function(){ doneToTrash(ids); after(); });
+      }
+    }
+    search.addEventListener("input", function(){ shown = SPACE_PAGE; paint(); });
+    function onKey(e){
+      if(!spaceState) return;
+      if(e.key === "Tab"){ var f = Array.prototype.filter.call(sheet.querySelectorAll("button, input"), function(el){ return !el.disabled && el.offsetParent !== null; }); if(!f.length) return; var a = f[0], z = f[f.length - 1]; if(e.shiftKey && (document.activeElement === a || !sheet.contains(document.activeElement))){ e.preventDefault(); z.focus(); } else if(!e.shiftKey && (document.activeElement === z || !sheet.contains(document.activeElement))){ e.preventDefault(); a.focus(); } }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("mousedown", function(e){ if(e.target === root) closeSpace(); });
+    spaceState = {kind: kind, root: root, opener: document.activeElement, onKey: onKey, repaint: paint};
+    spaceLayer.open(); paint();
+    var first = sheet.querySelector(".spSearch"); if(first) first.focus();
+  }
+  function openDoneTray(){ openSpace("done"); }
+
+  function openTrash(){ openSpace("trash"); }
+  var SPACE_ICONS = {
+    done: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 3.6l15.4-.5.5 15.9-3.1 1.9-12.8.4-.6-17.1z" fill="currentColor" fill-opacity="0.1"/><path d="M8 12.4l2.7 2.8 5-6"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.4l14-.6M9.5 6.9l.3-2.4 4.4-.2.3 2.4"/><path d="M6.2 7.6l1 12.3 9.6-.3 1-12"/><path d="M10 11v5.4M14 11v5.4"/></svg>'
+  };
+  (function(){
+    var d = document.getElementById("openDoneSpace"), t = document.getElementById("openTrashSpace");
+    if(!d || !t) return;
+    d.querySelector(".sysIco").innerHTML = SPACE_ICONS.done; t.querySelector(".sysIco").innerHTML = SPACE_ICONS.trash;
+    d.addEventListener("click", function(){ boardPanel.hidden = true; openSpace("done"); });
+    t.addEventListener("click", function(){ boardPanel.hidden = true; openSpace("trash"); });
+  })();
+
   // a checklist with everything ticked: offer the pile, never act on its own
   function offerDoneForChecklist(n){
     if(readOnly || !n || !n.textEl || n.type) return;
@@ -7230,7 +7700,7 @@
       selBar.appendChild(b);
       return b;
     }
-    if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) add(ICONS.tick, "Mark done", function(){ markDoneGroup(ids); });
+    if(ids.some(function(id){ var q = findNote(id); return q && (!q.type || isPaper(q)); })) add(ICONS.tick, "Mark done", function(){ markDoneGroup(ids); });
     if(pileEligibleList(ids).length >= 2){
       add(ICONS.move, "Stack", function(){ stackNotes(ids); }).title = "Arrange these notes in a vertical stack";
       add(ICONS.move, "Pile", function(){ makePile(ids); }).title = "Collapse these notes into one pile (nothing is deleted)";
@@ -7630,7 +8100,7 @@
     if(!token || !CLOUD_OK){ shareUnavailable("broken"); return; }
     var last = "";
     function paintLive(res){
-      var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(Boolean);
+      var objs = Stick.share.toClientObjects(res).map(cloudShareObject).filter(function(o){ return o && !isDoneItem(o) && !isTrashedItem(o); });          // Done and Trash are never part of a public share
       var sig = JSON.stringify(res.objects) + Object.keys(res.assets || {}).join();
       if(sig === last) return;
       last = sig;
@@ -7870,12 +8340,71 @@
       }
     });
     syncHighlight("search");
+    if(typeof updateSearchNav === "function") updateSearchNav(q);
   }
   function clearSearch(){
     if(!searchInput.value) return;
     searchInput.value = "";
     runSearch();
   }
+  // ---------- search that takes you there (v0.8.3): a count, next / previous, and a scope ----------
+  // Matches are found in the canonical object list, so a paper hidden inside a collapsed pile is found too (the pile opens at it). Nothing is changed by searching.
+  var searchScope = "board", searchHits = [], searchAt = -1;
+  function collectSearchHits(q){
+    var hits = [];
+    notes.forEach(function(n){
+      if(isZone(n) || isPileObj(n)) return;
+      var t = ""; try{ t = String(itemText(n) || ""); }catch(e){ t = ""; }
+      if(t.toLowerCase().indexOf(q) === -1) return;
+      hits.push({id: n.id, pile: isHiddenMember(n) ? n.pileId : null, x: n.x, y: n.y});
+    });
+    hits.sort(function(a, b){ return (a.y - b.y) || (a.x - b.x); });
+    return hits;
+  }
+  function spaceHits(kind, q){ return spaceList(kind).filter(function(o){ return spaceText(o).indexOf(q) !== -1; }); }
+  function updateSearchNav(q){
+    var nav = document.getElementById("searchNav"); if(!nav) return;
+    if(!q){ nav.hidden = true; searchHits = []; searchAt = -1; return; }
+    nav.hidden = false;
+    var count = document.getElementById("searchCount");
+    if(searchScope === "board"){
+      searchHits = collectSearchHits(q);
+      if(searchAt >= searchHits.length) searchAt = searchHits.length - 1;
+      count.textContent = searchHits.length ? ((searchAt < 0 ? 0 : searchAt + 1) + " / " + searchHits.length) : "0";
+    } else {
+      searchHits = spaceHits(searchScope, q); searchAt = -1;
+      count.textContent = searchHits.length + " in " + (searchScope === "done" ? "Done" : "Trash");
+    }
+    count.setAttribute("aria-label", searchHits.length + (searchHits.length === 1 ? " result" : " results"));
+  }
+  function goToSearchHit(step){
+    var q = searchInput.value.trim().toLowerCase(); if(!q) return;
+    if(searchScope !== "board"){ if(searchHits.length) openSpace(searchScope, {q: q}); else toast("Nothing in " + (searchScope === "done" ? "Done" : "Trash") + " matches."); return; }
+    updateSearchNav(q); if(!searchHits.length){ toast("No results."); return; }
+    searchAt = searchAt < 0 ? (step < 0 ? searchHits.length - 1 : 0) : (searchAt + step + searchHits.length) % searchHits.length;
+    var h = searchHits[searchAt], n = findNote(h.id); if(!n) return;
+    document.getElementById("searchCount").textContent = (searchAt + 1) + " / " + searchHits.length;
+    if(h.pile){                                                            // inside a collapsed pile: open the pile at that paper
+      var pile = findNote(h.pile), live = pile ? pileLive(pile) : [], i = live.indexOf(n);
+      if(pile && i !== -1){ pileBrowse[pile.id] = i; if(pile.el) paintPileShown(pile, pile.el); openPileBrowser(pile); return; }
+    }
+    centerOnObject(n); setSelection([n.id]);
+    if(n.el){ n.el.classList.remove("searchFocus"); void n.el.offsetWidth; n.el.classList.add("searchFocus"); setTimeout(function(){ if(n.el) n.el.classList.remove("searchFocus"); }, 1600); }
+  }
+  function centerOnObject(n){
+    var w = (n.el && n.el.offsetWidth) || n.w || NOTE_W;
+    var left = Math.max(0, (n.x + w / 2) * boardZoom - board.clientWidth / 2);
+    try{ board.scrollTo({left: left, behavior: reducedMotion() ? "auto" : "smooth"}); }catch(e){ board.scrollLeft = left; }
+  }
+  (function(){
+    var nav = document.getElementById("searchNav"); if(!nav) return;
+    document.getElementById("searchNext").addEventListener("click", function(){ goToSearchHit(1); });
+    document.getElementById("searchPrev").addEventListener("click", function(){ goToSearchHit(-1); });
+    var scope = document.getElementById("searchScope");
+    scope.addEventListener("change", function(){ searchScope = scope.value; searchAt = -1; updateSearchNav(searchInput.value.trim().toLowerCase()); });
+    searchInput.addEventListener("keydown", function(e){ if(e.key === "Enter" && searchInput.value.trim()){ e.preventDefault(); goToSearchHit(e.shiftKey ? -1 : 1); } });
+  })();
+
   searchInput.addEventListener("input", runSearch);
   // phones: Search is a small icon that opens a full-width field over the header, and Cancel puts the header back
   (function(){
@@ -9179,6 +9708,10 @@
     var picEl = $("asPic");
     (function(){                                    // Premium is shown the same way everywhere: a crown sitting on the head of the avatar, never as a word beside it
       var wrap = makeDiv("avCrownWrap"); picEl.parentNode.insertBefore(wrap, picEl); wrap.appendChild(picEl);
+      var pen = document.createElement("button"); pen.type = "button"; pen.className = "asPicEdit"; pen.setAttribute("aria-label", "Edit profile photo"); pen.title = "Edit photo";
+      pen.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
+      pen.addEventListener("click", function(){ $("asPhotoBtn").click(); });
+      wrap.style.position = "relative"; wrap.appendChild(pen);
       if(isPremium()){ var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium"; wrap.appendChild(c); }
     })();
 
@@ -9239,6 +9772,37 @@
       });
       inp.click();
     }
+    // Take a photo: nothing touches the camera until this is chosen, the camera light is on only while the preview is open, and Cancel (or Esc) always lets go of it.
+    async function takePhoto(){
+      var md = navigator.mediaDevices;
+      if(!(md && md.getUserMedia)){                                   // no live camera API here: the phone's own camera picker, if the device has one
+        var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "user");
+        inp.addEventListener("change", async function(){ var f = inp.files[0]; if(!f) return; var blob = await openAvatarCropper(f); if(blob) setStage({action: "upload", blob: blob, url: URL.createObjectURL(blob)}); });
+        inp.click(); return;
+      }
+      var wrap = makeDiv("camWrap"), video = document.createElement("video"), msg = document.createElement("p"), stream = null, done = false;
+      video.autoplay = true; video.muted = true; video.setAttribute("playsinline", ""); video.className = "camVideo"; video.setAttribute("aria-label", "Camera preview");
+      msg.className = "acctSub"; msg.textContent = "Allow camera access when your browser asks. Nothing is recorded until you press Take photo."; msg.style.margin = "8px 0 0";
+      wrap.appendChild(video); wrap.appendChild(msg);
+      function release(){ if(stream){ stream.getTracks().forEach(function(t){ try{ t.stop(); }catch(e){} }); stream = null; } video.srcObject = null; }
+      var shot = null;
+      var m = openModal({title: "Take a photo", content: wrap, width: 380,
+        actions: [{label: "Cancel", value: false}, {label: "Take photo", kind: "primary", value: true, id: "camShot", onClick: function(){
+          if(!stream || !video.videoWidth){ toast("The camera isn\u2019t ready yet."); return false; }
+          var c = document.createElement("canvas"); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext("2d").drawImage(video, 0, 0);
+          c.toBlob(function(b){ shot = b; }, "image/jpeg", 0.92); return true;
+        }}],
+        onClose: function(v){
+          release();
+          if(!v) return;
+          setTimeout(async function(){ if(!shot) return; var blob = await openAvatarCropper(new File([shot], "camera.jpg", {type: "image/jpeg"})); if(blob) setStage({action: "upload", blob: blob, url: URL.createObjectURL(blob)}); }, 80);
+        }});
+      try{
+        stream = await md.getUserMedia({video: {facingMode: "user"}, audio: false});
+        if(done){ release(); return; }
+        video.srcObject = stream; try{ await video.play(); }catch(e){}
+      }catch(err){ toast("Couldn\u2019t open the camera. You can upload a photo instead."); done = true; m.close(false); }
+    }
     $("asPhotoBtn").addEventListener("click", function(){
       if(openMenuState && openMenuState.anchor === $("asPhotoBtn")){ closeMenu(true); return; }
       var eff = effSource(), menu = makeDiv("asMenu");
@@ -9248,8 +9812,10 @@
         b.addEventListener("click", function(){ closeMenu(true); fn(); }); menu.appendChild(b);
       }
       item(eff === "none" ? "Upload photo" : "Upload a new photo", pickPhoto);
+      item("Take photo", takePhoto);
       if(providerUrl && eff !== "provider") item("Use " + providerName(provider) + " photo", function(){ setStage({action: "provider", blob: null, url: null}); });
       if(eff !== "none") item("Remove photo", function(){ setStage({action: "none", blob: null, url: null}); }, "danger");
+      item("Cancel", function(){});
       openMenu($("asPhotoBtn"), menu);
     });
 
@@ -11006,12 +11572,17 @@
     when: function(){ return pileEligibleList(selIds()).length >= 2; }, run: function(){ makePile(selIds()); }});
   defineAction({id: "unpile", label: "Unpile (open the selected pile)", group: "Selection", keywords: "spread expand open uncollapse", def: "", edit: true,
     when: function(){ var ids = selIds(); return ids.length === 1 && isPileObj(findNote(ids[0])); }, run: function(){ unpilePile(findNote(selIds()[0])); }});
+  [["layerFront", "Bring selection to front", "front"], ["layerForward", "Bring selection forward", "forward"], ["layerBackward", "Send selection backward", "backward"], ["layerBack", "Send selection to back", "back"]].forEach(function(l){
+    defineAction({id: l[0], label: l[1], group: "Selection", keywords: "layer order z stack top bottom", def: "", edit: true, when: function(){ return selIds().length > 0; }, run: function(){ layerObjects(selIds(), l[2]); }});
+  });
   defineAction({id: "straighten", label: "Straighten selected items", group: "Selection", keywords: "level rotate turn tilt flat", def: "", edit: true,
     when: function(){ return selIds().some(function(id){ var q = findNote(id); return rotatable(q) && (q.rot || 0) !== 0; }); }, run: function(){ straighten(selIds().map(findNote).filter(Boolean)); }});
   defineAction({id: "rotateLeft", label: "Rotate selected item left", group: "Selection", keywords: "turn tilt anticlockwise", def: "", edit: true,
     when: function(){ return selIds().some(function(id){ return rotatable(findNote(id)); }); }, run: function(){ rotateBy(selIds().map(findNote).filter(Boolean), -ROT_STEP); }});
   defineAction({id: "rotateRight", label: "Rotate selected item right", group: "Selection", keywords: "turn tilt clockwise", def: "", edit: true,
     when: function(){ return selIds().some(function(id){ return rotatable(findNote(id)); }); }, run: function(){ rotateBy(selIds().map(findNote).filter(Boolean), ROT_STEP); }});
+  defineAction({id: "openDone", label: "Open Done", group: "Go", keywords: "finished completed space", def: "", run: function(){ openSpace("done"); }});
+  defineAction({id: "openTrash", label: "Open Trash", group: "Go", keywords: "deleted bin restore recover space", def: "", run: function(){ openSpace("trash"); }});
   defineAction({id: "focus", label: "Open selection in Focus Mode", group: "Selection", keywords: "large big full", def: "F",
     when: function(){ var ids = selIds(); return ids.length === 1 && !findNote(ids[0]).type; },
     run: function(){ enterFocus(findNote(selIds()[0])); }});
@@ -11559,12 +12130,13 @@
   var cloudHost = {
     protectedIds: function(){ return quarantined; },           // unreadable here is not the same as deleted: never sent as a delete
     isShareView: function(){ return SHARE_LINK_PAGE; },       // the sync layer refuses to attach to a board from a share-link page
-    snapshot: function(){ return notes.concat(donePile).map(persistForm); },
+    snapshot: function(){ return notes.concat(donePile, trashPile).map(persistForm); },          // everything, whatever its state: nothing is ever "missing" because it is done, in Trash, piled or not drawn
     getObject: function(id){ var n = findNote(id) || findPile(id); return n ? persistForm(n) : null; },
     // changes that came from the server: applied without an undo step
     applyRemote: function(d){
       (d.removes || []).forEach(function(id){
         var pi = donePile.findIndex(function(x){ return x.id === id; }); if(pi !== -1) donePile.splice(pi, 1);
+        var ti = trashPile.findIndex(function(x){ return x.id === id; }); if(ti !== -1) trashPile.splice(ti, 1);
         var n = findNote(id); if(!n) return;
         selected.delete(id);
         if(n.el) n.el.remove();
@@ -11573,7 +12145,15 @@
       });
       (d.upserts || []).forEach(function(raw){
         var o = sanitizeSafely(raw); if(!o) return;
-        var ex = findNote(o.id), inPile = donePile.findIndex(function(x){ return x.id === o.id; });
+        var ex = findNote(o.id), inPile = donePile.findIndex(function(x){ return x.id === o.id; }), inTrash = trashPile.findIndex(function(x){ return x.id === o.id; });
+        if(isTrashedItem(o)){                                       // deleted on another device: it belongs in Trash (still stored, never lost)
+          pileRelease(o.id, false);
+          if(ex){ if(ex.el) ex.el.remove(); notes.splice(notes.indexOf(ex), 1); selected.delete(ex.id); clearDecorations(ex.id); }
+          if(inPile !== -1) donePile.splice(inPile, 1);
+          if(inTrash !== -1) trashPile[inTrash] = o; else trashPile.push(o);
+          return;
+        }
+        if(inTrash !== -1) trashPile.splice(inTrash, 1);            // restored on another device: fall through and draw it
         if(isDoneItem(o)){                                          // finished on another device: it belongs in the pile
           pileRelease(o.id, false);                                  // ...and it leaves any pile it was in (the pile shrinks, nothing else is touched)
           if(ex){ if(ex.el) ex.el.remove(); notes.splice(notes.indexOf(ex), 1); selected.delete(ex.id); clearDecorations(ex.id); }
@@ -11594,7 +12174,8 @@
         }
       });
       syncPileVisibility();
-      ensureWidth(); updateCount(); updateMinimap(); applySelection(); updateDonePile(false);
+      ensureWidth(); updateCount(); updateMinimap(); applySelection(); updateSpaceCounts();
+      if(spaceState) spaceState.repaint();
       if(searchInput.value.trim()) runSearch();
       saveNotesCache();
     },

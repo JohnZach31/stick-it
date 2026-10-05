@@ -1,5 +1,47 @@
 [
   {
+    "version": "0.8.3",
+    "codename": "Stick Around",
+    "title": "Stick-It v0.8.3 — Stick Around",
+    "date": null,
+    "status": "development",
+    "tldr": "Trash, Done spaces, richer scraps, reactions, layering and better media — your board remembers what happened to things.",
+    "highlights": [
+      "Done has somewhere to go: a real Done space, with a small stamp-and-confetti moment (none under reduced motion).",
+      "Trash without panic: deleting moves things to Trash first; restore them, or delete forever when you mean it.",
+      "Scraps got richer: newspaper scraps, source-linked clippings, emoji reactions.",
+      "Your board remembers more: search with next/previous and a count, proper layering, and piles you can shuffle, reorder and fan."
+    ],
+    "tourMode": "full",
+    "tour": [
+      {
+        "target": null,
+        "title": "Stick Around",
+        "body": "Things don't just sit on the board anymore. This takes about thirty seconds."
+      },
+      {
+        "target": "#brandBtn",
+        "title": "Done has somewhere to go",
+        "body": "Open your boards list: Done and Trash now live under System. Finished things keep their words, place and state, and 'Put back' returns them."
+      },
+      {
+        "target": ".note",
+        "title": "Trash without panic",
+        "body": "Deleting a note moves it to Trash first. It isn't gone yet: restore it, or delete forever when you really mean it."
+      },
+      {
+        "target": null,
+        "title": "Scraps got richer",
+        "body": "Add a Newspaper or a Clipping from the right-click menu, and react to anything with a quick emoji from the small + button under a selected note."
+      },
+      {
+        "target": "#searchInput",
+        "title": "Your board remembers more",
+        "body": "Search now shows a count and takes you to each result, even inside a pile. Layer things from Arrange in the ... menu."
+      }
+    ]
+  },
+  {
     "version": "0.8.2.2",
     "codename": "Touch the Paper",
     "title": "Stick-It v0.8.2.2 — Touch the Paper",

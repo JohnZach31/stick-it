@@ -111,8 +111,8 @@ const sandbox = (code, extra = {}) => { const ctx = vm.createContext({ Math, Arr
   const rows = [...md.matchAll(/^\| (.+?) \| (SHIPPED|PARTIAL|DEFERRED|NOT IMPLEMENTED)[^|]* \|$/gm)];
   ok(rows.length >= 20 && rows.some((r) => r[2] === 'PARTIAL') && rows.some((r) => r[2] === 'SHIPPED'), 'the status audit uses the four honest statuses and is not all "shipped"');
   const index = JSON.parse(pn('index.json')), data = JSON.parse(pn('patch-notes.json'));
-  ok(index[3].version === '0.8.1' && data[3].version === '0.8.1' && index[3].tldr === data[3].tldr && index[3].file === '0.8.1.md' && index[3].date === null && data[3].date === null, 'index.json and patch-notes.json agree and neither marks 0.8.1 as released');
-  ok(['highlights', 'added', 'improved', 'fixed', 'limitations'].every((k) => Array.isArray(data[3][k]) && data[3][k].length > 0), 'the structured data has highlights, added, improved, fixed and limitations');
+  ok(index[4].version === '0.8.1' && data[4].version === '0.8.1' && index[4].tldr === data[4].tldr && index[4].file === '0.8.1.md' && index[4].date === null && data[4].date === null, 'index.json and patch-notes.json agree and neither marks 0.8.1 as released');
+  ok(['highlights', 'added', 'improved', 'fixed', 'limitations'].every((k) => Array.isArray(data[4][k]) && data[4][k].length > 0), 'the structured data has highlights, added, improved, fixed and limitations');
   const js = pn('patch-notes.js');
   ok(/^export const patchNotes = \[/m.test(js) && js.includes(JSON.stringify(data[1].tldr)), 'patch-notes.js (for the website) is generated from the same data');
   const sum = pn('0.8.1-summary.md');

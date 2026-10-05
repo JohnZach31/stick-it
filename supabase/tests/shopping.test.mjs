@@ -149,7 +149,7 @@ ok(S.PRESETS.groceries.fields.join() === 'qty' && S.PRESETS.trip.fields.join() =
   ok(/if\(n\.type === "shopping"\) return renderShopping\(n, isNew\)/.test(app) && /if\(item\.type === "shopping"\) return buildStaticShopping\(item\)/.test(app), 'the board and shared views both draw a shopping list');
   ok(/OBJECT_MENUS\.shopping = shoppingMenu/.test(app) && /Details/.test(app) && /S\.FIELDS\.forEach\(function\(f\)\{/.test(app), 'the ... menu has a Details section with the five optional fields');
   ok(!/class="gear"|shGear/.test(app + css), 'there is no permanent gear on the node');
-  ok(/\(n\.type && n\.type !== "shopping"\)\) return;/.test(app) && /label: "Mark list done"|"Mark list done"/.test(app), 'a whole list can be marked Done, from its own menu');
+  ok(/\(n\.type && !isPaper\(n\)\)\) return;/.test(app) && /label: "Mark list done"|"Mark list done"/.test(app), 'a whole list can be marked Done, from its own menu');
   ok(!/markDone\(n\)[^;]*shopTick|shopTick[^}]*markDone/.test(app), 'ticking an item never marks the list done');
   ok(/if\(k === 1\)\{ go\(\); return; \}/.test(app) && /"Clear " \+ k \+ " bought items\?"/.test(app), 'clearing several bought items asks first; it is one undo step');
   ok(/Nothing to buy yet/.test(read('js/shopping.js')) && /Add the first item/.test(app), 'an empty list has a calm empty state with an obvious first entry');

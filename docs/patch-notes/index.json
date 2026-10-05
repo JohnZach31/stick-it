@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.3",
+    "codename": "Stick Around",
+    "title": "Stick-It v0.8.3 — Stick Around",
+    "date": null,
+    "status": "development",
+    "tldr": "Trash, Done spaces, richer scraps, reactions, layering and better media — your board remembers what happened to things.",
+    "file": "0.8.3.md"
+  },
+  {
     "version": "0.8.2.2",
     "codename": "Touch the Paper",
     "title": "Stick-It v0.8.2.2 — Touch the Paper",

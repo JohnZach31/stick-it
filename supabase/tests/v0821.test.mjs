@@ -214,7 +214,7 @@ ok(/\.pbCard\{ width:min\(420px, 100%\)/.test(css), 'the phone browser shows one
   ok(/IntersectionObserver/.test(fn('embedWatch')) && /embedStop\(m\)/.test(fn('embedWatch')) && /embedObserver\.unobserve\(elRef\)/.test(fn('removeNoteEl')), 'an offscreen player is unmounted and a deleted one is released');
   ok(/frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/player\.vimeo\.com;/.test(read('index.html')) && !/frame-src[^;]*\*/.test(read('index.html')), 'the CSP allows frames only from the two provider hosts');
   ok(/c\.type === "embed"/.test(fn('cloudSanitize')) && /Stick\.embed\.normalize\(c\)/.test(fn('cloudSanitize')) && /item\.type === "embed"/.test(fn('normalizeIncoming')), 'embeds survive sync and import through the same validation');
-  ok(/"url","provider","vid","start"\]/.test(app.match(/var SERIAL_FIELDS = \[[^\]]*\]/)[0]) && /embed\.js/.test(read('index.html')), 'embed fields are stored and the module is loaded');
+  ok(/"url","provider","vid","start"/.test(app.match(/var SERIAL_FIELDS = \[[^\]]*\]/)[0]) && /embed\.js/.test(read('index.html')), 'embed fields are stored and the module is loaded');
   ok(/n\.type === "embed"/.test(fn('noteHasContent')), 'an embed is never treated as an empty note');
 }
 
@@ -222,7 +222,7 @@ ok(/\.pbCard\{ width:min\(420px, 100%\)/.test(css), 'the phone browser shows one
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
 const pn1 = pn.find((x) => x.version === '0.8.2.1');
 ok(pn1 && pn1.codename === 'Room to Breathe' && pn1.status === 'development' && pn1.date === null, 'v0.8.2.1 "Room to Breathe" is recorded and not released');
-ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.2\.[12]"/.test(read('js/config.js')), 'the app is still in development');
+ok(/APP_STATUS: "development"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.(?:2\.[12]|3)"/.test(read('js/config.js')), 'the app is still in development');
 ok(fs.existsSync(path.join(root, 'docs/patch-notes/0.8.2.1.md')) && JSON.parse(read('docs/patch-notes/index.json')).find((x) => x.version === '0.8.2.1').file === '0.8.2.1.md', 'patch notes and the index are in step');
 ok(pn1.tour.length >= 6 && pn1.tour.some((s) => /Legal/.test(s.title)) && pn1.tourMode === 'full', 'the Spotlight tour is data in the existing patch system and points at Legal');
 ok(fs.existsSync(path.join(root, 'docs/dev/PRE-BETA-CHECKLIST.md')) && /not\*\* replace|does \*\*not\*\* replace/.test(read('docs/dev/PRE-BETA-CHECKLIST.md')), 'the pre-beta checkpoint is recorded');

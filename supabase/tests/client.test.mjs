@@ -573,6 +573,41 @@ try {
     E.sync.stop(); D.sync.stop();
   }
 
+  // ============================================================ v0.8.3: Done and Trash are states of live rows, never deletions
+  {
+    const D = await device('spaces.user@example.com');
+    const bd = await D.Stick.repo.createBoard('Spaces', null);
+    D.open(bd.id); await D.sync.start();
+    const keep = note({ html: 'keep' }), trashMe = note({ html: 'trash me', rot: 5 }), doneMe = note({ html: 'done me' });
+    const clip = { id: crypto.randomUUID(), type: 'clipping', x: 4, y: 4, w: 260, rot: 0, z: 4, variant: 'web', quote: 'a quote', sourceTitle: 'Src', sourceUrl: 'https://example.com/a', reactions: { '\uD83D\uDC4D': ['u1', 'u2'] }, phys: {} };
+    const paper = { id: crypto.randomUUID(), type: 'newspaper', x: 9, y: 9, w: 310, rot: 1, z: 5, variant: 'tabloid', headline: 'News', sub: 's', body: 'b', phys: {} };
+    D.notes.push(keep, trashMe, doneMe, clip, paper); D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    const live = async () => (await admin('select id, type, z_index, data from public.board_objects where board_id=$1 and deleted_at is null', [bd.id])).rows;
+    const deadCount = async () => (await admin('select count(*)::int c from public.board_objects where board_id=$1 and deleted_at is not null', [bd.id])).rows[0].c;
+    let rows = await live();
+    ok(rows.length === 5 && rows.find((r) => r.id === clip.id).data.sourceUrl === 'https://example.com/a' && rows.find((r) => r.id === clip.id).data.reactions['\uD83D\uDC4D'].length === 2 && rows.find((r) => r.id === paper.id).data.variant === 'tabloid', 'spaces: clippings (with source and reactions) and newspapers sync like any object');
+    // a "trash" and a "done" device: both lists are in every snapshot
+    const trash = [], done = [];
+    D.host.snapshot = () => D.notes.concat(done, trash).map((o) => JSON.parse(JSON.stringify(o)));
+    D.notes.splice(D.notes.indexOf(trashMe), 1); trash.push(Object.assign({}, trashMe, { trashedAt: Date.now() }));
+    D.notes.splice(D.notes.indexOf(doneMe), 1); done.push(Object.assign({}, doneMe, { doneAt: Date.now() }));
+    D.sync.notesChanged(); await sleep(250); await D.sync.flush();
+    rows = await live();
+    ok(rows.length === 5 && (await deadCount()) === 0, 'spaces: moving an object to Trash or Done leaves every row live; nothing is soft-deleted');
+    ok(rows.find((r) => r.id === trashMe.id).data.trashedAt > 0 && rows.find((r) => r.id === trashMe.id).data.html === 'trash me' && rows.find((r) => r.id === doneMe.id).data.doneAt > 0, 'spaces: the marker is stored on the row with all its content');
+    // negative control: a device that dropped Trash / Done from its snapshot WOULD delete them
+    D.host.snapshot = () => D.notes.map((o) => JSON.parse(JSON.stringify(o)));
+    D.sync.notesChanged(); await sleep(250); await D.sync.flush();
+    ok((await live()).length === 3 && (await deadCount()) === 2, 'control: leaving Done and Trash out of the snapshot WOULD delete them (the test can see the bug)');
+    // restore them: the rows come back (the sync layer re-creates them) and "delete forever" is the explicit removal
+    D.host.snapshot = () => D.notes.concat(done, trash).map((o) => JSON.parse(JSON.stringify(o)));
+    D.sync.notesChanged(); await sleep(250); await D.sync.flush();
+    rows = await live(); ok(rows.length === 5, 'spaces: with the lists back in the snapshot both objects are live again');
+    trash.splice(0, 1); D.sync.notesChanged(); await sleep(250); await D.sync.flush();
+    ok((await live()).length === 4 && (await deadCount()) >= 1, 'spaces: Delete forever (the object leaves every list) is the one thing that deletes its row');
+    D.sync.stop();
+  }
+
   // ============================================================ INCIDENT REGRESSIONS (data safety)
   // 2026-10-04: opening a share link in a browser that is signed in soft-deleted the account's whole board. The share page's own objects (the
   // shared copies) were diffed against what the account already knew, and every real object read as "removed".
