@@ -103,9 +103,9 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
 // ================================================================ MENUS: Paper and Arrange, one level
 {
   const { document } = parseHTML('<html><body></body></html>');
-  const code = ['makeDiv', 'menuItem', 'menuSub', 'paperSubmenu', 'arrangeSubmenu'].map(fn).join('\n') + '\nvar ROT_STEP = 3;';
+  const code = ['makeDiv', 'menuItem', 'placeFlyout', 'menuSub', 'paperSubmenu', 'arrangeSubmenu'].map(fn).join('\n') + '\nvar ROT_STEP = 3;';
   const calls = [];
-  const ctx = vm.createContext({ document, ICONS: { fit: '<svg></svg>', rip: '<svg></svg>', sticky: '<svg></svg>', move: '<svg></svg>' }, MOD: 'Ctrl', trimPaper: (n, how) => calls.push('trim:' + how), restorePaper: () => calls.push('restore'), closeFloatingPopovers: () => {},
+  const ctx = vm.createContext({ document, window: { innerWidth: 1000, innerHeight: 800 }, ICONS: { fit: '<svg></svg>', rip: '<svg></svg>', sticky: '<svg></svg>', move: '<svg></svg>' }, MOD: 'Ctrl', trimPaper: (n, how) => calls.push('trim:' + how), restorePaper: () => calls.push('restore'), closeFloatingPopovers: () => {},
     rotatable: (n) => n.type !== 'zone', isPinned: (n) => !!n.pinned, rotateBy: (l, d) => calls.push('rot:' + d), straighten: () => calls.push('straighten') });
   vm.runInContext(code, ctx);
   const pop = document.createElement('div'); document.body.appendChild(pop);
@@ -124,7 +124,7 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
   ok(key(head, 'ArrowLeft') && body.hidden, 'ArrowLeft closes it');
   ok(key(head, 'ArrowRight') && !body.hidden, 'ArrowRight opens it');
   const restore = [...body.querySelectorAll('.menuItem')].find((b) => /Restore/.test(b.textContent)); ok(restore.disabled === true, 'Restore full paper is disabled while nothing has been trimmed');
-  const arr = [...pop.querySelectorAll('.menuSub')][1]; arr.querySelector('.menuItem').click(); [...arr.querySelectorAll('.menuSubBody .menuItem')][1].click(); [...arr.querySelectorAll('.menuSubBody .menuItem')][2].click();
+  const arr = [...pop.querySelectorAll('.menuSub')][1]; arr.querySelector('.menuItem').click(); const aBody = [...document.querySelectorAll('.menuSubBody')].find((b) => b.getAttribute('aria-label') === 'Arrange'); ok(aBody.parentNode === document.body, 'an opened flyout lives on the page, so the scrolling menu cannot clip it'); [...aBody.querySelectorAll('.menuItem')][1].click(); [...aBody.querySelectorAll('.menuItem')][2].click();
   ok(calls.includes('rot:3') && calls.includes('straighten'), 'Arrange actions work without a pointer drag (rotate right, straighten)');
   const pinnedPop = document.createElement('div'); document.body.appendChild(pinnedPop); vm.runInContext('arrangeSubmenu', ctx)(pinnedPop, { id: 'p', pinned: true });
   ok([...pinnedPop.querySelectorAll('.menuSubBody .menuItem')].every((b) => b.classList.contains('disabled')), 'a pinned item shows the Arrange actions as unavailable');
@@ -139,6 +139,7 @@ ok(/rotation[^,]*between -360 and 360/.test(read('supabase/migrations/2026093012
   ok(['openPhotoMenu', 'paperMenu', 'shoppingMenu'].every((f) => /pinAndArrange\(pop, n\)/.test(fn(f))), 'photos, paper objects and shopping lists get Arrange too');
   ok(/button\.menuItem"\)\)\.filter\(function\(b\)\{ return !b\.closest\("\[hidden\]"\) && !b\.disabled; \}\)/.test(fn('menuNav')), 'arrow-key navigation skips items inside a closed submenu');
   ok(/\.menuSubBody\[hidden\]\{ display:none; \}/.test(css), 'a closed submenu takes no space (and no touch area)');
+ok(/\.menuSubBody\{ position:fixed;/.test(css) && /left = Math\.max\(8, h\.left - w - gap\)/.test(fn('placeFlyout')) && /h\.right \+ gap/.test(fn('placeFlyout')), 'a submenu opens as a flyout to the right of its row (to the left only when there is no room)');
 }
 
 // ================================================================ DELETE: one destructive language

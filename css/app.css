@@ -2672,7 +2672,7 @@ body.multi-sel .rotHandle, body.read-only .rotHandle{ display:none; }
 
 /* ---- grouped menus: one level of submenu, opening inline ---- */
 .menuSub > .menuItem[aria-expanded="true"]{ background:var(--accent-soft); }
-.menuSubBody{ padding-inline-start:14px; margin:2px 0 4px; border-inline-start:2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.menuSubBody{ position:fixed; z-index:10030; min-width:200px; padding:6px; background:var(--panel); border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 26px var(--shadow); }          /* a flyout beside its row, not an expanding list */
 .menuSubBody[hidden]{ display:none; }
 .menuItem.disabled, .menuItem:disabled{ opacity:0.5; cursor:default; }
 .menuItem.disabled:hover, .menuItem:disabled:hover{ background:none; }

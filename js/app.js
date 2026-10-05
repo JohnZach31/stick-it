@@ -1560,6 +1560,7 @@
 
   var openPopover = null, openPopoverTrigger = null;
   function closeFloatingPopovers(){
+    Array.prototype.forEach.call(document.querySelectorAll("body > .menuSubBody"), function(f){ f.remove(); });
     if(openPopover) openPopover.remove();
     openPopover = null;
     openPopoverTrigger = null;
@@ -1603,7 +1604,7 @@
     return pop;
   }
   document.addEventListener("click", function(e){
-    if(openPopover && !openPopover.contains(e.target) && e.target !== openPopoverTrigger && !(openPopoverTrigger && openPopoverTrigger.contains(e.target))){
+    if(openPopover && !openPopover.contains(e.target) && !(e.target.closest && e.target.closest(".menuSubBody")) && e.target !== openPopoverTrigger && !(openPopoverTrigger && openPopoverTrigger.contains(e.target))){
       closeFloatingPopovers();
     }
   });
@@ -2785,7 +2786,7 @@
     if(!selectedImageNote) return;
     var w = selectedImageNote.el && selectedImageNote.el.querySelector(".noteImgWrap");
     if(w && w.contains(e.target)) return;
-    if(e.target.closest && e.target.closest(".floatPop")) return;
+    if(e.target.closest && (e.target.closest(".floatPop") || e.target.closest(".menuSubBody"))) return;
     clearImageSelection();
   }, true);
   function removeImage(n){
@@ -6604,6 +6605,17 @@
   // ---------- menus ----------
   // ---------- grouped menus (v0.8.2.2): one level of submenu, keyboard friendly ----------
   // Top level = actions on the object itself. A submenu = actions on one physical property (Paper, Arrange). Never nested deeper.
+  // a submenu opens to the right of its row (to the left when there is no room), kept inside the screen
+  function placeFlyout(head, body){
+    if(typeof head.getBoundingClientRect !== "function") return;
+    var h = head.getBoundingClientRect(), w = body.offsetWidth || 210, bh = body.offsetHeight || 120, gap = 4;
+    var left = h.right + gap;
+    if(left + w > window.innerWidth - 8) left = Math.max(8, h.left - w - gap);
+    var top = Math.min(Math.max(8, h.top - 6), Math.max(8, window.innerHeight - bh - 8));
+    body.style.left = left + "px"; body.style.top = top + "px";
+    var r = body.getBoundingClientRect();          // a popover that is animating or transformed becomes the reference for "fixed": correct for it
+    if(Math.abs(r.left - left) > 1 || Math.abs(r.top - top) > 1){ body.style.left = (left - (r.left - left)) + "px"; body.style.top = (top - (r.top - top)) + "px"; }
+  }
   function menuSub(pop, icon, label, build){
     var wrap = makeDiv("menuSub");
     var head = menuItem(icon, label, function(){ toggle(); }, {kbd: "›"});
@@ -6613,6 +6625,7 @@
     function toggle(force){
       var open = force != null ? force : body.hidden;
       body.hidden = !open; head.setAttribute("aria-expanded", open ? "true" : "false");
+      if(open){ if(body.parentNode !== document.body) document.body.appendChild(body); placeFlyout(head, body); }          // lives on the page (not inside the scrolling menu) so nothing clips it
       if(open){ var f = body.querySelector("button.menuItem"); if(f && force === true) f.focus(); }
     }
     head.addEventListener("keydown", function(e){
@@ -6621,7 +6634,13 @@
     });
     body.addEventListener("keydown", function(e){
       if(e.key === "ArrowLeft" || e.key === "Backspace"){ e.preventDefault(); e.stopPropagation(); toggle(false); head.focus(); }
+      else if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+        e.preventDefault(); e.stopPropagation();
+        var its = Array.prototype.slice.call(body.querySelectorAll("button.menuItem")).filter(function(b){ return !b.disabled; }), i = its.indexOf(document.activeElement);
+        if(its.length) its[(i + (e.key === "ArrowDown" ? 1 : its.length - 1)) % its.length].focus();
+      }
     });
+    body.querySelectorAll("button.menuItem").forEach(function(b){ b.setAttribute("role", "menuitem"); });
     wrap.appendChild(head); wrap.appendChild(body); pop.appendChild(wrap);
     return wrap;
   }
