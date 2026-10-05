@@ -2630,8 +2630,6 @@ body.multi-sel .pileObj .pileNav, body.read-only .pileObj .pileNav, .pileObj.sta
 .embedObj .embSrc:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 body.dark .embedObj{ filter:none; }
 @media (prefers-reduced-motion: reduce){ .embedObj{ transition:none; } }
-#ccLang .lbl{ flex:1; text-align:start; }
-#ccLang .ccLangIco{ flex:none; }
 
 /* v0.8.2.1 correction: the Report control keeps its small look but has an effective 44x44px tap area on phones / touch (an invisible extension of the button;
    the strip itself stays one compact line, and nothing else sits within reach of it) */
@@ -2641,3 +2639,82 @@ body.dark .embedObj{ filter:none; }
   .shareBanner .pillBtn::after, .shareBanner .btn::after{ content:""; position:absolute; left:-8px; right:-8px; top:50%; height:44px; transform:translateY(-50%); min-width:44px; }
   .shareBanner{ min-height:36px; padding-inline-end:14px; }
 }
+
+/* ======================================================================================================================
+   v0.8.2.2 Touch the Paper
+   ====================================================================================================================== */
+/* ---- the tack (replaces the flat pin badge) ---- */
+.pinTack{ position:absolute; top:-6px; left:calc(50% + var(--tx, 38px) - 13px); z-index:6; width:26px; height:26px; transform:rotate(var(--tr, 0deg)); pointer-events:none; filter:drop-shadow(0 1px 1px rgba(40,25,10,0.35)); }
+.pinTack svg{ display:block; width:100%; height:100%; }
+body.dark .pinTack{ filter:drop-shadow(0 1px 1px rgba(0,0,0,0.6)) brightness(0.92); }
+.pinTack.drop{ animation:tackDrop .3s cubic-bezier(.3,.7,.4,1) both; }
+@keyframes tackDrop{ 0%{ transform:translateY(-22px) rotate(calc(var(--tr, 0deg) - 25deg)) scale(1.22); opacity:0; } 55%{ transform:translateY(1px) rotate(var(--tr, 0deg)) scale(1); opacity:1; } 75%{ transform:translateY(-1.5px) rotate(var(--tr, 0deg)); } 100%{ transform:translateY(0) rotate(var(--tr, 0deg)); opacity:1; } }
+.thud{ animation:paperThud .32s ease-out 1; }
+@keyframes paperThud{ 0%,52%{ translate:0 0; } 62%{ translate:0 1.5px; } 100%{ translate:0 0; } }
+.tackFall{ position:fixed; z-index:10020; pointer-events:none; transform:rotate(var(--tr, 0deg)); animation:tackFall .46s cubic-bezier(.5,0,.9,.6) forwards; filter:drop-shadow(0 2px 2px rgba(40,25,10,0.3)); }
+.tackFall svg{ display:block; width:100%; height:100%; }
+@keyframes tackFall{ 0%{ transform:translateY(0) rotate(var(--tr, 0deg)); opacity:1; } 100%{ transform:translateY(120px) rotate(calc(var(--tr, 0deg) + 70deg)); opacity:0; } }
+@media (prefers-reduced-motion: reduce){ .pinTack.drop, .thud, .tackFall{ animation:none !important; } .tackFall{ display:none; } }
+html[data-a11y-motion="reduce"] .pinTack.drop, html[data-a11y-motion="reduce"] .thud{ animation:none !important; }
+html[data-a11y-motion="reduce"] .tackFall{ display:none; }
+.pinBadge{ display:none; }
+
+/* ---- the rotation handle (only on the one selected object) ---- */
+.rotHandle{ position:absolute; left:-15px; top:-15px; z-index:7; width:30px; height:30px; padding:0; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink-soft); display:flex; align-items:center; justify-content:center; cursor:grab; box-shadow:0 1px 4px var(--shadow); touch-action:none; }
+.rotHandle:hover, .rotHandle:focus-visible, .rotHandle.on{ color:var(--ink); border-color:var(--accent); }
+.rotHandle:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.rotHandle.on{ cursor:grabbing; }
+.rotHandle.on::after{ content:attr(data-deg); position:absolute; left:34px; top:50%; transform:translateY(-50%); padding:2px 7px; border-radius:999px; background:var(--ink); color:var(--paper); font:700 0.72rem 'Sora',sans-serif; white-space:nowrap; }
+@media (pointer:coarse){ .rotHandle{ width:40px; height:40px; left:-18px; top:-18px; } .rotHandle svg{ width:20px; height:20px; } }
+.rotating{ transition:none !important; }
+body.multi-sel .rotHandle, body.read-only .rotHandle{ display:none; }
+@media print{ .rotHandle{ display:none; } }
+
+/* ---- grouped menus: one level of submenu, opening inline ---- */
+.menuSub > .menuItem[aria-expanded="true"]{ background:var(--accent-soft); }
+.menuSubBody{ padding-inline-start:14px; margin:2px 0 4px; border-inline-start:2px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+.menuSubBody[hidden]{ display:none; }
+.menuItem.disabled, .menuItem:disabled{ opacity:0.5; cursor:default; }
+.menuItem.disabled:hover, .menuItem:disabled:hover{ background:none; }
+
+/* ---- Legal & policies rows: a small Stick-It icon, then the words, then the arrow ---- */
+.asAction.hasIco{ justify-content:flex-start; gap:12px; }
+.asAction.hasIco .lbl{ flex:1 1 auto; text-align:start; }
+.asAction.hasIco .go{ margin-inline-start:auto; }
+.ccIco{ flex:none; width:26px; height:26px; display:inline-flex; align-items:center; justify-content:center; color:var(--accent-strong); }
+.ccIco svg{ width:24px; height:24px; display:block; }
+body.dark .ccIco{ color:var(--accent); }
+
+/* ---- links: actions on the link card ---- */
+.linkCard{ display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:8px; align-items:center; }
+.linkCard .lcActs{ grid-column:1 / -1; display:flex; gap:6px; flex-wrap:wrap; }
+.lcBtn{ min-height:32px; padding:4px 12px; border-radius:8px; border:1px solid var(--field-line); background:var(--field); color:var(--ink); font:600 0.76rem 'Sora',sans-serif; cursor:pointer; }
+.lcBtn:hover{ border-color:var(--accent); background:var(--accent-soft); }
+.lcBtn.lcVideo{ background:var(--btn-fill); border-color:var(--btn-fill); color:var(--btn-fg); }
+.lcBtn.lcVideo:hover{ background:var(--btn-fill-hover); border-color:var(--btn-fill-hover); }
+.lcBtn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+@media (pointer:coarse){ .lcBtn{ min-height:44px; padding:8px 16px; } }
+
+/* ---- delete: one restrained destructive language (the whole note never turns red) ---- */
+:root{ --destructive:#b3261e; --destructive-soft:rgba(179,38,30,0.13); --destructive-press:rgba(179,38,30,0.26); }
+body.dark{ --destructive:#ff8a80; --destructive-soft:rgba(255,138,128,0.18); --destructive-press:rgba(255,138,128,0.32); }
+.del:hover, .del:focus-visible{ background:var(--destructive-soft); color:var(--destructive); opacity:1; transform:scale(1.1); }
+.del:active{ background:var(--destructive-press); color:var(--destructive); transform:scale(0.96); }
+.del:focus-visible{ outline:2px solid var(--destructive); outline-offset:2px; }
+body.dark .note .del:hover, body.dark .note .del:focus-visible{ background:var(--destructive-soft); color:var(--destructive); }
+@media (hover:none){ .del:active{ background:var(--destructive-press); color:var(--destructive); opacity:1; } }
+.menuItem.danger:hover, .menuItem.danger:focus-visible{ background:var(--destructive-soft); color:var(--destructive); }
+.menuItem.danger:hover svg, .menuItem.danger:focus-visible svg{ color:var(--destructive); }
+.menuItem.danger:active{ background:var(--destructive-press); }
+.shopObj .shDel:hover, .shopObj .shDel:focus-visible{ background:var(--destructive-soft); color:var(--destructive); }
+
+/* ---- embedded video: a physical card on the board ---- */
+.embedObj{ border-radius:3px; border-color:color-mix(in srgb, var(--line) 80%, #000 10%); padding:8px 8px 6px; background:#fffdf5; box-shadow:0 1px 2px rgba(60,45,10,0.3), 0 8px 18px rgba(60,45,10,0.16); }
+body.dark .embedObj{ background:#27232f; box-shadow:0 1px 2px rgba(0,0,0,0.6), 0 8px 18px rgba(0,0,0,0.45); }
+.embedObj::before{ content:""; position:absolute; top:-9px; left:50%; width:64px; height:18px; transform:translateX(-50%) rotate(-2deg); background:rgba(255,246,196,0.8); border:1px solid rgba(120,100,40,0.2); pointer-events:none; }
+body.dark .embedObj::before{ background:rgba(242,234,219,0.22); border-color:rgba(255,255,255,0.12); }
+.embedObj .embHead{ padding:2px 2px 6px; font-size:0.66rem; opacity:0.8; }
+.embedObj .embFrame{ border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,0.25); }
+.embedObj .embFoot{ padding:6px 2px 0; font-size:0.68rem; opacity:0.75; }
+.embedObj .embFoot:hover, .embedObj .embFoot:focus-within{ opacity:1; }
+.embedObj .pCtl.pMore{ top:-14px; right:-14px; } .embedObj .pHandle{ right:-10px; bottom:-10px; }

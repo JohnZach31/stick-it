@@ -1197,7 +1197,7 @@
     if(!/^[\w-]{1,64}$/.test(c.id)) return null;
     c.x = clampNum(c.x, 0, 1e6, 0); c.y = clampNum(c.y, 0, 5000, 0);
     if(c.w != null) c.w = clampNum(c.w, 40, 1000, NOTE_W);
-    c.rot = clampNum(c.rot, -12, 12, 0);
+    c.rot = clampNum(c.rot, -15, 15, 0);
     c.z = Math.round(clampNum(c.z, 0, 1e9, 1));
     if(c.font !== undefined && !FONT_BY_NAME[c.font]) c.font = pickFont();
     if(c.bg !== undefined && !safeColor(c.bg)) c.bg = randomColor();
@@ -2173,6 +2173,7 @@
     document.body.classList.toggle("multi-sel", selected.size > 1);
     document.body.classList.toggle("hasSel", selected.size > 0);          // the selected object owns attention: neighbours go quiet (CSS)
     renderSelBar();
+    if(typeof syncRotHandle === "function") syncRotHandle();
   }
   function setSelection(ids){
     var prev = Array.from(selected);
@@ -2643,6 +2644,14 @@
     how.textContent = editable ? (MOD + "+click to open") : "Click to open";
     meta.appendChild(dom); meta.appendChild(url); meta.appendChild(how);
     card.appendChild(fav); card.appendChild(meta);
+    // the actions that fit THIS link: every link can be opened or copied; a supported video link can also be played on the board
+    var acts = makeDiv("lcActs");
+    function lcAct(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "lcBtn" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("mousedown", function(e){ e.preventDefault(); }); b.addEventListener("click", function(e){ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; }
+    var vInfo = window.Stick && Stick.embed && !readOnly && a.closest(".note") ? Stick.embed.parse(href) : null;
+    if(vInfo) lcAct("Play in Stick-It", function(){ hideLinkCard(); convertLinkToVideo(a, vInfo); }, "lcVideo");
+    lcAct("Open", function(){ openLink(href); hideLinkCard(); });
+    lcAct("Copy link", function(){ copyText(href).then(function(ok){ toast(ok ? "Link copied." : "Couldn\u2019t copy automatically."); }); hideLinkCard(); });
+    card.appendChild(acts);
     card.addEventListener("mouseenter", function(){ clearTimeout(linkHideTimer); });
     card.addEventListener("mouseleave", function(){ linkHideTimer = setTimeout(hideLinkCard, 200); });
     card.addEventListener("click", function(){ openLink(href); hideLinkCard(); });
@@ -2654,6 +2663,27 @@
     if(top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 8);
     card.style.left = left + "px"; card.style.top = top + "px";
     linkCardEl = card; linkCardFor = a;
+  }
+  // touch: there is no hover, so a tap on a link in a note shows the same actions (and a tap anywhere else puts them away)
+  var lastPointerKind = "mouse";
+  document.addEventListener("pointerdown", function(e){
+    lastPointerKind = e.pointerType || "mouse";
+    if(linkCardEl && !(e.target.closest && (e.target.closest(".linkCard") || e.target.closest(".text a[href]")))) hideLinkCard();
+  }, true);
+  document.addEventListener("click", function(e){
+    var a = e.target.closest && e.target.closest(".text a[href]");
+    if(a && (lastPointerKind === "touch" || lastPointerKind === "pen")){ e.preventDefault(); e.stopPropagation(); showLinkCard(a); }
+  }, true);
+  // a link that is already in a note becomes a video: a note that is only that link is replaced; otherwise the video is added beside the note
+  // and the note keeps its words and its link. One undo step either way.
+  function convertLinkToVideo(a, info){
+    var noteEl = a.closest(".note"), n = noteEl && findNote(noteEl.dataset.id);
+    if(!n || readOnly) return;
+    endEditing();
+    var only = Stick.embed.parse(htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim());
+    if(only && only.id === info.id && only.provider === info.provider && !n.image){ linkToEmbed(n, info); return; }
+    createEmbedAt(info, n.x + (n.el ? n.el.offsetWidth : 230) + 24, n.y);
+    toast("Added the video beside the note. The link is still in the note.");
   }
   document.addEventListener("mouseover", function(e){
     var a = e.target.closest && e.target.closest(".text a[href]");
@@ -3286,7 +3316,7 @@
       saveNotes(); rerenderNote(n);
       recordChange("Reset photo size", before);
     }));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -3975,7 +4005,7 @@
     }
     if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
     pop.appendChild(makeDiv("menuSep"));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -4353,7 +4383,7 @@
     if(bought) pop.appendChild(menuItem(ICONS.trash, "Clear " + bought + " bought item" + (bought === 1 ? "" : "s"), function(){ closeFloatingPopovers(); shopClearBought(n); }));
     pop.appendChild(menuItem(ICONS.tick, "Mark list done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "The whole shopping errand is finished. Ticks inside the list are kept."}));
     pop.appendChild(makeDiv("menuSep"));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -4898,7 +4928,8 @@
     pop.setAttribute("role", "menu");
     Array.prototype.forEach.call(pop.querySelectorAll("button.menuItem"), function(b){ b.setAttribute("role", "menuitem"); });
     pop.addEventListener("keydown", function(e){
-      var items = Array.prototype.slice.call(pop.querySelectorAll("button.menuItem")), i = items.indexOf(document.activeElement);
+      var items = Array.prototype.slice.call(pop.querySelectorAll("button.menuItem")).filter(function(b){ return !b.closest("[hidden]") && !b.disabled; }), i = items.indexOf(document.activeElement);
+      if(!items.length) return;
       if(e.key === "ArrowDown"){ e.preventDefault(); items[(i + 1) % items.length].focus(); }
       else if(e.key === "ArrowUp"){ e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
       else if(e.key === "Home"){ e.preventDefault(); items[0].focus(); }
@@ -4946,6 +4977,7 @@
     var anyUnpinned = ids.some(function(id){ var q = findNote(id); return q && !isPinned(q); });
     if(ids.some(function(id){ var q = findNote(id); return q && !q.type; })) pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDoneGroup(ids); }, {title: "Move the selected notes to the Done pile"}));
     pop.appendChild(menuItem(ICONS.pin, anyUnpinned ? "Pin in place" : "Unpin", function(){ closeFloatingPopovers(); setPinned(ids, anyUnpinned); }));
+    if(ids.some(function(id){ var q = findNote(id); return rotatable(q) && (q.rot || 0) !== 0 && !isPinned(q); })) pop.appendChild(menuItem(ICONS.move, "Straighten", function(){ closeFloatingPopovers(); straighten(ids.map(findNote).filter(Boolean)); }, {title: "Put the selected items back level"}));
     if(pileEligibleList(ids).length >= 2){
       pop.appendChild(menuItem(ICONS.move, "Stack (arrange vertically)", function(){ closeFloatingPopovers(); stackNotes(ids); }, {title: "Lines the notes up one below another. Nothing else changes."}));
       pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
@@ -5603,6 +5635,7 @@
     if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
     decoratePin(n);
+    if(selected.size === 1 && selected.has(n.id)) syncRotHandle();
     if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
     return made;
   }
@@ -6230,7 +6263,8 @@
     var c = normalizeIncoming(src, {allowAssets:true});
     if(!c) return null;
     c.phys = isPhoto(c) ? makePhotoPhys() : (isAV(c) || isPaper(c)) ? {} : makePhys();
-    c.rot = isPhoto(c) ? rand(-5, 5) : isPaper(c) ? rand(-3, 3) : rand(-6, 6);
+    var srcRot = Number(src.rot);
+    c.rot = isFinite(srcRot) ? clampRot(srcRot) : (isPhoto(c) ? rand(-5, 5) : isPaper(c) ? rand(-3, 3) : rand(-6, 6));          // a copy keeps the angle its original was turned to
     c.fontManual = !!src.fontManual;
     if(c.cutoutKey && src.cutoutKey){ c.cutoutKey = "co-" + newId(); copyCutoutBlob(src.cutoutKey, c.cutoutKey); }     // a copy never shares the device blob
     return c;
@@ -6421,7 +6455,8 @@
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
     var info = embedInfo(n), h = makeDiv("menuHint"); h.textContent = info ? Stick.embed.PROVIDERS[info.provider].label + " video" : "Video"; pop.appendChild(h);
     pop.appendChild(menuItem(ICONS.link, "Open the original link", function(){ closeFloatingPopovers(); var u = safeHref(n.url); if(u) window.open(u, "_blank", "noopener,noreferrer"); }));
-    pop.appendChild(menuItem(ICONS.link, "Show as a normal link", function(){ closeFloatingPopovers(); embedToLink(n); }, {title: "Turns this back into a note with the link. The original address is kept."}));
+    pop.appendChild(menuItem(ICONS.copy, "Copy link", function(){ closeFloatingPopovers(); copyText(n.url).then(function(ok){ toast(ok ? "Link copied." : "Couldn\u2019t copy automatically."); }); }));
+    pop.appendChild(menuItem(ICONS.link, "Convert back to a link", function(){ closeFloatingPopovers(); embedToLink(n); }, {title: "Turns this back into a note with the link. The original address is kept."}));
     pop.appendChild(pinMenuItem(n));
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
@@ -6554,6 +6589,56 @@
   }
 
   // ---------- menus ----------
+  // ---------- grouped menus (v0.8.2.2): one level of submenu, keyboard friendly ----------
+  // Top level = actions on the object itself. A submenu = actions on one physical property (Paper, Arrange). Never nested deeper.
+  function menuSub(pop, icon, label, build){
+    var wrap = makeDiv("menuSub");
+    var head = menuItem(icon, label, function(){ toggle(); }, {kbd: "›"});
+    head.setAttribute("aria-haspopup", "true"); head.setAttribute("aria-expanded", "false");
+    var body = makeDiv("menuSubBody"); body.hidden = true; body.setAttribute("role", "group"); body.setAttribute("aria-label", label);
+    build(body);
+    function toggle(force){
+      var open = force != null ? force : body.hidden;
+      body.hidden = !open; head.setAttribute("aria-expanded", open ? "true" : "false");
+      if(open){ var f = body.querySelector("button.menuItem"); if(f && force === true) f.focus(); }
+    }
+    head.addEventListener("keydown", function(e){
+      if(e.key === "ArrowRight"){ e.preventDefault(); e.stopPropagation(); toggle(true); }
+      else if(e.key === "ArrowLeft" && !body.hidden){ e.preventDefault(); e.stopPropagation(); toggle(false); }
+    });
+    body.addEventListener("keydown", function(e){
+      if(e.key === "ArrowLeft" || e.key === "Backspace"){ e.preventDefault(); e.stopPropagation(); toggle(false); head.focus(); }
+    });
+    wrap.appendChild(head); wrap.appendChild(body); pop.appendChild(wrap);
+    return wrap;
+  }
+  // Paper > Fit paper to content, Rip off empty paper, Restore full paper (only what applies to this note)
+  function paperSubmenu(pop, n){
+    if(n.cosmetic === "soup") return;
+    menuSub(pop, ICONS.fit, "Paper", function(body){
+      body.appendChild(menuItem(ICONS.fit, "Fit paper to content", function(){ trimPaper(n, "fit"); }, {title: "Shrink the note around its words"}));
+      body.appendChild(menuItem(ICONS.rip, "Rip off empty paper", function(){ trimPaper(n, "rip"); }, {title: "Tear away the unused paper"}));
+      var restore = menuItem(ICONS.sticky, "Restore full paper", function(){ closeFloatingPopovers(); restorePaper(n); });
+      if(!(n.h || n.rip)){ restore.disabled = true; restore.classList.add("disabled"); restore.title = "Nothing has been trimmed"; }
+      body.appendChild(restore);
+    });
+  }
+  // Arrange > Rotate left, Rotate right, Straighten (keyboard / non-pointer way to turn things, and a home for layer actions later)
+  function arrangeSubmenu(pop, n){
+    if(!rotatable(n)) return;
+    menuSub(pop, ICONS.move, "Arrange", function(body){
+      var pinned = isPinned(n);
+      var l = menuItem(ICONS.move, "Rotate left", function(){ rotateBy([n], -ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° anticlockwise"});
+      var r = menuItem(ICONS.move, "Rotate right", function(){ rotateBy([n], ROT_STEP); }, {title: "Turn it " + ROT_STEP + "° clockwise"});
+      var s = menuItem(ICONS.move, "Straighten", function(){ closeFloatingPopovers(); straighten([n]); }, {title: "Put it back level"});
+      [l, r, s].forEach(function(b){ if(pinned){ b.classList.add("disabled"); b.title = "Pinned items stay exactly as they are. Unpin to turn it."; } body.appendChild(b); });
+      if(pinned) return;
+      l.addEventListener("click", function(){ if(l.isConnected) l.focus(); }); r.addEventListener("click", function(){ if(r.isConnected) r.focus(); });
+    });
+  }
+  // the pin item, then Arrange (where the object can be turned)
+  function pinAndArrange(pop, n){ pop.appendChild(pinMenuItem(n)); arrangeSubmenu(pop, n); }
+
   function menuItem(icon, label, fn, extra){
     extra = extra || {};
     var b = document.createElement("button");
@@ -6650,15 +6735,11 @@
     pop.appendChild(menuItem(ICONS.sticky, n.cosmetic === "soup" ? "Remove Alphabet Soup" : isPremium() ? "Alphabet Soup" : "Alphabet Soup (Premium)", function(){
       closeFloatingPopovers(); setNoteCosmetic(n, n.cosmetic === "soup" ? null : "soup");
     }));
-    if(n.cosmetic !== "soup"){
-      pop.appendChild(menuItem(ICONS.fit, "Fit paper to content", function(){ trimPaper(n, "fit"); }, {title: "Shrink the note around its words"}));
-      pop.appendChild(menuItem(ICONS.rip, "Rip off empty paper", function(){ trimPaper(n, "rip"); }, {title: "Tear away the unused paper"}));
-      if(n.h || n.rip) pop.appendChild(menuItem(ICONS.sticky, "Restore full paper", function(){ closeFloatingPopovers(); restorePaper(n); }));
-    }
+    paperSubmenu(pop, n);
     var vOnly = window.Stick && Stick.embed && !n.image ? Stick.embed.parse(htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim()) : null;
     if(vOnly) pop.appendChild(menuItem(ICONS.video || ICONS.link, "Show link as video", function(){ closeFloatingPopovers(); linkToEmbed(n, vOnly); }, {title: "Shows this " + Stick.embed.PROVIDERS[vOnly.provider].label + " link as a video you can play here"}));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
-    pop.appendChild(pinMenuItem(n));
+    pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -6825,19 +6906,121 @@
     pop.appendChild(menuItem(ICONS.trash, "Delete zone", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger", title: "Only the paper goes; notes on it stay"}));
   }
   OBJECT_MENUS.zone = zoneMenu;
-  function decoratePin(n){
+  // ---------- turning things by hand (v0.8.2.2) ----------
+  // ONE angle: n.rot is the final angle in degrees and the only thing stored. The natural, slightly random tilt a new object gets is just its
+  // starting value; turning it by hand edits that same number. Nothing is added on top at render time, so there is no second random angle, no
+  // compounding and no drift on reload. Range -15..+15 (it is a design range: enough personality, never upside-down). Shift snaps to 5 degrees.
+  // Supported: notes, every paper kind (checklists are notes; receipts, tickets, postcards, photo strips, shopping lists), photos.
+  // Not supported: zones (background paper), piles, embedded video (a live player), audio and video recordings. Pinned items do not turn.
+  var ROT_MAX = 15, ROT_STEP = 3, ROT_SNAP = 5;
+  function rotatable(n){ return !!n && !isZone(n) && !isPileObj(n) && n.type !== "embed" && !isAV(n) && !isHiddenMember(n); }
+  function clampRot(v){ v = Number(v); if(!isFinite(v)) return 0; return Math.round(Math.max(-ROT_MAX, Math.min(ROT_MAX, v)) * 10) / 10; }
+  function snapRot(v){ return clampRot(Math.round(Number(v) / ROT_SNAP) * ROT_SNAP); }
+  function paintRot(n){ if(n && n.el) n.el.style.setProperty("--rot", (n.rot || 0) + "deg"); }
+  // set the angle of several objects as ONE undo step. Returns how many changed.
+  function setRotation(list, valueOf, label){
+    if(readOnly) return 0;
+    var eligible = list.filter(rotatable), turnable = eligible.filter(function(n){ return !isPinned(n); });
+    if(eligible.length && !turnable.length){ eligible.forEach(pinTug); toast("Pinned items stay exactly as they are. Unpin to turn them."); return 0; }
+    var before = captureState(turnable.map(function(n){ return n.id; })), changed = 0;
+    turnable.forEach(function(n){ var v = clampRot(valueOf(n)); if(v !== (n.rot || 0)){ n.rot = v; paintRot(n); changed++; } });
+    if(!changed) return 0;
+    saveNotes(); updateMinimap();
+    recordChange(label, before, {coalesce: label === "Rotate" ? null : null});
+    return changed;
+  }
+  function rotateBy(list, deg){ return setRotation(list, function(n){ return (n.rot || 0) + deg; }, deg < 0 ? "Rotate left" : "Rotate right"); }
+  function straighten(list){
+    var n = setRotation(list, function(){ return 0; }, "Straighten");
+    if(!n && list.some(function(x){ return rotatable(x) && !isPinned(x); })) toast("Already level.");
+    return n;
+  }
+
+  var rotHandleEl = null;
+  function removeRotHandle(){ if(rotHandleEl){ rotHandleEl.remove(); rotHandleEl = null; } }
+  // the handle only exists on the one selected object (so a big board pays nothing for it)
+  function syncRotHandle(){
+    removeRotHandle();
+    if(readOnly || singleNoteMode || selected.size !== 1) return;
+    var n = findNote(Array.from(selected)[0]);
+    if(!rotatable(n) || !n.el || isPinned(n)) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "rotHandle";
+    b.title = "Drag to turn (hold Shift to snap, double-click to straighten)"; b.setAttribute("aria-label", "Turn: drag, or use the arrow keys. Double-click to straighten.");
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v4.5h-4.5"/></svg>';
+    b.addEventListener("pointerdown", function(e){ if(e.pointerType === "mouse" && e.button !== 0) return; startRotate(e, n, b); });
+    b.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+    b.addEventListener("click", function(e){ e.stopPropagation(); });
+    b.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); straighten([n]); });
+    b.addEventListener("keydown", function(e){
+      var d = e.shiftKey ? 1 : ROT_STEP;
+      if(e.key === "ArrowLeft" || e.key === "ArrowDown"){ e.preventDefault(); e.stopPropagation(); rotateBy([n], -d); }
+      else if(e.key === "ArrowRight" || e.key === "ArrowUp"){ e.preventDefault(); e.stopPropagation(); rotateBy([n], d); }
+      else if(e.key === "Home" || e.key === "0"){ e.preventDefault(); e.stopPropagation(); straighten([n]); }
+    });
+    n.el.appendChild(b); rotHandleEl = b;
+  }
+  function startRotate(e, n, handle){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el; if(!el) return;
+    var r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    function angleAt(ev){ return Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI; }
+    var a0 = angleAt(e), start = n.rot || 0, cur = start, before = captureState([n.id]);
+    el.classList.add("rotating"); handle.classList.add("on");
+    try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+    function move(ev){
+      var d = angleAt(ev) - a0; while(d > 180) d -= 360; while(d < -180) d += 360;
+      var v = start + d;
+      cur = ev.shiftKey ? snapRot(v) : clampRot(v);
+      n.rot = cur; paintRot(n); handle.setAttribute("data-deg", (cur > 0 ? "+" : "") + Math.round(cur) + "°");
+    }
+    function up(){
+      handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up); handle.removeEventListener("pointercancel", up);
+      el.classList.remove("rotating"); handle.classList.remove("on"); handle.removeAttribute("data-deg");
+      if(cur !== start){ saveNotes(); updateMinimap(); recordChange("Rotate", before); }
+    }
+    handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", up); handle.addEventListener("pointercancel", up);
+  }
+
+  // ---------- a real tack (v0.8.2.2) ----------
+  // Only the pinned / not pinned state is stored. The tack is a small decoration drawn on the object (a spot and a tilt picked from its id, so it is
+  // the same every time); the drop and the fall are short, temporary animations that are removed when they finish and never touch the board's data.
+  var TACK_SVG = '<svg viewBox="0 0 26 26" width="26" height="26" aria-hidden="true" focusable="false">' +
+    '<ellipse cx="15" cy="16.5" rx="8.5" ry="6.2" fill="rgba(40,25,10,0.28)"/>' +
+    '<circle cx="12" cy="12" r="8.6" fill="#b3402e"/><circle cx="12" cy="12" r="8.6" fill="none" stroke="#7d2a1d" stroke-width="1.2"/>' +
+    '<circle cx="12" cy="12" r="5.3" fill="#d4604a"/><ellipse cx="9.4" cy="9.3" rx="2.4" ry="1.5" fill="rgba(255,255,255,0.65)" transform="rotate(-35 9.4 9.3)"/>' +
+    '</svg>';
+  function decoratePin(n, how){
     var el = n && n.el; if(!el) return;
-    var old = el.querySelector(":scope > .pinBadge"); if(old) old.remove();
+    var old = el.querySelector(":scope > .pinTack, :scope > .pinBadge"); if(old) old.remove();
     el.classList.toggle("pinned", isPinned(n));
     if(!isPinned(n)) return;
-    var b = document.createElement("span"); b.className = "pinBadge"; b.title = "Pinned in place"; b.setAttribute("role", "img"); b.setAttribute("aria-label", "Pinned in place");
-    b.innerHTML = ICONS.pin; el.appendChild(b);
+    var h = hashStr(String(n.id)), jx = (h % 17) - 8, side = (h >> 4) % 2 ? 1 : -1;
+    var t = document.createElement("span"); t.className = "pinTack"; t.title = "Pinned in place"; t.setAttribute("role", "img"); t.setAttribute("aria-label", "Pinned in place");
+    t.style.setProperty("--tx", (side * (34 + Math.abs(jx))) + "px"); t.style.setProperty("--tr", (((h >> 7) % 29) - 14) + "deg");
+    t.innerHTML = TACK_SVG;
+    if(how === "drop" && !reducedMotion()){
+      t.classList.add("drop"); el.classList.add("thud");
+      setTimeout(function(){ t.classList.remove("drop"); el.classList.remove("thud"); }, 520);
+    }
+    el.appendChild(t);
+  }
+  // unpinning: the tack lets go and falls. The falling copy is a temporary element on the page (not a board object); it is removed when it has gone.
+  function tackFall(n){
+    if(reducedMotion() || !n || !n.el) return;
+    var t = n.el.querySelector(":scope > .pinTack"); if(!t) return;
+    var r = t.getBoundingClientRect(); if(!r.width) return;
+    var c = t.cloneNode(true); c.className = "tackFall"; c.removeAttribute("title");
+    c.style.cssText = "left:" + r.left + "px;top:" + r.top + "px;width:" + r.width + "px;height:" + r.height + "px;--tr:" + (t.style.getPropertyValue("--tr") || "0deg");
+    document.body.appendChild(c);
+    var gone = false; function done(){ if(gone) return; gone = true; c.remove(); }
+    c.addEventListener("animationend", done); setTimeout(done, 900);
   }
   function setPinned(ids, on){
     var list = ids.map(findNote).filter(function(n){ return n && isPinned(n) !== on; });
     if(!list.length || readOnly) return;
     var before = captureState(list.map(function(n){ return n.id; }));
-    list.forEach(function(n){ if(on) n.pinned = true; else delete n.pinned; decoratePin(n); });
+    list.forEach(function(n){ if(on){ n.pinned = true; decoratePin(n, "drop"); } else { tackFall(n); delete n.pinned; decoratePin(n); } });
+    syncRotHandle();
     saveNotes();
     recordChange(on ? (list.length > 1 ? "Pin " + list.length + " items" : "Pin in place") : (list.length > 1 ? "Unpin " + list.length + " items" : "Unpin"), before);
     toast(on ? (list.length > 1 ? "Pinned " + list.length + " items in place." : "Pinned in place.") : "Unpinned.");
@@ -8137,6 +8320,27 @@
   }
 
   // ---- Legal & About
+  // ---------- Stick-It's own small icons for Legal & policies (v0.8.2.2) ----------
+  // One family: 24px, 1.7 stroke, round caps, a slightly lopsided paper scrap behind each idea. They follow the text colour, so light and dark both work.
+  // Decorative (the row label already says what it is), so they are hidden from assistive technology.
+  var SCRAP = '<path d="M4.2 3.6l15.4-.5.5 15.9-3.1 1.9-12.8.4-.6-17.1z" fill="currentColor" fill-opacity="0.1"/>';
+  var LEGAL_ICONS = {
+    whatsNew: '<path d="M4 4.2l14.8-.6 1.2 14.6-14.2 1.9z" fill="currentColor" fill-opacity="0.1"/><path d="M12 7.4l1.1 2.6 2.7.3-2 1.9.6 2.7-2.4-1.4-2.4 1.4.6-2.7-2-1.9 2.7-.3z"/>',
+    language: null,
+    privacy: SCRAP + '<rect x="8" y="11" width="8.4" height="6.6" rx="1.4"/><path d="M9.6 11V9.3a2.6 2.6 0 0 1 5.2 0V11"/><path d="M12.2 13.7v1.5"/>',
+    terms: SCRAP + '<path d="M8 8.2h8M8 11.4h8M8 14.6h5"/><path d="M14.4 17.2l1.2 1 2.2-2.6"/>',
+    young: SCRAP + '<circle cx="9" cy="9.2" r="1.9"/><path d="M5.9 16.4c.2-2.3 1.4-3.5 3.1-3.5s2.9 1.2 3.1 3.5"/><circle cx="15.4" cy="11.2" r="1.4"/><path d="M13.4 16.4c.1-1.6 1-2.5 2-2.5s1.9.9 2 2.5"/>',
+    storage: '<path d="M3.8 8.4l16.2-.3-.4 3.4-15.4.2z" fill="currentColor" fill-opacity="0.1"/><path d="M4.8 11.6l.6 7.6 13.4-.2.5-7.4"/><path d="M9.6 14.6h4.8"/><path d="M6 5.6l12-.4"/>',
+    accessibility: SCRAP + '<circle cx="12" cy="7.6" r="1.4"/><path d="M7.6 10.2l4.4.7 4.4-.7"/><path d="M12 11v3.1M12 14.1l-2 3.6M12 14.1l2 3.6"/>',
+    copyright: SCRAP + '<circle cx="12" cy="11.4" r="4.6"/><path d="M13.9 9.6a2.6 2.6 0 1 0 0 3.6"/><path d="M7.4 18.4h9.4" stroke-dasharray="1.6 1.4"/>'
+  };
+  function legalIconEl(key){
+    var span = document.createElement("span"); span.className = "ccIco"; span.setAttribute("aria-hidden", "true");
+    if(key === "language" && window.Stick && Stick.lang && Stick.lang.iconSvg){ span.innerHTML = Stick.lang.iconSvg(24); return span; }
+    var body = LEGAL_ICONS[key]; if(!body) return null;
+    span.innerHTML = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" focusable="false">' + body + '</svg>';
+    return span;
+  }
   var LEGAL_ABOUT = [
     ["Privacy Policy", "legal/privacy.html", "What Stick-It collects, why, and your choices."],
     ["Terms", "legal/terms.html", "The rules for using Stick-It."],
@@ -8152,12 +8356,13 @@
     var wn = document.createElement("button"); wn.type = "button"; wn.className = "asAction ccLink"; wn.id = "ccWhatsNew";
     wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version, with a short tour.</small></span><span class="go" aria-hidden="true">›</span>';
     wn.addEventListener("click", function(){ openWhatsNew(); });
+    var wnIco = legalIconEl("whatsNew"); if(wnIco){ wn.insertBefore(wnIco, wn.firstChild); wn.classList.add("hasIco"); }
     list.appendChild(wn);
     // the globe: only languages whose legal pages are complete are listed (js/lang.js); the same registry will serve the app later
     var langs = window.Stick && Stick.lang ? Stick.lang.complete("legal") : [];
     if(langs.length > 1){
       var gb = document.createElement("button"); gb.type = "button"; gb.className = "asAction ccLink"; gb.id = "ccLang"; gb.setAttribute("aria-expanded", "false"); gb.setAttribute("aria-controls", "ccLangList");
-      gb.innerHTML = (Stick.lang ? '<span class="ccLangIco" aria-hidden="true">' + Stick.lang.iconSvg(22) + '</span>' : "") + '<span class="lbl"><span class="t">Language</span><small>Read the legal pages in another language.</small></span><span class="go" aria-hidden="true">›</span>';
+      gb.classList.add("hasIco"); gb.innerHTML = (Stick.lang ? '<span class="ccIco" aria-hidden="true">' + Stick.lang.iconSvg(24) + '</span>' : "") + '<span class="lbl"><span class="t">Language</span><small>Read the legal pages in another language.</small></span><span class="go" aria-hidden="true">›</span>';
       var gl = document.createElement("div"); gl.className = "ccLangList"; gl.id = "ccLangList"; gl.hidden = true;
       langs.forEach(function(l){
         var a = document.createElement("a"); a.className = "asAction ccLink ccLangItem"; a.href = l.code === "en" ? "legal/privacy.html" : "legal/" + l.code + "/privacy.html"; a.target = "_blank"; a.rel = "noopener"; a.lang = l.code; a.dir = l.dir; a.textContent = l.native;
@@ -8174,6 +8379,7 @@
       a.addEventListener("click", function(e){ if(docId && window.Stick && Stick.legalReader && Stick.legalContent){ e.preventDefault(); a.removeAttribute("target"); Stick.legalReader.open(docId); } });
       a.innerHTML = '<span class="lbl"><span class="t"></span><small></small></span><span class="go" aria-hidden="true">›</span>';
       a.querySelector(".t").textContent = l[0]; a.querySelector("small").textContent = l[2];
+      var ico = legalIconEl(docId); if(ico){ a.insertBefore(ico, a.firstChild); a.classList.add("hasIco"); }
       if(/[\u0590-\u05ff]/.test(l[0])){ a.querySelector(".lbl").dir = "auto"; }
       list.appendChild(a);
     });
@@ -10763,6 +10969,12 @@
     when: function(){ return pileEligibleList(selIds()).length >= 2; }, run: function(){ makePile(selIds()); }});
   defineAction({id: "unpile", label: "Unpile (open the selected pile)", group: "Selection", keywords: "spread expand open uncollapse", def: "", edit: true,
     when: function(){ var ids = selIds(); return ids.length === 1 && isPileObj(findNote(ids[0])); }, run: function(){ unpilePile(findNote(selIds()[0])); }});
+  defineAction({id: "straighten", label: "Straighten selected items", group: "Selection", keywords: "level rotate turn tilt flat", def: "", edit: true,
+    when: function(){ return selIds().some(function(id){ var q = findNote(id); return rotatable(q) && (q.rot || 0) !== 0; }); }, run: function(){ straighten(selIds().map(findNote).filter(Boolean)); }});
+  defineAction({id: "rotateLeft", label: "Rotate selected item left", group: "Selection", keywords: "turn tilt anticlockwise", def: "", edit: true,
+    when: function(){ return selIds().some(function(id){ return rotatable(findNote(id)); }); }, run: function(){ rotateBy(selIds().map(findNote).filter(Boolean), -ROT_STEP); }});
+  defineAction({id: "rotateRight", label: "Rotate selected item right", group: "Selection", keywords: "turn tilt clockwise", def: "", edit: true,
+    when: function(){ return selIds().some(function(id){ return rotatable(findNote(id)); }); }, run: function(){ rotateBy(selIds().map(findNote).filter(Boolean), ROT_STEP); }});
   defineAction({id: "focus", label: "Open selection in Focus Mode", group: "Selection", keywords: "large big full", def: "F",
     when: function(){ var ids = selIds(); return ids.length === 1 && !findNote(ids[0]).type; },
     run: function(){ enterFocus(findNote(selIds()[0])); }});

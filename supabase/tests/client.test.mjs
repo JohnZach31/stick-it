@@ -548,6 +548,31 @@ try {
     D.sync.stop();
   }
 
+  // ============================================================ v0.8.2.2: a turned, pinned note keeps both through the account (and a view-only decoration deletes nothing)
+  {
+    const D = await device('turn.user@example.com');
+    const bd = await D.Stick.repo.createBoard('Turned', null);
+    D.open(bd.id); await D.sync.start();
+    const turned = note({ html: 'turned', rot: 14.5, pinned: true });
+    const level = note({ html: 'level', rot: 0 });
+    const video = { id: crypto.randomUUID(), type: 'embed', x: 5, y: 5, w: 340, rot: 0, z: 3, url: 'https://youtu.be/dQw4w9WgXcQ', provider: 'youtube', vid: 'dQw4w9WgXcQ', phys: {} };
+    D.notes.push(turned, level, video); D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    const live = async () => (await admin('select id, type, rotation, data from public.board_objects where board_id=$1 and deleted_at is null', [bd.id])).rows;
+    let rows = await live(); const r1 = rows.find((r) => r.id === turned.id);
+    ok(rows.length === 3 && r1 && Math.abs(Number(r1.rotation) - 14.5) < 1e-9 && r1.data.pinned === true, 'rotation 14.5 and the pinned state reach the server');
+    ok(rows.find((r) => r.id === video.id).data.url === 'https://youtu.be/dQw4w9WgXcQ' && rows.find((r) => r.id === video.id).type === 'embed', 'an embedded video keeps its original address on the server');
+    // turn it again and unpin it: an edit, not a deletion
+    turned.rot = -9; delete turned.pinned; D.sync.notesChanged(); await sleep(200); await D.sync.flush();
+    rows = await live(); const r2 = rows.find((r) => r.id === turned.id);
+    ok(rows.length === 3 && Number(r2.rotation) === -9 && !('pinned' in r2.data), 'turning and unpinning update the same row and delete nothing');
+    // a second device opening the board sees the same angle
+    const E = await device('turn.user@example.com');
+    E.open(bd.id); await E.sync.start(); await E.sync.flush(); await sleep(300);
+    const t2 = E.notes.find((o) => o.id === turned.id);
+    ok(t2 && t2.rot === -9 && !t2.pinned, 'another device loads the same angle and pin state');
+    E.sync.stop(); D.sync.stop();
+  }
+
   // ============================================================ INCIDENT REGRESSIONS (data safety)
   // 2026-10-04: opening a share link in a browser that is signed in soft-deleted the account's whole board. The share page's own objects (the
   // shared copies) were diffed against what the account already knew, and every real object read as "removed".

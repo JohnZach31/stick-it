@@ -1,5 +1,47 @@
 [
   {
+    "version": "0.8.2.2",
+    "codename": "Touch the Paper",
+    "title": "Stick-It v0.8.2.2 — Touch the Paper",
+    "date": null,
+    "status": "development",
+    "tldr": "More physical controls, less menu clutter, and objects that behave a little more like the things they represent.",
+    "highlights": [
+      "Pin it for real: a physical tack drops onto the paper (and falls away when you unpin).",
+      "Turn things a little sideways: rotate notes and scraps by hand, snap with Shift, or straighten.",
+      "Links can become videos: turn an existing video link into something playable without pasting it again.",
+      "Cleaner menus: Paper controls live under Paper, turning controls under Arrange, and Delete looks like Delete."
+    ],
+    "tourMode": "full",
+    "tour": [
+      {
+        "target": null,
+        "title": "Touch the Paper",
+        "body": "More physical controls, less menu clutter. This takes about thirty seconds."
+      },
+      {
+        "target": ".note",
+        "title": "Pin it for real",
+        "body": "Pinning a note now looks like pinning a note. Tack included. Press P on a selected note and watch it drop."
+      },
+      {
+        "target": ".note",
+        "title": "Turn things a little sideways",
+        "body": "Select a note and drag the small turn handle at its corner. Hold Shift to snap, double-click it to straighten, or use Arrange in the ... menu."
+      },
+      {
+        "target": null,
+        "title": "Links can become videos",
+        "body": "Already pasted a video link? Click it and choose Play in Stick-It to turn it into something playable on the board."
+      },
+      {
+        "target": ".moreBtn",
+        "title": "Cleaner menus",
+        "body": "Paper controls now live with Paper controls, and turning lives under Arrange. Delete turns red when you point at it."
+      }
+    ]
+  },
+  {
     "version": "0.8.2.1",
     "codename": "Room to Breathe",
     "title": "Stick-It v0.8.2.1 — Room to Breathe",

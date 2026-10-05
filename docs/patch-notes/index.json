@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.2.2",
+    "codename": "Touch the Paper",
+    "title": "Stick-It v0.8.2.2 — Touch the Paper",
+    "date": null,
+    "status": "development",
+    "tldr": "More physical controls, less menu clutter, and objects that behave a little more like the things they represent.",
+    "file": "0.8.2.2.md"
+  },
+  {
     "version": "0.8.2.1",
     "codename": "Room to Breathe",
     "title": "Stick-It v0.8.2.1 — Room to Breathe",
