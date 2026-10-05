@@ -32,6 +32,19 @@ Share a board with a link that just *works*.
 | 🧲 **Handle a few at once** | Ctrl/Cmd+click or drag a box to select notes, then move, duplicate, copy/paste, share or send them to another board together. |
 | ⌨️ **Real keyboard shortcuts** | Select, nudge, resize, zoom, all documented in-app, one hover away. |
 | 📱 **Quick capture on your phone** | Tap the board and choose what to put down: a sticky, a photo, a voice memo or a video. Bigger tap targets, and the on-screen keyboard won't swallow the note you're typing into. |
+| 📌 **Pin it for real** | Pin a note (or a whole selection with **P**) and a physical tack drops onto the paper; unpin and it falls away. Pinned things stay exactly where they are. |
+| 🔄 **Turn things a little sideways** | Select a note, photo or scrap and drag its turn handle (Shift snaps to 5°, double-click straightens, or use *Arrange* in the menu). |
+| 📚 **Piles and stacks** | Stack notes in a column, or collapse them into a pile you can browse one paper at a time. Nothing in a pile is ever deleted by collapsing it. |
+| ▶️ **Links that become videos** | Paste a YouTube or Vimeo link (or click one already in a note) and choose to keep it as a link or play it right on the board. Nothing loads until you press Play. |
+| ✅ **Done pile & Clean up** | Finished notes tuck into a Done pile; a tidy-up button arranges what's on screen, leaving pinned notes and zones alone. |
+| 📜 **Legal, in the app** | Privacy, Terms, Storage, Accessibility, Young people and Copyright open inside Stick-It (English and Hebrew), generated from the same source as the public pages. |
+
+---
+
+## 🆕 What's new
+
+**v0.8.2.2 — Touch the Paper** (in development): a physical tack, hand rotation, grouped *Paper* / *Arrange* menus, link-to-video for existing links, clearer delete, Legal & policies icons. Selecting several things with a drag box no longer leaves a text cursor in a note, so shortcuts like **P** act on the group instead of typing into it.
+Earlier: v0.8.2.1 *Room to Breathe* (in-app legal reader, compact phone shell, pile browsing, safe video embeds), v0.8.2 *Get a Grip*. Full notes: [docs/patch-notes/](docs/patch-notes/).
 
 ---
 
@@ -48,7 +61,7 @@ MIT. See [LICENSE](LICENSE).
 Stick-It can run local-only (guest) or sync to a Supabase project. See `docs/backend/`:
 `00-audit`, `01-database-and-security`, `02-architecture-and-auth`, `03-storage-migration-sharing`,
 `06-setup` (manual steps, which values are public vs secret), `07-security-csp-status` (what is and isn't done).
-Tests: `cd supabase/tests && npm ci && npm run test:all`.
+Tests: `cd supabase/tests && npm ci && npm run test:all`. Legal pages and the in-app reader are generated: `python tools/build-legal.py`.
 
 ## Legal and privacy
 

@@ -2173,8 +2173,21 @@
     document.body.classList.toggle("multi-sel", selected.size > 1);
     document.body.classList.toggle("hasSel", selected.size > 0);          // the selected object owns attention: neighbours go quiet (CSS)
     renderSelBar();
+    if(selected.size > 1) dropTextFocus();
     if(typeof syncRotHandle === "function") syncRotHandle();
   }
+  // With several things selected, keys are about the group (P pins them all, D marks them done...), never about the words inside one of them:
+  // so no note keeps a text cursor or a text selection while a group is selected.
+  function dropTextFocus(){
+    var ae = document.activeElement;
+    if(ae && ae.isContentEditable && ae.closest && ae.closest(".note, .paperObj")) ae.blur();
+    try{ var sel = window.getSelection(); if(sel && sel.rangeCount && !sel.isCollapsed || (sel && sel.rangeCount && sel.anchorNode && sel.anchorNode.parentElement && sel.anchorNode.parentElement.closest && sel.anchorNode.parentElement.closest(".note .text"))) sel.removeAllRanges(); }catch(e){}
+  }
+  document.addEventListener("keydown", function(e){
+    if(selected.size < 2 || e.ctrlKey || e.metaKey || e.altKey || e.key.length !== 1) return;
+    var t = e.target;
+    if(t && t.isContentEditable && t.closest && t.closest(".note, .paperObj")){ t.blur(); try{ window.getSelection().removeAllRanges(); }catch(err){} }
+  }, true);
   function setSelection(ids){
     var prev = Array.from(selected);
     selected = new Set(ids.filter(function(id){ return !!findNote(id) && !hiddenIds[id]; }));
@@ -7765,6 +7778,7 @@
         if(box){
           box.remove();
           document.body.style.userSelect = "";
+          if(selected.size > 1) dropTextFocus();
           suppressBoardClick = true;
           setTimeout(function(){ suppressBoardClick = false; }, 350);
         }

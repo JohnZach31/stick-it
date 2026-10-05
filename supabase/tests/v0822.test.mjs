@@ -194,6 +194,11 @@ ok(!/\.ccLangIco/.test(css.slice(css.indexOf('Touch the Paper')).replace(/#ccLan
   ok(!/\.embedObj[^{]*\{[^}]*animation[^}]*infinite/.test(css), 'the embed card adds no looping animation');
 }
 
+// ================================================================ a group selection never leaves a text cursor behind (P pins the group, it does not type "p")
+ok(/if\(selected\.size > 1\) dropTextFocus\(\);/.test(fn('applySelection')) && /ae\.blur\(\)/.test(fn('dropTextFocus')) && /removeAllRanges/.test(fn('dropTextFocus')), 'selecting several things blurs any note text and clears the text selection');
+ok(/selected\.size < 2 \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey \|\| e\.key\.length !== 1/.test(app) && /t\.isContentEditable && t\.closest && t\.closest\("\.note, \.paperObj"\)\)\{ t\.blur\(\)/.test(app), 'with a group selected, a typed key is never typed into a note: the note is blurred first so the shortcut acts on the group');
+ok(/box\.remove\(\);\s+document\.body\.style\.userSelect = "";\s+if\(selected\.size > 1\) dropTextFocus/.test(app), 'the drag box also clears it when it ends');
+
 // ================================================================ patch data
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
 ok(pn[0].version === '0.8.2.2' && pn[0].codename === 'Touch the Paper' && pn[0].status === 'development' && pn[0].date === null && pn[0].title === 'Stick-It v0.8.2.2 — Touch the Paper', 'v0.8.2.2 "Touch the Paper" is recorded and not released');
