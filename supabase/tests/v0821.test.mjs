@@ -92,7 +92,7 @@ ok(/not by itself agreement to marketing|merely/i.test(priv) || /would not by it
 ok(/No payment provider is active today/i.test(priv) && !/stripe/i.test(priv), 'Privacy: no payment provider is claimed active, none is named');
 ok(/currently does not set its own browser cookies/i.test(priv) && /local storage and IndexedDB/i.test(priv) && /technically different from cookies/i.test(priv), 'Privacy: cookie wording is the browser-storage explanation');
 ok(!/no analytics/i.test(priv) && /product analytics may be introduced/i.test(priv), 'Privacy: no absolute no-analytics promise');
-ok(/reasonably determine that an account used false age information/i.test(priv) && !/forever|immediately/i.test(priv.split('False age information')[1].slice(0, 700)), 'Privacy: measured wording about false age information');
+ok(/reasonably determine that false age information was deliberately used/i.test(priv) && !/forever|immediately/i.test(priv.split('False age information')[1].slice(0, 700)), 'Privacy: measured wording about false age information');
 ok(!/not responsible for any illegal/i.test(priv) && /responsible for making sure/i.test(priv), 'Privacy: responsibility wording is measured, not absolute');
 ok(/video provider/i.test(priv) && !/youtube|vimeo/i.test(priv + stor + acc + cpy + young), 'embedded video is mentioned conditionally and no provider is named in legal text');
 ok(!/no advertising, analytics or session-recording/i.test(stor) && /does not currently use advertising or session-recording/i.test(stor) && /Product analytics may be introduced/i.test(stor), 'Storage: analytics wording is accurate and conditional');
@@ -148,6 +148,22 @@ ok(/env\(safe-area-inset-bottom/.test(css.slice(css.indexOf('.donePile{ position
   ok([375, 390, 430, 600, 700, 800, 919, 1024, 1280, 1440].every((w) => !overlaps(w)), 'the Done pile does not overlap the minimap at common widths');
 }
 
+// ---- final corrections before push: Report tap area, one age policy
+ok(/\.shareBanner \.pillBtn::after, \.shareBanner \.btn::after\{ content:""; position:absolute; left:-8px; right:-8px; top:50%; height:44px; transform:translateY\(-50%\); min-width:44px; \}/.test(css) && /@media \(pointer:coarse\), \(max-width:600px\)/.test(css), 'Report: an invisible extension gives it an effective 44px-high tap area on phones/touch while the strip stays compact');
+ok(/\.shareBanner \.pillBtn, \.shareBanner \.btn\{ position:relative; \}/.test(css), 'Report: the hit area is anchored to the button, so it cannot reach neighbouring controls');
+{
+  const pe = en('privacy'), ye = en('young'), ph = he('privacy'), yh = he('young');
+  const same = /not automatically deleted solely because of age/i, dl = /false age information was deliberately used to bypass age protections/i, law = /subject to applicable law and any retention we are required to maintain/i;
+  ok(same.test(pe) && same.test(ye) && dl.test(pe) && dl.test(ye) && law.test(pe) && law.test(ye), 'Privacy 14 and Young people say the same age policy (English)');
+  ok(/אינם נמחקים אוטומטית רק בגלל הגיל/.test(ph) && /אינם נמחקים אוטומטית רק בגלל הגיל/.test(yh) && /במכוון/.test(ph) && /במכוון/.test(yh), 'Privacy 14 and Young people say the same age policy (Hebrew)');
+  ok(/LEGAL REVIEW RECOMMENDED/.test(C.docs.en.privacy.html) && /LEGAL REVIEW RECOMMENDED/.test(C.docs.en.young.html), 'the age-policy wording keeps its LEGAL REVIEW marker');
+  ok(!/must stay consistent/.test(C.docs.en.privacy.html), 'the old "must stay consistent" reviewer note is resolved');
+}
+
+// ---- the bottom-centre pills push each other up instead of overlapping
+ok(/\[document\.getElementById\("selBar"\), document\.querySelector\("\.footSlip"\), toastEl, hint\]/.test(fn('stackFloaters')) || /\[document\.getElementById\("selBar"\), document\.querySelector\("\.footSlip"\), toastEl, hint\]/.test(app), 'selection bar, saving slip, toast and hint are laid out as one stack above the minimap');
+ok(/cur \+= \(el\.offsetHeight \|\| 36\) \+ 8/.test(app) && /getComputedStyle\(mm\)\.display !== "none"/.test(app), 'each pill sits above the previous one with a gap, measured from the real minimap');
+ok(/setTimeout\(stackFloaters, 0\)/.test(app) && /MutationObserver\(scheduleStackFloaters\)/.test(app), 'the stack re-lays itself whenever a pill appears, changes or goes');
 // ================================================================ BUTTONS: contrast by tokens
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 const lum = (c) => { const [r, g, b] = c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };

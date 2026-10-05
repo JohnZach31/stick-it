@@ -2632,3 +2632,12 @@ body.dark .embedObj{ filter:none; }
 @media (prefers-reduced-motion: reduce){ .embedObj{ transition:none; } }
 #ccLang .lbl{ flex:1; text-align:start; }
 #ccLang .ccLangIco{ flex:none; }
+
+/* v0.8.2.1 correction: the Report control keeps its small look but has an effective 44x44px tap area on phones / touch (an invisible extension of the button;
+   the strip itself stays one compact line, and nothing else sits within reach of it) */
+.shareBanner .pillBtn, .shareBanner .btn{ position:relative; }
+@media (pointer:coarse), (max-width:600px){
+  .shareBanner .pillBtn, .shareBanner .btn{ min-height:30px; padding:4px 12px; }
+  .shareBanner .pillBtn::after, .shareBanner .btn::after{ content:""; position:absolute; left:-8px; right:-8px; top:50%; height:44px; transform:translateY(-50%); min-width:44px; }
+  .shareBanner{ min-height:36px; padding-inline-end:14px; }
+}

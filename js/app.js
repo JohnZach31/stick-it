@@ -510,6 +510,31 @@
     return {name: named ? getDisplayName() : getAnonName(), avatar: named && !!pr.shareShowAvatar, bio: named && !!pr.shareShowBio};
   }
 
+  // ---------- the bottom-centre pills push each other up instead of overlapping ----------
+  // The selection bar, the "saving" slip, the toast and the hint all float at the bottom centre. They are laid out as one stack from the minimap
+  // upwards, in that order, so every one of them stays readable and clickable, whatever combination is showing.
+  var floaterRaf = 0;
+  function stackFloaters(){
+    floaterRaf = 0;
+    var mm = document.getElementById("minimap"), base = 14;
+    if(mm && getComputedStyle(mm).display !== "none"){ var r = mm.getBoundingClientRect(); if(r.height) base = Math.max(14, Math.round(window.innerHeight - r.top) + 8); }
+    var cur = base;
+    [document.getElementById("selBar"), document.querySelector(".footSlip"), toastEl, hint].forEach(function(el){
+      if(!el) return;
+      var on = el === toastEl ? el.classList.contains("show") : el === hint ? !el.classList.contains("hidden") : !el.hidden;
+      if(!on || !el.offsetHeight && el !== toastEl) { return; }
+      el.style.bottom = "calc(" + cur + "px + env(safe-area-inset-bottom, 0px))";
+      cur += (el.offsetHeight || 36) + 8;
+    });
+  }
+  function scheduleStackFloaters(){ if(!floaterRaf) floaterRaf = setTimeout(stackFloaters, 0); }          // (a timer, not rAF: it must also run in a hidden tab)
+  (function(){
+    if(!window.MutationObserver) return;
+    var mo = new MutationObserver(scheduleStackFloaters);
+    [document.getElementById("selBar"), toastEl, hint].forEach(function(el){ if(el) mo.observe(el, {attributes: true, childList: true, attributeFilter: ["class", "hidden"]}); });
+    window.addEventListener("resize", scheduleStackFloaters);
+    window.__floaterObserver = mo;
+  })();
   var toastTimer;
   function toast(msg, actionLabel, actionFn){
     toastEl.innerHTML = "";
@@ -11188,7 +11213,9 @@
     if(FT.el && FT.el.isConnected) return FT.el;
     var e = makeDiv("footSlip"); e.setAttribute("role", "status"); e.setAttribute("aria-live", "polite"); e.hidden = true;
     e.innerHTML = '<span class="fsNote" aria-hidden="true"><span class="fsRed">' + buildLogoSvg(LOGO_COLORS.loading.fill, LOGO_COLORS.loading.dark) + '</span><span class="fsGreen">' + buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark) + '</span></span><span class="fsMsg"></span><button type="button" class="fsRetry" hidden>Try again</button>';
-    document.body.appendChild(e); FT.el = e; return e;
+    document.body.appendChild(e); FT.el = e;
+    if(window.__floaterObserver) window.__floaterObserver.observe(e, {attributes: true, attributeFilter: ["hidden", "class"]});
+    return e;
   }
   function ftPaint(){
     clearTimeout(FT.timer);

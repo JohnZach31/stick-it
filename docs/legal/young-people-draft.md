@@ -16,7 +16,7 @@ Stick-It asks "How old are you?" before it offers sign-in. We keep only the resu
 
 A verified parental-consent process **does not exist yet**. Until it does, children under 13 can use Stick-It only as guests. We will not pretend a click or an e-mail address is verified consent.
 
-If a child's cloud account was created anyway (for example by getting around the age step), the account is **restricted and kept pending**: cloud features are blocked, we do not delete it automatically, and a parent or guardian can ask us to delete it. Accounts that never finish the age step and have nothing in them are cleaned up by a scheduled job once the owner turns that job on.
+If a child's cloud account was created anyway (for example by getting around the age step), the account is **restricted and kept pending**: cloud features are blocked, we do not delete it automatically, and a parent or guardian can ask us to delete it. Accounts identified as belonging to children are not automatically deleted solely because of age. If we reasonably determine that false age information was deliberately used to bypass age protections, we may suspend or delete the account and associated cloud data, subject to applicable law and any retention we are required to maintain (the same policy as in the [Privacy Policy](privacy.html)). [LEGAL REVIEW RECOMMENDED] Accounts that never finish the age step and have nothing in them are cleaned up by a scheduled job once the owner turns that job on.
 
 ## What we do not do for young people
 
