@@ -13,7 +13,7 @@ Stick-It is operated by **Jonathan Zachevsky**, an individual in **Israel**. No 
 - **As a guest** you can use Stick-It without an account. Your boards stay in your browser on your device. We do not receive them.
 - **If you create an account**, we store your account details and the boards, notes, pictures, voice memos and videos you put in it, so they follow you between devices.
 - **Share links** show what you choose to share to anyone who has the link.
-- We run **no advertising, no analytics and no session recording**, and we do not sell personal data.
+- We currently run **no advertising and no session recording**, and we do not currently use product analytics. We do not sell personal data. Product analytics may be introduced later (see section 9); if so, this policy is updated first, and analytics will never read your notes, comments, searches or private media.
 - **Young people:** children under 13 may use Stick-It only as guests until verified parental consent exists. See section 14 and the [Young people and parents](young-people.html) page.
 
 ## 3. Data we collect, and why
@@ -34,7 +34,14 @@ Stick-It is operated by **Jonathan Zachevsky**, an individual in **Israel**. No 
 | **Reports** | Content or copyright reports you send us | To handle abuse and copyright complaints |
 | **Technical and security data** | Standard request data (IP address, device/browser type, time) is processed by our hosting and database providers | To deliver and protect the service |
 
-We do not ask for your phone number, postal address, payment details, contacts, location or date of birth.
+Stick-It does not currently collect your phone number, postal address, payment details, contacts, precise location or date of birth.
+
+**Possible future features.** Stick-It may introduce optional features in the future that require additional information, such as payment information, a phone number, contacts or location. If that happens, this policy and any relevant in-product notice will be updated before those features collect that information. In outline, and only if such features are built:
+
+- **Phone number:** possibly for one-time verification codes or account recovery. Optional communications would be sent only where the law allows and only if you specifically agree to them; giving a phone number would not by itself be agreement to marketing.
+- **Payment information:** Premium may later use an external payment provider. We would aim for full card numbers to be handled by that provider rather than stored by Stick-It. No payment provider is active today.
+- **Contacts:** possibly to help you invite people to a board. We would ask for explicit permission, prefer contacts you select, and not silently upload a whole address book unless that were truly necessary.
+- **Location:** possibly for optional features such as map pins or location-linked notes. Nothing in Stick-It today needs your location, including for offline use.
 
 ## 4. Whether you must give it
 
@@ -46,7 +53,11 @@ This policy is the notice at collection: who runs Stick-It (section 1), what is 
 
 ## 6. How we use it
 
-To provide, secure and maintain Stick-It; sync your boards; show your name, picture and bio on links **only if you chose that**; apply age-based protections; answer reports and legal requests; and keep the service reliable (without reading your content). We do not use your content to train AI models, we do not sell it, and we do not use it for advertising. [OWNER INPUT REQUIRED: confirm this reflects intent]
+To provide, secure and maintain Stick-It; sync your boards; show your name, picture and bio on links **only if you chose that**; apply age-based protections; answer reports and legal requests; and keep the service reliable. We do not use your content to train AI models, we do not sell it, and we do not use it for advertising. [OWNER INPUT REQUIRED: confirm this reflects intent]
+
+**Access to your content.** Stick-It does not routinely inspect your private content. Your boards are stored in our cloud infrastructure, so limited access can happen where it is necessary to operate and secure the service, to provide support you have asked for, to look into content that is reported or reasonably suspected of breaking the law or the Terms, to enforce the Terms, or to meet a legal obligation. Routine browsing of private content is not part of how Stick-It works.
+
+**Responsibility for content.** You are responsible for making sure that what you create, upload or share complies with the law and with the Terms. Where a violation is reported or reasonably suspected, Stick-It may investigate and may restrict or remove content or an account where that is appropriate. [LEGAL REVIEW RECOMMENDED]
 
 ## 7. Who receives it
 
@@ -62,9 +73,13 @@ We do not sell personal data and do not share it for advertising.
 
 Product-update e-mail is **off by default**, only for adults who switch it on, and never sent to people under 18. Every message must carry a one-click unsubscribe link, the sender's identity and a valid contact. **No marketing e-mail is sent today.** It stays disabled until a public postal address and sender are configured. [LEGAL REVIEW RECOMMENDED: Israeli Communications Law section 30A]
 
-## 9. Browser storage
+## 9. Browser storage, cookies and analytics
 
-Stick-It saves your guest boards, settings and (when signed in) your session and a cached copy of your boards in your browser (local storage and IndexedDB). It sets **no cookies**. This storage is needed for the app to work. Clearing browser data removes it; signing out removes the signed-in copy. See the [Storage notice](storage.html).
+Stick-It currently does not set its own browser cookies. Instead, it uses browser storage such as local storage and IndexedDB for guest boards, preferences, cached board data and session-related information. These technologies serve similar persistence purposes but are technically different from cookies. This storage is needed for the app to work. Clearing browser data removes it; signing out removes the signed-in copy. See the [Storage notice](storage.html).
+
+**Third-party content.** If you choose to show a supported video link as an embedded video, your browser contacts that video provider's servers to play it, and the provider may use cookies or similar technologies under its own policy. A link kept as a plain link contacts nothing until you open it.
+
+**Possible future changes.** Product analytics (for example counts of accounts, boards, object types, feature use, errors and performance, never the content of your notes, comments, searches or private media), payment processing or other embedded providers may use cookies or similar technologies in future. If that happens, this policy and the Storage notice will be updated at the same time.
 
 ## 10. International processing
 
@@ -103,6 +118,8 @@ Stick-It is a general-audience service. We do not market to anyone under 18.
 - **Adults (18+):** full use.
 - **Teens (13-17):** accounts allowed with conservative defaults: no marketing e-mail, links show no profile details by default, no public profile.
 - **Children (under 13):** guest use on their own device only. A cloud account is not available until a parent or guardian has given verified consent. **That mechanism does not exist yet.** If a child's account exists (for example created by getting around the age step), we restrict cloud features and keep it pending; we do not delete it automatically.
+
+**False age information.** If we reasonably determine that an account used false age information to get around age protections, we may suspend or delete the account and its associated cloud data, subject to applicable law and any retention we are legally required to keep. Active account data may be deleted; provider logs and backups may persist for a time; Stick-It does not keep deleted content merely for future use. [LEGAL REVIEW RECOMMENDED: this must stay consistent with the Young people and parents page, which describes pending restricted accounts]
 
 Parents and guardians: see [Young people and parents](young-people.html). [LEGAL REVIEW RECOMMENDED]
 

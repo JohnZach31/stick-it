@@ -1,0 +1,133 @@
+/* The in-app Legal reader (js/legal-reader.js). Everything is scoped under .lrBackdrop so it cannot touch the board.
+   Same notebook-page look as the standalone legal pages: warm cream paper, ruled lines that the text sits on, a red margin line. */
+.lrBackdrop{ position:fixed; inset:0; z-index:10050; background:rgba(40,32,12,0.5); display:flex; align-items:stretch; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.lrSheet{
+  --ln:30px; --sheet:#fffdf4; --desk:#efe7cd; --ink:#33301f; --soft:#5b5640; --line:#e4dbb9; --rule:rgba(92,134,184,0.2); --margin:rgba(205,92,92,0.4);
+  --accent:#8a4f0d; --focus:#8f5710; --warn:#fff3a8; --warn-ink:#4a3a00; --tape:rgba(255,246,196,0.85);
+  --head:'Patrick Hand','Alef','Varela Round','Neucha',sans-serif; --bodyf:'Sora','Heebo','Rubik',system-ui,sans-serif; --mono:ui-monospace,Consolas,'SFMono-Regular',monospace;
+  position:relative; display:flex; flex-direction:column; width:min(920px, 100%); max-height:100%; background:var(--desk); color:var(--ink);
+  border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,0.4); overflow:hidden; font-family:var(--bodyf); outline:none;
+}
+body.dark .lrSheet{ --sheet:#27232f; --desk:#17131f; --ink:#ede9f7; --soft:#b9b1d3; --line:#3b3454; --rule:rgba(150,170,220,0.16); --margin:rgba(225,120,120,0.34); --accent:#ffb454; --focus:#ffb454; --warn:#4a4228; --warn-ink:#f2eadb; --tape:rgba(242,234,219,0.2); }
+.lrSheet[data-size="small"]{ --ln:27px; } .lrSheet[data-size="large"]{ --ln:38px; }
+.lrSheet.lrContrast{ --ink:#000; --soft:#1c1a12; --rule:rgba(0,0,0,0.28); --margin:rgba(160,20,20,0.7); --accent:#5a2f00; --line:#000; }
+body.dark .lrSheet.lrContrast{ --ink:#fff; --soft:#f4f0ff; --rule:rgba(255,255,255,0.3); --accent:#ffd27a; --line:#fff; }
+.lrSheet button, .lrSheet a{ font-family:var(--bodyf); }
+.lrSheet :focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+/* header */
+.lrHead{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 14px; background:var(--sheet); border-bottom:1px solid var(--line); }
+.lrBrand{ display:flex; align-items:center; gap:8px; }
+.lrMark{ display:inline-flex; width:28px; height:28px; } .lrMark svg{ width:100%; height:100%; }
+.lrWord{ font-weight:700; font-size:1.05rem; color:var(--ink); }
+.lrTitle{ font-family:var(--head); font-size:1.25rem; color:var(--soft); padding-inline-start:10px; border-inline-start:1px solid var(--line); }
+.lrTools{ margin-inline-start:auto; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.lrToolWrap{ position:relative; }
+.lrBtn{ display:inline-flex; align-items:center; gap:6px; min-height:40px; padding:6px 12px; border:1px solid var(--line); border-radius:10px; background:var(--sheet); color:var(--ink); font-size:0.88rem; font-weight:600; cursor:pointer; text-decoration:none; }
+.lrBtn:hover{ background:color-mix(in srgb, var(--sheet) 80%, var(--line)); color:var(--ink); }
+.lrIconBtn{ width:40px; padding:0; justify-content:center; }
+.lrLangIcon, .lrBtn .langIcon{ flex:none; }
+.lrPop{ position:absolute; inset-inline-end:0; top:calc(100% + 6px); z-index:3; min-width:210px; padding:8px; background:var(--sheet); color:var(--ink); border:1px solid var(--line); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.25); }
+.lrPop[hidden]{ display:none; }
+.lrItem{ display:block; width:100%; text-align:start; padding:9px 12px; border:0; border-radius:8px; background:transparent; color:var(--ink); font-size:0.95rem; cursor:pointer; min-height:40px; }
+.lrItem:hover{ background:color-mix(in srgb, var(--sheet) 80%, var(--line)); } .lrItem.on{ font-weight:700; }
+.lrItem.on::after{ content:" \2713"; }
+.lrRow{ border:0; margin:0 0 10px; padding:0; } .lrRow legend{ font-weight:700; font-size:0.85rem; padding:0 0 4px; }
+.lrSeg{ display:inline-flex; margin-inline-end:4px; }
+.lrSeg input{ position:absolute; opacity:0; width:1px; height:1px; }
+.lrSeg span{ display:inline-block; padding:7px 12px; min-height:36px; border:1px solid var(--line); border-radius:999px; font-size:0.85rem; cursor:pointer; background:var(--sheet); color:var(--ink); }
+.lrSeg input:checked + span{ background:var(--ink); color:var(--sheet); border-color:var(--ink); }
+.lrSeg input:focus-visible + span{ outline:2px solid var(--focus); outline-offset:2px; }
+
+/* document tabs */
+.lrNav{ display:flex; gap:4px; overflow-x:auto; padding:8px 14px 0; background:var(--desk); scrollbar-width:thin; }
+.lrDoc{ flex:none; padding:8px 14px; min-height:40px; border:1px solid transparent; border-radius:10px 10px 0 0; background:transparent; color:var(--soft); font-size:0.88rem; font-weight:600; cursor:pointer; white-space:nowrap; }
+.lrDoc:hover{ color:var(--ink); background:color-mix(in srgb, var(--sheet) 70%, transparent); }
+.lrDoc[aria-current="page"]{ color:var(--ink); background:var(--sheet); border-color:var(--line); border-bottom-color:var(--sheet); }
+
+/* the page */
+.lrBody{ position:relative; flex:1; overflow:auto; padding:6px 14px 20px; overscroll-behavior:contain; outline:none; }
+.lrBanner{ position:relative; margin:14px auto 14px; max-width:820px; padding:12px 16px; background:var(--warn); color:var(--warn-ink); border-radius:3px; box-shadow:2px 4px 10px rgba(60,45,10,0.18); font-size:0.9rem; line-height:1.5; }
+.lrArticle{ position:relative; max-width:820px; margin:0 auto; background-color:var(--sheet);
+  background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--ln) - 1px), var(--rule) calc(var(--ln) - 1px), var(--rule) var(--ln));
+  background-position:0 calc(var(--ln) * 0.5);
+  border-radius:4px 10px 10px 4px; box-shadow:0 1px 2px rgba(60,45,10,0.18), 0 8px 24px rgba(60,45,10,0.12);
+  padding:var(--ln) 36px var(--ln) 64px; font-size:1rem; }
+.lrArticle[dir="rtl"]{ border-radius:10px 4px 4px 10px; padding:var(--ln) 64px var(--ln) 36px; font-family:'Heebo','Rubik','Assistant',system-ui,sans-serif; }
+.lrArticle::before{ content:""; position:absolute; top:0; bottom:0; inset-inline-start:46px; width:2px; background:var(--margin); pointer-events:none; }
+.lrArticle > *{ position:relative; }
+/* one rhythm: every line is --ln tall, and every gap is a whole number of lines, so the words sit on the rules */
+.lrArticle h1, .lrArticle h2, .lrArticle h3, .lrArticle h4{ font-family:var(--head); font-weight:400; letter-spacing:0.01em; color:var(--ink); }
+.lrArticle[dir="rtl"] h1, .lrArticle[dir="rtl"] h2, .lrArticle[dir="rtl"] h3{ font-family:'Alef','Heebo',sans-serif; font-weight:700; letter-spacing:0; }
+.lrArticle h1{ font-size:2.1rem; line-height:calc(var(--ln) * 2); margin:0 0 var(--ln); }
+.lrArticle h2{ font-size:1.5rem; line-height:var(--ln); margin:calc(var(--ln) * 2) 0 var(--ln); }
+.lrArticle h3{ font-size:1.2rem; line-height:var(--ln); margin:var(--ln) 0 0; }
+.lrArticle p, .lrArticle li{ line-height:var(--ln); margin:0; overflow-wrap:anywhere; }
+.lrArticle p{ margin-bottom:var(--ln); }
+.lrArticle ul, .lrArticle ol{ margin:0 0 var(--ln); padding-inline-start:1.4em; }
+.lrArticle strong, .lrArticle b{ font-weight:700; }
+.lrArticle .bw{ font-weight:600; font-style:normal; text-decoration:none; }                 /* the brand word: never underlined (underline means a link) */
+.lrArticle a{ color:var(--accent); text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; }
+.lrArticle code{ font:0.86em var(--mono); background:color-mix(in srgb, var(--sheet) 85%, var(--line)); padding:1px 5px; border-radius:4px; border:1px solid var(--line); }
+.lrArticle pre{ overflow:auto; background:color-mix(in srgb, var(--sheet) 90%, var(--line)); border:1px solid var(--line); border-radius:8px; padding:12px; margin:0 0 var(--ln); }
+.lrArticle blockquote.draftNote{ position:relative; margin:var(--ln) 0; padding:calc(var(--ln) * 0.6) 18px; background:var(--warn); color:var(--warn-ink); border:0; border-radius:3px; box-shadow:2px 4px 10px rgba(60,45,10,0.18); }
+.lrArticle blockquote.draftNote p{ margin:0; line-height:1.5; font-size:0.92rem; }
+.lrArticle mark.todo{ background:var(--warn); color:var(--warn-ink); padding:0 4px; border-radius:4px; font-family:var(--mono); font-size:0.82em; }       /* owner / review markers share one mono treatment */
+.lrArticle .tableWrap{ overflow-x:auto; margin:0 0 var(--ln); background:var(--sheet); border-radius:6px; }
+.lrArticle table{ border-collapse:collapse; width:100%; font-size:0.9rem; line-height:1.45; }
+.lrArticle th, .lrArticle td{ border:1px solid var(--line); padding:8px 10px; text-align:start; vertical-align:top; }
+.lrArticle thead th{ background:color-mix(in srgb, var(--sheet) 88%, var(--line)); font-family:var(--head); font-weight:400; font-size:1.05rem; }
+.lrTopWrap{ margin:var(--ln) 0 0 !important; }
+.lrTop{ min-height:44px; padding:8px 16px; border:1px solid var(--line); border-radius:999px; background:var(--sheet); color:var(--ink); font-weight:600; cursor:pointer; }
+.lrTop:hover{ background:color-mix(in srgb, var(--sheet) 80%, var(--line)); }
+
+/* decoration: tiny paper scraps tucked in the corner. Very faint, never clickable, never over the text column's reading area */
+.lrScraps{ pointer-events:none; position:absolute; inset:0; overflow:hidden; }
+.lrScraps i{ position:absolute; display:block; opacity:0.16; border-radius:2px; box-shadow:0 1px 2px rgba(0,0,0,0.25); }
+.lrScraps .s1{ width:34px; height:30px; background:#ffe27a; top:8px; inset-inline-end:10px; transform:rotate(7deg); }
+.lrScraps .s2{ width:26px; height:38px; background:#cfe6cf; bottom:14px; inset-inline-start:10px; transform:rotate(-6deg); }
+.lrScraps .s3{ width:36px; height:22px; background:#f1b8b0; bottom:30px; inset-inline-end:12px; transform:rotate(4deg); }
+@media (max-width:640px){ .lrScraps{ display:none; } }
+
+/* phones: the sheet takes the whole screen, the toolbar stays compact, reading comes first */
+@media (max-width:640px){
+  .lrBackdrop{ padding:0; }
+  .lrSheet{ width:100%; border-radius:0; --ln:28px; }
+  .lrSheet[data-size="small"]{ --ln:25px; } .lrSheet[data-size="large"]{ --ln:36px; }
+  .lrHead{ padding:8px 10px; gap:6px; }
+  .lrTitle{ display:none; }
+  .lrLbl, .lrLinkBtn{ display:none; }
+  .lrLinkBtn{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+  .lrBtn{ min-height:44px; min-width:44px; justify-content:center; padding:6px 10px; }
+  .lrBody{ padding:4px 8px 16px; }
+  .lrArticle{ padding:var(--ln) 14px var(--ln) 44px; } .lrArticle[dir="rtl"]{ padding:var(--ln) 44px var(--ln) 14px; }
+  .lrArticle::before{ inset-inline-start:32px; }
+  .lrArticle h1{ font-size:1.7rem; } .lrArticle h2{ font-size:1.3rem; }
+  .lrPop{ position:fixed; inset-inline:10px; top:auto; bottom:10px; min-width:0; }
+}
+.lrSheet[data-size="large"] .lrArticle p, .lrSheet[data-size="large"] .lrArticle li{ font-size:1.2rem; }
+.lrSheet[data-size="small"] .lrArticle p, .lrSheet[data-size="small"] .lrArticle li{ font-size:0.9rem; }
+.lrSheet[data-size="large"] .lrArticle h1{ font-size:2.5rem; } .lrSheet[data-size="large"] .lrArticle h2{ font-size:1.75rem; } .lrSheet[data-size="large"] .lrArticle h3{ font-size:1.4rem; }
+.lrSheet.lrCalm *{ animation:none !important; transition:none !important; scroll-behavior:auto !important; }
+@media (prefers-reduced-motion: reduce){ .lrSheet *{ animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+@media print{ .lrBackdrop{ position:static; background:none; padding:0; } .lrHead, .lrNav, .lrScraps, .lrTopWrap{ display:none; } .lrSheet{ box-shadow:none; max-height:none; } }
+
+/* compact Legal entry for shared / public views (replaces the row of seven links across the canvas) */
+.legalFoot{ position:fixed; left:10px; bottom:calc(8px + env(safe-area-inset-bottom)); right:auto; z-index:5; padding:0; background:none; pointer-events:none; display:block; }
+.legalFoot .legalChip{ pointer-events:auto; display:inline-flex; align-items:center; min-height:32px; padding:4px 12px; border-radius:999px; font-size:0.78rem; font-weight:600; text-decoration:none; color:var(--ink-soft); background:color-mix(in srgb, var(--paper) 90%, transparent); border:1px solid color-mix(in srgb, var(--ink-soft) 30%, transparent); }
+.legalFoot .legalChip:hover, .legalFoot .legalChip:focus-visible{ color:var(--ink); background:var(--paper); }
+@media (pointer:coarse){ .legalFoot .legalChip{ min-height:44px; padding:8px 16px; } }
+.ccLangIco{ display:inline-flex; margin-inline-end:10px; color:var(--accent-strong, currentColor); }
+
+/* v0.8.2.1 notebook rhythm: every ruled line belongs to the text block it sits behind (not to the whole page), and every gap is a whole number of lines,
+   so words sit on the rules and a table or note in between can never push the rest off the grid. */
+.lrArticle{ background-image:none; }
+.lrArticle p, .lrArticle li, .lrArticle h1, .lrArticle h2, .lrArticle h3{ background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--ln) - 1px), var(--rule) calc(var(--ln) - 1px), var(--rule) var(--ln)); margin:0; }
+.lrArticle p{ padding-bottom:var(--ln); }
+.lrArticle ul, .lrArticle ol{ margin:0; padding-bottom:var(--ln); background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--ln) - 1px), var(--rule) calc(var(--ln) - 1px), var(--rule) var(--ln)); }
+.lrArticle h1{ line-height:calc(var(--ln) * 2); padding-bottom:var(--ln); }
+.lrArticle h2{ line-height:var(--ln); padding-top:var(--ln); }
+.lrArticle h3{ line-height:var(--ln); padding-top:var(--ln); }
+.lrArticle h1:first-child{ padding-top:0; }
+.lrArticle h1{ background-image:none; }
+.lrArticle blockquote p, .lrArticle td p, .lrArticle th p{ background-image:none; padding:0; }

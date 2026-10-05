@@ -16,7 +16,7 @@ Local storage is not called a "cookie" here. Whether storing it needs consent de
 | Third-party scripts | none (html2canvas and supabase-js are bundled, first-party files) | n/a | n/a | n/a | n/a |
 | Analytics, advertising, retargeting, pixels | none | n/a | n/a | n/a | n/a |
 | Session replay | none (see below) | n/a | n/a | n/a | n/a |
-| Embedded third-party content / iframes | none (CSP `frame-src 'none'`) | n/a | n/a | n/a | n/a |
+| Embedded video (only if a person chooses "Show as embedded video" and presses Play) | CSP `frame-src` allows only `https://www.youtube-nocookie.com` and `https://player.vimeo.com` (v0.8.2.1); nothing loads until Play. The provider may set its own cookies or similar technologies | n/a | provider-controlled | provider-controlled | [LEGAL REVIEW RECOMMENDED] |
 | Fonts | self-hosted files | Yes | Stick-It | browser HTTP cache | No |
 
 ## Session replay

@@ -67,7 +67,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
       if (d === 'legal/he/' && f === 'copyright') { ok(/mailto:support\.stickit@gmail\.com/.test(rd(d + f + '.html')), `${d}${f}: copyright contact present`); continue; }
       ok(/mailto:support\.stickit@gmail\.com/.test(rd(d + f + '.html')) && !/(OWNER INPUT REQUIRED|נדרש מידע מהבעלים): (privacy e-mail|support e-mail|copyright e-mail|דוא)/.test(rd(d + f + '.html')), `${d}${f}: contact filled, no e-mail placeholder left`);
     }
-    ok(/L\.draft !== false/.test(rd('legal/legal.js')), 'legal.js keeps the DRAFT banner while draft is true');
+    ok(/l\.draft !== false/.test(rd('js/legal-fill.js')) && /legalFill/.test(rd('legal/legal.js')), 'the legal pages keep the DRAFT banner while draft is true (rules in legal-fill.js, shared with the in-app reader)');
     ok(!/Maalot/.test(rd('js/legal-config.js')) && /publicPostalAddress: null/.test(rd('js/legal-config.js')), 'public postal address stays null');
   }
   ok(!Object.keys(L).some(k => /home|residen|street/i.test(k)), 'the public config has no field for a private/residential address');
@@ -234,7 +234,7 @@ const load = (f, ctx) => vm.runInContext(fs.readFileSync(path.join(root, f), 'ut
   ok(/object_id uuid not null|object_id/.test(read('supabase/migrations/20260930120000_core_schema.sql').slice(read('supabase/migrations/20260930120000_core_schema.sql').indexOf('create table public.comments'))) && !/free.?floating/i.test(col.replace(/free.?floating[^\n]*\n/gi, '')), 'comments always belong to an object');
   // patch notes
   const pn = JSON.parse(read('docs/patch-notes/index.json'));
-  ok(Array.isArray(pn) && pn[1].version === '0.8.1' && pn[1].codename === 'One Place' && pn[1].status === 'development' && pn[1].date === null && pn[1].title === 'Stick-It v0.8.1 — One Place' && pn[2].version === '0.8.0' && pn[2].codename === 'Cut It Out' && exists('docs/patch-notes/' + pn[1].file), 'patch-note index: v0.8.0 "Cut It Out", status development, no release date, file exists');
+  ok(Array.isArray(pn) && pn[2].version === '0.8.1' && pn[2].codename === 'One Place' && pn[2].status === 'development' && pn[2].date === null && pn[2].title === 'Stick-It v0.8.1 — One Place' && pn[3].version === '0.8.0' && pn[3].codename === 'Cut It Out' && exists('docs/patch-notes/' + pn[2].file), 'patch-note index: v0.8.0 "Cut It Out", status development, no release date, file exists');
   ok(exists('docs/patch-notes/HISTORY-TODO.md') && !/20\d\d-\d\d-\d\d/.test(read('docs/patch-notes/HISTORY-TODO.md')), 'the history TODO exists and invents no dates');
   const notes = read('docs/patch-notes/0.8.0.md');
   ok(['## TL;DR', '## Highlights', '## Added', '## Improved', '## Changed', '## Fixed', '## Privacy & Security', '## Under the Hood', '## Known Limitations', '## Deferred', '## Development References'].every((h) => notes.includes(h)) && /status: \*\*development\*\*/.test(notes), 'the patch note has every planned section and says development');

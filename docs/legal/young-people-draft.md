@@ -22,7 +22,7 @@ If a child's cloud account was created anyway (for example by getting around the
 
 - No marketing e-mail to anyone under 18.
 - No public profiles by default.
-- No advertising, analytics or tracking.
+- No advertising and no tracking. (There is no product analytics today; if that ever changes, the Privacy Policy is updated first and analytics never read notes, comments, searches or private media.) [LEGAL REVIEW RECOMMENDED]
 - No collection of a date of birth.
 
 ## For parents and guardians

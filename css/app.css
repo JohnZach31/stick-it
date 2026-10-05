@@ -1443,10 +1443,7 @@
   .legalAck{ margin:12px 2px 0; font-size:0.74rem; line-height:1.45; color:var(--ink-soft); text-align:center; }
   .legalAck a, .legalLinks a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
   .legalLinks{ display:flex; flex-wrap:wrap; gap:4px 14px; font-size:0.78rem; color:var(--ink-soft); }
-  .legalFoot{ display:flex; flex-wrap:wrap; gap:4px 14px; justify-content:center; padding:8px 12px; font-size:0.74rem; color:var(--ink-soft); }
-  .legalFoot a{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
-  .legalFoot.fixed{ position:fixed; left:0; right:0; bottom:0; z-index:5; background:color-mix(in srgb, var(--paper) 88%, transparent); pointer-events:none; }
-  .legalFoot.fixed a{ pointer-events:auto; }
+  /* .legalFoot (the compact Legal chip) lives in css/legal-reader.css */
   .ageRow{ display:flex; gap:10px; margin-top:12px; }
   .ageRow label{ flex:1; font-size:0.76rem; font-weight:600; color:var(--ink-soft); }
   .ageRow select{ display:block; width:100%; margin-top:5px; padding:10px 10px; border-radius:10px; border:1px solid var(--edge); background:var(--field); color:var(--ink); font:inherit; font-size:0.92rem; }
@@ -1951,7 +1948,7 @@
 .stripPickMsg{ margin-top:8px; font-size:0.78rem; color:var(--ink-soft); }
 
 /* ---------- Done pile: a small stack at the board's edge ---------- */
-.donePile{ position:fixed; left:14px; bottom:46px; z-index:9990; display:flex; align-items:center; gap:9px; padding:7px 14px 7px 10px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; box-shadow:0 2px 8px var(--shadow); font:600 0.78rem 'Sora',sans-serif; transition:transform .15s ease, border-color .15s ease; }
+.donePile{ position:fixed; left:14px; bottom:calc(var(--done-bottom, 30px) + env(safe-area-inset-bottom, 0px)); z-index:9990; display:flex; align-items:center; gap:9px; padding:7px 14px 7px 10px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; box-shadow:0 2px 8px var(--shadow); font:600 0.78rem 'Sora',sans-serif; transition:transform .15s ease, border-color .15s ease; }
 .donePile[hidden]{ display:none; }
 .donePile:hover{ border-color:var(--accent); transform:translateY(-1px); }
 .donePile:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
@@ -1972,7 +1969,9 @@
 .doneFull{ margin-top:6px; padding:8px 10px; border-radius:8px; background:var(--panel); border:1px dashed var(--line); font-size:1rem; line-height:1.35; white-space:pre-wrap; overflow-wrap:anywhere; max-height:180px; overflow-y:auto; }
 .doneFull[hidden]{ display:none; }
 .doneActs{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
-@media (max-width:720px){ .donePile{ bottom:60px; } }
+/* v0.8.2.1: the Done pile sits ~16px lower (was 46px; 60px on phones). Between 601 and 919px the minimap strip runs under it, so it keeps its old height there. */
+@media (max-width:919px){ .donePile{ --done-bottom:46px; } }
+@media (max-width:600px){ .donePile{ --done-bottom:44px; } }
 @media (prefers-reduced-motion: reduce){ .donePile.bump{ animation:none; } .note.toDone{ transition:none !important; } }
 
 /* ---------- Focus Mode formatting strip: a faint strip of sticky paper along the bottom edge of the note ---------- */
@@ -2534,3 +2533,102 @@ body.dark .pileObj .pileEdge{ background:#3a3550; }
 body.dark .pileObj .pileTop{ color:#f2eadb; }
 .pileObj.static{ pointer-events:none; }
 @media (prefers-reduced-motion: reduce){ .pileObj{ transition:none; } }
+
+/* ---------- v0.8.2.1: button states (one place) ----------
+   The generic hover tint (a 9% accent wash) used to win over a primary button's fill and left white text on cream ("Save" on hover).
+   Now: the tint applies only to buttons that have no fill of their own, and filled buttons have explicit, contrast-checked state tokens.
+   Light: white on #9a5d12 (5.3:1), hover #865210 (~6.6:1). Dark: dark text on amber, hover a touch lighter (~11:1). */
+body{ --btn-fill:var(--accent-strong); --btn-fg:var(--on-accent); }          /* on body (not :root) so the dark theme's accent and on-accent are the ones resolved */
+:root{ --btn-fill-hover:#865210; --btn-fill-active:#734510; --danger-fill-hover:#9c3a24; --danger-fill-fg:#ffffff; }
+body.dark{ --btn-fill-hover:#ffc47d; --btn-fill-active:#ffd29b; --danger-fill-hover:#ff7f90; --danger-fill-fg:#1e1a30; }
+:where(.pillBtn:not(.primary):not(.dangerFill), .gearBtn, .asAction, .bmGo, .tourBtns button:not(.primary)):not(:disabled):hover{ background-color:color-mix(in srgb, var(--accent, #9a5d12) 9%, transparent); color:var(--ink); }
+.pillBtn.primary, .btn.primary, .tourBtns button.primary, .addBoardRow button{ background:var(--btn-fill); border-color:var(--btn-fill); color:var(--btn-fg); }
+.pillBtn.primary:not(:disabled):hover, .btn.primary:not(:disabled):hover, .tourBtns button.primary:hover, .addBoardRow button:hover{ background:var(--btn-fill-hover); border-color:var(--btn-fill-hover); color:var(--btn-fg); filter:none; }
+.pillBtn.primary:not(:disabled):active, .btn.primary:not(:disabled):active, .tourBtns button.primary:active{ background:var(--btn-fill-active); border-color:var(--btn-fill-active); color:var(--btn-fg); }
+.pillBtn.primary:focus-visible, .btn.primary:focus-visible, .tourBtns button.primary:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; background:var(--btn-fill); color:var(--btn-fg); }
+.pillBtn.dangerFill{ background:var(--danger); border-color:var(--danger); color:var(--danger-fill-fg); }
+.pillBtn.dangerFill:not(:disabled):hover{ background:var(--danger-fill-hover); border-color:var(--danger-fill-hover); color:var(--danger-fill-fg); filter:none; }
+.btn.danger.confirm:hover{ background:var(--danger-fill-hover); color:var(--danger-fill-fg); }
+.pillBtn:disabled, .pillBtn[aria-disabled="true"], .btn:disabled{ opacity:0.5; cursor:not-allowed; filter:none; }
+.pillBtn.primary:disabled{ background:var(--btn-fill); color:var(--btn-fg); }
+@media (hover:none){ .pillBtn.primary:not(:disabled):hover, .btn.primary:not(:disabled):hover{ background:var(--btn-fill); border-color:var(--btn-fill); } }
+
+/* ---------- v0.8.2.1 Room to Breathe: the shell gives the board its space back ---------- */
+/* desktop: a bigger, easier-to-find search (still well short of dominating the bar) */
+.searchWrap{ flex:1 1 320px; max-width:560px; min-width:150px; }
+.searchWrap input{ padding:10px 16px 10px 38px; font-size:0.95rem; border-width:1.5px; }
+.searchWrap svg{ left:14px; width:16px; height:16px; }
+.searchToggle, .searchCancel{ display:none; }
+
+/* the view-only strip: one compact line (board, who shared it, view only) with the Report action beside it */
+.shareBanner{ padding:4px 12px; gap:8px; flex-wrap:nowrap; font-size:0.8rem; min-height:34px; }
+.shareBanner #shareBannerText{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.shareBanner .pillBtn, .shareBanner .btn{ min-height:28px; padding:3px 10px; font-size:0.74rem; width:auto; flex:none; }
+.shareBanner .acctAv{ flex:none; }
+@media (pointer:coarse){ .shareBanner .pillBtn, .shareBanner .btn{ min-height:36px; padding:6px 12px; } .shareBanner{ min-height:42px; } }
+/* a shared board is read-only: controls that do nothing there stay out of the way */
+body.viewStrip #cleanBtn, body.viewStrip #shareBtn, body.viewStrip #kbdBtn, body.viewStrip #helpBtn, body.viewStrip #quickSignOut{ display:none; }
+
+/* phones: header, search and strip are tight; the board gets the rest */
+@media (max-width:600px){
+  .topbar{ min-height:48px; padding:3px 8px; gap:6px; flex-wrap:nowrap; }
+  .brand{ font-size:1.02rem; gap:6px; min-width:0; flex:1 1 auto; }
+  .logoMark{ width:20px; height:20px; }
+  .brand .boardName{ min-width:0; max-width:34vw; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rightButtons{ gap:4px; }
+  .gearBtn{ width:40px; height:40px; }
+  #kbdBtn, #helpBtn{ display:none; }                     /* keyboard shortcuts mean nothing on a phone; help stays in Settings */
+  .searchWrap{ display:none; }
+  .searchToggle{ display:flex; }
+  /* search opens over the header: a full-width field and a cancel */
+  body.searchOpen .brand, body.searchOpen .rightButtons{ display:none; }
+  body.searchOpen .searchWrap{ display:block; flex:1 1 auto; max-width:none; }
+  body.searchOpen .searchWrap input{ font-size:1rem; min-height:40px; }
+  body.searchOpen .searchCancel{ display:flex; flex:none; min-height:40px; padding:0 10px; align-items:center; background:none; border:0; color:var(--ink); font-weight:600; font-size:0.9rem; cursor:pointer; }
+  .shareBanner{ font-size:0.74rem; padding:3px 8px; min-height:32px; }
+  .shareBanner #copyToMineBtn{ display:none; }
+}
+@media (max-width:600px){ .brand{ white-space:nowrap; } .brand .boardName{ max-width:22vw; } }
+@media (max-width:430px){ .brand .boardName{ display:none; } }
+
+/* ---------- piles: browsing (v0.8.2.1) ---------- */
+.pileObj .pileNav{ position:absolute; top:50%; transform:translateY(-50%); width:30px; height:44px; padding:0; border:0; border-radius:10px; background:rgba(51,48,31,0.78); color:#fffdf5; font:700 24px/1 'Sora',sans-serif; cursor:pointer; opacity:0; z-index:2; display:flex; align-items:center; justify-content:center; transition:opacity .12s ease; }
+.pileObj .pilePrev{ left:-14px; } .pileObj .pileNext{ right:-14px; }
+.pileObj:hover .pileNav, .pileObj.selected .pileNav, .pileObj:focus-within .pileNav{ opacity:1; }
+.pileObj .pileNav:hover, .pileObj .pileNav:focus-visible{ background:#33301f; }
+body.dark .pileObj .pileNav{ background:rgba(237,233,247,0.85); color:#1e1a30; }
+@media (hover:none){ .pileObj .pileNav{ display:none; } }              /* on touch a tap opens the browser instead (no hover needed) */
+body.multi-sel .pileObj .pileNav, body.read-only .pileObj .pileNav, .pileObj.static .pileNav{ display:none; }
+.pbBackdrop{ position:fixed; inset:0; z-index:10040; background:var(--scrim); display:flex; align-items:center; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.pbCard{ width:min(420px, 100%); max-height:100%; display:flex; flex-direction:column; gap:10px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:16px; padding:12px; box-shadow:0 20px 60px rgba(0,0,0,0.4); outline:none; }
+.pbStage{ flex:1 1 auto; min-height:140px; max-height:min(60vh, 520px); overflow:auto; display:flex; align-items:flex-start; justify-content:center; padding:10px 6px; touch-action:pan-y; }
+.pbPaper{ max-width:100%; pointer-events:none; }
+.pbFallback{ padding:16px; font-size:1.1rem; overflow-wrap:anywhere; }
+.pbBar{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.pbIndex{ font:700 1rem 'Sora',sans-serif; min-width:5.5em; text-align:center; }
+.pbNav{ width:48px; height:48px; border-radius:50%; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:700 28px/1 'Sora',sans-serif; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.pbNav:hover{ border-color:var(--accent); background:var(--accent-soft); }
+.pbFoot{ display:flex; gap:8px; justify-content:space-between; flex-wrap:wrap; }
+.pbBack, .pbTake{ min-height:44px; padding:8px 16px; border-radius:10px; border:1px solid var(--field-line); background:var(--field); color:var(--ink); font:600 0.9rem 'Sora',sans-serif; cursor:pointer; }
+.pbBack{ background:var(--btn-fill); border-color:var(--btn-fill); color:var(--btn-fg); }
+.pbBack:hover{ background:var(--btn-fill-hover); border-color:var(--btn-fill-hover); }
+.pbTake:hover{ border-color:var(--accent); background:var(--accent-soft); }
+.pbCard :focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+
+/* ---------- embedded video links (v0.8.2.1) ---------- */
+.embedObj{ min-width:200px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; box-shadow:0 2px 6px var(--shadow), 0 10px 22px var(--shadow); padding:0 0 6px; }
+.embedObj .embHead{ padding:6px 10px; font:600 0.72rem 'Sora',sans-serif; letter-spacing:0.04em; text-transform:uppercase; color:var(--ink-soft); cursor:grab; }
+.embedObj .embFrame{ position:relative; width:100%; aspect-ratio:16 / 9; background:#1d1a14; overflow:hidden; }
+.embedObj .embFrame iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+.embedObj .embPlay{ all:unset; box-sizing:border-box; position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; cursor:pointer; color:#fff;
+  background:repeating-linear-gradient(135deg, #2b2620 0 14px, #26221c 14px 28px); }
+.embedObj .embPlay:hover svg circle{ fill:rgba(154,93,18,0.95); }
+.embedObj .embPlay:focus-visible{ outline:3px solid var(--focus); outline-offset:-3px; }
+.embedObj .embWho{ font:600 0.78rem 'Sora',sans-serif; opacity:0.9; }
+.embedObj .embFoot{ padding:6px 10px 0; font-size:0.74rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.embedObj .embSrc{ color:var(--accent-strong); text-decoration:underline; text-underline-offset:2px; }
+.embedObj .embSrc:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+body.dark .embedObj{ filter:none; }
+@media (prefers-reduced-motion: reduce){ .embedObj{ transition:none; } }
+#ccLang .lbl{ flex:1; text-align:start; }
+#ccLang .ccLangIco{ flex:none; }

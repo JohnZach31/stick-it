@@ -3,7 +3,7 @@
 Every page sets a CSP with a `<meta http-equiv>` tag (GitHub Pages cannot send headers).
 
 ## Main app (`index.html`)
-`default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: <Supabase + avatar hosts>; media-src ...; connect-src 'self' <Supabase>; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`
+`default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob: <Supabase + avatar hosts>; media-src ...; connect-src 'self' <Supabase>; frame-src https://www.youtube-nocookie.com https://player.vimeo.com; object-src 'none'; base-uri 'self'; form-action 'self'`
 
 - **`'unsafe-inline'` is gone from `script-src` and from `style-src`.** The former 390 KB inline script is now `js/app.js` and the inline stylesheet is `css/app.css`. There are no inline event handlers and no `javascript:` URLs.
 - **One remaining relaxation: `style-src-attr 'unsafe-inline'`.** It only governs `style="..."` attributes written in HTML strings (about 50 in the markup and in a few `innerHTML` templates). Styles set from JavaScript (`el.style.x = ...`) are not affected by CSP. Removing this last relaxation means turning every `style="..."` attribute into a class; it is a separate, mechanical refactor and has not been done.

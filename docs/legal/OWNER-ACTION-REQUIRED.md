@@ -54,3 +54,9 @@ If the owner address was ever committed to this repository's history it is not r
 5. **Privacy Policy and storage notice** now mention comments, review, presence and on-device cutouts (English and Hebrew). They remain DRAFT: re-read the new rows.
 6. **Real phone test**: make a cutout with a finger, two-finger pan and pinch. It is the one touch path not yet tried on a physical device.
 7. Patch notes: `docs/patch-notes/0.8.0.md` stays "development" until you decide to release.
+
+## Added with v0.8.2.1 (Room to Breathe)
+8. **Re-read the changed wording** in `docs/legal/privacy-policy-draft.md`, `storage-notice-draft.md`, `accessibility-statement-draft.md`, `copyright-page-draft.md` (and the minimum consistency edit in `young-people-draft.md`), English and Hebrew. The Hebrew additions were drafted, not translated by a professional: a native / legal read is needed. All pages remain DRAFT.
+9. **Young people vs Privacy §14**: Privacy now says an account that used false age information may be suspended or deleted; the Young people page says restricted accounts are kept pending and not deleted automatically. Decide the real policy so the two agree.
+10. **Video embeds**: the CSP now allows frames from `youtube-nocookie.com` and `player.vimeo.com` (only after a person chooses to embed and presses Play). Confirm you want these two providers, and have the privacy / storage wording reviewed for them.
+11. **Pre-beta review checklist**: `docs/dev/PRE-BETA-CHECKLIST.md`.

@@ -26,7 +26,7 @@ ok(/body\.dark \.kbdKeys kbd, body\.dark \.palKeys kbd/.test(css), 'shortcut key
 
 // ---- zones, pin, history, bookmarks
 ok(/function renderZone\(n, isNew\)/.test(app) && /OBJECT_MENUS\.zone = zoneMenu/.test(app), 'zones render and have a menu');
-ok(/if\(n && \(n\.type === "zone" \|\| n\.type === "pile"\)\) return true;/.test(app), 'a zone is never treated as an empty note (clean-up-empty would delete it)');
+ok(/if\(n && \(n\.type === "zone" \|\| n\.type === "pile" \|\| n\.type === "embed"\)\) return true;/.test(app), 'a zone is never treated as an empty note (clean-up-empty would delete it)');
 ok(/!insideAnyZone\(n\)/.test(app) && /isPinned\(n\) && !isZone\(n\)/.test(app), 'Clean up leaves pinned notes and notes inside a zone alone');
 ok(/var VH = \{list: \[\], i: -1/.test(app) && /CAP: 30/.test(app) && /def: "Alt\+\["/.test(app), 'spatial history is capped and bound to Alt+[ / Alt+]');
 ok(/BOOKMARK_MAX = 30/.test(app) && /function goToBookmark/.test(app), 'bookmarks are capped and navigable');
@@ -98,7 +98,7 @@ ok(/@media \(hover:hover\) and \(prefers-reduced-motion:no-preference\)\{[\s\S]*
   ok(D.tour.length >= 3 && D.tour.every((s) => s.title && s.body), 'every tour step has a title and words');
   const targets = D.tour.map((s) => s.target).filter(Boolean);
   ok(targets.every((t) => /^[#.][\w-]+$/.test(t)), 'tour targets are simple selectors');
-  ok(targets.every((t) => (t[0] === '#' ? html.includes('id="' + t.slice(1) + '"') : (html.includes(t.slice(1)) || app.includes('"' + t.slice(1) + '"') || app.includes('className = "' + t.slice(1)) || app.includes('"' + t.slice(1) + ' ') || app.includes('class="' + t.slice(1) + '"') || t === '.note'))), 'every tour target names something that exists');
+  ok(targets.every((t) => (t[0] === '#' ? html.includes('id="' + t.slice(1) + '"') : (html.includes(t.slice(1)) || app.includes('"' + t.slice(1) + '"') || app.includes('className = "' + t.slice(1)) || app.includes('"' + t.slice(1) + ' ') || app.includes('class="' + t.slice(1) + '"') || app.includes(' ' + t.slice(1) + '"') || t === '.note'))), 'every tour target names something that exists');
   ok(/function maybeOfferPatchTour/.test(app) && /firstRun\)\{ ptMarkSeen\(\)/.test(app) && /Stick\.dev\.patchTour/.test(app), 'the update card skips first-time visitors and the replay/reset tools are dev-only');
   ok(/Show me/.test(app) && /Not now/.test(app) && /View patch notes/.test(app), 'the update card has Show me, Not now and View patch notes');
   ok(/escapeHtml\(s\.title/.test(app) && /escapeHtml\(s\.body/.test(app), 'tour step words are escaped before they reach the page');

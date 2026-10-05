@@ -53,6 +53,7 @@
     if(mark) mark.innerHTML = svg;
   }
   setLogo("loading");
+  if(window.Stick && Stick.legalReader) Stick.legalReader.init({layer: OV.layer, logo: function(){ return buildLogoSvg(LOGO_COLORS.ready.fill, LOGO_COLORS.ready.dark); }});
 
   // Fonts are script-aware. `script` is the writing system a font is designed for;
   // Hebrew fonts also carry their own matching Latin glyphs. `mood` picks the
@@ -317,12 +318,14 @@
 
   // ---------- legal pages (kept out of the board UI: sign-in, Settings, Account settings and public views only) ----------
   var LEGAL_LINKS = [["Privacy", "legal/privacy.html"], ["Terms", "legal/terms.html"], ["Young people & parents", "legal/young-people.html"], ["Storage", "legal/storage.html"], ["Accessibility", "legal/accessibility.html"], ["Copyright / DMCA", "legal/copyright.html"], ["עברית", "legal/he/privacy.html"]];
+  // One compact "Legal" entry instead of a row of seven links across the bottom of the canvas. It opens the in-app reader; the href stays a real
+  // standalone page so it also works without scripts and for anyone who opens it in a new tab.
   function legalLinksEl(cls){
     var d = document.createElement("div");
     d.className = cls || "legalLinks";
-    LEGAL_LINKS.forEach(function(l){
-      var a = document.createElement("a"); a.href = l[1]; a.target = "_blank"; a.rel = "noopener"; a.textContent = l[0]; d.appendChild(a);
-    });
+    var a = document.createElement("a"); a.className = "legalChip"; a.href = "legal/privacy.html"; a.textContent = "Legal"; a.title = "Privacy, Terms and other legal documents";
+    a.addEventListener("click", function(e){ if(window.Stick && Stick.legalReader && Stick.legalContent){ e.preventDefault(); Stick.legalReader.open("privacy"); } });
+    d.appendChild(a);
     return d;
   }
   // The sign-in dialog carries one short line with two links. What is collected and why is in the Privacy Policy (sections 3-7).
@@ -1032,6 +1035,12 @@
     item = item || {};
     if(item.type === "pile") return null;
     if(item.pileId !== undefined){ item = Object.assign({}, item); delete item.pileId; }
+    if(item.type === "embed"){
+      var emb = window.Stick && Stick.embed && Stick.embed.normalize(item); if(!emb) return null;
+      var eo2 = {id: newId(), type: "embed", x: clampNum(item.x, 0, 1e6, 0), y: clampNum(item.y, 0, 5000, 0), w: emb.w, rot: 0, z: 0, url: emb.url, provider: emb.provider, vid: emb.vid, phys: {}};
+      if(emb.start) eo2.start = emb.start;
+      return eo2;
+    }
     opts = opts || {};
     function cloudRefs(o){
       if(!opts.allowAssets) return o;
@@ -1132,7 +1141,7 @@
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
   var ZONE_MIN_W = 160, ZONE_MAX_W = 1000, ZONE_MIN_H = 110, ZONE_MAX_H = 1600;
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1168,6 +1177,14 @@
     if(c.font !== undefined && !FONT_BY_NAME[c.font]) c.font = pickFont();
     if(c.bg !== undefined && !safeColor(c.bg)) c.bg = randomColor();
     if(c.pileId !== undefined && !/^[\w-]{1,64}$/.test(String(c.pileId))) delete c.pileId;
+    if(c.type === "embed"){                                      // an embedded video link: re-derived from the stored address every time, never trusted
+      var en = window.Stick && Stick.embed && Stick.embed.normalize(c); if(!en) return null;
+      var eo = {id: c.id, type: "embed", x: c.x, y: c.y, w: en.w, rot: c.rot, z: c.z, url: en.url, provider: en.provider, vid: en.vid, phys: c.phys && typeof c.phys === "object" ? c.phys : {}};
+      if(en.start) eo.start = en.start;
+      if(c.pinned === true) eo.pinned = true;
+      if(c.createdAt !== undefined) eo.createdAt = clampNum(c.createdAt, 0, 1e14, Date.now());
+      return eo;
+    }
     if(c.type === "pile"){                                       // a pile only references its members; it carries no content of its own
       var pn = window.Stick && Stick.pile && Stick.pile.normalize(c); if(!pn) return null;
       var po = {id: c.id, type: "pile", x: c.x, y: c.y, w: pn.w, rot: c.rot, z: c.z, members: pn.members, ox: pn.ox, oy: pn.oy, edges: pn.edges, phys: c.phys && typeof c.phys === "object" ? c.phys : {}};
@@ -2006,7 +2023,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2161,7 +2178,7 @@
     return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
-    if(n && (n.type === "zone" || n.type === "pile")) return true;               // a zone is the user’s own layout, a pile holds other notes: never "empty"
+    if(n && (n.type === "zone" || n.type === "pile" || n.type === "embed")) return true;               // a zone is the user’s own layout, a pile holds other notes: never "empty"
     if(isPaper(n)) return Stick.objects.hasContent(n);
     if(isObj(n) || n.image) return true;
     if(n.isTask && n.due) return true;
@@ -3391,6 +3408,7 @@
   var AUDIO_W = 236, AUDIO_MIN_W = 190, AUDIO_MAX_W = 440, VIDEO_MIN_W = 120, VIDEO_MAX_W = 480;
   function objSize(n){
     if(n && n.type === "pile") return {w: n.w || 200, h: (n.el && n.el.offsetHeight) || 150};
+    if(n && n.type === "embed") return {w: n.w || 340, h: (n.el && n.el.offsetHeight) || Math.round((n.w || 340) * 0.5625) + 78};
     if(isPhoto(n)) return photoFrameSize(n);
     if(isPaper(n)) return paperSize(n);
     if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
@@ -5252,8 +5270,25 @@
     t = String(t || "").replace(/\s+/g, " ").trim();
     return t.slice(0, 140) || (isPaper(top) ? Stick.objects.LABELS[top.type] : "Empty note");
   }
+  // Browsing a pile is a VIEW: which member is showing is remembered here (not saved, not synced). The pile's member list, every member's data
+  // and the board's object list are never touched by it.
+  var pileBrowse = {};
+  function browseIdx(n, live){ var i = pileBrowse[n.id] || 0; return live.length ? Math.min(Math.max(0, i), live.length - 1) : 0; }
+  function paintPileShown(n, el){
+    var live = pileLive(n); if(!el || !live.length) return;
+    var i = browseIdx(n, live), top = live[i], txt = el.querySelector(".pileText"), topEl = el.querySelector(".pileTop"), badge = el.querySelector(".pileCount");
+    if(txt){ txt.textContent = pileSnippet(top); txt.style.fontFamily = top && top.font && FONT_BY_NAME[top.font] ? '"' + top.font + '", cursive' : ""; }
+    if(topEl){ var bg = top && !top.type && top.bg ? top.bg : "#fffdf5"; topEl.style.background = document.body.classList.contains("dark") && top && !top.type && top.bg ? dimPaperColor(top.bg) : bg; }
+    if(badge) badge.textContent = i ? (i + 1) + " / " + live.length : String(live.length);
+    el.setAttribute("aria-label", Stick.pile.label(n, live.length) + ". Showing " + (i + 1) + " of " + live.length + ": " + pileSnippet(top).slice(0, 60));
+  }
+  function pileStep(n, dir){
+    var live = pileLive(n); if(live.length < 2) return;
+    pileBrowse[n.id] = (browseIdx(n, live) + dir + live.length) % live.length;
+    paintPileShown(n, n.el);
+  }
   function buildPileEl(n, live){
-    var top = live[0], P = Stick.pile;
+    var top = live[browseIdx(n, live)], P = Stick.pile;
     var el = makeDiv("boardObj paperObj pileObj");
     el.style.setProperty("--pw", (n.w || P.WIDTH[2]) + "px"); el.style.setProperty("--rot", (n.rot || 0) + "deg");
     el.setAttribute("role", "group"); el.setAttribute("aria-label", P.label(n, live.length) + ". On top: " + pileSnippet(top).slice(0, 60)); el.tabIndex = 0;
@@ -5269,7 +5304,7 @@
     txt.textContent = pileSnippet(top); txt.dir = "auto";
     if(top && top.font && FONT_BY_NAME[top.font]) txt.style.fontFamily = '"' + top.font + '", cursive';
     topEl.appendChild(txt); el.appendChild(topEl);
-    var badge = makeDiv("pileCount"); badge.textContent = String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
+    var badge = makeDiv("pileCount"); badge.textContent = browseIdx(n, live) ? (browseIdx(n, live) + 1) + " / " + live.length : String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
     return el;
   }
   function buildPileStatic(item){ var live = pileLive(item); if(live.length < 2) return makeDiv(""); var el = buildPileEl(item, live); el.classList.add("static"); el.removeAttribute("tabindex"); return el; }
@@ -5287,9 +5322,19 @@
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
       more.addEventListener("click", function(e){ e.stopPropagation(); pileMenu(n, more); });
       el.appendChild(more);
+      [["pilePrev", "\u2039", "Previous paper in this pile", -1], ["pileNext", "\u203a", "Next paper in this pile", 1]].forEach(function(d){
+        var nb = document.createElement("button"); nb.type = "button"; nb.className = "pileNav " + d[0]; nb.textContent = d[1]; nb.title = d[2]; nb.setAttribute("aria-label", d[2]);
+        nb.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+        nb.addEventListener("mousedown", function(e){ e.preventDefault(); });
+        nb.addEventListener("click", function(e){ e.stopPropagation(); pileStep(n, d[3]); });
+        el.appendChild(nb);
+      });
+      var pileDownAt = null;
+      el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))) openPileBrowser(n); });
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest("button")) return;
+        pileDownAt = {x: e.clientX, y: e.clientY, touch: e.pointerType === "touch" || e.pointerType === "pen"};
         e.preventDefault(); endEditing(); closeCaptureMenu();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
         if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
@@ -5298,9 +5343,16 @@
         bringToFront(n, el);
         startDrag(e, n, group ? selectedNotes() : [n]);          // only the pile moves: its members are not drawn and keep their place until it is opened
       });
+      // a touch tap (not a drag) on a pile opens the browser: no hover needed, one paper shown clearly at a time
+      el.addEventListener("pointerup", function(e){
+        if(!pileDownAt || !pileDownAt.touch) return;
+        var moved = Math.abs(e.clientX - pileDownAt.x) + Math.abs(e.clientY - pileDownAt.y) > 8; pileDownAt = null;
+        if(!moved && !(e.target.closest && e.target.closest("button"))) openPileBrowser(n);
+      });
       el.addEventListener("keydown", function(e){
         if(e.target !== el) return;
         if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "ArrowRight" || e.key === "ArrowLeft"){ e.preventDefault(); var rtl = getComputedStyle(el).direction === "rtl"; pileStep(n, (e.key === "ArrowRight") !== rtl ? 1 : -1); }
         else if(e.key === "Enter"){ e.preventDefault(); var r0 = el.getBoundingClientRect(); openObjectContextMenu(n, r0.left + 24, r0.top + 24); }
         else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
         else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); deleteNotes([n.id]); }     // the safe meaning: open the pile, delete nothing
@@ -5364,9 +5416,9 @@
     syncPileVisibility(); saveNotes();
     recordChange("Send the top paper to the back", before);
   }
-  function pileTakeTop(pile){
+  function pileTakeTop(pile, memberId){
     var live = pileLive(pile); if(live.length < Stick.pile.MIN_MEMBERS) return;
-    var top = live[0], before = captureState(pileTransactionIds(pile));
+    var top = (memberId && findNote(memberId) && live.indexOf(findNote(memberId)) !== -1) ? findNote(memberId) : live[0], before = captureState(pileTransactionIds(pile));
     delete top.pileId; pile.members = Stick.pile.removeMember(pile.members, top.id);
     var rest = pileLive(pile);
     top.x = Math.max(0, pile.x + (pile.w || 200) + 24); top.y = clampY(pile.y, top); zCounter += 1; top.z = zCounter;
@@ -5456,10 +5508,61 @@
     toast("Moved the top paper to Done.", "Undo", function(){ undoIfTop(action); });
   }
 
+  var pileBrowserState = null, pileBrowserLayer = OV.layer("pile-browser", function(){ closePileBrowser(); }, function(){ return !!pileBrowserState; });
+  function closePileBrowser(){
+    if(!pileBrowserState) return;
+    var st = pileBrowserState; pileBrowserState = null; pileBrowserLayer.close(); st.root.remove();
+    var n = findNote(st.id); if(n && n.el) paintPileShown(n, n.el);
+    if(st.opener && st.opener.focus && document.contains(st.opener)){ try{ st.opener.focus(); }catch(e){} }
+  }
+  function openPileBrowser(pile){
+    if(!pile || !isPileObj(pile) || pileLive(pile).length < Stick.pile.MIN_MEMBERS) return;
+    closePileBrowser(); closeFloatingPopovers();
+    var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar");
+    card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Browse the pile"); card.tabIndex = -1;
+    var prev = document.createElement("button"), next = document.createElement("button"), idx = makeDiv("pbIndex"), back = document.createElement("button");
+    prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
+    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
+    back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
+    var take = document.createElement("button"); take.type = "button"; take.className = "pbTake"; take.textContent = "Take this one out";
+    bar.appendChild(prev); bar.appendChild(idx); bar.appendChild(next);
+    card.appendChild(stage); card.appendChild(bar); var foot = makeDiv("pbFoot"); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
+    root.appendChild(card); document.body.appendChild(root);
+    pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
+    pileBrowserLayer.open();
+    function paint(){
+      var live = pileLive(pile);
+      if(live.length < Stick.pile.MIN_MEMBERS){ closePileBrowser(); return; }
+      var i = browseIdx(pile, live), m = live[i]; stage.textContent = "";
+      var paper = null;
+      try{ paper = buildStaticNote(m); }catch(err){ paper = null; }
+      if(paper){ paper.classList.add("pbPaper"); paper.style.cssText += ";position:relative;left:auto;top:auto;transform:none;margin:0 auto;"; stage.appendChild(paper); }
+      else { var f = makeDiv("pbFallback"); f.textContent = pileSnippet(m); stage.appendChild(f); }
+      idx.textContent = (i + 1) + " / " + live.length;
+      take.hidden = readOnly;
+    }
+    function step(d){ var live = pileLive(pile); if(live.length < 2) return; pileBrowse[pile.id] = (browseIdx(pile, live) + d + live.length) % live.length; paint(); }
+    prev.addEventListener("click", function(){ step(-1); }); next.addEventListener("click", function(){ step(1); });
+    back.addEventListener("click", closePileBrowser);
+    root.addEventListener("mousedown", function(e){ if(e.target === root) closePileBrowser(); });
+    take.addEventListener("click", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
+    card.addEventListener("keydown", function(e){
+      if(e.key === "ArrowRight"){ e.preventDefault(); step(1); } else if(e.key === "ArrowLeft"){ e.preventDefault(); step(-1); }
+      else if(e.key === "Tab"){ var f = Array.prototype.filter.call(card.querySelectorAll("button"), function(b){ return !b.hidden; }); if(!f.length) return; var a = f[0], z = f[f.length - 1]; if(e.shiftKey && document.activeElement === a){ e.preventDefault(); z.focus(); } else if(!e.shiftKey && document.activeElement === z){ e.preventDefault(); a.focus(); } }
+    });
+    // swipe left / right on the paper
+    var sx = null;
+    stage.addEventListener("pointerdown", function(e){ sx = e.clientX; });
+    stage.addEventListener("pointerup", function(e){ if(sx == null) return; var dx = e.clientX - sx; sx = null; if(Math.abs(dx) > 50) step(dx < 0 ? 1 : -1); });
+    stage.addEventListener("pointercancel", function(){ sx = null; });
+    paint(); next.focus();
+  }
+
   // ---- menus
   function pileMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
     var live = pileLive(n), h = makeDiv("menuHint"); h.textContent = Stick.pile.label(n, live.length); pop.appendChild(h);
+    pop.appendChild(menuItem(ICONS.search || ICONS.more, "Browse the papers\u2026", function(){ closeFloatingPopovers(); openPileBrowser(n); }, {title: "Look through the pile one paper at a time. Nothing changes."}));
     pop.appendChild(menuItem(ICONS.move, "Unpile (put them back)", function(){ closeFloatingPopovers(); unpilePile(n); }, {title: "Spreads the papers back out where they were. Nothing is deleted."}));
     pop.appendChild(menuItem(ICONS.move, "Send the top paper to the back", function(){ closeFloatingPopovers(); pileSendTopToBack(n); }));
     pop.appendChild(menuItem(ICONS.move, "Take the top paper out", function(){ closeFloatingPopovers(); pileTakeTop(n); }));
@@ -5480,6 +5583,7 @@
   }
   function renderNoteCore(n, isNew, opts){
     if(isPileObj(n)) return renderPile(n, isNew);
+    if(n.type === "embed") return renderEmbed(n, isNew);
     if(isZone(n)) return renderZone(n, isNew);
     if(isPhoto(n)) return renderPhoto(n, isNew, opts);
     if(isPaper(n)) return renderPaper(n, isNew, opts);
@@ -5846,6 +5950,7 @@
     if(isAV(n)){ stopMediaFor(n); if(n.mediaId) MediaStore.release(n.mediaId); }
     var elRef = n.el;
     if(!elRef) return;
+    if(embedObserver){ try{ embedObserver.unobserve(elRef); }catch(e){} }          // a removed video player is gone for good (no leak)
     if(!animate){ elRef.remove(); return; }
     elRef.classList.add("removing");
     elRef.addEventListener("animationend", function(){ elRef.remove(); }, {once:true});
@@ -6187,10 +6292,171 @@
     }
     insertNotes(copies, copies.length > 1 ? "Paste " + copies.length + " notes" : "Paste note");
   }
+  // ---------- video links: keep as a link, or show as an embedded video (v0.8.2.1) ----------
+  // Only allowlisted providers (js/embed.js) can become a video. The player address is BUILT from a validated id; the pasted address is never an
+  // iframe source. Nothing contacts the provider until Play is pressed, and the player is unmounted again when it scrolls away or the object goes.
+  function embedInfo(n){ return window.Stick && Stick.embed ? Stick.embed.parse(n.url) : null; }
+  var embedObserver = null;
+  function embedWatch(n){
+    if(!window.IntersectionObserver || !n.el) return;
+    if(!embedObserver) embedObserver = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(!en.isIntersecting){ var id = en.target.dataset && en.target.dataset.id, m = id && findNote(id); if(m && m.type === "embed") embedStop(m); } });
+    }, {root: null, threshold: 0});
+    embedObserver.observe(n.el);
+  }
+  function embedStop(n){
+    if(!n.el) return;
+    var frame = n.el.querySelector(".embFrame"); if(!frame || !frame.querySelector("iframe")) return;
+    frame.textContent = ""; frame.appendChild(embedPoster(n)); frame.classList.remove("playing");
+  }
+  function embedPlay(n){
+    var info = embedInfo(n); if(!info || !n.el) return;
+    var frame = n.el.querySelector(".embFrame"); if(!frame) return;
+    var f = document.createElement("iframe");
+    f.src = info.embedUrl + "&autoplay=1";
+    f.title = (Stick.embed.PROVIDERS[info.provider].label) + " video";
+    f.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture; fullscreen"); f.setAttribute("allowfullscreen", "");
+    f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin"); f.setAttribute("loading", "lazy");
+    f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox");
+    frame.textContent = ""; frame.appendChild(f); frame.classList.add("playing"); embedWatch(n);
+  }
+  function embedPoster(n){
+    var info = embedInfo(n), label = info ? Stick.embed.PROVIDERS[info.provider].label : "Video";
+    var b = document.createElement("button"); b.type = "button"; b.className = "embPlay"; b.setAttribute("aria-label", "Play the " + label + " video here");
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="44" height="44" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,0.55)"/><path d="M9.5 7.5l7 4.5-7 4.5z" fill="#fff"/></svg><span class="embWho"></span>';
+    b.querySelector(".embWho").textContent = label;
+    b.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    b.addEventListener("click", function(e){ e.stopPropagation(); embedPlay(n); });
+    return b;
+  }
+  function renderEmbed(n, isNew){
+    var info = embedInfo(n);
+    if(!info){ n.el = null; return null; }                                  // an address that no longer checks out is not drawn (and never deleted)
+    var P = Stick.embed.PROVIDERS[info.provider];
+    var el = makeDiv("boardObj paperObj embedObj");
+    el.style.setProperty("--pw", (n.w || 340) + "px"); el.style.setProperty("--rot", (n.rot || 0) + "deg");
+    el.setAttribute("role", "group"); el.setAttribute("aria-label", P.label + " video. " + n.url); el.tabIndex = 0;
+    var head = makeDiv("embHead"); head.textContent = P.label + " video"; el.appendChild(head);
+    var frame = makeDiv("embFrame"); frame.appendChild(embedPoster(n)); el.appendChild(frame);
+    var foot = makeDiv("embFoot"), a = document.createElement("a"); a.className = "embSrc";
+    var href = safeHref(n.url); if(href){ a.href = href; a.target = "_blank"; a.rel = "noopener noreferrer"; }
+    a.textContent = n.url.replace(/^https?:\/\//, "").slice(0, 64); a.title = "Open the original link";
+    a.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    foot.appendChild(a); el.appendChild(foot);
+    if(isNew) el.classList.add("new");
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.zIndex = n.z;
+    if(selected.has(n.id)) el.classList.add("selected");
+    n.el = el; n.textEl = null; n.captionEl = null;
+    boardInner.appendChild(el);
+    if(!readOnly){
+      var more = document.createElement("button"); more.type = "button"; more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options for this video"; more.setAttribute("aria-label", "Options for this video");
+      more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      more.addEventListener("click", function(e){ e.stopPropagation(); embedMenu(n, more); });
+      el.appendChild(more);
+      var h = document.createElement("button"); h.type = "button"; h.className = "pCtl pHandle"; h.title = "Drag to resize"; h.setAttribute("aria-label", "Drag to resize");
+      h.addEventListener("pointerdown", function(e){ embedResize(e, n); }); h.addEventListener("mousedown", function(e){ e.preventDefault(); });
+      el.appendChild(h);
+      el.addEventListener("pointerdown", function(e){
+        if(e.pointerType === "mouse" && e.button !== 0) return;
+        if(e.target.closest && (e.target.closest("button") || e.target.closest("iframe") || e.target.closest("a"))) return;
+        e.preventDefault(); endEditing(); closeCaptureMenu();
+        if(searchInput.value.trim()) setTimeout(clearSearch, 0);
+        if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
+        var group = selected.has(n.id) && selected.size > 1;
+        if(!group) setSelection([n.id]);
+        bringToFront(n, el);
+        startDrag(e, n, group ? selectedNotes() : [n]);
+      });
+      el.addEventListener("keydown", function(e){
+        if(e.target !== el) return;
+        if(e.key === " "){ e.preventDefault(); setSelection([n.id]); }
+        else if(e.key === "Enter"){ e.preventDefault(); embedPlay(n); }
+        else if(e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")){ e.preventDefault(); var r = el.getBoundingClientRect(); openObjectContextMenu(n, r.left + 24, r.top + 24); }
+        else if(e.key === "Delete" || e.key === "Backspace"){ e.preventDefault(); requestDelete([n.id]); }
+      });
+      el.addEventListener("focus", function(){ if(!selected.has(n.id)) setSelection([n.id]); });
+      if(isNew) el.addEventListener("animationend", function(){ el.classList.remove("new"); }, {once: true});
+    }
+    return el;
+  }
+  function embedResize(e, n){
+    e.preventDefault(); e.stopPropagation();
+    var el = n.el, before = captureState([n.id]), startX = e.clientX, startW = n.w || 340, w = startW;
+    document.body.style.cursor = "nwse-resize";
+    function move(ev){ w = Math.round(Math.min(640, Math.max(220, startW + (ev.clientX - startX) / boardZoom))); el.style.setProperty("--pw", w + "px"); }
+    function up(){
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      document.body.style.cursor = "";
+      if(w === startW) return;
+      n.w = w; ensureWidth(); saveNotes(); updateMinimap(); recordChange("Resize video", before);
+    }
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  }
+  function embedMenu(n, anchor){
+    var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
+    var info = embedInfo(n), h = makeDiv("menuHint"); h.textContent = info ? Stick.embed.PROVIDERS[info.provider].label + " video" : "Video"; pop.appendChild(h);
+    pop.appendChild(menuItem(ICONS.link, "Open the original link", function(){ closeFloatingPopovers(); var u = safeHref(n.url); if(u) window.open(u, "_blank", "noopener,noreferrer"); }));
+    pop.appendChild(menuItem(ICONS.link, "Show as a normal link", function(){ closeFloatingPopovers(); embedToLink(n); }, {title: "Turns this back into a note with the link. The original address is kept."}));
+    pop.appendChild(pinMenuItem(n));
+    pop.appendChild(makeDiv("menuSep"));
+    pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
+  }
+  OBJECT_MENUS.embed = embedMenu;
+  function linkNoteHtml(url){ return '<a href="' + escapeAttr(url) + '">' + escapeHtml(url) + "</a>"; }
+  // swap one object for another at the same place, as ONE undo step (the old one is removed, the new one is created)
+  function swapObject(old, fresh, label){
+    var before = captureState([old.id]);
+    fresh.x = old.x; fresh.y = old.y; zCounter += 1; fresh.z = zCounter;
+    var i = notes.indexOf(old); if(i !== -1) notes.splice(i, 1);
+    selected.delete(old.id); removeNoteEl(old, false); clearDecorations(old.id);
+    notes.push(fresh); renderNote(fresh, true, {focus: false});
+    ensureWidth(); saveNotes(); updateCount(); updateMinimap(); setSelection([fresh.id]);
+    return recordChange(label, before, {newIds: [fresh.id]});
+  }
+  function embedToLink(n){
+    var nn = {id: newId(), x: n.x, y: n.y, html: linkNoteHtml(n.url), bg: randomColor(), font: pickFont(), rot: rand(-4, 4), z: 0, categoryIndex: 0, phys: makePhys()};
+    var action = swapObject(n, nn, "Show video as a link");
+    toast("Back to a normal link.", "Undo", function(){ undoIfTop(action); });
+  }
+  function linkToEmbed(n, info){
+    var emb = {id: newId(), type: "embed", x: n.x, y: n.y, w: 340, rot: rand(-2, 2), z: 0, url: info.source, provider: info.provider, vid: info.id, phys: {}};
+    if(info.start) emb.start = info.start;
+    var action = swapObject(n, emb, "Show link as video");
+    toast("Showing it as a video. Nothing loads until you press Play.", "Undo", function(){ undoIfTop(action); });
+  }
+  function createEmbedAt(info, x, y){
+    zCounter += 1;
+    var emb = {id: newId(), type: "embed", x: Math.max(0, x), y: clampY(y), w: 340, rot: rand(-2, 2), z: zCounter, url: info.source, provider: info.provider, vid: info.id, phys: {}};
+    if(info.start) emb.start = info.start;
+    notes.push(emb); renderNote(emb, true, {focus: false});
+    ensureWidth(); saveNotes(); updateCount(); updateMinimap(); setSelection([emb.id]);
+    recordChange("Add video", {}, {newIds: [emb.id]});
+  }
+  // the choice: never converted automatically. Closing the dialog any other way keeps it as a link.
+  function askVideoChoice(info){
+    return new Promise(function(resolve){
+      var P = Stick.embed.PROVIDERS[info.provider];
+      var body = document.createElement("p"); body.className = "acctSub"; body.style.margin = "0";
+      body.textContent = "This is a " + P.label + " video link. You can keep it as a normal link, or show it as a video you can play here. Nothing is loaded from " + P.label + " until you press Play.";
+      openModal({title: "Show this " + P.label + " link as a video?", content: body, width: 380,
+        actions: [{label: "Keep as link", value: "link"}, {label: "Show as embedded video", kind: "primary", value: "embed"}],
+        onClose: function(v){ resolve(v === "embed" ? "embed" : "link"); }});
+    });
+  }
+
   // Pasting on the board (not while typing) captures whatever is on the clipboard.
   // The note is only created once we know what goes in it.
   function pasteAsNewNote(text, html){
     var one = (text || "").trim(), content;
+    var vInfo = one && !/\s/.test(one) && window.Stick && Stick.embed ? Stick.embed.parse(normalizeUrl(one) || "") : null;
+    if(vInfo){                                                      // a video link: ask, never convert on its own
+      var vc0 = viewCenter();
+      askVideoChoice(vInfo).then(function(choice){
+        if(choice === "embed") createEmbedAt(vInfo, vc0.x - 170, vc0.y - 100);
+        else addNoteAt(vc0.x, vc0.y - 60, {html: '<a href="' + escapeAttr(normalizeUrl(one)) + '">' + escapeHtml(one) + "</a>", focus: false});
+      });
+      return true;
+    }
     if(one && !/\s/.test(one) && /^(https?:\/\/|www\.)/i.test(one) && normalizeUrl(one)){
       content = '<a href="' + escapeAttr(normalizeUrl(one)) + '">' + escapeHtml(one) + "</a>";
     } else if(html){
@@ -6364,6 +6630,8 @@
       pop.appendChild(menuItem(ICONS.rip, "Rip off empty paper", function(){ trimPaper(n, "rip"); }, {title: "Tear away the unused paper"}));
       if(n.h || n.rip) pop.appendChild(menuItem(ICONS.sticky, "Restore full paper", function(){ closeFloatingPopovers(); restorePaper(n); }));
     }
+    var vOnly = window.Stick && Stick.embed && !n.image ? Stick.embed.parse(htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim()) : null;
+    if(vOnly) pop.appendChild(menuItem(ICONS.video || ICONS.link, "Show link as video", function(){ closeFloatingPopovers(); linkToEmbed(n, vOnly); }, {title: "Shows this " + Stick.embed.PROVIDERS[vOnly.provider].label + " link as a video you can play here"}));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
     pop.appendChild(pinMenuItem(n));
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
@@ -7364,6 +7632,20 @@
     runSearch();
   }
   searchInput.addEventListener("input", runSearch);
+  // phones: Search is a small icon that opens a full-width field over the header, and Cancel puts the header back
+  (function(){
+    var tgl = document.getElementById("searchToggle"), cancel = document.getElementById("searchCancel");
+    if(!tgl || !cancel) return;
+    function setOpen(on){
+      document.body.classList.toggle("searchOpen", on); tgl.setAttribute("aria-expanded", on ? "true" : "false");
+      if(on) setTimeout(function(){ searchInput.focus(); }, 0);
+      else { clearSearch(); searchInput.blur(); tgl.focus(); }
+    }
+    tgl.addEventListener("click", function(){ setOpen(true); });
+    cancel.addEventListener("click", function(){ setOpen(false); });
+    searchInput.addEventListener("keydown", function(e){ if(e.key === "Escape" && !searchInput.value && document.body.classList.contains("searchOpen")) setOpen(false); });
+    window.matchMedia && matchMedia("(min-width: 601px)").addEventListener && matchMedia("(min-width: 601px)").addEventListener("change", function(m){ if(m.matches) document.body.classList.remove("searchOpen"); });
+  })();
   searchInput.addEventListener("keydown", function(e){ if(e.key === "Escape"){ clearSearch(); searchInput.blur(); } });
 
   // ---------- settings & share panels ----------
@@ -7850,10 +8132,11 @@
     var langs = window.Stick && Stick.lang ? Stick.lang.complete("legal") : [];
     if(langs.length > 1){
       var gb = document.createElement("button"); gb.type = "button"; gb.className = "asAction ccLink"; gb.id = "ccLang"; gb.setAttribute("aria-expanded", "false"); gb.setAttribute("aria-controls", "ccLangList");
-      gb.innerHTML = '<span class="lbl"><span class="t">Language</span><small>Read the legal pages in another language.</small></span><span class="go" aria-hidden="true">›</span>';
+      gb.innerHTML = (Stick.lang ? '<span class="ccLangIco" aria-hidden="true">' + Stick.lang.iconSvg(22) + '</span>' : "") + '<span class="lbl"><span class="t">Language</span><small>Read the legal pages in another language.</small></span><span class="go" aria-hidden="true">›</span>';
       var gl = document.createElement("div"); gl.className = "ccLangList"; gl.id = "ccLangList"; gl.hidden = true;
       langs.forEach(function(l){
         var a = document.createElement("a"); a.className = "asAction ccLink ccLangItem"; a.href = l.code === "en" ? "legal/privacy.html" : "legal/" + l.code + "/privacy.html"; a.target = "_blank"; a.rel = "noopener"; a.lang = l.code; a.dir = l.dir; a.textContent = l.native;
+        a.addEventListener("click", function(e){ if(window.Stick && Stick.legalReader && Stick.legalContent){ e.preventDefault(); try{ localStorage.setItem("stickit.legal.lang", l.code); }catch(err){} Stick.legalReader.open("privacy", {lang: l.code}); } });
         gl.appendChild(a);
       });
       var langLayer = OV.layer("language-chooser", function(){ gl.hidden = true; gb.setAttribute("aria-expanded", "false"); gb.focus(); }, function(){ return !gl.hidden && gl.isConnected; });
@@ -7862,6 +8145,8 @@
     }
     LEGAL_ABOUT.forEach(function(l){
       var a = document.createElement("a"); a.className = "asAction ccLink"; a.href = l[1]; a.target = "_blank"; a.rel = "noopener";
+      var docId = {"legal/privacy.html": "privacy", "legal/terms.html": "terms", "legal/young-people.html": "young", "legal/storage.html": "storage", "legal/accessibility.html": "accessibility", "legal/copyright.html": "copyright"}[l[1]];
+      a.addEventListener("click", function(e){ if(docId && window.Stick && Stick.legalReader && Stick.legalContent){ e.preventDefault(); a.removeAttribute("target"); Stick.legalReader.open(docId); } });
       a.innerHTML = '<span class="lbl"><span class="t"></span><small></small></span><span class="go" aria-hidden="true">›</span>';
       a.querySelector(".t").textContent = l[0]; a.querySelector("small").textContent = l[2];
       if(/[\u0590-\u05ff]/.test(l[0])){ a.querySelector(".lbl").dir = "auto"; }
@@ -9479,17 +9764,20 @@
     clearTimeout(recoverT);
     recoverT = setTimeout(function(){ if(!readOnly && !singleNoteMode && boardInner.clientHeight) recoverVertical(); }, 250);
   });
-  // the header wraps onto extra rows on narrow screens; keep the board (and banner) below it
+  // the header (and, on a shared board, the view-only strip) take space at the top: keep the board directly below them, whatever their height
   (function syncTopbarHeight(){
     var bar = document.querySelector(".topbar");
     function sync(){
-      var h = Math.max(56, Math.round(bar.getBoundingClientRect().bottom));
-      board.style.top = h + "px";
+      var h = Math.max(44, Math.round(bar.getBoundingClientRect().bottom));
+      var strip = shareBanner.hidden ? 0 : Math.round(shareBanner.getBoundingClientRect().height);
       shareBanner.style.top = h + "px";
+      board.style.top = (h + strip) + "px";
+      document.documentElement.style.setProperty("--chrome-top", (h + strip) + "px");
+      document.body.classList.toggle("viewStrip", !shareBanner.hidden);
       syncNoteMaxHeight();
     }
     sync();
-    if(window.ResizeObserver) new ResizeObserver(sync).observe(bar);
+    if(window.ResizeObserver){ var ro = new ResizeObserver(sync); ro.observe(bar); ro.observe(shareBanner); }
     window.addEventListener("resize", sync);
     if(document.fonts && document.fonts.ready) document.fonts.ready.then(sync); // the header grows once its fonts arrive
   })();
@@ -9907,7 +10195,7 @@
     return im;
   }
   function estimateNoteH(n){
-    if(isObj(n)) return objSize(n).h;
+    if(isObj(n) || (n && n.type === "embed")) return objSize(n).h;
     if(n.el && n.el.offsetHeight) return n.el.offsetHeight;
     var inner = (n.w || NOTE_W) - 28, h = 40;
     if(n.image){ var iw = Math.min(inner, n.imgW || defaultImgW(n) || inner); h += iw * (n.imgRatio || 0.75) + 8; }
@@ -10461,7 +10749,7 @@
   defineAction({id: "cleanBoard", label: "Clean the whole board", group: "Board", keywords: "tidy organize arrange everything canvas", def: "", edit: true, run: function(){ openCleanUp("board"); }});
   defineAction({id: "cleanUp", label: "Clean up…", group: "Board", keywords: "tidy organize arrange broom", def: "", edit: true, run: function(){ openCleanUp(); }});
   defineAction({id: "palette", label: "Open the command palette", group: "Go", keywords: "commands actions find run", def: "Mod+K", run: function(){ openPalette(); }});
-  defineAction({id: "search", label: "Search notes", group: "Go", keywords: "find look", def: "/", run: function(){ searchInput.focus(); searchInput.select(); }});
+  defineAction({id: "search", label: "Search notes", group: "Go", keywords: "find look", def: "/", run: function(){ var t = document.getElementById("searchToggle"); if(t && t.offsetParent !== null){ t.click(); return; } searchInput.focus(); searchInput.select(); }});
   defineAction({id: "boards", label: "Switch board", group: "Go", keywords: "boards change open other", def: "",
     run: function(){ if(boardPanel.hidden) brandBtn.click(); }});
   defineAction({id: "shortcuts", label: "Keyboard shortcuts", group: "Go", keywords: "keys keyboard help rebind customize", def: "?", run: function(){ openControlCenter("shortcuts"); }});

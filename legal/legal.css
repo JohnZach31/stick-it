@@ -171,3 +171,19 @@ html[data-a11y-theme="dark"] .segOpt input:checked + span{ color:#1e1a30; }
 .readSwitch{ display:flex; align-items:center; gap:8px; padding:5px 0; font-size:0.88rem; cursor:pointer; }
 .readSwitch input{ width:18px; height:18px; accent-color:var(--accent); }
 @media (max-width:640px){ .toolLbl{ display:none; } .toolBtn{ padding:6px 9px; } .toolPanel{ position:fixed; left:12px; right:12px; top:auto; bottom:12px; inset-inline-end:12px; inset-inline-start:12px; } #langBtnPanel{ inset-inline-start:12px; } }
+
+/* the brand word in running text: one restrained treatment, never underlined (underline means a link) */
+.bw{ font-weight:600; font-style:normal; text-decoration:none; }
+
+/* v0.8.2.1 notebook rhythm: every ruled line belongs to the text block it sits behind (not to the whole page), and every gap is a whole number of lines,
+   so words sit on the rules and a table or note in between can never push the rest off the grid. */
+article{ background-image:none; }
+article p, article li, article h1, article h2, article h3{ background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--ln) - 1px), var(--rule) calc(var(--ln) - 1px), var(--rule) var(--ln)); margin:0; }
+article p{ padding-bottom:var(--ln); }
+article ul, article ol{ margin:0; padding-bottom:var(--ln); background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--ln) - 1px), var(--rule) calc(var(--ln) - 1px), var(--rule) var(--ln)); }
+article h1{ line-height:calc(var(--ln) * 2); padding-bottom:var(--ln); }
+article h2{ line-height:var(--ln); padding-top:var(--ln); }
+article h3{ line-height:var(--ln); padding-top:var(--ln); }
+article h1:first-child{ padding-top:0; }
+article h1{ background-image:none; }
+article blockquote p{ background-image:none; padding:0; }

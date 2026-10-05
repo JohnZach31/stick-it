@@ -1,47 +1,15 @@
 /* Legal pages: fills real business details from js/legal-config.js (only when the owner has set them) and shows the draft
- * banner while anything is missing. No analytics, no third-party requests. */
+ * banner while anything is missing. The rules live in js/legal-fill.js, which the in-app reader uses too. No analytics, no third-party requests. */
 (function () {
   var L = (window.Stick && window.Stick.legal) || {};
   var page = document.body.getAttribute("data-page");
-  var missing = L.missing ? L.missing() : ["operatorName"];
   var he = document.body.getAttribute("data-lang") === "he";
   var banner = document.getElementById("draftBanner");
-  var notFinal = L.draft !== false || missing.length > 0 || (page === "copyright" && !L.dmcaRegistered);
-  if (banner && notFinal) {
-    banner.hidden = false;
-    banner.textContent = he
-      ? (page === "copyright" && !L.dmcaRegistered
-        ? "דף לפיתוח בלבד. לא נרשם סוכן DMCA והפרטים בדף הם מצייני מקום. אין להסתמך על הדף."
-        : "טיוטה. הטקסט לא נבדק על ידי עורך דין ואינו סופי; פריטים מסומנים עדיין דורשים פרטים מהבעלים.")
-      : (page === "copyright" && !L.dmcaRegistered
-        ? "Development-only page. No DMCA designated agent has been registered yet, and the details below are placeholders. Do not rely on this page."
-        : "Draft. This text has not been finalised or reviewed by a lawyer, and highlighted items still need the owner's details.");
-  }
-
-  // replace a highlighted placeholder with the real value when we have one
-  var map = [
-    [/privacy e-?mail/i, "privacyEmail"], [/support e-?mail/i, "supportEmail"], [/security contact/i, "privacyEmail"], [/copyright e-?mail/i, "copyrightEmail"],
-    [/דוא"ל פרטיות|איש קשר לאבטחה/, "privacyEmail"], [/דוא"ל תמיכה|דוא"ל נגישות/, "supportEmail"], [/דוא"ל זכויות יוצרים/, "copyrightEmail"],
-    [/legal name of the (person or company|operator)/i, "operatorName"]
-  ];
-  // [PUBLIC POSTAL ADDRESS NOT CONFIGURED] is replaced ONLY by a deliberately configured public address; never anything else.
-  if (L.publicPostalAddress) map.push([/PUBLIC POSTAL ADDRESS NOT CONFIGURED|כתובת דואר ציבורית לא הוגדרה/, "publicPostalAddress"]);
-  Array.prototype.forEach.call(document.querySelectorAll("mark.todo"), function (m) {
-    var t = m.textContent;
-    if (/,/.test(t.replace(/^\[[^:]*:/, ""))) return;               // combined placeholders stay visible
-    for (var i = 0; i < map.length; i++) {
-      if (map[i][0].test(t) && L[map[i][1]]) { m.replaceWith(document.createTextNode(L[map[i][1]])); return; }
-    }
-  });
-
-  // the registered agent table (copyright page) shows real values only once registered
-  if (page === "copyright" && L.dmcaRegistered && L.dmcaAgent) {
-    var rows = { "Service provider": L.operatorName, "Name / role": L.dmcaAgent.name, "Organization": L.dmcaAgent.organization,
-                 "Mailing address": L.dmcaAgent.address, "Telephone": L.dmcaAgent.phone, "E-mail": L.dmcaAgent.email };
-    Array.prototype.forEach.call(document.querySelectorAll("tbody tr"), function (tr) {
-      var k = tr.cells[0] && tr.cells[0].textContent.trim();
-      if (k && rows[k] && tr.cells[1]) tr.cells[1].textContent = rows[k];
-    });
+  var F = window.Stick && window.Stick.legalFill;
+  if (F) {
+    var text = F.bannerText(page, he);
+    if (banner && text) { banner.hidden = false; banner.textContent = text; }
+    F.apply(document, page);
   }
 
   // complaint form: only when registered AND switched on

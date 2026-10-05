@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.2.1",
+    "codename": "Room to Breathe",
+    "title": "Stick-It v0.8.2.1 — Room to Breathe",
+    "date": null,
+    "status": "development",
+    "tldr": "Less chrome, clearer paperwork, and more room for the board.",
+    "file": "0.8.2.1.md"
+  },
+  {
     "version": "0.8.2",
     "codename": "Get a Grip",
     "title": "Stick-It v0.8.2 — Get a Grip",

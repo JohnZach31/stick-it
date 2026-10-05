@@ -52,7 +52,7 @@ ok(!/premium|plan\b/i.test(read('js/boardguard.js').replace(/tied to a plan|not 
 function build() {
   const a = app.indexOf('  var multiplyLimiter = '), b = app.indexOf('  var CLIP_KEY = ');
   const dup = app.slice(a, b);
-  const c = app.indexOf('  function pasteNotes(data){'), d = app.indexOf('  // Pasting on the board (not while typing)');
+  const c = app.indexOf('  function pasteNotes(data){'), d = app.indexOf('  // ---------- video links:');
   const paste = app.slice(c, d);
   let now = 100000, idSeq = 0, timers = [], toasts = [], confirmAnswers = [], confirms = [], inserted = [];
   const sb = {

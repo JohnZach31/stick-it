@@ -27,7 +27,7 @@
   // ---- the globe: only languages whose legal pages are complete
   var langs = LG ? LG.complete("legal") : [];
   if (langs.length > 1) {
-    var globe = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18"/></svg>';
+    var globe = LG.iconSvg ? LG.iconSvg(20) : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/></svg>';
     var gb = toolButton(T.language, globe, "langBtn"), gp = mk("div", "toolPanel"); gp.id = "langBtnPanel"; gp.hidden = true; gp.setAttribute("role", "menu"); gp.setAttribute("aria-label", T.language);
     var cur = LG.current().code, other = document.querySelector(".langSwitch");
     langs.forEach(function (l) {

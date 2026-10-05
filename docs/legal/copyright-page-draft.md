@@ -4,11 +4,11 @@
 
 ## Reporting copyright infringement
 
-Stick-It lets people store and share their own content. If you are a copyright owner (or authorised to act for one) and you believe content on Stick-It infringes your copyright, please send a notice to our designated agent.
+Stick-It lets people create, paste, upload and share content. Users are responsible for making sure they have the rights or permission needed for what they add. Stick-It does not proactively inspect every private board for copyright ownership. If a valid copyright complaint is received, Stick-It may investigate and may restrict or remove the reported material where appropriate. This page does not limit any responsibility Stick-It has under the law. If you are a copyright owner (or authorised to act for one) and you believe content on Stick-It infringes your copyright, please send a notice to the general copyright contact below. No DMCA designated agent is registered yet.
 
 ### Where to send a copyright notice
 
-E-mail: [OWNER INPUT REQUIRED: copyright e-mail]. This is Stick-It's general copyright contact. It is **not** a registered DMCA designated agent (see below). Postal address: [PUBLIC POSTAL ADDRESS NOT CONFIGURED].
+E-mail: [OWNER INPUT REQUIRED: copyright e-mail]. This is Stick-It's general copyright contact only. It is **not** a registered DMCA designated agent (see below), and must not be described as one until registration is complete. Postal address: [PUBLIC POSTAL ADDRESS NOT CONFIGURED].
 
 ### DMCA Designated Agent
 
