@@ -9511,7 +9511,11 @@
             style: pf.avatarStyle, color: pf.avatarColor, emoji: pf.avatarEmoji};
   }
   (function(){ var v = document.getElementById("verTag"), c = (window.Stick && Stick.config) || {};
-    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); } })();
+    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); }
+    // a local build says so, in the tab title and beside the version, so it is never mistaken for the live site (production shows neither)
+    var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
+    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev · localhost"; }
+    try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
     updateAccountIcon0();
@@ -13067,6 +13071,12 @@
     if(!session && !viewerMode){
       try{ if(sessionStorage.getItem(INVITE_KEY)){ toast("Sign in to accept your invitation."); setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 600); } }catch(e){}
     }
+    if(!session && Stick.auth.staleSession && navigator.onLine && !Stick.auth.callbackPending){
+      // The cached login is dead (the server rejected its refresh token). Booting into cloud mode on it left people behind a red loader with nothing to press.
+      // Forget it and start again as a guest, once; guest mode never depends on the network.
+      var loop = false; try{ loop = !!sessionStorage.getItem("stickit.staleDropped"); sessionStorage.setItem("stickit.staleDropped", "1"); }catch(e){}
+      if(!loop){ try{ sessionStorage.setItem("stickit.staleNote", "1"); }catch(e){} Stick.auth.dropStale(); location.reload(); return; }
+    }
     if(!session){
       // can't prove who we are right now (offline, or the login expired): work from the cache; edits stay queued
       authLost = !navigator.onLine ? false : true;
@@ -13079,6 +13089,7 @@
     try{ profile = await Stick.auth.profile(); }catch(e){}
     if(profile && !(await ensureAgeAttested(profile))) return;      // nothing else loads until the age screen has been passed
     rememberAccount(session.user, profile);
+    try{ sessionStorage.removeItem("stickit.staleDropped"); }catch(e){}
     refreshAccountData();                               // preferences + photo; the mirror in settings covers offline
     var lastAcctRefresh = Date.now();
     document.addEventListener("visibilitychange", function(){
