@@ -119,7 +119,7 @@ body.dark .po-newspaper{ filter:brightness(0.9); }
 .po-clipping .clDomain{ font:0.7rem 'Sora',sans-serif; color:#6b5d3a; text-decoration:underline; text-underline-offset:2px; overflow-wrap:anywhere; cursor:pointer; } .po-clipping .clDomain.none{ text-decoration:none; opacity:0.6; cursor:default; }
 .po-clipping .clDomain:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 body.dark .po-clipping .poSheet{ filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6)) brightness(0.88); }
-@media print{ .po-clipping .poSheet{ clip-path:none; } }
+@media print{ body:not(.printing) .po-clipping .poSheet{ clip-path:none; } }
 
 /* ---- shopping list: the Comment tab is placed from the PAPER's own edge (js: placeShopTab), never from the node box that also holds the cart ---- */
 .shopObj > .cmtTab{ z-index:0; left:22px; bottom:auto; transform:rotate(-1deg); border-radius:0 0 7px 7px; }
@@ -478,3 +478,4 @@ html[data-a11y-motion="reduce"] .asCard .asAction{ transition:none; }
 .asCard .asAction, .asCard .asItem{ border-top:0; background-image:linear-gradient(color-mix(in srgb, var(--line) 75%, transparent), color-mix(in srgb, var(--line) 75%, transparent)); background-size:calc(100% - 24px) 1px; background-position:center top; background-repeat:no-repeat; }
 .asCard > h4 + .asAction, .asCard > h4 + .asItem, .asCard > h5 + .asItem, .asCard .ccLegalList > .asAction:first-child, .wnBody > :first-child{ background-image:none; }
 .asCard .asAction:not(:disabled):hover, .asCard .asItem:hover{ background-size:0 0; }
+.sharePrintRow{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:10px 0 0; }

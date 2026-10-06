@@ -176,6 +176,7 @@
   // pins (dark board): mostly classic red, a few restrained alternatives
   var PIN_COLORS = ["#cf3f36","#cf3f36","#cf3f36","#b8332c","#3f74c4","#d9a93a","#3f9467","#e8e4dc"];
 
+  var PRINT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
   var ICONS = {
     soup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8z"></path><path d="M9 7c0-1.2 1-1.2 1-2.4M13 7c0-1.2 1-1.2 1-2.4"></path></svg>',
     receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4L14 21l-2-1.4L10 21l-2-1.4L6 21z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>',
@@ -3408,6 +3409,7 @@
     }, {kbd:"\u203A"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share photo…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this photo (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   function firstImageFile(dt){
@@ -4155,6 +4157,7 @@
     }, {kbd:"›"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share " + kind + "…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this " + kind + " (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   Stick.objects.KINDS.forEach(function(k){ OBJECT_MENUS[k] = paperMenu; });
@@ -4533,6 +4536,7 @@
     }, {kbd: "›"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share list…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this list (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
   }
   OBJECT_MENUS.shopping = shoppingMenu;
@@ -5249,6 +5253,7 @@
     }, {kbd: "\u203A"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share selection\u2026", function(){ closeFloatingPopovers(); openShareModal(selectedNotes()); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print selection\u2026", function(){ closeFloatingPopovers(); printObjects(selectedNotes()); }, {title: "Print only the selected items (or save them as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes(ids); }, {cls: "danger"}));
   }
   // "Add video" asks HOW first: nothing opens a file picker, a camera or a network request until one of the three is chosen.
@@ -7343,6 +7348,7 @@
       closeFloatingPopovers();
       openShareModal([n]);
     }, {cls: empty ? "disabled" : "", title: empty ? "Add some text or an image first" : ""}));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ if(empty){ toast("Add some text or an image before printing."); return; } closeFloatingPopovers(); printObjects([n]); }, {cls: empty ? "disabled" : "", title: empty ? "Add some text or an image first" : "Print just this note (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -8135,6 +8141,7 @@
       picker.style.paddingLeft = "0";
     });
     add(ICONS.share, "Share", function(){ openShareModal(selectedNotes()); });
+    add(PRINT_ICON, "", function(){ printObjects(selectedNotes()); }).setAttribute("aria-label", "Print selection");
     add(ICONS.trash, "Delete", function(){ requestDelete(ids); }, "danger");
     var x = add(ICONS.close, "", function(){ clearSelection(); }, "x");
     x.title = "Clear selection"; x.setAttribute("aria-label", "Clear selection");
@@ -8341,6 +8348,11 @@
     copyLink.style.cssText = "display:block;text-align:center;width:100%;margin:12px 0 0;";
     copyLink.textContent = "Just copy the link";
     content.appendChild(copyLink);
+    var pr = makeDiv("sharePrintRow"), prBtn = document.createElement("button"), pdfBtn = document.createElement("button");
+    prBtn.type = pdfBtn.type = "button"; prBtn.className = pdfBtn.className = "pillBtn"; prBtn.textContent = isGroup ? "Print selection" : "Print"; pdfBtn.textContent = "Print / Save as PDF";
+    pdfBtn.title = "Opens your browser\u2019s print window; choose \u201cSave as PDF\u201d there";
+    prBtn.addEventListener("click", function(){ printObjects(list); }); pdfBtn.addEventListener("click", function(){ printObjects(list, {pdf: true}); });
+    pr.appendChild(prBtn); pr.appendChild(pdfBtn); content.appendChild(pr);
     var fine = document.createElement("p");
     fine.className = "shareFine";
     fine.className = "shareFine big";
@@ -8385,6 +8397,72 @@
       } else toast("Couldn't copy automatically.");
     });
   }
+
+  // ---------- Print / Save as PDF ----------
+  // Uses the browser's own print window (so "Save as PDF" is the browser's, not a Stick-It PDF engine). Only the objects handed in are printed, from clean copies of
+  // their data: a temporary #printRoot is built on demand, everything else on the page is hidden by print CSS (css/print.css), and the root, the title and the
+  // dark-mode switch are put back as soon as printing ends. The board, its objects, selection and history are never touched.
+  var printState = null, printBusy = false;
+  function printable(n){ return !!n && !isPileObj(n) && !isZone(n) && !isAV(n) && n.type !== "embed" && !isHiddenMember(n) && noteHasContent(n); }
+  function printTitleFor(list){
+    var first = list[0], t = ""; try{ t = String(itemText(first) || "").replace(/\s+/g, " ").trim().slice(0, 40); }catch(e){}
+    return "Stick-It" + (list.length > 1 ? " \u2013 " + list.length + " items" : t ? " \u2013 " + t : " \u2013 note");
+  }
+  function endPrint(){
+    if(!printState) return;
+    var st = printState; printState = null;
+    clearTimeout(st.timer); window.removeEventListener("afterprint", st.after);
+    if(st.root.parentNode) st.root.remove();
+    document.body.classList.remove("printing"); if(st.dark) document.body.classList.add("dark");
+    document.title = st.title;
+  }
+  async function printObjects(list, opts){
+    opts = opts || {};
+    if(printState || printBusy) return;          // one print at a time (a quick double click must not build two print roots)
+    printBusy = true;
+    var chosen = (list || []).filter(Boolean), items = chosen.filter(printable);
+    var skipped = chosen.length - items.length;
+    if(!items.length){ printBusy = false; toast(chosen.some(isPileObj) ? "Open the pile and select a paper in it to print it." : chosen.some(isAV) ? "Recordings and videos can\u2019t be printed." : "There is nothing to print yet."); return; }
+    endEditing(); closeFloatingPopovers();
+    var root = null;
+    try{
+    var P = Stick.printLayout, data = items.map(function(n){ return PublicShare.toPublicNote(Object.assign({}, n)); });      // clean copies: the originals are never changed
+    root = document.createElement("div"); root.id = "printRoot"; root.setAttribute("aria-hidden", "true");
+    var sheet = makeDiv("printSheet"); root.appendChild(sheet);
+    var els = data.map(function(it){ var el = buildStaticNote(it); el.removeAttribute("id"); Array.prototype.forEach.call(el.querySelectorAll("[id]"), function(x){ x.removeAttribute("id"); }); el.classList.add("printObj"); return el; });
+    els.forEach(function(el){ el.style.left = "0px"; el.style.top = "0px"; el.style.transform = "none"; sheet.appendChild(el); });
+    document.body.appendChild(root);
+    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
+    await Promise.all(Array.prototype.map.call(root.querySelectorAll("img"), function(im){ return im.complete ? Promise.resolve() : new Promise(function(r){ im.addEventListener("load", r, {once: true}); im.addEventListener("error", r, {once: true}); setTimeout(r, 4000); }); }));
+    var sizes = data.map(function(it, i){ return {x: it.x || 0, y: it.y || 0, w: els[i].offsetWidth, h: els[i].offsetHeight, rot: it.rot || 0}; });
+    var plan = P.plan(sizes);
+    sheet.className = "printSheet " + plan.mode; sheet.style.width = ""; sheet.style.height = "";
+    function holder(i, sc){      // a box the size of the scaled object, holding the object scaled and tilted inside it
+      var el = els[i], rb = P.rotBox(sizes[i]), box = makeDiv("printItem"); box.style.width = Math.ceil(rb.w * sc) + "px"; box.style.height = Math.ceil(rb.h * sc) + "px";
+      var bw = Math.ceil(rb.w * sc), bh = Math.ceil(rb.h * sc); el.style.position = "absolute"; el.style.left = Math.round((bw - sizes[i].w) / 2) + "px"; el.style.top = Math.round((bh - sizes[i].h) / 2) + "px";          // scaling about the centre keeps the centre where it is
+      el.style.transformOrigin = "50% 50%"; el.style.transform = "rotate(" + (sizes[i].rot || 0) + "deg) scale(" + sc + ")";
+      el.style.setProperty("--rot", "0deg"); box.appendChild(el); return box;
+    }
+    if(plan.mode === "spatial"){
+      sheet.style.width = plan.width + "px"; sheet.style.height = plan.height + "px";
+      plan.boxes.forEach(function(b){ var h = holder(b.index, b.scale); h.style.position = "absolute"; h.style.left = Math.round(b.left) + "px"; h.style.top = Math.round(b.top) + "px"; sheet.appendChild(h); });
+    } else {
+      plan.boxes.forEach(function(b){ var h = holder(b.index, b.scale); if(b.whole === false || plan.spans) h.classList.add("spans"); sheet.appendChild(h); });
+    }
+    printBusy = false;
+    var st = {root: root, title: document.title, dark: document.body.classList.contains("dark"), timer: null, after: function(){ endPrint(); }};
+    printState = st;
+    st.timer = setTimeout(endPrint, 180000);
+    window.addEventListener("afterprint", st.after);
+    document.body.classList.remove("dark"); document.body.classList.add("printing");          // paper is printed on a light background, whatever the screen theme
+    if(opts.pdf) toast("In the print window, choose \u201cSave as PDF\u201d as the destination.");
+    document.title = printTitleFor(items);
+    if(skipped) toast(skipped + (skipped === 1 ? " item" : " items") + " can\u2019t be printed (piles, zones, recordings, videos) and " + (skipped === 1 ? "was" : "were") + " left out.");
+    if(opts.preview){ var esc = function(e){ if(e.key === "Escape"){ document.removeEventListener("keydown", esc, true); endPrint(); } }; document.addEventListener("keydown", esc, true); return; }          // inspect the print layout on screen; Esc closes it
+    setTimeout(function(){ try{ window.print(); }catch(e){ endPrint(); toast("Couldn\u2019t open the print window."); } }, 60);
+    }catch(err){ printBusy = false; if(printState){ endPrint(); } else { if(root && root.parentNode) root.remove(); document.body.classList.remove("printing"); } toast("Couldn’t prepare that for printing."); }
+  }
+  window.Stick = window.Stick || {}; Stick.print = {objects: printObjects, byIds: function(ids, o){ return printObjects(ids.map(findNote), o); }, isPrinting: function(){ return !!printState; }, printable: printable};
 
   // Public page for a shared note or group: minimal, just the paper.
   function publicShell(){
