@@ -176,6 +176,7 @@
   // pins (dark board): mostly classic red, a few restrained alternatives
   var PIN_COLORS = ["#cf3f36","#cf3f36","#cf3f36","#b8332c","#3f74c4","#d9a93a","#3f9467","#e8e4dc"];
 
+  var PRINT_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9V4h10v5"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 14h10v6H7z"/></svg>';
   var ICONS = {
     soup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11h18a8 8 0 0 1-8 8h-2a8 8 0 0 1-8-8z"></path><path d="M9 7c0-1.2 1-1.2 1-2.4M13 7c0-1.2 1-1.2 1-2.4"></path></svg>',
     receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4L14 21l-2-1.4L10 21l-2-1.4L6 21z"></path><path d="M9 8h6M9 12h6M9 16h3"></path></svg>',
@@ -840,7 +841,12 @@
     var mb = meaningfulBottom(n); if(!mb) return;
     if(n.el.offsetHeight - (mb + PAPER_BOTTOM) < 110) return;
     n._trimAsked = true;
-    toast("Trim empty paper?", "Trim", function(){ var cur = findNote(n.id); if(cur) trimPaper(cur, "rip"); });
+    // v0.8.3.3: obvious unused paper is trimmed straight away (no question), and Undo is right there. Never for a note with a picture, a task row or a size the person set
+    // themselves, and never when something is still being typed. Reduced motion: no tearing animation (trimPaper already skips it).
+    if(n.image || n.assetId || n.isTask || n.attachedAssetId || (n.textEl && n.textEl.querySelector("img, video, iframe, audio"))) return;
+    var cur = findNote(n.id); if(!cur || !cur.el || document.activeElement === cur.textEl || cur.el.classList.contains("editing")) return;
+    var depth = undoStack.length; trimPaper(cur, "rip", {auto: true});
+    if(undoStack.length === depth + 1){ var act = undoStack[undoStack.length - 1]; toast("Paper trimmed", "Undo", function(){ undoIfTop(act); }); }
   }
   // blank lines at the very end of the writing (Enter or Shift+Enter pressed and never used, empty blocks, filler breaks) are not
   // content: fitting or ripping the paper removes them, so the paper can really end where the words end
@@ -874,9 +880,10 @@
     }
     pushHistory({label: label, custom: true, t: Date.now(), undo: function(){ return put(before); }, redo: function(){ return put(after); }});
   }
-  function trimPaper(n, mode){
+  function trimPaper(n, mode, opts){
+    var quiet = !!(opts && opts.auto);
     if(readOnly || !n || n.type || !n.el) return;
-    if(n.cosmetic === "soup"){ toast("A soup bowl keeps its own shape."); return; }
+    if(n.cosmetic === "soup"){ if(!quiet) toast("A soup bowl keeps its own shape."); return; }
     endEditing(); closeFloatingPopovers();
     if(n.textEl) n.html = n.textEl.innerHTML;
     var el = n.el, before = captureState([n.id]), oldH = el.offsetHeight, oldW = n.w || NOTE_W, newW = oldW, prevW = el.style.width;
@@ -887,10 +894,10 @@
     }
     el.style.width = newW + "px";
     var mb = meaningfulBottom(n);
-    if(!mb){ el.style.width = prevW; if(changedWords && n.textEl) n.textEl.innerHTML = before[n.id].html; toast("Write something first, then trim the paper."); return; }
+    if(!mb){ el.style.width = prevW; if(changedWords && n.textEl) n.textEl.innerHTML = before[n.id].html; if(!quiet) toast("Write something first, then trim the paper."); return; }
     var newH = Math.max(PAPER_MIN_H, Math.ceil(mb + PAPER_BOTTOM));
     el.style.width = prevW;
-    if(oldH - newH < 18 && oldW - newW < 12 && !changedWords){ if(n.textEl && changedWords) n.textEl.innerHTML = before[n.id].html; toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
+    if(oldH - newH < 18 && oldW - newW < 12 && !changedWords){ if(n.textEl && changedWords) n.textEl.innerHTML = before[n.id].html; if(!quiet) toast(mode === "rip" ? "There\u2019s no empty paper to tear off." : "This note already fits its words."); return; }
     var ripChip = null;
     if(mode === "rip"){
       n.rip = n.rip || ripStyleFor(n);
@@ -1172,8 +1179,11 @@
   // (declared here, above everything that runs while the page loads: the cached board is sanitised during boot, long before the zone code below)
   var ZONE_MATERIALS = [["paper", "Paper"], ["kraft", "Kraft"], ["cardboard", "Cardboard"], ["grid", "Grid paper"], ["felt", "Felt"]];
   var ZONE_TINTS = ["#fff3a8", "#ffd6d6", "#d6ecff", "#d8f3dc", "#ead6ff", "#ffe3c2", "#e4e4e4"];
+  // five locally hosted title faces for a zone's name (Latin; Hebrew falls through to Alef/Heebo). A zone keeps the one it was given: it comes from its id unless one is chosen.
+  var ZONE_TITLE_FONTS = [["Caveat Brush", "Marker"], ["Amatic SC", "Tall"], ["Architects Daughter", "Drafting"], ["Fredoka", "Round"], ["Gloria Hallelujah", "Hand"]];
+  function zoneTitleFont(n){ var i = n && n.tf != null ? Number(n.tf) : -1; if(!(i >= 0 && i < ZONE_TITLE_FONTS.length)) i = hashStr(String(n && n.id || "z")) % ZONE_TITLE_FONTS.length; return i; }
   var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1243,6 +1253,7 @@
       if(!ZONE_MATERIALS.some(function(m){ return m[0] === c.variant; })) c.variant = "paper";
       c.bg = safeColor(c.bg) || ZONE_TINTS[0];
       if(c.carry !== true) delete c.carry;
+      if(c.tf !== undefined){ var tfi = Math.round(Number(c.tf)); if(tfi >= 0 && tfi < 5) c.tf = tfi; else delete c.tf; }
       if(c.min === true && Array.isArray(c.hold)){ c.hold = c.hold.filter(function(x){ return typeof x === "string" && x.length <= 64; }).slice(0, 5000); } else { delete c.min; delete c.hold; }
       if(c.pinned !== undefined && c.pinned !== true) delete c.pinned;
       delete c.html;
@@ -1462,6 +1473,7 @@
   window.addEventListener("pagehide", flushTypingNotify);
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
+    if(typeof zoneFitAll === "function") zoneFitAll();          // a zone's paper grows to cover a member that has grown past it
     clearTimeout(typingNotifyT); typingNotifyT = null; typingFirst = 0;
     safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
@@ -2098,7 +2110,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2196,7 +2208,7 @@
       var a = undoStack.pop();
       var ok = a.custom ? a.undo() : applySide(a.changes, "before");
       redoStack.push(a);
-      if(ok){ afterHistoryApply(); toast("Undid: " + lowerFirst(a.label)); return true; }
+      if(ok){ afterHistoryApply(); try{ SoundFx.cue("undo"); }catch(e){} toast("Undid: " + lowerFirst(a.label)); return true; }
     }
     toast("Nothing to undo.");
     return false;
@@ -2277,6 +2289,18 @@
     if(/<ul[^>]*checklist/i.test(html)) return true;
     var t = n.textEl ? n.textEl.textContent : htmlToText(html);
     return !!t.replace(/[\s\u200b\u00a0]/g, "");
+  }
+  // "empty" in the strict sense used by close (X) and Delete: a sticky or checklist with no words at all, or a paper object whose every text field is empty, with
+  // nothing attached or marked on it. Anything with an image, a due date, a pin, reactions, a share or any words at all is NOT throwaway and goes to Trash as before.
+  function isThrowaway(n){
+    if(!n || n.pinned || n.image || n.assetId || n.attachedAssetId || n.mediaId || n.due || n.cutoutKey || (n.reactions && Object.keys(n.reactions).length)) return false;
+    if(n.type === "zone" || n.type === "pile" || n.type === "embed" || isPileObj(n) || isAV(n) || isPhoto(n) || n.cosmetic) return false;
+    if(n.type === "shopping" || n.type === "photo_strip" || n.type === "postcard") return false;
+    if(isPaper(n)){ var t = ""; try{ t = Stick.objects.text(n); }catch(e){ return false; } return !String(t || "").replace(/[\s\u200b\u00a0]/g, ""); }
+    var html = n.textEl ? n.textEl.innerHTML : (n.html || "");
+    if(/<(a|img|video|iframe|audio)\b/i.test(html)) return false;
+    var tx = n.textEl ? n.textEl.textContent : htmlToText(html);
+    return !tx.replace(/[\s\u200b\u00a0]/g, "");          // a checklist of empty rows has no text either
   }
   function focusNoScroll(el){ try{ el.focus({preventScroll:true}); }catch(e){ el.focus(); } }
   function selectionIn(textEl){
@@ -3271,7 +3295,7 @@
       if(!res || !live) return;
       if(res.useOriginal){ toast("Kept your original photo."); return; }
       applyCutout(live, res, style && style !== "polaroid" ? style : "cutout");
-    }, function(){ cutoutBusy = false; toast("Couldn't make a clean cutout. Your original photo is unchanged."); });
+    }, function(err){ cutoutBusy = false; toast(err && err.message === "NO_SUBJECT" ? "Couldn't find one clear subject (this looks like a screenshot, document or card). Your original photo is unchanged." : "Couldn't make a clean cutout. Your original photo is unchanged."); });
   }
   function applyCutout(n, res, style){
     var before = captureState([n.id]);
@@ -3386,10 +3410,13 @@
     }, {kbd:"\u203A"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share photo…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this photo (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   function firstImageFile(dt){
-    return dt && dt.files ? Array.prototype.filter.call(dt.files, function(f){ return f.type.indexOf("image/") === 0; })[0] || null : null;
+    var f = dt && dt.files ? Array.prototype.filter.call(dt.files, function(x){ return x.type.indexOf("image/") === 0; })[0] || null : null;
+    if(!f && dt && dt.items){ for(var i = 0; i < dt.items.length; i++){ var it = dt.items[i]; if(it.kind === "file" && /^image\//.test(it.type)){ f = it.getAsFile(); if(f) break; } } }          // some browsers expose a pasted image only as an item
+    return f;
   }
   // Reads an image into a board-friendly JPEG (kept sharp enough for large prints).
   function loadPhotoFile(file){
@@ -3979,10 +4006,24 @@
     var rg = document.createRange(); rg.selectNodeContents(host); rg.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
     function value(){ return spec.multi ? Stick.objects.clean.lines(host.innerText, spec.max, 14) : Stick.objects.clean.one(host.textContent, spec.max); }
     function key(e){
+      if(e.key === "Tab" && n.type === "newspaper" && !e.ctrlKey && !e.metaKey && !e.altKey){          // headline -> subheading -> story; Shift+Tab goes back; past the ends Tab leaves as usual
+        var order = ["headline", "sub", "body"], at = order.indexOf(f), nx = at + (e.shiftKey ? -1 : 1);
+        if(at !== -1 && nx >= 0 && nx < order.length){
+          e.preventDefault(); e.stopPropagation(); finish(true);
+          setTimeout(function(){ var cur = findNote(n.id), fe = cur && cur.el && cur.el.querySelector('.poF[data-f="' + order[nx] + '"]'); if(fe) editPaperField(cur, fe); }, 0);
+        }
+        return;
+      }
       if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); host.textContent = start; finish(false); }
       else if(e.key === "Enter"){ e.preventDefault(); if(spec.multi && !e.ctrlKey && !e.metaKey){ document.execCommand("insertLineBreak"); } else finish(true); }
     }
-    function paste(e){ e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
+    function paste(e){
+      // in a Newspaper, an image on the clipboard (and no text with it) is the Newspaper's picture; text always pastes as text
+      if(n.type === "newspaper"){
+        var cd = e.clipboardData, img = cd ? firstImageFile(cd) : null, txt = cd ? (cd.getData("text/plain") || "") : "";
+        if(img && !txt.trim()){ e.preventDefault(); e.stopPropagation(); finish(true); setNewspaperImage(findNote(n.id) || n, img); return; }
+      }
+      e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
     function finish(commit){
       if(done) return; done = true; activePaperEdit = null;
       if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
@@ -4048,23 +4089,24 @@
   }
 
   // a Newspaper can carry one optional picture. It is added, replaced and removed here; Color / Black & white and halftone are only how it is printed.
+  // the picture comes from the file chooser or from a pasted image (the same path for both)
+  function setNewspaperImage(n, f){
+    if(!f || f.type.indexOf("image/") !== 0){ toast("That doesn't look like a picture."); return; }
+    loadPhotoFile(f).then(function(l){
+      var before = captureState([n.id]), had = !!(n.image || n.assetId);
+      n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState; if(!n.imgMode) n.imgMode = "bw"; if(!n.imgSize) n.imgSize = "full"; if(!n.imgFit) n.imgFit = "cover";
+      saveNotes(); rerenderNote(n); recordChange(had ? "Replace newspaper picture" : "Add newspaper picture", before);
+      if(cloudSync) cloudSync.notesChanged();
+    }, function(){ toast("That image couldn't be read."); });
+  }
   function pickNewspaperImage(n){
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = function(){
-      var f = inp.files && inp.files[0]; if(!f) return;
-      if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a picture."); return; }
-      loadPhotoFile(f).then(function(l){
-        var before = captureState([n.id]), had = !!(n.image || n.assetId);
-        n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState; if(!n.imgMode) n.imgMode = "bw";
-        saveNotes(); rerenderNote(n); recordChange(had ? "Replace newspaper picture" : "Add newspaper picture", before);
-        if(cloudSync) cloudSync.notesChanged();
-      }, function(){ toast("That image couldn't be read."); });
-    };
+    inp.onchange = function(){ var f = inp.files && inp.files[0]; if(f) setNewspaperImage(n, f); };
     inp.click();
   }
   function removeNewspaperImage(n){
     var before = captureState([n.id]);
-    delete n.image; delete n.assetId; delete n.mediaState; delete n.imgRatio; delete n.imgMode; delete n.halftone;
+    delete n.image; delete n.assetId; delete n.mediaState; delete n.imgRatio; delete n.imgMode; delete n.halftone; delete n.imgSize; delete n.imgFit;
     saveNotes(); rerenderNote(n); recordChange("Remove newspaper picture", before);
   }
 
@@ -4086,7 +4128,9 @@
     });
     menuSub(pop, ICONS.paper || ICONS.sticky, "Style", function(body){
     Stick.objects.VARIANTS[n.type].forEach(function(v){
-      body.appendChild(menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); }))
+      var vit = menuItem(v === (n.variant || Stick.objects.VARIANTS[n.type][0]) ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', Stick.objects.VARIANT_NAMES[v], function(){ closeFloatingPopovers(); setPaperProp(n, "variant", v, "Change " + kind + " style"); });
+      if(n.type === "newspaper"){ var sw = document.createElement("span"); sw.className = "po-newspaper npSw v-" + v; sw.setAttribute("aria-hidden", "true"); sw.innerHTML = "<i></i><i></i><i></i>"; vit.appendChild(sw); }
+      body.appendChild(vit);
     });
     });
 
@@ -4110,6 +4154,10 @@
           body.appendChild(menuItem(n.imgMode === "color" ? ICONS.tick : '<span class="menuGap"></span>', "Color", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "color", "Newspaper picture: color"); }));
           body.appendChild(menuItem(n.imgMode !== "color" ? ICONS.tick : '<span class="menuGap"></span>', "Black & white", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "bw", "Newspaper picture: black and white"); }));
           body.appendChild(menuItem(n.halftone ? ICONS.tick : '<span class="menuGap"></span>', "Halftone print", function(){ closeFloatingPopovers(); setPaperProp(n, "halftone", n.halftone ? undefined : true, "Newspaper picture: halftone"); }, {title: "A printed-dot texture over the picture (the picture itself is unchanged)"}));
+          var sh = makeDiv("menuHint"); sh.textContent = "Size"; body.appendChild(sh);
+          [["small", "Small"], ["medium", "Medium"], ["large", "Large"], ["full", "Full width"]].forEach(function(o){ body.appendChild(menuItem((n.imgSize || "full") === o[0] ? ICONS.tick : '<span class="menuGap"></span>', o[1], function(){ closeFloatingPopovers(); setPaperProp(n, "imgSize", o[0], "Newspaper picture size"); })); });
+          var fh = makeDiv("menuHint"); fh.textContent = "Fit"; body.appendChild(fh);
+          [["cover", "Fill the frame (crop)"], ["contain", "Show the whole picture"]].forEach(function(o){ body.appendChild(menuItem((n.imgFit || "cover") === o[0] ? ICONS.tick : '<span class="menuGap"></span>', o[1], function(){ closeFloatingPopovers(); setPaperProp(n, "imgFit", o[0], "Newspaper picture fit"); })); });
           body.appendChild(menuItem(ICONS.close, "Remove image", function(){ closeFloatingPopovers(); removeNewspaperImage(n); }));
         }
       });
@@ -4122,6 +4170,7 @@
     if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this to Done"}));
+    addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4131,6 +4180,7 @@
     }, {kbd:"›"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share " + kind + "…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this " + kind + " (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   Stick.objects.KINDS.forEach(function(k){ OBJECT_MENUS[k] = paperMenu; });
@@ -4509,6 +4559,7 @@
     }, {kbd: "›"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share list…", function(){ closeFloatingPopovers(); openShareModal([n]); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ closeFloatingPopovers(); printObjects([n]); }, {title: "Print just this list (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"}));
   }
   OBJECT_MENUS.shopping = shoppingMenu;
@@ -4685,7 +4736,7 @@
     sheet.appendChild(paperField("npHead", "headline", item, true));
     sheet.appendChild(paperField("npSub", "sub", item, true));
     if(item.image || item.assetId){                                 // the optional picture: printed as the paper says (Color / Black & white, halftone); the file itself is never altered
-      var fig = makeDiv("npFig " + (item.imgMode === "color" ? "color" : "bw") + (item.halftone ? " ht" : "")); fig.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
+      var fig = makeDiv("npFig " + (item.imgMode === "color" ? "color" : "bw") + (item.halftone ? " ht" : "") + " sz-" + (item.imgSize || "full") + (item.imgFit === "contain" ? " contain" : "")); fig.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
       if(item.image){ var pim = document.createElement("img"); PreviewCache.use(pim, item.image, item.w || 320); pim.alt = item.headline ? "Picture for: " + item.headline : "Newspaper picture"; pim.draggable = false; fig.appendChild(pim); }
       else fig.classList.add("pending");
       sheet.appendChild(fig);
@@ -5133,7 +5184,7 @@
     {id: "postcard", group: "Add", label: "Postcard", icon: ICONS.postcard, touch: "more", run: function(bx, by){ createPostcardFromFile(bx, by); }},
     {id: "strip", group: "Add", label: "Photo Strip", icon: ICONS.strip, touch: "more", run: function(bx, by){ createStripFromFiles(bx, by); }},
     {id: "record", group: "Media", label: "Record", icon: ICONS.mic, touch: "main"},
-    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main"},
+    {id: "video", group: "Media", label: "Video", icon: ICONS.film, touch: "main", run: function(bx, by){ openAddVideo(bx, by); }},
     {id: "zone", group: "Add", label: "Zone", icon: ICONS.zone, touch: "more", run: function(bx, by){ createZone(bx, by); }},
     {id: "soup", group: "Premium", label: "Alphabet Soup", icon: ICONS.soup, touch: "more", run: function(bx, by){ createSoup(bx, by); }}
   ];
@@ -5215,6 +5266,7 @@
       pop.appendChild(menuItem(ICONS.move, "Stack (arrange vertically)", function(){ closeFloatingPopovers(); stackNotes(ids); }, {title: "Lines the notes up one below another. Nothing else changes."}));
       pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
     }
+    addToPileMenu(pop, ids);
     pop.appendChild(menuItem(ICONS.move, "Bring to front", function(){ closeFloatingPopovers(); layerObjects(ids, "front"); }));
     pop.appendChild(menuItem(ICONS.move, "Send to back", function(){ closeFloatingPopovers(); layerObjects(ids, "back"); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
@@ -5225,9 +5277,39 @@
     }, {kbd: "\u203A"});
     pop.appendChild(moveItem);
     pop.appendChild(menuItem(ICONS.share, "Share selection\u2026", function(){ closeFloatingPopovers(); openShareModal(selectedNotes()); }));
+    pop.appendChild(menuItem(PRINT_ICON, "Print selection\u2026", function(){ closeFloatingPopovers(); printObjects(selectedNotes()); }, {title: "Print only the selected items (or save them as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes(ids); }, {cls: "danger"}));
   }
-  function captureAction(kind, bx, by){
+  // "Add video" asks HOW first: nothing opens a file picker, a camera or a network request until one of the three is chosen.
+  function openAddVideo(bx, by){
+    var wrap = makeDiv("addVideoDlg"), list = makeDiv("vidOpts"), form = makeDiv("vidLink"); form.hidden = true;
+    var m;
+    function opt(icon, title, sub, fn){
+      var b = document.createElement("button"); b.type = "button"; b.className = "vidOpt";
+      b.innerHTML = '<span class="vIc" aria-hidden="true">' + icon + '</span><span class="vTx"><b></b><small></small></span>';
+      b.querySelector("b").textContent = title; b.querySelector("small").textContent = sub;
+      b.addEventListener("click", fn); list.appendChild(b); return b;
+    }
+    opt(ICONS.film, "Upload video", "Choose a video file from this device.", function(){ m.close(false); captureAction("video", bx, by, {direct: true}); });
+    opt(ICONS.link, "Paste video link", "A YouTube or Vimeo link, shown as a video you can play here.", function(){ list.hidden = true; form.hidden = false; var i = form.querySelector("input"); if(i) i.focus(); });
+    opt(ICONS.camera, "Record with camera", "Opens your camera only now. You can cancel there.", function(){ m.close(false); captureAction("video", bx, by, {direct: true, camera: true}); });
+    var inp = document.createElement("input"); inp.type = "url"; inp.className = "asIn"; inp.placeholder = "https://\u2026"; inp.setAttribute("aria-label", "Video link"); inp.autocomplete = "off"; inp.spellcheck = false;
+    var msg = document.createElement("p"); msg.className = "asHint"; msg.setAttribute("role", "status");
+    var row = makeDiv("vidLinkRow"), go = document.createElement("button"); go.type = "button"; go.className = "pillBtn primary"; go.textContent = "Add video"; var bk = document.createElement("button"); bk.type = "button"; bk.className = "pillBtn"; bk.textContent = "Back";
+    row.appendChild(bk); row.appendChild(go); form.appendChild(inp); form.appendChild(msg); form.appendChild(row);
+    function submit(){
+      var raw = inp.value.trim(); if(!raw){ msg.textContent = "Paste a link first."; return; }
+      var url = normalizeUrl(raw), info = url && window.Stick && Stick.embed ? Stick.embed.parse(url) : null;
+      if(!info){ msg.textContent = "Stick-It can show YouTube and Vimeo links as videos. That one isn\u2019t supported, so nothing was added."; return; }
+      m.close(false); createEmbedAt(info, bx - 170, by - 100);
+    }
+    go.addEventListener("click", submit); bk.addEventListener("click", function(){ form.hidden = true; list.hidden = false; msg.textContent = ""; var f = list.querySelector("button"); if(f) f.focus(); });
+    inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); submit(); } });
+    wrap.appendChild(list); wrap.appendChild(form);
+    m = openModal({title: "Add video", content: wrap, width: 400, actions: [{label: "Cancel", value: false}]});
+  }
+  function captureAction(kind, bx, by, opts){
+    if(kind === "video" && !(opts && opts.direct)){ openAddVideo(bx, by); return; }
     if(kind === "sticky"){ addNoteAt(bx, by); return; }
     if(kind === "record"){ startRecording(bx, by); return; }
     if(kind === "cutout"){
@@ -5242,6 +5324,7 @@
     }
     var inp = captureInput(kind);
     inp.value = "";
+    if(kind === "video"){ if(opts && opts.camera) inp.setAttribute("capture", "environment"); else inp.removeAttribute("capture"); }          // only "Record with camera" asks the phone for its camera
     inp.onchange = function(){
       var f = inp.files && inp.files[0];
       if(!f) return;
@@ -5540,6 +5623,7 @@
       var p = byId[n.pileId];
       if(p && isPileObj(p) && live[p.id] >= Stick.pile.MIN_MEMBERS && (p.members || []).indexOf(n.id) !== -1) hiddenIds[n.id] = true;
     });
+    if(pileFocus && hiddenIds[pileFocus.id]) delete hiddenIds[pileFocus.id];
     zoneHolder = {};
     notes.forEach(function(z){
       if(!isZone(z) || z.min !== true || !Array.isArray(z.hold)) return;
@@ -5579,22 +5663,71 @@
     if(txt){ txt.textContent = pileSnippet(top); txt.style.fontFamily = top && top.font && FONT_BY_NAME[top.font] ? '"' + top.font + '", cursive' : ""; }
     if(topEl){ var bg = top && !top.type && top.bg ? top.bg : "#fffdf5"; topEl.style.background = document.body.classList.contains("dark") && top && !top.type && top.bg ? dimPaperColor(top.bg) : bg; }
     if(badge) badge.textContent = i ? (i + 1) + " / " + live.length : String(live.length);
-    paintPileKind(el, top); paintPileTabs(n, el, live, i);
+    paintPileKind(el, top); paintPileTabs(n, el, live, i); fitPileTop(n, el, live[i]);
     el.setAttribute("aria-label", Stick.pile.label(n, live.length) + ". Showing " + (i + 1) + " of " + live.length + ": " + pileSnippet(top).slice(0, 60));
   }
   // v0.8.3.2: a pile shows what is on top as a paper (a small tab says what kind of thing it is), and a row of paper tabs along the bottom is its index:
   // one tab per paper (the one showing is raised), so a pile of mixed papers still reads as one pile. Display only; nothing is stored.
+  // The paper on top is drawn as itself (a note stays a note, a receipt a receipt, a newspaper a newspaper), shrunk to the pile's footprint when it is wider. Only this ONE paper is
+  // mounted: the papers behind it are still just the cheap edges, and the members themselves stay unmounted. Recordings and videos keep the plain snippet card.
+  function fitPileTop(n, el, top){
+    var tp = el && el.querySelector(".pileTop"); if(!tp || !top || isAV(top) || top.type === "pile" || top.type === "embed") return;
+    var old = tp.querySelector(".pileMember"); if(old) old.remove();
+    var paper = null; try{ paper = buildStaticNote(top); }catch(err){ paper = null; }
+    if(!paper){ tp.classList.remove("live"); return; }
+    paper.classList.add("pbPaper"); paper.style.cssText += ";position:absolute;left:0;top:0;transform:none;margin:0;pointer-events:none;";
+    var host = makeDiv("pileMember"); host.setAttribute("aria-hidden", "true"); host.appendChild(paper);
+    var txt = tp.querySelector(".pileText"); if(txt) txt.hidden = true;
+    tp.classList.add("live"); tp.appendChild(host);
+    var pw = n.w || Stick.pile.WIDTH[2], mw = top.w || (top.type && Stick.objects ? Stick.objects.defaultW(top.type) : NOTE_W) || NOTE_W;
+    var sc = Math.min(1, pw / Math.max(60, mw)); paper.style.width = mw + "px"; paper.style.transformOrigin = "0 0"; paper.style.transform = "scale(" + sc + ")";
+    var h = Math.max(60, Math.round(paper.offsetHeight * sc)); host.style.height = h + "px"; host.style.width = Math.round(mw * sc) + "px";
+    host.style.marginInline = "auto"; tp.style.minHeight = h + "px";
+  }
+  // ---- add loose papers to a pile that already exists (no dismantling): pile membership is the only thing that changes
+  function pilesOnBoard(){ return notes.filter(function(p){ return isPileObj(p) && p.el && !isHiddenMember(p) && pileLive(p).length >= Stick.pile.MIN_MEMBERS; }); }
+  function pileChoiceLabel(p){ var lv = pileLive(p), t = lv[0]; return (t ? pileSnippet(t).slice(0, 22) : "Pile") + " \u00b7 " + lv.length; }
+  function addToPile(pileId, ids){
+    if(readOnly) return 0;
+    var pile = findNote(pileId); if(!pile || !isPileObj(pile)) return 0;
+    var list = ids.map(findNote).filter(function(m){ return m && m.id !== pile.id && !isPileObj(m) && !m.pileId && !isHiddenMember(m) && Stick.pile.eligible(m); });
+    if(!list.length){ toast("Those can\u2019t go into a pile (pinned, Done, or not a note)."); return 0; }
+    if(pile.members.length + list.length > Stick.pile.MAX_MEMBERS){ toast("A pile holds up to " + Stick.pile.MAX_MEMBERS + " papers."); return 0; }
+    endEditing(); closeFloatingPopovers();
+    var before = captureState(pile.members.concat([pile.id]).concat(list.map(function(m){ return m.id; })));
+    var ordered = Stick.pile.order(list);
+    pile.members = ordered.map(function(m){ return m.id; }).concat(pile.members);          // on top, in reading order
+    ordered.forEach(function(m){ m.pileId = pile.id; selected.delete(m.id); });
+    pileBrowse[pile.id] = 0;
+    finishPileChange(); setSelection([pile.id]);
+    var action = recordChange("Add " + list.length + (list.length === 1 ? " paper" : " papers") + " to a pile", before);
+    toast("Added " + list.length + (list.length === 1 ? " paper" : " papers") + " to the pile.", "Undo", function(){ undoIfTop(action); });
+    return list.length;
+  }
+  // "Add to pile >" in the menus: lists the piles on this board (top paper, count)
+  function addToPileMenu(pop, ids){
+    if(readOnly) return;
+    var targets = pilesOnBoard(), loose = ids.map(findNote).filter(function(m){ return m && !isPileObj(m) && !m.pileId && Stick.pile.eligible(m); });
+    if(!targets.length || !loose.length) return;
+    menuSub(pop, ICONS.move, "Add to pile", function(body){
+      targets.forEach(function(p){
+        body.appendChild(menuItem(ICONS.move, pileChoiceLabel(p), function(){ closeFloatingPopovers(); addToPile(p.id, ids); }, {title: "Put " + (loose.length === 1 ? "this paper" : "these " + loose.length + " papers") + " on top of this pile"}));
+      });
+    });
+  }
   function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
   function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
-  var PILE_TABS_MAX = 7;
+  var PILE_TABS_MAX = 3, PILE_TAB_SLOT = 28;
+  // the rail above the pile has a fixed height and one fixed slot per tab. How many slots fit is worked out from the pile's width (room is kept for the kind tab and the "..." button).
+  function pileTabSlots(n){ return Math.max(1, Math.min(PILE_TABS_MAX, Math.floor(((n.w || 200) - 12 - 58 - 44) / PILE_TAB_SLOT))); }
   function paintPileTabs(n, el, live, at){
     var row = el.querySelector(".pileTabs"); if(!row) return;
     row.textContent = "";
-    var count = live.length, from = 0, to = count;
-    if(count > PILE_TABS_MAX){ from = Math.max(0, Math.min(count - PILE_TABS_MAX, at - Math.floor(PILE_TABS_MAX / 2))); to = from + PILE_TABS_MAX; }
+    var count = live.length, from = 0, to = count, slots = pileTabSlots(n);
+    if(count > slots){ from = Math.max(0, Math.min(count - slots, at - Math.floor(slots / 2))); to = from + slots; }
     for(var i = from; i < to; i++){
       (function(i){
-        var t = document.createElement("button"); t.type = "button"; t.className = "pileTab" + (i === at ? " on" : ""); t.setAttribute("aria-label", "Paper " + (i + 1) + " of " + count + ": " + pileKindName(live[i]));
+        var t = document.createElement("button"); t.type = "button"; t.className = "pileTab" + (i === at ? " on" : ""); t.title = "Paper " + (i + 1) + " of " + count; t.setAttribute("aria-label", "Paper " + (i + 1) + " of " + count + ": " + pileKindName(live[i]));
         t.setAttribute("aria-current", i === at ? "true" : "false"); t.textContent = String(i + 1);
         var top = live[i]; if(top && !top.type && top.bg) t.style.setProperty("--tab", document.body.classList.contains("dark") ? dimPaperColor(top.bg) : top.bg);
         t.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); t.addEventListener("mousedown", function(e){ e.preventDefault(); });
@@ -5625,8 +5758,12 @@
     txt.textContent = pileSnippet(top); txt.dir = "auto";
     if(top && top.font && FONT_BY_NAME[top.font]) txt.style.fontFamily = '"' + top.font + '", cursive';
     topEl.appendChild(txt); el.appendChild(topEl);
+    el._pileN = n;
     var kind = makeDiv("pileKind"); kind.setAttribute("aria-hidden", "true"); kind.textContent = pileKindName(top); el.appendChild(kind);
     var tabs = makeDiv("pileTabs"); tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Papers in this pile"); el.appendChild(tabs); paintPileTabs(n, el, live, browseIdx(n, live));
+    var openB = document.createElement("button"); openB.type = "button"; openB.className = "pileOpen"; openB.title = "Browse the papers in this pile"; openB.setAttribute("aria-label", "Browse the papers in this pile"); openB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="4" width="11" height="15" rx="1.5"/><path d="M4 8v11a1 1 0 0 0 1 1h9"/></svg>';
+    openB.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); openB.addEventListener("mousedown", function(e){ e.preventDefault(); }); openB.addEventListener("click", function(e){ e.stopPropagation(); openPileBrowser(n); });
+    el.appendChild(openB);
     var badge = makeDiv("pileCount"); badge.textContent = browseIdx(n, live) ? (browseIdx(n, live) + 1) + " / " + live.length : String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
     return el;
   }
@@ -5640,20 +5777,14 @@
     if(selected.has(n.id)) el.classList.add("selected");
     n.el = el; n.textEl = null; n.captionEl = null;
     boardInner.appendChild(el);
+    fitPileTop(n, el, live[browseIdx(n, live)]);
     if(!readOnly){
       var more = document.createElement("button"); more.type = "button"; more.className = "pCtl pMore"; more.innerHTML = ICONS.more; more.title = "Options for this pile"; more.setAttribute("aria-label", "Options for this pile");
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
       more.addEventListener("click", function(e){ e.stopPropagation(); pileMenu(n, more); });
       el.appendChild(more);
-      [["pilePrev", "\u2039", "Previous paper in this pile", -1], ["pileNext", "\u203a", "Next paper in this pile", 1]].forEach(function(d){
-        var nb = document.createElement("button"); nb.type = "button"; nb.className = "pileNav " + d[0]; nb.textContent = d[1]; nb.title = d[2]; nb.setAttribute("aria-label", d[2]);
-        nb.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
-        nb.addEventListener("mousedown", function(e){ e.preventDefault(); });
-        nb.addEventListener("click", function(e){ e.stopPropagation(); pileStep(n, d[3]); });
-        el.appendChild(nb);
-      });
       var pileDownAt = null;
-      el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))) openPileBrowser(n); });
+      el.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); openPileBrowser(n); }, true);          // capture phase on the pile itself: nothing inside it (the top paper, a tab, an edge) can swallow it or turn it into a note edit
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest("button")) return;
@@ -5708,6 +5839,8 @@
 
   function makePile(ids){
     if(readOnly) return;
+    var inSel = ids.map(findNote).filter(isPileObj);
+    if(inSel.length === 1 && ids.length > 1){ addToPile(inSel[0].id, ids); return; }          // a pile plus loose papers selected: add them to that pile
     var list = pileEligibleList(ids), skipped = ids.length - list.length;
     if(list.length < Stick.pile.MIN_MEMBERS){ toast("Select at least two notes (not pinned, not Done) to pile them."); return; }
     if(list.length > Stick.pile.MAX_MEMBERS){ toast("A pile holds up to " + Stick.pile.MAX_MEMBERS + " papers."); return; }
@@ -5860,23 +5993,32 @@
   function openPileBrowser(pile){
     if(!pile || !isPileObj(pile) || pileLive(pile).length < Stick.pile.MIN_MEMBERS) return;
     closePileBrowser(); closeFloatingPopovers();
-    var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar");
+    var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar"), desk = makeDiv("pbDesk");
     card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Browse the pile"); card.tabIndex = -1;
     var fanOK = !(window.matchMedia && matchMedia("(max-width: 700px), (pointer: coarse)").matches), fan = false;
     var prev = document.createElement("button"), next = document.createElement("button"), idx = makeDiv("pbIndex"), back = document.createElement("button");
     prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
-    prev.textContent = "‹"; next.textContent = "›"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
+    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.classList.add("pbPrev"); next.classList.add("pbNext"); prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper"); prev.title = "Previous paper"; next.title = "Next paper";
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
-    function tool(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", fn); return b; }
-    var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
-    var shuf = tool("Shuffle", function(){ shufflePile(pile); paint(); });
-    var earlier = tool("← Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); });
-    var later = tool("Move later →", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); });
-    var fanBtn = tool("Fan", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.textContent = fan ? "Single" : "Fan"; paint(); }); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
-    bar.appendChild(prev); bar.appendChild(idx); bar.appendChild(next);
-    var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
-    card.appendChild(stage); card.appendChild(bar); card.appendChild(tools);
-    var foot = makeDiv("pbFoot"); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
+    var SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+    function ic(d){ return SVG + d + "</svg>"; }
+    // compact icon controls where the meaning is universal (each has an aria-label and a tooltip); text stays where an icon would be a guess
+    function tool(label, fn, cls, icon){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); if(icon){ b.innerHTML = icon; b.classList.add("ico"); b.title = label; b.setAttribute("aria-label", label); } else b.textContent = label; b.addEventListener("click", fn); return b; }
+    var editB = tool("Edit this paper", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) focusPileMember(pile, m.id); }, "", ic('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'));
+    var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); }, "", ic('<path d="M12 15V4M8 8l4-4 4 4M5 20h14"/>'));
+    var shuf = tool("Shuffle the pile", function(){ shufflePile(pile); paint(); }, "", ic('<path d="M3 7h3c4 0 5 10 9 10h5M3 17h3c1.6 0 2.7-1.2 3.6-2.6M13.5 9.4C14.4 8.2 15.4 7 17 7h3M17 4l3 3-3 3M17 14l3 3-3 3"/>'));
+    var earlier = tool("Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); }, "", ic('<path d="M19 12H5M11 6l-6 6 6 6"/>'));
+    var later = tool("Move later", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); }, "", ic('<path d="M5 12h14M13 6l6 6-6 6"/>'));
+    var FANIC = ic('<rect x="9" y="6" width="6" height="12" rx="1"/><rect x="9" y="6" width="6" height="12" rx="1" transform="rotate(-24 12 20)"/><rect x="9" y="6" width="6" height="12" rx="1" transform="rotate(24 12 20)"/>'), ONEIC = ic('<rect x="7" y="4" width="10" height="16" rx="1.5"/>');
+    var fanBtn = tool("Fan the papers out", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.innerHTML = fan ? ONEIC : FANIC; var lb = fan ? "Back to one paper" : "Fan the papers out"; fanBtn.title = lb; fanBtn.setAttribute("aria-label", lb); card.classList.toggle("isFan", fan); paint(); }, "", FANIC); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
+    bar.appendChild(idx);
+    desk.appendChild(prev); desk.appendChild(stage); desk.appendChild(next);          // previous / next are tabs on the edges of the paper, not buttons floating around it
+    // one slip, grouped by meaning: arrange the pile | work on this paper | leave (previous / next are the edge tabs on the paper itself)
+    var tools = makeDiv("pbTools pbGroup"); tools.setAttribute("role", "group"); tools.setAttribute("aria-label", "Arrange the pile"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
+    var onPaper = makeDiv("pbOnPaper pbGroup"); onPaper.setAttribute("role", "group"); onPaper.setAttribute("aria-label", "This paper"); onPaper.appendChild(editB); onPaper.appendChild(take);
+    var foot = makeDiv("pbFoot pbGroup"); foot.appendChild(back);
+    var slip = makeDiv("pbSlip"); slip.appendChild(tools); slip.appendChild(onPaper); slip.appendChild(foot);          // every action on one control slip
+    card.appendChild(bar); card.appendChild(desk); card.appendChild(slip);
     root.appendChild(card); document.body.appendChild(root);
     pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
     pileBrowserLayer.open();
@@ -5896,7 +6038,7 @@
         for(var k = from; k < to; k++){
           (function(k){
             var slot = makeDiv("pbFanCard" + (k === i ? " current" : "")), off = k - i;
-            slot.style.setProperty("--fo", off); slot.setAttribute("role", "button"); slot.tabIndex = -1; slot.setAttribute("aria-label", "Paper " + (k + 1) + " of " + live.length + (k === i ? " (showing)" : ""));
+            slot.style.setProperty("--fo", (k - (from + (to - from - 1) / 2)).toFixed(2));          // spread around the middle of the visible papers, so the fan is centred on the desk slot.setAttribute("role", "button"); slot.tabIndex = -1; slot.setAttribute("aria-label", "Paper " + (k + 1) + " of " + live.length + (k === i ? " (showing)" : ""));
             slot.appendChild(paperOf(live[k]));
             slot.addEventListener("click", function(){ pileBrowse[pile.id] = k; paint(); });
             fanEl.appendChild(slot);
@@ -5904,8 +6046,9 @@
         }
         stage.appendChild(fanEl);
       } else stage.appendChild(paperOf(live[i]));
-      idx.textContent = (i + 1) + " / " + live.length;
-      take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
+      idx.textContent = "paper " + (i + 1) + " of " + live.length; idx.title = pileKindName(live[i]);
+      prev.disabled = next.disabled = live.length < 2;
+      editB.hidden = readOnly || isAV(live[i]) || live[i].type === "embed"; take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
       earlier.disabled = i === 0; later.disabled = i === live.length - 1;
     }
     function step(d){ var live = pileLive(pile); if(live.length < 2) return; pileBrowse[pile.id] = (browseIdx(pile, live) + d + live.length) % live.length; paint(); }
@@ -5926,10 +6069,39 @@
     paint(); next.focus();
   }
 
+  // ---- editing the paper that is showing (member focus mode)
+  // The paper stays a member of its pile (nothing moves, nothing is removed). For as long as it is being edited it is simply drawn, over the pile, as the real thing, so every
+  // editor that note or object already has works unchanged. Esc, or a click anywhere else, puts it back.
+  var pileFocus = null;
+  function focusPileMember(pile, memberId){
+    if(readOnly || !pile || !isPileObj(pile)) return;
+    var m = findNote(memberId); if(!m || (pile.members || []).indexOf(memberId) === -1) return;
+    if(isAV(m) || m.type === "embed"){ openPileBrowser(pile); return; }
+    endPileFocus(); closeFloatingPopovers();
+    pileFocus = {pileId: pile.id, id: memberId}; rebuildHidden(); syncPileVisibility();
+    var cur = findNote(memberId); if(!cur || !cur.el){ pileFocus = null; syncPileVisibility(); return; }
+    var p = findNote(pile.id); cur.el.classList.add("pileFocused");
+    cur.el.style.left = (p ? p.x : cur.x) + "px"; cur.el.style.top = (p ? p.y : cur.y) + "px"; cur.el.style.zIndex = String(((p && p.z) || 1) + 2);
+    setSelection([memberId]);
+    var first = cur.el.querySelector(".poF");
+    setTimeout(function(){ if(cur.textEl) focusNoScroll(cur.textEl); else if(first) editPaperField(cur, first); }, 30);
+    pileFocus.out = function(e){ var t = e.target; if(cur.el && cur.el.contains(t)) return; if(t.closest && t.closest(".floatPop, .noteMenu, .acctBackdrop, .menuSubBody")) return; endPileFocus(); };
+    pileFocus.key = function(e){ if(e.key === "Escape"){ e.stopPropagation(); e.preventDefault(); endPileFocus(); } };
+    window.addEventListener("pointerdown", pileFocus.out, true); window.addEventListener("keydown", pileFocus.key, true);
+  }
+  function endPileFocus(){
+    if(!pileFocus) return;
+    var f = pileFocus; pileFocus = null;
+    window.removeEventListener("pointerdown", f.out, true); window.removeEventListener("keydown", f.key, true);
+    endEditing(); var m = findNote(f.id); if(m && m.el) m.el.classList.remove("pileFocused");
+    rebuildHidden(); syncPileVisibility();
+    var p = findNote(f.pileId); if(p && p.el) paintPileShown(p, p.el);
+  }
   // ---- menus
   function pileMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
     var live = pileLive(n), h = makeDiv("menuHint"); h.textContent = Stick.pile.label(n, live.length); pop.appendChild(h);
+    pop.appendChild(menuItem(ICONS.pencil, "Edit this paper", function(){ closeFloatingPopovers(); var lv = pileLive(n), tm = lv[browseIdx(n, lv)]; if(tm) focusPileMember(n, tm.id); }, {title: "Bring the paper on top out to edit it. It stays in the pile."}));
     pop.appendChild(menuItem(ICONS.search || ICONS.more, "Browse the papers\u2026", function(){ closeFloatingPopovers(); openPileBrowser(n); }, {title: "Look through the pile one paper at a time. Nothing changes."}));
     pop.appendChild(menuItem(ICONS.move, "Shuffle the pile", function(){ closeFloatingPopovers(); shufflePile(n); }, {title: "Mix up the order. Nothing is removed."}));
     pop.appendChild(menuItem(ICONS.move, "Unpile (put them back)", function(){ closeFloatingPopovers(); unpilePile(n); }, {title: "Spreads the papers back out where they were. Nothing is deleted."}));
@@ -6357,6 +6529,8 @@
   var draggingIds = null;
   function startDrag(e, primary, group){
     var everyone = group;
+    if(isZone(primary) && isPinned(primary)){ pendingFront = null; pinTug(primary); return; }          // a pinned zone stays put, and (with "Move with notes") does not carry its members off either: they remain independently movable
+    if(pileFocus && group.some(function(g){ return g.id === pileFocus.id; })) return;          // a paper being edited out of its pile does not move
     group = group.filter(function(g){ return !isPinned(g); });               // pinned items stay put, even in a group
     if(!group.length){ pendingFront = null; everyone.forEach(pinTug); return; }
     var startX = e.clientX, startY = e.clientY;
@@ -6447,6 +6621,7 @@
       list = list.filter(function(n){ return !isPileObj(n); });
     }
     if(!list.length) return;
+    if(!opts.silent && !opts.force && list.every(isThrowaway)){ deleteNotes(ids, {silent: true}); return; }          // closing an empty, never-used note just makes it disappear: Trash is for things that meant something
     if(!opts.silent){ trashNotes(list); return; }          // an explicit delete goes to Trash first; only a quiet clean-up of an unused blank note is deleted outright
     var hadContent = list.some(noteHasContent);
     var before = opts.silent ? null : captureState(list.map(function(n){ return n.id; }));
@@ -6982,7 +7157,7 @@
     if(!canReact() || selected.size !== 1) return;
     var n = findNote(Array.from(selected)[0]); if(!n || !n.el || isZone(n)) return;
     var b = document.createElement("button"); b.type = "button"; b.className = "reactAdd"; b.title = "React"; b.setAttribute("aria-label", "Add a reaction"); b.setAttribute("aria-haspopup", "true");
-    b.textContent = "+ ☺";
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.2c.9 1.3 2 1.9 3.5 1.9s2.6-.6 3.5-1.9"/><circle cx="9" cy="9.8" r="0.6" fill="currentColor"/><circle cx="15" cy="9.8" r="0.6" fill="currentColor"/></svg>';
     b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("mousedown", function(e){ e.preventDefault(); });
     b.addEventListener("click", function(e){ e.stopPropagation(); reactionPicker(n, b); });
     n.el.appendChild(b); reactAddEl = b;
@@ -6999,18 +7174,28 @@
       return b;
     }
     var quick = makeDiv("reactQuick"); Stick.reactions.SET.forEach(function(e){ quick.appendChild(pick(e)); });
-    var more = makeDiv("reactMore"); more.hidden = true; more.setAttribute("aria-label", "More emoji");
-    Stick.reactions.MORE.forEach(function(g){
-      var h = makeDiv("reactGroup"); h.textContent = g.name; more.appendChild(h);
-      var row = makeDiv("reactGrid"); g.items.forEach(function(e){ row.appendChild(pick(e)); }); more.appendChild(row);
-    });
-    var plus = document.createElement("button"); plus.type = "button"; plus.className = "reactPick reactPlus"; plus.textContent = "+"; plus.setAttribute("aria-label", "More emoji"); plus.setAttribute("aria-expanded", "false");
+    var more = makeDiv("reactMore"); more.hidden = true;
+    var search = document.createElement("input"); search.type = "search"; search.className = "reactSearch"; search.placeholder = "Search emoji"; search.setAttribute("aria-label", "Search emoji"); search.autocomplete = "off";
+    var groups = makeDiv("reactGroups"); more.appendChild(search); more.appendChild(groups);
+    var built = false;
+    function build(q){                                  // the broader set is only drawn when "More" is opened (nothing is mounted for objects that never open it)
+      groups.textContent = ""; q = (q || "").trim().toLowerCase(); var any = false;
+      Stick.reactions.MORE.forEach(function(g){
+        if(q && g.name.toLowerCase().indexOf(q) === -1 && (g.words || "").indexOf(q) === -1) return;
+        any = true; var h = makeDiv("reactGroup"); h.textContent = g.name; groups.appendChild(h);
+        var row = makeDiv("reactGrid"); g.items.forEach(function(e){ row.appendChild(pick(e)); }); groups.appendChild(row);
+      });
+      if(!any){ var none = makeDiv("reactNone"); none.textContent = "No emoji match."; groups.appendChild(none); }
+    }
+    search.addEventListener("input", function(){ build(search.value); });
+    search.addEventListener("keydown", function(e){ e.stopPropagation(); if(e.key === "Escape"){ e.preventDefault(); closeFloatingPopovers(); } });
+    var plus = document.createElement("button"); plus.type = "button"; plus.className = "reactMoreBtn"; plus.textContent = "More"; plus.setAttribute("aria-label", "More emoji"); plus.setAttribute("aria-expanded", "false");
     plus.addEventListener("mousedown", function(ev){ ev.preventDefault(); });
     plus.addEventListener("click", function(ev){
-      ev.stopPropagation(); var open = more.hidden; more.hidden = !open; plus.setAttribute("aria-expanded", open ? "true" : "false"); plus.textContent = open ? "\u2212" : "+";
-      if(open){ var f = more.querySelector("button"); if(f) f.focus(); }
+      ev.stopPropagation(); var open = more.hidden; more.hidden = !open; plus.setAttribute("aria-expanded", open ? "true" : "false"); plus.classList.toggle("on", open);
+      if(open){ if(!built){ build(""); built = true; } search.focus(); }
     });
-    quick.appendChild(plus); pop.appendChild(quick); pop.appendChild(more);
+    pop.appendChild(quick); quick.appendChild(plus); pop.appendChild(more);
     var first = quick.querySelector("button"); if(first) first.focus();
   }
 
@@ -7208,6 +7393,7 @@
     if(!n.image && htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim().length >= 20) pop.appendChild(menuItem(ICONS.clipping, "Make clipping", function(){ closeFloatingPopovers(); noteToClipping(n); }, {title: "Keep these words as a clipping, with a place for where they came from"}));
     if(vOnly) pop.appendChild(menuItem(ICONS.video || ICONS.link, "Show link as video", function(){ closeFloatingPopovers(); linkToEmbed(n, vOnly); }, {title: "Shows this " + Stick.embed.PROVIDERS[vOnly.provider].label + " link as a video you can play here"}));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
+    addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
@@ -7225,6 +7411,7 @@
       closeFloatingPopovers();
       openShareModal([n]);
     }, {cls: empty ? "disabled" : "", title: empty ? "Add some text or an image first" : ""}));
+    pop.appendChild(menuItem(PRINT_ICON, "Print…", function(){ if(empty){ toast("Add some text or an image before printing."); return; } closeFloatingPopovers(); printObjects([n]); }, {cls: empty ? "disabled" : "", title: empty ? "Add some text or an image first" : "Print just this note (or save it as a PDF from the print window)"}));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
       var open = moveItem.nextSibling && moveItem.nextSibling.classList && moveItem.nextSibling.classList.contains("boardPick");
@@ -7257,19 +7444,49 @@
     return notes.filter(function(o){ return o !== z && !isZone(o) && o.el && o.el.isConnected && inBox(noteCenter(o), box); });
   }
   function insideAnyZone(n){ if(isZone(n)) return false; var c = noteCenter(n); return notes.some(function(z){ return isZone(z) && z.el && z.el.isConnected && inBox(c, zoneBox(z)); }); }
+  // A zone's paper always covers its members: if a member grows (a bigger photo, a longer newspaper, a rotation) past the zone's edge, the zone's visible surface grows to cover it. It never
+  // ejects the member and never shrinks by itself. Only the zone's own size (and, for a member that overhangs the left or top, its origin) changes; members, their positions and the count are untouched.
+  var ZONE_PAD = 10, zoneFitting = false;
+  function memberBounds(o){
+    var sz = objSize(o), a = Math.abs((o.rot || 0) * Math.PI / 180), w = sz.w, h = sz.h;
+    var bw = w * Math.cos(a) + h * Math.sin(a), bh = w * Math.sin(a) + h * Math.cos(a), cx = o.x + w / 2, cy = o.y + h / 2;
+    return {l: cx - bw / 2, t: cy - bh / 2, r: cx + bw / 2, b: cy + bh / 2};
+  }
+  function zoneFitOne(z){
+    if(!isZone(z) || z.min === true || !z.el || !z.el.isConnected) return false;
+    var members = zoneContents(z); if(!members.length) return false;
+    var L = z.x, T = z.y, R = z.x + (z.w || 360), B = z.y + (z.h || 240);
+    members.forEach(function(o){ var b = memberBounds(o); L = Math.min(L, b.l - ZONE_PAD); T = Math.min(T, b.t - ZONE_PAD - 30); R = Math.max(R, b.r + ZONE_PAD); B = Math.max(B, b.b + ZONE_PAD); });
+    L = Math.max(0, Math.floor(L)); T = Math.max(0, Math.floor(T)); R = Math.ceil(R); B = Math.ceil(B);
+    var nw = Math.min(ZONE_MAX_W, R - L), nh = Math.min(ZONE_MAX_H, B - T);
+    if(L === z.x && T === z.y && nw <= (z.w || 360) && nh <= (z.h || 240)) return false;
+    z.x = L; z.y = T; z.w = Math.max(z.w || 360, nw); z.h = Math.max(z.h || 240, nh);
+    z.el.style.left = z.x + "px"; z.el.style.top = z.y + "px"; z.el.style.width = z.w + "px"; z.el.style.height = z.h + "px";
+    return true;
+  }
+  function zoneFitAll(){
+    if(zoneFitting) return false; zoneFitting = true; var any = false;
+    try{ notes.forEach(function(z){ if(isZone(z) && zoneFitOne(z)) any = true; }); }finally{ zoneFitting = false; }
+    return any;
+  }
   function zoneLabel(n){ return n.title ? "Zone: " + n.title : "Untitled zone"; }
   function renderZone(n, isNew){
     var el = document.createElement("div");
     el.className = "zone mat-" + zoneMaterial(n) + (isNew ? " new" : "");
-    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.width = (n.w || 360) + "px"; el.style.height = (n.h || 240) + "px"; el.style.zIndex = 0;
+    el.dataset.id = n.id; el.style.left = n.x + "px"; el.style.top = n.y + "px"; el.style.width = (n.w || 360) + "px"; el.style.height = (n.h || 240) + "px";
     el.style.setProperty("--zone", safeColor(n.bg) || ZONE_TINTS[0]);
     el.setAttribute("aria-label", zoneLabel(n)); el.setAttribute("role", "group");
     if(selected.has(n.id)) el.classList.add("selected");
     n.el = el; n.textEl = null; n.captionEl = null;
     var bar = makeDiv("zoneBar"), title = makeDiv("zoneTitle");
     title.textContent = n.title || ""; title.setAttribute("data-ph", "Name this zone");
+    if(!readOnly) title.classList.add("editable");
+    title.style.fontFamily = '"' + ZONE_TITLE_FONTS[zoneTitleFont(n)][0] + '", "Alef", "Heebo", sans-serif';
     bar.appendChild(title);
-    var cnt = document.createElement("span"); cnt.className = "zoneCount"; cnt.setAttribute("aria-live", "off"); bar.appendChild(cnt);
+    var cnt = document.createElement("button"); cnt.type = "button"; cnt.className = "zoneCount";
+    cnt.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
+    cnt.addEventListener("click", function(e){ e.stopPropagation(); selectZoneMembers(n); });
+    bar.appendChild(cnt);
     el.appendChild(bar);
     if(!readOnly){
       var mn = document.createElement("button"); mn.type = "button"; mn.className = "zoneMin";
@@ -7296,7 +7513,7 @@
         base.forEach(function(b){ if(isZone(b) && (b.carry === true || b.min === true)) (b.min === true ? zoneHeld(b) : zoneContents(b)).forEach(function(o){ if(!seen[o.id]){ seen[o.id] = 1; all.push(o); } }); });
         startDrag(e, n, all);
       });
-      bar.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
+      bar.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest(".zoneTitle"))) return; e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
       el.addEventListener("keydown", function(e){
         if(e.target !== el) return;
         if(e.key === "Enter"){ e.preventDefault(); editZoneTitle(n); }
@@ -7319,7 +7536,9 @@
     var el = n && n.el; if(!el || !isZone(n)) return;
     var min = n.min === true, c = zoneMemberCount(n);
     el.classList.toggle("zoneMinimized", min);
-    var cnt = el.querySelector(".zoneCount"); if(cnt) cnt.textContent = c ? c + (c === 1 ? " object" : " objects") : "";
+    var cnt = el.querySelector(".zoneCount");
+    if(cnt){ cnt.textContent = ""; cnt.hidden = !c; if(c){ var b = document.createElement("b"); b.textContent = String(c); cnt.appendChild(b); cnt.appendChild(document.createTextNode(c === 1 ? " object" : " objects")); }
+      cnt.title = min ? "Restore the zone and select what is on it" : "Select everything on this zone"; cnt.setAttribute("aria-label", c + (c === 1 ? " object" : " objects") + ". " + (min ? "Restore and select" : "Select them")); }
     var b = el.querySelector(".zoneMin");
     if(b){ b.innerHTML = min ? ICONS.expand || "+" : ICONS.minus || "\u2212"; b.title = min ? "Restore this zone and everything on it" : "Minimize this zone"; b.setAttribute("aria-label", min ? "Restore this zone" : "Minimize this zone"); b.setAttribute("aria-expanded", min ? "false" : "true"); }
     el.setAttribute("aria-label", zoneLabel(n) + (min ? " (minimized, " + c + (c === 1 ? " object)" : " objects)") : ""));
@@ -7338,7 +7557,16 @@
     });
   }
   var zonePaintT = null;
-  function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; syncZoneMembership(); }, 120); }
+  function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; if(!readOnly && zoneFitAll()) saveNotes(); syncZoneMembership(); }, 120); }
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ if(typeof scheduleZonePaint === "function") scheduleZonePaint(); });
+  // the count is a handle on the zone's contents: select them all (a minimized zone is restored first so there is something to see)
+  function selectZoneMembers(z){
+    if(!isZone(z)) return;
+    if(z.min === true){ var held = (z.hold || []).slice(); restoreZone(z); setSelection(held.filter(function(id){ return !!findNote(id); })); return; }
+    var ids = zoneContents(z).map(function(o){ return o.id; });
+    if(!ids.length){ toast("Nothing is on this zone yet."); return; }
+    setSelection(ids);
+  }
   function minimizeZone(n){
     if(readOnly || !isZone(n) || n.min === true) return;
     var members = zoneContents(n); closeFloatingPopovers(); endEditing();
@@ -7397,6 +7625,7 @@
     var vc = viewCenter();
     var x = bx != null ? bx : vc.x, y = by != null ? by : Math.min(vc.y, 260);
     var z = {id: newId(), type: "zone", x: Math.max(0, Math.round(x - 180)), y: Math.max(0, Math.round(y - 120)), w: 360, h: 240, title: "", variant: "paper", bg: ZONE_TINTS[Math.floor(Math.random() * 3)], rot: 0, z: 0, phys: {}, createdAt: Date.now()};
+    z.tf = hashStr(z.id) % ZONE_TITLE_FONTS.length;
     z.y = Math.min(z.y, Math.max(0, boardHeight() - z.h - 8));
     insertNotes([z], "Add zone");
     setTimeout(function(){ editZoneTitle(z); }, 60);
@@ -7404,28 +7633,46 @@
   }
   function zoneMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu"); if(!pop) return;
+    pop.classList.add("zoneMenuPop");
     var count = zoneMemberCount(n);
-    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " object on this zone" : " objects on this zone"); pop.appendChild(hint);
+    var hint = makeDiv("menuHint"); hint.textContent = count + (count === 1 ? " object in this zone" : " objects in this zone"); pop.appendChild(hint);
     pop.appendChild(menuItem(ICONS.pencil, "Rename", function(){ closeFloatingPopovers(); editZoneTitle(n); }));
     pop.appendChild(menuItem(ICONS.minus || ICONS.tick, n.min === true ? "Restore zone" : "Minimize zone", function(){ closeFloatingPopovers(); if(n.min === true) restoreZone(n); else minimizeZone(n); }, {title: "Collapse the zone to its title and count; everything on it comes back when you restore"}));
-    var mh = makeDiv("menuHint"); mh.textContent = "Material"; pop.appendChild(mh);
-    ZONE_MATERIALS.forEach(function(m){
-      pop.appendChild(menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
-        closeFloatingPopovers(); var before = captureState([n.id]); n.variant = m[0]; saveNotes(); rerenderNote(n); recordChange("Zone material", before);
-      }, {cls: zoneMaterial(n) === m[0] ? "on" : ""}));
+    pop.appendChild(makeDiv("menuSep"));
+    menuSub(pop, ICONS.paper || ICONS.sticky, "Material", function(body){
+      ZONE_MATERIALS.forEach(function(m){
+        var it = menuItem(zoneMaterial(n) === m[0] ? ICONS.tick : '<span class="menuGap"></span>', m[1], function(){
+          closeFloatingPopovers(); var before = captureState([n.id]); n.variant = m[0]; saveNotes(); rerenderNote(n); recordChange("Zone material", before);
+        }, {cls: zoneMaterial(n) === m[0] ? "on" : ""});
+        var sw = document.createElement("span"); sw.className = "zoneMatSw mat-" + m[0]; sw.setAttribute("aria-hidden", "true"); sw.style.setProperty("--zone", safeColor(n.bg) || ZONE_TINTS[0]); it.appendChild(sw);
+        body.appendChild(it);
+      });
     });
-    var ch = makeDiv("menuHint"); ch.textContent = "Colour"; pop.appendChild(ch);
-    var sw = makeDiv("zoneSwatches");
-    ZONE_TINTS.forEach(function(c){
-      var b = document.createElement("button"); b.type = "button"; b.className = "zoneSw" + ((safeColor(n.bg) || ZONE_TINTS[0]) === c ? " on" : ""); b.style.background = c; b.setAttribute("aria-label", "Colour " + c);
-      b.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.bg = c; saveNotes(); rerenderNote(n); recordChange("Zone colour", before); });
-      sw.appendChild(b);
+    menuSub(pop, ICONS.palette || ICONS.sticky, "Colour", function(body){
+      var sw = makeDiv("zoneSwatches");
+      ZONE_TINTS.forEach(function(c){
+        var b = document.createElement("button"); b.type = "button"; b.className = "zoneSw" + ((safeColor(n.bg) || ZONE_TINTS[0]) === c ? " on" : ""); b.style.background = c; b.setAttribute("aria-label", "Colour " + c); b.setAttribute("aria-pressed", (safeColor(n.bg) || ZONE_TINTS[0]) === c ? "true" : "false");
+        b.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.bg = c; saveNotes(); rerenderNote(n); recordChange("Zone colour", before); });
+        sw.appendChild(b);
+      });
+      body.appendChild(sw);
     });
-    pop.appendChild(sw);
-    pop.appendChild(menuItem(n.carry === true ? ICONS.tick : '<span class="menuGap"></span>', "Move with its notes", function(){
-      closeFloatingPopovers(); var before = captureState([n.id]); if(n.carry === true) delete n.carry; else n.carry = true; saveNotes(); recordChange("Zone moves with its notes", before);
-    }, {cls: n.carry === true ? "on" : "", title: "When on, dragging the zone carries the notes lying on it"}));
+    menuSub(pop, ICONS.pencil, "Title style", function(body){
+      ZONE_TITLE_FONTS.forEach(function(f, i){
+        var it = menuItem(zoneTitleFont(n) === i ? ICONS.tick : '<span class="menuGap"></span>', f[1], function(){ closeFloatingPopovers(); var before = captureState([n.id]); n.tf = i; saveNotes(); rerenderNote(n); recordChange("Zone title style", before); }, {cls: zoneTitleFont(n) === i ? "on" : ""});
+        var lab = it.querySelector(".t, span:last-child") || it; lab.style.fontFamily = '"' + f[0] + '", "Alef", sans-serif'; lab.style.fontSize = "1.05rem";
+        body.appendChild(it);
+      });
+    });
+    // "Move with notes" is a switch row: one line, label left, switch right
+    var row = document.createElement("button"); row.type = "button"; row.className = "menuItem menuToggle"; row.setAttribute("role", "menuitemcheckbox"); row.setAttribute("aria-checked", n.carry === true ? "true" : "false");
+    row.title = "When on, dragging the zone carries the notes lying on it";
+    var lbl = document.createElement("span"); lbl.className = "mtLabel"; lbl.textContent = "Move with notes"; var sw2 = document.createElement("span"); sw2.className = "mtSwitch" + (n.carry === true ? " on" : ""); sw2.setAttribute("aria-hidden", "true");
+    row.appendChild(lbl); row.appendChild(sw2);
+    row.addEventListener("click", function(){ closeFloatingPopovers(); var before = captureState([n.id]); if(n.carry === true) delete n.carry; else n.carry = true; saveNotes(); recordChange("Zone moves with its notes", before); });
+    pop.appendChild(row);
     pop.appendChild(pinMenuItem(n));
+    pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.trash, "Delete zone", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger", title: "Only the paper goes; notes on it stay"}));
   }
   OBJECT_MENUS.zone = zoneMenu;
@@ -7569,20 +7816,28 @@
   }
   function pileWhen(o){ try{ return new Date(o.doneAt).toLocaleDateString(undefined, {day:"numeric", month:"short"}); }catch(e){ return ""; } }
   var pileBtn = null;
+  // The two system spaces people reach for, as one small dock in the corner: a tick and a bin, each with a count, shown only when it holds something. (Other system spaces do not belong here.)
+  var spaceDock = null, trashBtn = null;
   function ensurePileBtn(){
     if(pileBtn) return pileBtn;
-    pileBtn = document.createElement("button");
-    pileBtn.type = "button"; pileBtn.className = "donePile"; pileBtn.hidden = true;
-    pileBtn.innerHTML = '<span class="dpStack" aria-hidden="true"><i></i><i></i><i></i></span><span class="dpLabel"></span>';
+    spaceDock = makeDiv("spaceDock"); spaceDock.setAttribute("role", "group"); spaceDock.setAttribute("aria-label", "Done and Trash"); spaceDock.hidden = true;
+    pileBtn = document.createElement("button"); pileBtn.type = "button"; pileBtn.className = "donePile dockBtn"; pileBtn.hidden = true;
+    pileBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span class="dpLabel"></span>';
     pileBtn.addEventListener("click", openDoneTray);
-    document.body.appendChild(pileBtn);
+    trashBtn = document.createElement("button"); trashBtn.type = "button"; trashBtn.className = "trashDock dockBtn"; trashBtn.hidden = true;
+    trashBtn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13M10 11v6M14 11v6"/></svg><span class="dpLabel"></span>';
+    trashBtn.addEventListener("click", function(){ openSpace("trash"); });
+    spaceDock.appendChild(pileBtn); spaceDock.appendChild(trashBtn);
+    document.body.appendChild(spaceDock);
     return pileBtn;
   }
   function updateDonePile(bump){
-    var b = ensurePileBtn(), k = donePile.length;
-    b.hidden = !k || singleNoteMode || readOnly;
-    b.querySelector(".dpLabel").textContent = "Done \u00b7 " + k;
-    b.setAttribute("aria-label", "Done pile: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it.");
+    var b = ensurePileBtn(), k = donePile.length, t = trashPile.length, off = singleNoteMode || readOnly;
+    b.hidden = !k || off; trashBtn.hidden = !t || off; spaceDock.hidden = b.hidden && trashBtn.hidden;
+    b.querySelector(".dpLabel").textContent = String(k);
+    b.setAttribute("aria-label", "Done: " + k + (k === 1 ? " finished note" : " finished notes") + ". Open it."); b.title = "Done (" + k + ")";
+    trashBtn.querySelector(".dpLabel").textContent = String(t);
+    trashBtn.setAttribute("aria-label", "Trash: " + t + (t === 1 ? " item" : " items") + ". Open it."); trashBtn.title = "Trash (" + t + ")";
     if(bump && !b.hidden){ b.classList.remove("bump"); void b.offsetWidth; b.classList.add("bump"); }
   }
   // a small, quick "finished" moment: a DONE stamp lands and a few paper scraps pop (about 0.45 s, removed afterwards). Nothing at all under reduced motion.
@@ -7975,6 +8230,7 @@
       picker.style.paddingLeft = "0";
     });
     add(ICONS.share, "Share", function(){ openShareModal(selectedNotes()); });
+    add(PRINT_ICON, "", function(){ printObjects(selectedNotes()); }).setAttribute("aria-label", "Print selection");
     add(ICONS.trash, "Delete", function(){ requestDelete(ids); }, "danger");
     var x = add(ICONS.close, "", function(){ clearSelection(); }, "x");
     x.title = "Clear selection"; x.setAttribute("aria-label", "Clear selection");
@@ -7998,7 +8254,7 @@
   var dialogSeq = 0;
   function openModal(o){
     var opener = document.activeElement;
-    var backdrop = makeDiv("acctBackdrop");
+    var backdrop = makeDiv("acctBackdrop" + (document.querySelector(".prBackdrop, .lrBackdrop, .ptrBackdrop, .pbBackdrop, .spBackdrop") ? " critical" : ""));          // a dialog opened from a reader or a system space always sits above it
     var card = makeDiv("acctCard modalCard" + (o.slip ? " slipCard" : ""));
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
@@ -8163,24 +8419,22 @@
     }
     var skipped = list.length - shareable.length;
 
-    var content = document.createElement("div");
-    var previewBox = makeDiv("sharePreview");
-    var arr = buildArrangement(items, 330, 230);
-    previewBox.appendChild(arr.el);
-    content.appendChild(previewBox);
-    var msgBox = makeDiv("shareMsg");
-    msgBox.textContent = msg;
-    content.appendChild(msgBox);
-    var copyMsg = document.createElement("button");
-    copyMsg.className = "guestBtn copyBtn";
-    copyMsg.style.cssText = "background:var(--accent-strong);color:var(--on-accent);border-color:var(--accent-strong);";
-    copyMsg.textContent = "Copy message";
-    content.appendChild(copyMsg);
-    var copyLink = document.createElement("button");
-    copyLink.className = "acctBack";
-    copyLink.style.cssText = "display:block;text-align:center;width:100%;margin:12px 0 0;";
-    copyLink.textContent = "Just copy the link";
-    content.appendChild(copyLink);
+    var content = document.createElement("div"); content.className = "shareCompact";
+    var top = makeDiv("shareTop"), previewBox = makeDiv("sharePreview"), stat = makeDiv("shareStat");
+    var arr = buildArrangement(items, 190, 120);
+    previewBox.appendChild(arr.el); top.appendChild(previewBox);
+    var st1 = document.createElement("strong"); st1.textContent = (isGroup ? shareable.length + " items" : "1 item") + " · link ready"; var st2 = document.createElement("span"); st2.textContent = "Anyone with the link can view " + (isGroup ? "them" : "it") + ", no account needed."; stat.appendChild(st1); stat.appendChild(st2); top.appendChild(stat);
+    content.appendChild(top);
+    var acts = makeDiv("shareActs");
+    var copyLink = document.createElement("button"); copyLink.type = "button"; copyLink.className = "pillBtn primary"; copyLink.textContent = "Copy link";
+    var copyMsg = document.createElement("button"); copyMsg.type = "button"; copyMsg.className = "pillBtn"; copyMsg.textContent = "Copy message";
+    var prBtn = document.createElement("button"), pdfBtn = document.createElement("button");
+    prBtn.type = pdfBtn.type = "button"; prBtn.className = pdfBtn.className = "pillBtn"; prBtn.textContent = isGroup ? "Print selection" : "Print"; pdfBtn.textContent = "Print / Save as PDF";
+    pdfBtn.title = "Opens your browser’s print window; choose “Save as PDF” there";
+    prBtn.addEventListener("click", function(){ printObjects(list); }); pdfBtn.addEventListener("click", function(){ printObjects(list, {pdf: true}); });
+    [copyLink, copyMsg, prBtn, pdfBtn].forEach(function(b){ acts.appendChild(b); }); content.appendChild(acts);
+    var more = document.createElement("details"); more.className = "shareMore"; var sum = document.createElement("summary"); sum.textContent = "What will people see?"; more.appendChild(sum);
+    var msgBox = makeDiv("shareMsg"); msgBox.textContent = msg; more.appendChild(msgBox);
     var fine = document.createElement("p");
     fine.className = "shareFine";
     fine.className = "shareFine big";
@@ -8193,14 +8447,14 @@
       (skipped - avLeft > 0 ? " (" + (skipped - avLeft) + " empty note" + (skipped - avLeft > 1 ? "s were" : " was") + " left out.)" : "") +
       (avLeft ? (cloudShare ? " (" + avLeft + " recording" + (avLeft > 1 ? "s" : "") + " still uploading " + (avLeft > 1 ? "were" : "was") + " left out.)" : " Voice memos and videos stay on this device for now, so they aren't included.") : "") +
       (!cloudShare && link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "")));
-    content.appendChild(fine);
+    more.appendChild(fine);
+    content.appendChild(more);
     if(shareInfo){
       var off = document.createElement("button");
-      off.className = "acctBack";
-      off.style.cssText = "display:block;text-align:center;width:100%;margin:10px 0 0;color:var(--danger);";
+      off.className = "acctBack shareOff";
       off.textContent = "Turn this link off";
       off.addEventListener("click", function(){
-        Stick.share.disable(shareInfo.id).then(function(){ off.textContent = "\u2713 Link turned off"; off.disabled = true; toast("That link no longer works."); })
+        Stick.share.disable(shareInfo.id).then(function(){ off.textContent = "✓ Link turned off"; off.disabled = true; toast("That link no longer works."); })
           .catch(function(){ toast("Couldn't turn it off. Try again."); });
       });
       content.appendChild(off);
@@ -8225,6 +8479,72 @@
       } else toast("Couldn't copy automatically.");
     });
   }
+
+  // ---------- Print / Save as PDF ----------
+  // Uses the browser's own print window (so "Save as PDF" is the browser's, not a Stick-It PDF engine). Only the objects handed in are printed, from clean copies of
+  // their data: a temporary #printRoot is built on demand, everything else on the page is hidden by print CSS (css/print.css), and the root, the title and the
+  // dark-mode switch are put back as soon as printing ends. The board, its objects, selection and history are never touched.
+  var printState = null, printBusy = false;
+  function printable(n){ return !!n && !isPileObj(n) && !isZone(n) && !isAV(n) && n.type !== "embed" && !isHiddenMember(n) && noteHasContent(n); }
+  function printTitleFor(list){
+    var first = list[0], t = ""; try{ t = String(itemText(first) || "").replace(/\s+/g, " ").trim().slice(0, 40); }catch(e){}
+    return "Stick-It" + (list.length > 1 ? " \u2013 " + list.length + " items" : t ? " \u2013 " + t : " \u2013 note");
+  }
+  function endPrint(){
+    if(!printState) return;
+    var st = printState; printState = null;
+    clearTimeout(st.timer); window.removeEventListener("afterprint", st.after);
+    if(st.root.parentNode) st.root.remove();
+    document.body.classList.remove("printing"); if(st.dark) document.body.classList.add("dark");
+    document.title = st.title;
+  }
+  async function printObjects(list, opts){
+    opts = opts || {};
+    if(printState || printBusy) return;          // one print at a time (a quick double click must not build two print roots)
+    printBusy = true;
+    var chosen = (list || []).filter(Boolean), items = chosen.filter(printable);
+    var skipped = chosen.length - items.length;
+    if(!items.length){ printBusy = false; toast(chosen.some(isPileObj) ? "Open the pile and select a paper in it to print it." : chosen.some(isAV) ? "Recordings and videos can\u2019t be printed." : "There is nothing to print yet."); return; }
+    endEditing(); closeFloatingPopovers();
+    var root = null;
+    try{
+    var P = Stick.printLayout, data = items.map(function(n){ return PublicShare.toPublicNote(Object.assign({}, n)); });      // clean copies: the originals are never changed
+    root = document.createElement("div"); root.id = "printRoot"; root.setAttribute("aria-hidden", "true");
+    var sheet = makeDiv("printSheet"); root.appendChild(sheet);
+    var els = data.map(function(it){ var el = buildStaticNote(it); el.removeAttribute("id"); Array.prototype.forEach.call(el.querySelectorAll("[id]"), function(x){ x.removeAttribute("id"); }); el.classList.add("printObj"); return el; });
+    els.forEach(function(el){ el.style.left = "0px"; el.style.top = "0px"; el.style.transform = "none"; sheet.appendChild(el); });
+    document.body.appendChild(root);
+    if(document.fonts && document.fonts.ready){ try{ await document.fonts.ready; }catch(e){} }
+    await Promise.all(Array.prototype.map.call(root.querySelectorAll("img"), function(im){ return im.complete ? Promise.resolve() : new Promise(function(r){ im.addEventListener("load", r, {once: true}); im.addEventListener("error", r, {once: true}); setTimeout(r, 4000); }); }));
+    var sizes = data.map(function(it, i){ return {x: it.x || 0, y: it.y || 0, w: els[i].offsetWidth, h: els[i].offsetHeight, rot: it.rot || 0}; });
+    var plan = P.plan(sizes);
+    sheet.className = "printSheet " + plan.mode; sheet.style.width = ""; sheet.style.height = "";
+    function holder(i, sc){      // a box the size of the scaled object, holding the object scaled and tilted inside it
+      var el = els[i], rb = P.rotBox(sizes[i]), box = makeDiv("printItem"); box.style.width = Math.ceil(rb.w * sc) + "px"; box.style.height = Math.ceil(rb.h * sc) + "px";
+      var bw = Math.ceil(rb.w * sc), bh = Math.ceil(rb.h * sc); el.style.position = "absolute"; el.style.left = Math.round((bw - sizes[i].w) / 2) + "px"; el.style.top = Math.round((bh - sizes[i].h) / 2) + "px";          // scaling about the centre keeps the centre where it is
+      el.style.transformOrigin = "50% 50%"; el.style.transform = "rotate(" + (sizes[i].rot || 0) + "deg) scale(" + sc + ")";
+      el.style.setProperty("--rot", "0deg"); box.appendChild(el); return box;
+    }
+    if(plan.mode === "spatial"){
+      sheet.style.width = plan.width + "px"; sheet.style.height = plan.height + "px";
+      plan.boxes.forEach(function(b){ var h = holder(b.index, b.scale); h.style.position = "absolute"; h.style.left = Math.round(b.left) + "px"; h.style.top = Math.round(b.top) + "px"; sheet.appendChild(h); });
+    } else {
+      plan.boxes.forEach(function(b){ var h = holder(b.index, b.scale); if(b.whole === false || plan.spans) h.classList.add("spans"); sheet.appendChild(h); });
+    }
+    printBusy = false;
+    var st = {root: root, title: document.title, dark: document.body.classList.contains("dark"), timer: null, after: function(){ endPrint(); }};
+    printState = st;
+    st.timer = setTimeout(endPrint, 180000);
+    window.addEventListener("afterprint", st.after);
+    document.body.classList.remove("dark"); document.body.classList.add("printing");          // paper is printed on a light background, whatever the screen theme
+    if(opts.pdf) toast("In the print window, choose \u201cSave as PDF\u201d as the destination.");
+    document.title = printTitleFor(items);
+    if(skipped) toast(skipped + (skipped === 1 ? " item" : " items") + " can\u2019t be printed (piles, zones, recordings, videos) and " + (skipped === 1 ? "was" : "were") + " left out.");
+    if(opts.preview){ var esc = function(e){ if(e.key === "Escape"){ document.removeEventListener("keydown", esc, true); endPrint(); } }; document.addEventListener("keydown", esc, true); return; }          // inspect the print layout on screen; Esc closes it
+    setTimeout(function(){ try{ window.print(); }catch(e){ endPrint(); toast("Couldn\u2019t open the print window."); } }, 60);
+    }catch(err){ printBusy = false; if(printState){ endPrint(); } else { if(root && root.parentNode) root.remove(); document.body.classList.remove("printing"); } toast("Couldn’t prepare that for printing."); }
+  }
+  window.Stick = window.Stick || {}; Stick.print = {objects: printObjects, byIds: function(ids, o){ return printObjects(ids.map(findNote), o); }, isPrinting: function(){ return !!printState; }, printable: printable};
 
   // Public page for a shared note or group: minimal, just the paper.
   function publicShell(){
@@ -8900,6 +9220,7 @@
     var signedIn = ccSignedIn();
     cc.adopt(document.getElementById("secAppearance"), cc.panes.appearance);
     buildLookSection(cc, cc.panes.appearance);
+    cc.panes.appearance.appendChild(buildInputCard());
     if(!signedIn) cc.adopt(document.getElementById("sharingSec"), cc.panes.sharing);
     if(signedIn) buildAccountParts(cc); else buildGuestAccount(cc, cc.panes.account);
     cc.adopt(document.getElementById("secBoardData"), cc.panes.privacy);
@@ -8951,24 +9272,65 @@
       src.connect(f); f.connect(g); g.connect(c.destination); src.start();
       return true;
     }
+    // a thump of filtered noise (the stamp) and/or soft sine partials with a quick attack and a short decay (the chime). All low, all short.
+    // a tiny shared bus (soft compressor + a roof at 3.2 kHz) so a chord of several notes can never clip or sound sharp
+    var busNode = null;
+    function out(c){
+      if(busNode && busNode.ctx === c) return busNode;
+      var comp = c.createDynamicsCompressor(); comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.18;
+      var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200; comp.connect(lp); lp.connect(c.destination); comp.ctx = c; busNode = comp; return comp;
+    }
+    // a thump of filtered noise (the paper stamp)
+    function thump(c, t0, v, dur, cutoff){
+      var n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
+      for(var i = 0; i < n; i++){ d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
+      var src = c.createBufferSource(); src.buffer = buf; var f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff;
+      var g = c.createGain(); g.gain.value = v; src.connect(f); f.connect(g); g.connect(out(c)); src.start(t0);
+    }
+    function partial(c, t0, freq, v, attack, decay, type){
+      var o = c.createOscillator(), g = c.createGain(); o.type = type || "sine"; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + attack); g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
+      o.connect(g); g.connect(out(c)); o.start(t0); o.stop(t0 + attack + decay + 0.03);
+    }
+    // Stick-It's sound language: tiny jazz chords, never beeps. Each is 3-4 notes strummed a few ms apart (like a thumb across a guitar) and gone within about half a second.
+    // Voicings (Hz): see docs/dev/SOUND.md.
+    var CH = {
+      dim7B: [246.94, 293.66, 349.23, 415.30],        // B dim7: B3 D4 F4 Ab4, the tiny "passing" chord
+      c69:   [261.63, 329.63, 440.00, 587.33],        // C6/9 (no 5th): C4 E4 A4 D5, where it comes to rest
+      dim7E: [311.13, 369.99, 440.00, 523.25],        // Eb dim7: Eb4 Gb4 A4 C5, a lighter sting for Restore
+      dim7Blow: [207.65, 174.61, 146.83, 123.47]      // B dim7 an octave and a half down, listed top to bottom: Ab3 F3 D3 B2 (strummed downwards for Trash)
+    };
+    function chord(c, t0, notes, v, strum, decay, type){ notes.forEach(function(f, i){ partial(c, t0 + i * strum, f, v, 0.01, decay, type || "triangle"); }); }
+    function playCue(name, volume){
+      var c = audio(); if(!c) return false;
+      if(c.state === "suspended") try{ c.resume(); }catch(e){}
+      var v = Math.max(0, Math.min(1, volume / 100)), t0 = c.currentTime + 0.005;
+      if(name === "done"){                                   // paper stamp, a diminished chord that leans forward, and its warm resolution
+        thump(c, t0, 0.35 * v, 0.06, 650);
+        chord(c, t0 + 0.02, CH.dim7B, 0.075 * v, 0.014, 0.16);
+        chord(c, t0 + 0.19, CH.c69, 0.07 * v, 0.016, 0.34, "sine");
+      } else if(name === "trash"){                          // a darker, descending dismissal: the low dim7 strummed downwards, settling a semitone lower on A2
+        thump(c, t0, 0.4 * v, 0.08, 420);
+        chord(c, t0 + 0.01, CH.dim7Blow, 0.085 * v, 0.018, 0.2);
+        partial(c, t0 + 0.11, 110.00, 0.07 * v, 0.012, 0.26, "sine");
+      } else if(name === "undo"){                           // Done played backwards: the 6/9 leans back into the diminished chord, both strummed downwards and soft
+        chord(c, t0, CH.c69.slice().reverse(), 0.055 * v, 0.012, 0.13, "sine");
+        chord(c, t0 + 0.15, CH.dim7B.slice().reverse(), 0.05 * v, 0.014, 0.22);
+      }
+      else if(name === "restore"){ chord(c, t0, CH.dim7E, 0.06 * v, 0.012, 0.2, "sine"); }
+      else return false;
+      return true;
+    }
     return {
       enabled: function(){ return settings.soundOn !== false; },
       volume: function(){ return Math.max(0, Math.min(100, Number(settings.soundVolume == null ? 60 : settings.soundVolume))); },
-      preview: function(){ return tap(this.volume()); },
+      preview: function(){ return playCue("done", this.volume()) || tap(this.volume()); },
       play: function(){ return this.enabled() && this.volume() > 0 ? tap(this.volume()) : false; },
-      // short cues for Done (rising two-note chime), Trash (low soft thud), Restore (quick upward blip). Only ever from a user's own action; respects the Sounds setting; never before the first gesture (the context stays suspended).
+      // short cues for Done (a paper stamp with a tiny soft chime), Trash (a low soft thud) and Restore (a quick upward blip). Only ever from a user's own action; respects the Sounds setting; never before the first gesture.
       cue: function(name){
         if(!this.enabled() || this.volume() <= 0) return false;
-        var c = audio(); if(!c || c.state === "suspended" && !navigator.userActivation) return false;
-        if(c.state === "suspended") try{ c.resume(); }catch(e){}
-        var notes = {done: [[660, 0, 0.11], [990, 0.09, 0.16]], trash: [[180, 0, 0.14], [120, 0.06, 0.12]], restore: [[420, 0, 0.09], [630, 0.07, 0.12]]}[name]; if(!notes) return false;
-        var v = this.volume() / 100 * 0.22, t0 = c.currentTime;
-        notes.forEach(function(nt){
-          var o = c.createOscillator(), g = c.createGain(); o.type = name === "trash" ? "triangle" : "sine"; o.frequency.value = nt[0];
-          g.gain.setValueAtTime(0.0001, t0 + nt[1]); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + nt[1] + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t0 + nt[1] + nt[2]);
-          o.connect(g); g.connect(c.destination); o.start(t0 + nt[1]); o.stop(t0 + nt[1] + nt[2] + 0.02);
-        });
-        return true;
+        var c = audio(); if(!c || (c.state === "suspended" && !(navigator.userActivation && navigator.userActivation.hasBeenActive))) return false;
+        return playCue(name, this.volume());
       }
     };
   })();
@@ -9141,10 +9503,8 @@
     rebinderEl = sec; sec._cleanup = endCapture;
     return sec;
   }
-  function buildShortcutsPane(cc, pane){
-    pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
-    var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
-    (function(){                                                          // "Input": two small choices, saved the moment they change
+  // "Input": two small choices (what a double-click on the board creates, what pasted text becomes), saved the moment they change. Lives with the other personal preferences in Appearance.
+  function buildInputCard(){
       var card = document.createElement("section"); card.className = "asCard"; card.setAttribute("aria-labelledby", "ccInH");
       card.innerHTML = '<h4 id="ccInH">Input</h4>';
       function row(id, label, help, list, key){
@@ -9157,8 +9517,11 @@
       }
       row("inDbl", "Double-click the canvas creates", "What a double-click on empty board makes. Ask me each time opens the add menu where you clicked.", DBL_NODES, "dblNode");
       row("inPaste", "Pasted text becomes", "When you paste plain text onto the board (not into a note you are editing).", PASTE_MODES, "pasteText");
-      pane.insertBefore(card, box);
-    })();
+      return card;
+  }
+  function buildShortcutsPane(cc, pane){
+    pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
+    var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
     if(KB) buildRebinder(box, groups);
     SHORTCUT_GROUPS.forEach(function(g){
       var sec = document.createElement("section"); sec.className = "asCard kbdGroup"; var h = document.createElement("h4"); h.textContent = g.title; sec.appendChild(h);
@@ -9213,14 +9576,27 @@
     ["Copyright / DMCA", "legal/copyright.html", "Report content or send a notice."]
   ];
   function buildLegalPane(cc, pane){
-    pane.innerHTML = '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
+    pane.innerHTML = '<section class="asCard wnCard" aria-labelledby="ccWnH"><h4 id="ccWnH">What’s New</h4><div class="wnBody"></div></section>' +
+      '<section class="asCard" aria-labelledby="ccLegH"><h4 id="ccLegH">Legal &amp; policies</h4><div class="ccLegalList"></div></section>' +
       '<section class="asCard" aria-labelledby="ccAbH"><h4 id="ccAbH">About Stick-It</h4><p class="ccAbout" id="ccAbout"></p></section>';
     var list = pane.querySelector(".ccLegalList");
-    var wn = document.createElement("button"); wn.type = "button"; wn.className = "asAction ccLink"; wn.id = "ccWhatsNew";
-    wn.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>Every patch note, and a replayable tour for each.</small></span><span class="go" aria-hidden="true">›</span>';
-    wn.addEventListener("click", function(){ if(window.Stick && Stick.patchReader && Stick.patchHistory) Stick.patchReader.open(); else openWhatsNew(); });
-    var wnIco = legalIconEl("whatsNew"); if(wnIco){ wn.insertBefore(wnIco, wn.firstChild); wn.classList.add("hasIco"); }
-    list.appendChild(wn);
+    // What's New: the latest update with its two actions, and an obvious door to every update. (The history, the full notes and the tour replay all live behind these.)
+    (function(){
+      var box = pane.querySelector(".wnBody"), H = window.Stick && Stick.patchHistory, hasReader = !!(window.Stick && Stick.patchReader && H && H.versions && H.versions.length);
+      if(!hasReader){ var fb = document.createElement("button"); fb.type = "button"; fb.className = "asAction ccLink"; fb.id = "ccWhatsNew"; fb.innerHTML = '<span class="lbl"><span class="t">What’s New</span><small>What changed in this version.</small></span><span class="go" aria-hidden="true">›</span>'; fb.addEventListener("click", function(){ openWhatsNew(); }); box.appendChild(fb); return; }
+      var v = H.versions[0], latest = makeDiv("wnLatest");
+      var tag = document.createElement("span"); tag.className = "wnSticker"; tag.textContent = "Latest · v" + v.version;
+      var nm = document.createElement("b"); nm.className = "wnName"; nm.textContent = v.codename; var tl = document.createElement("p"); tl.className = "wnTldr"; tl.textContent = v.summary || "";
+      var acts = makeDiv("wnActs"), r1 = document.createElement("button"), r2 = document.createElement("button");
+      r1.type = r2.type = "button"; r1.className = "pillBtn primary"; r2.className = "pillBtn"; r1.textContent = "Read the notes"; r2.textContent = "Replay the update tour";
+      r1.addEventListener("click", function(){ Stick.patchReader.open({version: v.version}); }); r2.addEventListener("click", function(){ Stick.patchReader.openTour(v.version); });
+      acts.appendChild(r1); acts.appendChild(r2); latest.appendChild(tag); latest.appendChild(nm); latest.appendChild(tl); latest.appendChild(acts); box.appendChild(latest);
+      var all = document.createElement("button"); all.type = "button"; all.className = "asAction ccLink wnAll"; all.id = "ccWhatsNew";
+      all.innerHTML = '<span class="lbl"><span class="t">All updates</span><small>The whole patch history, every note, and a replayable tour for each update.</small></span><span class="go"><span class="wnCount"></span><span aria-hidden="true">›</span></span>';
+      all.querySelector(".wnCount").textContent = H.versions.length + " updates";
+      all.addEventListener("click", function(){ Stick.patchReader.open(); });
+      box.appendChild(all);
+    })();
     // the globe: only languages whose legal pages are complete are listed (js/lang.js); the same registry will serve the app later
     var langs = window.Stick && Stick.lang ? Stick.lang.complete("legal") : [];
     if(langs.length > 1){
@@ -9320,14 +9696,17 @@
             style: pf.avatarStyle, color: pf.avatarColor, emoji: pf.avatarEmoji};
   }
   (function(){ var v = document.getElementById("verTag"), c = (window.Stick && Stick.config) || {};
-    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); } })();
+    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); }
+    // a local build says so, in the tab title and beside the version, so it is never mistaken for the live site (production shows neither)
+    var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
+    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev · localhost"; }
+    try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
     updateAccountIcon0();
     var old = accountBtn.querySelector(".crown");
     if(old) old.remove();
-    var qs = document.getElementById("quickSignOut");
-    if(qs) qs.hidden = !settings.account;
+    var qs = document.getElementById("quickSignOut"); if(qs) qs.remove();          // the avatar's own menu (right-click / long-press) has Sign out; no second button
     if(settings.account && isPremium()){
       var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium";
       accountBtn.appendChild(c);
@@ -9770,7 +10149,7 @@
   async function openManageShares(onChange){
     var content = document.createElement("div");
     content.className = "acctSub"; content.style.textAlign = "left";
-    var modal = openModal({title: "Your active links", content: content, width: 460, actions: [{label: "Done", kind: "primary", value: true}]});
+    var modal = openModal({title: "Shared links", content: content, width: 520, actions: [{label: "Done", kind: "primary", value: true}]});
     var ld = localLoader(content, "Loading your links\u2026");
     try{
       var list = await Stick.share.list();
@@ -9779,25 +10158,33 @@
       var act = list.filter(function(x){ return x.is_active; });
       await new Promise(function(r){ ld.stop(r); });
       content.innerHTML = "";
-      if(!act.length){ content.textContent = "You have no active share links."; return; }
-      var note = document.createElement("p"); note.style.margin = "0 0 10px";
+      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "You have no active shared links."; content.appendChild(none); return; }
+      var note = document.createElement("p"); note.className = "lkNote";
       note.textContent = "Anyone with one of these links can view it. Turn a link off and it stops working straight away.";
       content.appendChild(note);
+      var listEl = makeDiv("lkList"); content.appendChild(listEl);
+      // one compact card per link: what it is, where it came from, when, and as whom; then its one action
       act.forEach(function(x){
-        var row = makeDiv("asRow");
-        var t = document.createElement("div");
-        var kind = x.share_type === "board_live" ? "Live board" : x.share_type === "group_snapshot" ? "Group of items" : "Single item";
-        t.innerHTML = "<span></span><small></small>";
-        t.firstChild.textContent = kind + (x.board_id && names[x.board_id] ? " \u00b7 " + names[x.board_id] : "");
-        t.lastChild.textContent = "Created " + new Date(x.created_at).toLocaleDateString() + (x.by_name ? " \u00b7 shown as " + x.by_name : "") +
-          (x.by_avatar_asset_id ? " \u00b7 with photo" : "") + (x.by_bio ? " \u00b7 with bio" : "");
-        var b = document.createElement("button"); b.className = "pillBtn danger"; b.textContent = "Turn off";
+        var card = makeDiv("lkCard"), live = x.share_type === "board_live", group = x.share_type === "group_snapshot";
+        var ic = makeDiv("lkIcon"); ic.setAttribute("aria-hidden", "true"); ic.innerHTML = live ? ICONS.share : group ? ICONS.copy : ICONS.sticky;
+        var body = makeDiv("lkBody"), head = makeDiv("lkHead"), kind = document.createElement("strong");
+        kind.textContent = live ? "Whole board" : group ? "Selection of notes" : "Single note"; head.appendChild(kind);
+        var bn = x.board_id && names[x.board_id]; if(bn){ var bs = document.createElement("span"); bs.className = "lkBoard"; bs.textContent = "from " + bn; head.appendChild(bs); }
+        body.appendChild(head);
+        var meta = makeDiv("lkMeta");
+        function chip(txt, cls){ var c = document.createElement("span"); c.className = "lkChip" + (cls ? " " + cls : ""); c.textContent = txt; meta.appendChild(c); }
+        chip("Created " + new Date(x.created_at).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}));
+        if(live) chip("Read only", "perm"); else chip("Frozen copy");
+        if(x.by_name) chip("Shown as " + x.by_name);
+        if(x.by_avatar_asset_id) chip("With photo"); if(x.by_bio) chip("With bio");
+        body.appendChild(meta);
+        var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn danger lkOff"; b.textContent = "Turn off"; b.setAttribute("aria-label", "Turn off this " + kind.textContent.toLowerCase() + " link");
         b.addEventListener("click", function(){
           b.disabled = true;
-          Stick.share.disable(x.id).then(function(){ row.remove(); if(onChange) onChange(-1); toast("That link no longer works."); },
+          Stick.share.disable(x.id).then(function(){ card.remove(); if(onChange) onChange(-1); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "You have no active shared links."; listEl.appendChild(n2); } },
             function(){ b.disabled = false; toast("Couldn't turn it off. Try again."); });
         });
-        row.appendChild(t); row.appendChild(b); content.appendChild(row);
+        card.appendChild(ic); card.appendChild(body); card.appendChild(b); listEl.appendChild(card);
       });
     }catch(e){ if(!modal.card.isConnected){ ld.stop(); return; } ld.fail("Couldn\u2019t load your links. " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ modal.close(false); setTimeout(function(){ openManageShares(onChange); }, 0); }); }
   }
@@ -9965,6 +10352,12 @@
           '<div class="asItem" id="asBioRow"><label class="lbl" for="asShowBio">Show bio</label><input type="checkbox" class="asSw" id="asShowBio" role="switch"></div>' +
           '<div class="asItem"><label class="lbl" for="asBoardMode">New board links<small>Nothing is shared until you make a link.</small></label><span class="asSel"><select class="asSelect" id="asBoardMode"><option value="view">Read only</option><option value="ask">Ask every time</option></select></span></div>' +
           '<div class="asPreview" id="asPreview" aria-live="polite"></div>' +
+        '</section>' +
+// ---------- the links you have made, and what a link is
+        '<section class="asCard" aria-labelledby="asH2b">' +
+          '<h4 id="asH2b">Your links</h4>' +
+          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage shared links<small>See and turn off every link you’ve made.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
+          '<p class="asHint" style="margin-top:6px;">A link to a note or a selection is a <b>frozen copy</b>: changing the original later does not change what people see. A link to a whole board is live and read only unless you choose otherwise. Anyone with a link can view it, no account needed, and you can turn any link off at any time. Printing and saving as a PDF never creates a link.</p>' +
         '</section>');
     P.appearance.insertAdjacentHTML("beforeend",
 // ---------- personalization
@@ -9992,7 +10385,7 @@
           '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by email<small>Occasional Stick-It news and feature updates. You can unsubscribe anytime.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
-          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
+          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage shared links<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
           '<button type="button" class="asAction" id="asCorrect"><span class="lbl">Correct my profile details<small>Change your name, username or bio at the top of this page, then Save.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
@@ -10009,10 +10402,11 @@
     var picEl = $("asPic");
     (function(){                                    // Premium is shown the same way everywhere: a crown sitting on the head of the avatar, never as a word beside it
       var wrap = makeDiv("avCrownWrap"); picEl.parentNode.insertBefore(wrap, picEl); wrap.appendChild(picEl);
-      var pen = document.createElement("button"); pen.type = "button"; pen.className = "asPicEdit"; pen.setAttribute("aria-label", "Edit profile photo"); pen.title = "Edit photo";
-      pen.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>';
-      pen.addEventListener("click", function(){ $("asPhotoBtn").click(); });
-      wrap.style.position = "relative"; wrap.appendChild(pen);
+      // ONE way to change the photo: the pencil on the avatar (it is the same button that used to be the "Change photo" pill; its words stay for screen readers)
+      var pen = $("asPhotoBtn"), act = pen.closest(".asHeroActions");
+      pen.className = "asPicEdit"; pen.setAttribute("aria-label", "Change profile photo"); pen.title = "Change profile photo";
+      pen.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg><span id="asPhotoLbl" class="sr-only"></span>';
+      wrap.style.position = "relative"; wrap.appendChild(pen); if(act) act.remove();
       if(isPremium()){ var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium"; wrap.appendChild(c); }
     })();
 
@@ -10115,7 +10509,11 @@
       item(eff === "none" ? "Upload photo" : "Upload a new photo", pickPhoto);
       item("Take photo", takePhoto);
       if(providerUrl && eff !== "provider") item("Use " + providerName(provider) + " photo", function(){ setStage({action: "provider", blob: null, url: null}); });
-      if(eff !== "none") item("Remove photo", function(){ setStage({action: "none", blob: null, url: null}); }, "danger");
+      if(eff !== "none") item("Remove photo", function(){
+        // removing is staged until Save, so nothing is destroyed here; Undo puts the previous photo choice straight back (an upload in progress keeps its preview)
+        var prev = stage; stage = {action: "none", blob: null, url: null}; refreshHero();
+        toast("Profile photo removed · Undo", "Undo", function(){ if(stage.action === "none"){ stage = prev; refreshHero(); toast("Photo restored."); } });
+      }, "danger");
       item("Cancel", function(){});
       openMenu($("asPhotoBtn"), menu);
     });
@@ -10257,7 +10655,7 @@
         '<div class="asStat"><small>Storage</small><span class="asSkel"></span></div><div class="asStat"><small>Member since</small><span class="asSkel"></span></div>';
     }
     var activeShares = null;
-    function paintShareCount(){ $("asSharesN").textContent = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); }
+    function paintShareCount(){ var t = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); $("asSharesN").textContent = t; if($("asSharesN2")) $("asSharesN2").textContent = t; }
     function loadUsage(){
       statSkeleton();
       Stick.account.usage().then(function(u){
@@ -10334,7 +10732,8 @@
 
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
-    $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); });
+    function manageShares(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); }
+    $("asShares").addEventListener("click", manageShares); $("asShares2").addEventListener("click", manageShares);
     try{
       var localBoards = Stick.migrate.inspectLocal(localStorage);
       if(localBoards.length){
@@ -10422,6 +10821,34 @@
 
   (function(){ var b = document.getElementById("board"); if(b) b.setAttribute("tabindex", "-1"); })();
   document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
+  // the avatar's own menu: right-click on a computer, a long press on a phone (a plain tap still opens the account window, as before)
+  function openAccountMenu(){
+    closeFloatingPopovers();
+    var pop = openFloatingPopover(accountBtn, "noteMenu"); if(!pop) return;
+    if(settings.account){
+      var who = makeDiv("menuHint"); who.textContent = settings.account.name || settings.account.email || "Your account"; pop.appendChild(who);
+      pop.appendChild(menuItem(ICONS.pencil, "Account settings", function(){ closeFloatingPopovers(); openControlCenter("account"); }));
+      pop.appendChild(menuItem(ICONS.move, "Switch account…", function(){
+        closeFloatingPopovers();
+        confirmDialog({title: "Switch account?", body: "You’ll be signed out on this device, then you can choose another account. Your boards stay saved in the account you leave.", confirm: "Switch account"}).then(function(ok){
+          if(!ok) return; try{ sessionStorage.setItem("stickit.switchAccount", "1"); }catch(e){}
+          if(CLOUD) cloudSignOut("local"); else { signOut(); try{ sessionStorage.removeItem("stickit.switchAccount"); }catch(e){} openAccountModal(); }
+        });
+      }, {title: "Sign out here and choose another account"}));
+      pop.appendChild(makeDiv("menuSep"));
+      pop.appendChild(menuItem(ICONS.close, "Sign out", function(){ closeFloatingPopovers(); confirmSignOut(function(){ if(CLOUD) cloudSignOut(); else signOut(); }); }, {cls: "danger"}));
+    } else {
+      pop.appendChild(menuItem(ICONS.share, "Sign in or create an account", function(){ closeFloatingPopovers(); openAccountModal(); }));
+    }
+  }
+  accountBtn.addEventListener("contextmenu", function(e){ e.preventDefault(); openAccountMenu(); });
+  (function(){
+    var t = null, fired = false;
+    accountBtn.addEventListener("pointerdown", function(e){ if(e.pointerType === "mouse") return; fired = false; clearTimeout(t); t = setTimeout(function(){ fired = true; openAccountMenu(); }, 550); });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function(ev){ accountBtn.addEventListener(ev, function(){ clearTimeout(t); }); });
+    accountBtn.addEventListener("click", function(e){ if(fired){ fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  })();
+  try{ if(sessionStorage.getItem("stickit.switchAccount")){ sessionStorage.removeItem("stickit.switchAccount"); setTimeout(function(){ if(!settings.account) openAccountModal(); }, 900); } }catch(e){}
   accountBtn.addEventListener("click", openAccountModal);
   var quickOut = document.getElementById("quickSignOut");
   if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); confirmSignOut(function(){ if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } }); });
@@ -10759,6 +11186,21 @@
     }
     return {items: items, placed: placed, pages: pageNo};
   }
+  // v0.8.3.3: each zone is its own small page. "Also tidy inside zones" sets what lies on a zone down again INSIDE that zone's bounds only; whatever does not fit stays exactly
+  // where it is, so nothing is ever pulled out of the zone it belongs to. A minimized zone is left alone (its objects are not drawn).
+  function cleanZonePlans(){
+    var out = [];
+    notes.forEach(function(z){
+      if(!isZone(z) || z.min === true || !z.el || !z.el.isConnected) return;
+      var members = zoneContents(z).filter(function(o){ return !isPinned(o); }); if(!members.length) return;
+      var items = members.map(cleanItem), M = 16, bar = 40, page = {x0: z.x + M, x1: z.x + (z.w || 360) - M, y0: z.y + bar + M, y1: z.y + (z.h || 240) - M};
+      if(page.x1 - page.x0 < 60 || page.y1 - page.y0 < 40) return;
+      var res = cleanPack(cleanOrder(items), page, 18, []), keep = [];
+      res.placed.forEach(function(p){ var t = cleanTarget(p), fits = t.x >= page.x0 - 1 && t.y >= page.y0 - 1 && t.x + p.it.w <= page.x1 + 1 && t.y + p.it.h <= page.y1 + 1; if(fits) keep.push(p); });
+      out.push({z: z, total: members.length, placed: keep, moving: cleanMoving({placed: keep}).length});
+    });
+    return out;
+  }
   function cleanTarget(p){ return {x: Math.max(0, Math.round(p.cx - p.it.w / 2)), y: Math.max(8, Math.round(p.cy - p.it.h / 2))}; }
   // the objects that would really change place (this is the number the person sees)
   function cleanMoving(plan){ return plan.placed.filter(function(p){ var t = cleanTarget(p); return t.x !== Math.round(p.it.n.x) || t.y !== Math.round(p.it.n.y); }); }
@@ -10770,14 +11212,18 @@
       var items = ids.map(findNote).filter(Boolean).map(cleanItem), plan = cleanPlan(items);
       return {ids: ids, plan: plan, moving: cleanMoving(plan).length};
     }
-    var pinnedOnScreen = pinnedHere.filter(onScreen).length;
-    return {screen: build(screenIds), board: build(allIds), pinned: {screen: pinnedOnScreen, board: pinnedHere.length}};
+    var pinnedOnScreen = pinnedHere.filter(onScreen).length, zp = cleanZonePlans();
+    return {screen: build(screenIds), board: build(allIds), pinned: {screen: pinnedOnScreen, board: pinnedHere.length},
+      zones: {plans: zp, moving: zp.reduce(function(t, x){ return t + x.moving; }, 0), objects: zp.reduce(function(t, x){ return t + x.total; }, 0), count: zp.length}};
   }
-  function applyClean(snap, scope){
+  function applyClean(snap, scope, inside){
     var part = scope === "screen" ? snap.screen : snap.board;
     var plan = cleanPlan(part.ids.map(findNote).filter(Boolean).map(cleanItem)), moving = cleanMoving(plan);
-    if(!moving.length) return 0;
-    var before = captureState(part.ids);
+    var zonePlans = inside ? cleanZonePlans() : [], zoneMoving = [];
+    zonePlans.forEach(function(zp){ zoneMoving = zoneMoving.concat(cleanMoving({placed: zp.placed})); });
+    if(!moving.length && !zoneMoving.length) return 0;
+    moving = moving.concat(zoneMoving);
+    var before = captureState(part.ids.concat(zoneMoving.map(function(p){ return p.it.n.id; })));
     moving.forEach(function(p){
       var n = p.it.n, t = cleanTarget(p);
       n.x = t.x; n.y = t.y;
@@ -10793,7 +11239,8 @@
     closeFloatingPopovers(); endEditing();
     var snap = cleanSnapshot();
     if(!snap.board.ids.length){ toast(snap.pinned.board ? "Everything on this board is pinned in place." : "The board is empty, so there is nothing to tidy."); return; }
-    function run(scope){ setTimeout(function(){ var moved = applyClean(snap, scope); toast(moved ? "Tidied " + moved + (moved === 1 ? " item." : " items.") : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }
+    function run(scope, inside){ setTimeout(function(){ var moved = applyClean(snap, scope, !!inside); toast(moved ? "Tidied " + moved + (moved === 1 ? " item." : " items.") : "Everything was already tidy.", moved ? "Undo" : null, moved ? function(){ undo(); } : null); }, 30); }
+    var insideBox = null;
     if(preset === "screen" || preset === "board"){ run(preset); return; }       // from the command palette
     var vis = snap.screen.moving, total = snap.board.moving, scope = snap.screen.ids.length ? "screen" : "board", content = makeDiv("cleanBox"), group = makeDiv("cleanOpts"), summary = makeDiv("cleanSum"), go = null;
     group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", "What to tidy"); summary.setAttribute("role", "status");
@@ -10812,8 +11259,11 @@
       Array.prototype.forEach.call(group.children, function(b){ var on = b.dataset.scope === scope; b.setAttribute("aria-checked", String(on)); b.classList.toggle("on", on); b.tabIndex = on ? 0 : -1; });
       var n = scope === "screen" ? vis : total;
       summary.textContent = n ? (scope === "screen" ? "Tidy " + plural(n) + " on your screen" : "Tidy " + plural(n) + " across the board") : "Everything here is already tidy";
-      note.textContent = "Nothing is deleted. Items keep their size and tilt, and you can undo it right after." + pinNote();
-      if(go) go.disabled = !n;
+      var zi = snap.zones, inside = !!(insideBox && insideBox.checked);
+      zonesLine.textContent = snap.board.ids.length + (snap.board.ids.length === 1 ? " object" : " objects") + " on the board" + (zi.count ? " \u00b7 " + zi.objects + (zi.objects === 1 ? " object" : " objects") + " inside " + zi.count + (zi.count === 1 ? " zone" : " zones") + (inside ? " (will be tidied)" : " (left as they are)") : "");
+      if(inside && zi.moving) summary.textContent += " + " + plural(zi.moving) + " inside zones";
+      note.textContent = "Nothing is deleted. Items keep their size and tilt, and you can undo it right after." + pinNote() + (zi.count ? " Objects on a zone are never pulled off it." : "");
+      if(go) go.disabled = !(n || (inside && zi.moving));
     }
     group.addEventListener("keydown", function(e){
       if(e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "ArrowUp" || e.key === "ArrowLeft"){
@@ -10824,11 +11274,17 @@
       }
     });
     if(!vis && total) scope = "board";
-    var note = makeDiv("cleanNote");
-    content.appendChild(group); content.appendChild(summary); content.appendChild(note);
+    var note = makeDiv("cleanNote"), zonesLine = makeDiv("cleanZones");
+    content.appendChild(group); content.appendChild(summary); content.appendChild(zonesLine);
+    if(snap.zones.count){
+      var lab = document.createElement("label"); lab.className = "cleanInside"; insideBox = document.createElement("input"); insideBox.type = "checkbox"; insideBox.id = "cleanInside";
+      lab.appendChild(insideBox); lab.appendChild(document.createTextNode(" Also tidy inside zones")); content.appendChild(lab);
+      insideBox.addEventListener("change", function(){ paint(); });
+    }
+    content.appendChild(note);
     var m = openModal({title: "Clean up canvas", sub: "Put things back in order, like straightening up a desk.", content: content, width: 440,
       actions: [{label: "Cancel", value: false}, {label: "Tidy up", kind: "primary", value: true, id: "cleanGo"}],
-      onClose: function(v){ if(v) run(scope); }});
+      onClose: function(v){ if(v) run(scope, !!(insideBox && insideBox.checked)); }});
     go = m.card.querySelector("#cleanGo"); paint();
     setTimeout(function(){ var cur = group.querySelector(".cleanOpt.on"); if(cur) cur.focus(); }, 60);
   }
@@ -11221,6 +11677,7 @@
   }
 
   function startTour(custom){
+    if(tourRoot) endTour();                   // only ever one tutorial and one backdrop (a second start used to leave the first one stuck on screen)
     if(!panel.hidden) cancelSettings();
     sharePanel.hidden = true;
     closeFloatingPopovers();
@@ -11246,8 +11703,11 @@
   function tourKeys(e){
     if(!tourRoot || e.ctrlKey || e.metaKey || e.altKey) return;
     var t = e.target; if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); endTour(); return; }
+    // a button inside the tour card keeps its own Enter (Skip skips, Previous goes back); anywhere else Enter is "Next" and is NOT passed on, so it can never press a control underneath (the "?" button used to start a second tutorial on top of this one)
+    if(e.key === "Enter" && t && t.tagName === "BUTTON" && tourRoot.contains(t)) return;
     var next = tourRoot.querySelector("#tourNext"), back = tourRoot.querySelector("#tourBack");
-    if(e.key === "ArrowRight" || (e.key === "Enter" && !(t && t.tagName === "BUTTON" && t !== next))){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(next) next.click(); }
+    if(e.key === "ArrowRight" || e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(next) next.click(); }
     else if(e.key === "ArrowLeft" || e.key === "Backspace" || e.key === "Delete"){ e.preventDefault(); e.stopPropagation(); tourKeyUsed = true; if(back) back.click(); }
   }
   function endTour(){
@@ -11273,6 +11733,7 @@
       "</div>";
     if(tourKeyUsed){ var kh = document.createElement("p"); kh.className = "tourKeys"; kh.textContent = "Enter \u2192 Next \u00b7 Backspace \u2190 Previous \u00b7 Esc closes"; card.appendChild(kh); }
     card.querySelector("#tourSkip").addEventListener("click", endTour);
+    try{ card.querySelector("#tourNext").focus({preventScroll: true}); }catch(e){}          // focus lives in the card, so keys go to the tutorial, not the page underneath
     var backBtn = card.querySelector("#tourBack");
     if(backBtn) backBtn.addEventListener("click", function(){ tourIndex--; renderTourStep(); });
     card.querySelector("#tourNext").addEventListener("click", function(){
@@ -11322,7 +11783,7 @@
     card.style.top = top + "px";
     card.style.left = left + "px";
   }
-  helpBtn.addEventListener("click", function(){ startTour(); });
+  helpBtn.addEventListener("click", function(){ if(tourRoot) return; startTour(); });
 
   kbdBtn.addEventListener("click", function(e){ e.stopPropagation(); openControlCenter("shortcuts"); });
 
@@ -11804,6 +12265,14 @@
       location.hash = "";
       location.reload();
     });
+    // "+ New board" lives with the boards (above the System spaces); it opens a small naming slip. Enter creates, Esc cancels.
+    (function(){
+      var open = document.getElementById("newBoardOpen"), slip = document.getElementById("newBoardSlip");
+      function show(on){ slip.hidden = !on; open.hidden = on; open.setAttribute("aria-expanded", on ? "true" : "false"); if(on){ newBoardName.value = ""; newBoardName.focus(); } else { try{ open.focus(); }catch(e){} } }
+      open.addEventListener("click", function(e){ e.stopPropagation(); show(true); });
+      newBoardName.addEventListener("keydown", function(e){ if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); show(false); } });
+      var prev = boardPanel; if(prev) new MutationObserver(function(){ if(prev.hidden && !slip.hidden){ slip.hidden = true; open.hidden = false; open.setAttribute("aria-expanded", "false"); } }).observe(prev, {attributes: true, attributeFilter: ["hidden"]});
+    })();
     newBoardName.addEventListener("keydown", function(e){
       if(e.key === "Enter") addBoardBtn.click();
     });
@@ -12238,9 +12707,16 @@
       return !!(s && !s.isCollapsed && String(s).trim());
     }
     var pendingPasteT = null;
+    // A click on a paper's text selects the paper AND puts a caret in that text. With only a caret (no selected words) there is nothing to copy as text, so Ctrl/Cmd+C
+    // copies the selected paper itself (this was why Copy on a Newspaper "sometimes worked": it depended on where you had clicked). Selected words still copy as words.
+    function paperCaretOnly(){
+      var ae = document.activeElement, sel = window.getSelection();
+      return !!(ae && ae.isContentEditable && ae.closest && ae.closest(".paperObj") && selected.size === 1 && (!sel || sel.isCollapsed));
+    }
     document.addEventListener("keydown", function(e){
-      if(!(e.ctrlKey || e.metaKey) || e.altKey || isTyping() || modalOpen()) return;
+      if(!(e.ctrlKey || e.metaKey) || e.altKey || modalOpen()) return;
       var k = e.key.toLowerCase();
+      if(isTyping() && !(k === "c" && paperCaretOnly())) return;
       if((k === "c" || k === "x") && selected.size && !pageTextSelected()){
         var ids = Array.from(selected);
         copyNotesToClipboard(null, k === "x");
@@ -12255,7 +12731,7 @@
       }
     });
     document.addEventListener("copy", function(e){
-      if(isTyping() || modalOpen() || pageTextSelected()) return;
+      if((isTyping() && !paperCaretOnly()) || modalOpen() || pageTextSelected()) return;
       copyNotesToClipboard(e, Date.now() - lastNoteCopy < 800);
     });
     document.addEventListener("cut", function(e){
@@ -12826,6 +13302,12 @@
     if(!session && !viewerMode){
       try{ if(sessionStorage.getItem(INVITE_KEY)){ toast("Sign in to accept your invitation."); setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 600); } }catch(e){}
     }
+    if(!session && Stick.auth.staleSession && navigator.onLine && !Stick.auth.callbackPending){
+      // The cached login is dead (the server rejected its refresh token). Booting into cloud mode on it left people behind a red loader with nothing to press.
+      // Forget it and start again as a guest, once; guest mode never depends on the network.
+      var loop = false; try{ loop = !!sessionStorage.getItem("stickit.staleDropped"); sessionStorage.setItem("stickit.staleDropped", "1"); }catch(e){}
+      if(!loop){ try{ sessionStorage.setItem("stickit.staleNote", "1"); }catch(e){} Stick.auth.dropStale(); location.reload(); return; }
+    }
     if(!session){
       // can't prove who we are right now (offline, or the login expired): work from the cache; edits stay queued
       authLost = !navigator.onLine ? false : true;
@@ -12838,6 +13320,7 @@
     try{ profile = await Stick.auth.profile(); }catch(e){}
     if(profile && !(await ensureAgeAttested(profile))) return;      // nothing else loads until the age screen has been passed
     rememberAccount(session.user, profile);
+    try{ sessionStorage.removeItem("stickit.staleDropped"); }catch(e){}
     refreshAccountData();                               // preferences + photo; the mirror in settings covers offline
     var lastAcctRefresh = Date.now();
     document.addEventListener("visibilitychange", function(){

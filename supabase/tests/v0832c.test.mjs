@@ -14,7 +14,7 @@ let many = {}; RR.MORE.flatMap((g) => g.items).slice(0, 20).forEach((e) => { man
 ok(Object.keys(many).length === RR.MAX_KINDS, 'an object keeps at most ' + RR.MAX_KINDS + ' kinds of reaction');
 ok(RR.SET.length === 6 && RR.MORE.length >= 4 && RR.MORE.every((g) => g.items.length > 5 && g.items.every(RR.isEmoji)), 'the quick six plus a broader palette of real emoji');
 const sm = RR.summary({ '🎉': ['a'], '👍': ['a', 'b'] }, 'a'); ok(sm[0].emoji === '👍' && sm[1].emoji === '🎉', 'quick emoji first, then the others');
-ok(/reactQuick/.test(fn('reactionPicker')) && /reactPlus/.test(fn('reactionPicker')) && /Stick\.reactions\.MORE/.test(fn('reactionPicker')), 'the picker shows the quick six with a "+" for more');
+ok(/reactQuick/.test(fn('reactionPicker')) && /reactMoreBtn/.test(fn('reactionPicker')) && /Stick\.reactions\.MORE/.test(fn('reactionPicker')), 'the picker shows the quick six with a "+" for more');
 ok(!/React/.test(fn('openObjectMenu')) && !/reaction/i.test(fn('paperMenu')), 'reactions are not an item in the "..." menu');
 ok(/min-width:44px|width:44px; height:44px/.test(css), 'reaction buttons are 44px');
 
@@ -46,7 +46,7 @@ ok(/notes\.concat\(donePile, trashPile\)/.test(app) || /donePile/.test(app), 'Do
   ok((read('js/sync.js').match(/"newspaper"/g) || []).length >= 3, 'the picture is uploaded and loaded like a postcard picture');
   const pm = fn('paperMenu');
   ok(/pickNewspaperImage/.test(pm) && /removeNewspaperImage/.test(pm) && /Halftone print/.test(pm) && /Black & white/.test(pm) && /"Color"/.test(pm), 'the menu can add, replace, remove, switch color / black & white and toggle halftone');
-  ok(/recordChange\("Remove newspaper picture"/.test(fn('removeNewspaperImage')) && /Replace newspaper picture/.test(fn('pickNewspaperImage')), 'each picture change is one undo step');
+  ok(/recordChange\("Remove newspaper picture"/.test(fn('removeNewspaperImage')) && /Replace newspaper picture/.test(fn('setNewspaperImage')), 'each picture change is one undo step');
   ok(/filter:grayscale\(1\)/.test(css) && !/canvas|toDataURL/.test(fn('buildNewspaperSheet')), 'black & white is a print treatment (CSS); the original is never redrawn');
 }
 

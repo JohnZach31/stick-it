@@ -5,9 +5,9 @@ let pass = 0, fail = 0; const ok = (c, m) => { if (c) pass++; else { fail++; con
 const app = read('js/app.js'); const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
 const v = pn.find((e) => e.version === '0.8.3.2');
 ok(v && v.codename === 'Finish the Flow' && v.status === 'development' && v.date === null, 'v0.8.3.2 is recorded as development, not released');
-ok(/APP_VERSION: "0\.8\.3\.2", APP_CODENAME: "Finish the Flow", APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.3.2, development');
+ok(/APP_VERSION: "0\.8\.3\.[23]"[^}]*APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.3.2, development');
 ok(v.tour.length === 6 && v.highlights.length === 5, 'the Spotlight has the five cards plus the intro');
-ok(fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.2.md')) && JSON.parse(read('docs/patch-notes/index.json'))[0].file === '0.8.3.2.md', 'notes and index are in step');
+ok(fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.2.md')) && JSON.parse(read('docs/patch-notes/index.json')).some((e) => e.file === '0.8.3.2.md'), 'notes and index are in step');
 let check = true; try { execFileSync('node', ['tools/build-patch-data.mjs', '--check'], { cwd: root, stdio: 'pipe' }); } catch (e) { check = false; }
 ok(check, 'generated patch files match the single patch source (--check)');
 const hist = read('js/patch-history.js'); ok(pn.every((e) => hist.includes('"' + e.version + '"')), 'every patch is in the in-app history');

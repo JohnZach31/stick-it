@@ -262,7 +262,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
   ok(/getUserMedia\(\{video: \{facingMode: "user"\}/.test(tp) && (app.match(/getUserMedia\(\{video: \{facingMode/g) || []).length === 1, 'the camera is requested in exactly one place: Take photo (the voice recorder asks for the microphone only)');
   ok(/release\(\)/.test(tp) && /getTracks\(\)\.forEach\(function\(t\)\{ try\{ t\.stop\(\)/.test(tp) && /onClose: function\(v\)\{\s*release\(\);/.test(tp), 'Cancel, Esc and Take photo all switch the camera off');
   ok(/capture", "user"/.test(tp) && /Couldn\\u2019t open the camera/.test(tp), 'devices without a live camera API get the phone\'s camera picker; a refusal says so and offers upload');
-  ok(/item\("Take photo", takePhoto\)/.test(app) && /item\("Cancel", function\(\)\{\}\)/.test(app) && /asPicEdit/.test(app) && /Edit profile photo/.test(app), 'the account photo has a pencil, and a menu: Upload, Take photo, Remove, Cancel');
+  ok(/item\("Take photo", takePhoto\)/.test(app) && /item\("Cancel", function\(\)\{\}\)/.test(app) && /asPicEdit/.test(app) && /Change profile photo/.test(app), 'the account photo has a pencil, and a menu: Upload, Take photo, Remove, Cancel');
   ok(/\.shopObj > \.cmtTab\{ z-index:0; left:22px; bottom:auto;/.test(css) && /function placeShopTab/.test(app), 'the Comment tab hangs from the paper edge (placed by script from the paper, not the node box)');
   ok(!/\.shopObj > \.cmtTab[^{]*\{[^}]*position:fixed/.test(css), 'the tab is positioned inside the object, so it follows movement, rotation and resize');
   { // shopping state survives Done and restore

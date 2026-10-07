@@ -119,7 +119,7 @@ body.dark .po-newspaper{ filter:brightness(0.9); }
 .po-clipping .clDomain{ font:0.7rem 'Sora',sans-serif; color:#6b5d3a; text-decoration:underline; text-underline-offset:2px; overflow-wrap:anywhere; cursor:pointer; } .po-clipping .clDomain.none{ text-decoration:none; opacity:0.6; cursor:default; }
 .po-clipping .clDomain:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
 body.dark .po-clipping .poSheet{ filter:drop-shadow(0 2px 3px rgba(0,0,0,0.6)) brightness(0.88); }
-@media print{ .po-clipping .poSheet{ clip-path:none; } }
+@media print{ body:not(.printing) .po-clipping .poSheet{ clip-path:none; } }
 
 /* ---- shopping list: the Comment tab is placed from the PAPER's own edge (js: placeShopTab), never from the node box that also holds the cart ---- */
 .shopObj > .cmtTab{ z-index:0; left:22px; bottom:auto; transform:rotate(-1deg); border-radius:0 0 7px 7px; }
@@ -253,3 +253,365 @@ body.dark .pileObj .pileKind{ background:#4a4228; color:#f2eadb; }
 .pileObj .pileTab:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:1px; }
 @media (hover:none){ .pileObj .pileTabs{ display:none; } }              /* touch: a tap opens the pile and shows one paper at a time */
 body.multi-sel .pileObj .pileTabs, .pileObj.static .pileTabs{ display:none; }
+
+/* ===== v0.8.3.3 Sand the Edges ===== */
+/* [hidden] must win over component display rules: a guest was seeing the header Sign out button because .gearBtn's display overrode it */
+#quickSignOut[hidden], .gearBtn[hidden]{ display:none !important; }
+/* --- zones (v0.8.3.3) --- */
+/* the zone paper stays at the back (it has no z-index, so it is not a stacking context); only its title rail rises above the objects on it */
+.zone{ z-index:auto; }
+.zone .zoneBar{ position:relative; z-index:9999; }
+.zone.new{ z-index:0; }
+.zoneBar{ gap:8px; }
+.zoneTitle{ flex:0 1 auto; max-width:calc(100% - 150px); font-size:1.15rem; line-height:1.2; font-weight:400; letter-spacing:0.01em; cursor:default; align-self:center; }
+.zoneTitle.editable{ cursor:text; }
+.zoneTitle:empty::before{ font-weight:400; }
+.zoneBar::after{ content:""; flex:1 1 0; order:1; }                 /* the rest of the rail is the drag handle */
+.zoneTitle{ order:0; } .zoneCount{ order:2; } .zoneMin{ order:3; } .zoneMore{ order:4; }
+.zoneCount{ margin-inline-start:0; padding:2px 9px; border:1px solid rgba(0,0,0,0.18); border-radius:999px; background:rgba(255,255,255,0.55); color:#33301f; font:500 0.74rem 'Sora',sans-serif; opacity:1; cursor:pointer; pointer-events:auto; min-height:26px; display:inline-flex; align-items:center; gap:4px; }
+.zoneCount b{ font-weight:800; font-size:0.9rem; }
+.zoneCount:hover, .zoneCount:focus-visible{ background:#fff; border-color:var(--accent, #8a4f0d); }
+.zoneCount:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:1px; }
+.zone.mat-felt .zoneCount{ color:#33301f; }
+@media (pointer:coarse){ .zoneCount{ min-height:40px; padding:4px 14px; } }
+/* a whisper of life: while the pointer is on a zone its edge lifts a hair and the paper "breathes" once. Static with reduced motion and on touch. */
+@media (hover:hover) and (prefers-reduced-motion: no-preference){
+  .zone:not(.zoneMinimized):hover{ box-shadow:0 2px 6px rgba(60,45,10,0.18); animation:zoneBreath 2.8s ease-in-out infinite; }
+  @keyframes zoneBreath{ 0%,100%{ box-shadow:0 1px 3px rgba(60,45,10,0.14); } 50%{ box-shadow:0 3px 9px rgba(60,45,10,0.22); } }
+}
+html[data-a11y-motion="reduce"] .zone:hover{ animation:none !important; }
+/* the zone menu */
+.zoneMenuPop{ min-width:210px; }
+.menuToggle{ display:flex !important; align-items:center; justify-content:space-between; gap:14px; white-space:nowrap; width:100%; }
+.menuToggle .mtLabel{ flex:1; text-align:start; white-space:nowrap; }
+.mtSwitch{ flex:none; position:relative; width:34px; height:20px; border-radius:999px; background:rgba(0,0,0,0.22); transition:background .15s ease; }
+.mtSwitch::after{ content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,0.35); transition:transform .15s ease; }
+.mtSwitch.on{ background:var(--accent-strong, #8a4f0d); } .mtSwitch.on::after{ transform:translateX(14px); }
+[dir="rtl"] .mtSwitch::after{ left:auto; right:2px; } [dir="rtl"] .mtSwitch.on::after{ transform:translateX(-14px); }
+@media (prefers-reduced-motion: reduce){ .mtSwitch, .mtSwitch::after{ transition:none; } }
+.zoneMatSw{ flex:none; margin-inline-start:auto; width:34px; height:18px; border-radius:4px; border:1px solid rgba(0,0,0,0.25); display:inline-block; background:color-mix(in srgb, var(--zone, #fff3a8) 55%, #fff); }
+.zoneMatSw.mat-kraft{ background:#c8a373; } .zoneMatSw.mat-cardboard{ background:repeating-linear-gradient(90deg, rgba(0,0,0,0.08) 0 2px, transparent 2px 5px), #b98f5f; }
+.zoneMatSw.mat-grid{ background:linear-gradient(rgba(60,90,160,0.3) 1px, transparent 1px) 0 0/6px 6px, linear-gradient(90deg, rgba(60,90,160,0.3) 1px, transparent 1px) 0 0/6px 6px, #f4f7ff; }
+.zoneMatSw.mat-felt{ background:color-mix(in srgb, var(--zone, #fff3a8) 70%, #234 30%); }
+.menuSubBody .menuItem{ display:flex; align-items:center; gap:8px; }
+
+/* --- reactions as paper tabs (v0.8.3.3) ---
+   They hang from the bottom edge of the paper like the Comment tab does, but on the RIGHT, so the two never share a corner:
+   [Comment] at the left, [chips][react] at the right. Nothing is drawn on an object that has no reactions and is not selected. */
+.reactChips{ left:auto; right:50px; bottom:-17px; z-index:5; gap:3px; flex-wrap:nowrap; justify-content:flex-end; max-width:calc(100% - 120px); }
+.reactChip{ min-height:19px; height:19px; padding:0 7px 1px; border-radius:0 0 7px 7px; border:1px solid color-mix(in srgb, var(--line) 80%, #000 15%); border-top:0; background:linear-gradient(#fffdf0, #f6efd2); color:#4a3a00; font:700 0.7rem 'Sora',sans-serif; box-shadow:0 1px 2px rgba(60,45,10,0.28); gap:3px; font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Sora',sans-serif; }
+.reactChip .reactN{ font-family:'Sora',sans-serif; font-size:0.64rem; }
+.reactChip.mine{ background:linear-gradient(#ffeaa0, #ffdd6c); border-color:#b88a1a; }
+.reactChip:hover{ height:23px; }
+.reactAdd{ right:14px; bottom:-17px; z-index:5; min-height:19px; height:19px; width:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:0 0 7px 7px; border:1px solid color-mix(in srgb, var(--line) 80%, #000 15%); border-top:0; background:linear-gradient(#fffdf0, #f6efd2); color:#6b5a1f; box-shadow:0 1px 2px rgba(60,45,10,0.28); }
+.reactAdd:hover, .reactAdd:focus-visible{ height:24px; color:#33301f; background:linear-gradient(#fff6c2, #ffe98a); }
+.reactAdd svg{ display:block; }
+body.dark .reactChip, body.dark .reactAdd{ background:linear-gradient(#4f4730, #453e2a); color:#f2eadb; border-color:rgba(242,234,219,0.35); }
+body.dark .reactChip.mine{ background:linear-gradient(#7a6320, #5f4d18); }
+@media (pointer:coarse){ .reactAdd{ min-height:30px; height:30px; width:48px; } .reactChip{ min-height:30px; height:30px; padding:0 10px; } .reactChips{ bottom:-28px; } .reactAdd{ bottom:-28px; } }
+/* the picker: a paper slip, not a toolbar */
+.floatPop.reactPop{ display:flex; flex-direction:column; gap:6px; padding:10px; background:#fffdf4; border:1px solid rgba(60,45,10,0.22); border-radius:6px 14px 14px 14px; box-shadow:0 8px 22px rgba(60,45,10,0.3), 0 1px 2px rgba(60,45,10,0.2); position:relative; }
+.floatPop.reactPop::before{ content:""; position:absolute; top:-8px; left:18px; width:46px; height:14px; background:rgba(255,226,120,0.85); transform:rotate(-2deg); box-shadow:0 1px 2px rgba(60,45,10,0.25); }
+body.dark .floatPop.reactPop{ background:#2b2638; border-color:rgba(255,255,255,0.18); }
+.reactPop .reactQuick{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.reactPick{ width:44px; height:44px; border-radius:50%; font-size:1.4rem; line-height:1; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1px solid transparent; font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif; }
+.reactMoreBtn{ min-height:44px; padding:0 14px; border-radius:999px; border:1.5px dashed rgba(60,45,10,0.35); background:transparent; color:#4a3a00; font:700 0.78rem 'Sora',sans-serif; cursor:pointer; }
+body.dark .reactMoreBtn{ color:#f2eadb; border-color:rgba(255,255,255,0.35); }
+.reactMoreBtn:hover, .reactMoreBtn.on{ background:rgba(255,226,120,0.45); }
+.reactMoreBtn:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:2px; }
+.reactPop .reactMore{ margin-top:2px; padding-top:8px; border-top:1px dashed rgba(60,45,10,0.28); display:flex; flex-direction:column; gap:6px; }
+.reactPop .reactMore[hidden]{ display:none; }
+.reactSearch{ width:100%; box-sizing:border-box; min-height:40px; padding:6px 12px; border-radius:999px; border:1.5px solid rgba(60,45,10,0.25); background:#fff; color:#33301f; font:0.88rem 'Sora',sans-serif; }
+body.dark .reactSearch{ background:#1c1829; color:#ede9f7; border-color:rgba(255,255,255,0.25); }
+.reactGroups{ max-height:min(240px, 36vh); overflow:auto; overscroll-behavior:contain; }
+.reactNone{ padding:10px 4px; font-size:0.85rem; opacity:0.7; }
+.reactPop{ max-width:min(330px, calc(100vw - 20px)); }
+/* the submenu items must not wrap ("Grid paper") */
+.menuSubBody .menuItem{ white-space:nowrap; }
+/* --- collaboration e-mail pills: even padding, centred text, a clear gap, tappable X --- */
+.pillField{ gap:6px 6px; padding:7px 8px; align-items:center; align-content:flex-start; }
+.pillField .pill{ display:inline-flex; align-items:center; gap:2px; height:30px; padding:0 4px 0 12px; border-radius:999px; line-height:1; font-size:0.84rem; box-sizing:border-box; background:#f3e8c0; border:1px solid rgba(60,45,10,0.2); color:#33301f; }
+body.dark .pillField .pill{ background:#4a4228; color:#f2eadb; border-color:rgba(255,255,255,0.2); }
+.pillField .pill > span{ line-height:1; padding-bottom:1px; max-width:min(240px, 60vw); }
+.pillField .pillX{ width:26px; height:26px; margin:0; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:1.05rem; line-height:1; border-radius:50%; }
+@media (pointer:coarse){ .pillField .pill{ height:36px; } .pillField .pillX{ width:34px; height:34px; } }
+.collabDlg .pillField input.pillIn{ flex:1 1 150px; min-height:30px; padding:0 4px; margin:0; line-height:30px; box-sizing:border-box; }
+.collabDlg .pillField input.pillIn::placeholder{ line-height:30px; }
+.collabDlg{ max-height:min(70vh, 560px); overflow:auto; }
+
+/* --- Add video (v0.8.3.3) --- */
+.addVideoDlg .vidOpts{ display:flex; flex-direction:column; gap:8px; }
+.addVideoDlg .vidOpt{ display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:10px 14px; border:1px solid var(--line, #e4dbb9); border-radius:12px; background:var(--panel, #fffdf4); color:var(--ink, #33301f); text-align:start; cursor:pointer; font-family:inherit; }
+.addVideoDlg .vidOpt:hover{ border-color:var(--accent, #8a4f0d); background:color-mix(in srgb, var(--panel, #fffdf4) 85%, var(--accent-soft, #ffe58a)); }
+.addVideoDlg .vidOpt:active{ transform:translateY(1px); }
+.addVideoDlg .vidOpt:focus-visible{ outline:2px solid var(--focus, #8f5710); outline-offset:2px; }
+.addVideoDlg .vIc{ flex:none; width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center; } .addVideoDlg .vIc svg{ width:24px; height:24px; }
+.addVideoDlg .vTx{ display:flex; flex-direction:column; gap:2px; min-width:0; } .addVideoDlg .vTx b{ font-size:0.95rem; } .addVideoDlg .vTx small{ font-size:0.78rem; opacity:0.75; line-height:1.3; }
+.addVideoDlg .vidLink{ display:flex; flex-direction:column; gap:8px; } .addVideoDlg .vidLink[hidden], .addVideoDlg .vidOpts[hidden]{ display:none; }
+.addVideoDlg .vidLink .asIn{ width:100%; box-sizing:border-box; }
+.addVideoDlg .vidLinkRow{ display:flex; gap:8px; justify-content:flex-end; }
+.cleanZones{ margin-top:6px; font-size:0.82rem; opacity:0.85; }
+.cleanInside{ display:flex; align-items:center; gap:8px; min-height:40px; margin-top:6px; font-size:0.9rem; cursor:pointer; }
+
+/* --- the Done / Trash dock (v0.8.3.3): small, one corner, hidden when both are empty --- */
+.spaceDock{ position:fixed; left:14px; bottom:calc(var(--done-bottom, 30px) + env(safe-area-inset-bottom, 0px)); z-index:9990; display:flex; gap:6px; }
+.spaceDock[hidden]{ display:none; }
+.spaceDock .dockBtn{ position:static; display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 11px 4px 9px; border-radius:999px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; box-shadow:0 1px 4px var(--shadow); font:700 0.78rem 'Sora',sans-serif; --done-bottom:0px; }
+.spaceDock .dockBtn[hidden]{ display:none; }
+.spaceDock .dockBtn svg{ flex:none; } .spaceDock .donePile{ color:#2f7d46; } body.dark .spaceDock .donePile{ color:#7fcf8f; }
+.spaceDock .dockBtn:hover{ border-color:var(--accent); transform:translateY(-1px); } .spaceDock .dockBtn:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+@media (max-width:919px){ .spaceDock{ --done-bottom:46px; } } @media (max-width:600px){ .spaceDock{ --done-bottom:44px; } }
+@media (pointer:coarse){ .spaceDock .dockBtn{ min-height:44px; padding:6px 14px; } }
+/* --- "+ New board": with your boards, a slip appears to name it --- */
+.addBoardRow{ display:block; padding:0; margin-top:8px; background:transparent; border:0; border-radius:0; }
+.addBoardRow .newBoardOpen{ all:unset; box-sizing:border-box; width:100%; display:flex; align-items:center; min-height:40px; padding:0 12px; border-radius:10px; border:1.5px dashed var(--line); color:var(--ink-soft); font:600 0.86rem 'Sora',sans-serif; cursor:pointer; background:transparent; }
+.addBoardRow .newBoardOpen:hover{ background:var(--accent-soft); color:var(--ink); border-color:var(--accent); } .addBoardRow .newBoardOpen:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.addBoardRow .newBoardOpen[hidden], .addBoardRow .newBoardSlip[hidden]{ display:none; }
+.addBoardRow .newBoardSlip{ display:flex; align-items:center; gap:6px; padding:5px 5px 5px 12px; border-radius:10px; background:#fff8c4; border:1px solid rgba(60,45,10,0.2); box-shadow:0 2px 6px rgba(60,45,10,0.15); }
+body.dark .addBoardRow .newBoardSlip{ background:#4a4228; }
+.addBoardRow .newBoardSlip input{ flex:1; min-width:0; border:0; outline:0; background:transparent; font:0.88rem 'Sora',sans-serif; color:inherit; padding:6px 0; }
+.addBoardRow .newBoardSlip button{ all:unset; box-sizing:border-box; width:auto; height:auto; min-height:32px; padding:0 14px; border-radius:8px; background:var(--btn-fill, #9a5d12); color:var(--btn-fg, #fff); font:700 0.8rem 'Sora',sans-serif; cursor:pointer; display:inline-flex; align-items:center; }
+.addBoardRow .newBoardSlip button:focus-visible{ outline:2px solid var(--focus); outline-offset:2px; }
+.sysSpaces{ margin-top:12px; }
+
+/* ===== Newspaper styles, each readable at a glance (v0.8.3.3): not just another font ===== */
+.po-newspaper .npMast::after{ display:block; font:600 0.52rem 'Sora',sans-serif; letter-spacing:0.12em; text-transform:uppercase; opacity:0.7; margin-top:2px; }
+/* Broadsheet: the classic. Big spaced masthead between double rules, two tight columns, cream paper */
+.po-newspaper.v-broadsheet .npMast{ font-size:0.95rem; letter-spacing:0.24em; border-top:3px double var(--np-rule); border-bottom:1px solid var(--np-rule); padding:4px 0; }
+.po-newspaper.v-broadsheet .npMast::after{ content:"Vol. I \00b7 Late Edition"; }
+/* Tabloid: a red banner, a shouting headline, one wide column, a yellow kicker */
+.po-newspaper.v-tabloid .npMast{ margin:0 -14px 6px; padding:6px 10px; font-size:0.95rem; text-align:start; }
+.po-newspaper.v-tabloid .npMast::after{ content:"EXCLUSIVE \00b7 SEE PAGE 3"; opacity:0.85; }
+.po-newspaper.v-tabloid .npHead{ font-size:2rem; line-height:1; text-transform:uppercase; letter-spacing:-0.01em; }
+.po-newspaper.v-tabloid .npSub{ display:inline-block; background:#ffe14d; padding:0 6px; font-style:normal; font-weight:800; opacity:1; }
+.po-newspaper.v-tabloid .npBody{ column-count:1; column-width:auto; column-rule:0; text-align:start; font-weight:500; }
+.po-newspaper.v-tabloid .poRule{ border-top:4px solid #b3261e; }
+/* Gazette: centred, old paper that has yellowed at the edges, an ornament in the rule */
+.po-newspaper.v-gazette .poSheet{ box-shadow:inset 0 0 38px rgba(150,110,40,0.35), 0 1px 2px rgba(60,45,10,0.3), 0 8px 18px rgba(60,45,10,0.14); }
+.po-newspaper.v-gazette .npMast{ font-size:1.25rem; text-transform:none; letter-spacing:0.02em; font-weight:400; }
+.po-newspaper.v-gazette .npMast::after{ content:"\2766  \00b7  est. on the board  \00b7  \2766"; letter-spacing:0.06em; }
+.po-newspaper.v-gazette .poRule{ border-top:1px solid var(--np-rule); border-bottom:1px solid var(--np-rule); height:3px; }
+.po-newspaper.v-gazette .npBody{ column-count:1; column-width:auto; column-rule:0; text-align:center; font-style:italic; }
+/* Evening: rust ink on pink stock, a "FINAL" strip, left-aligned italic headline */
+.po-newspaper.v-evening .npMast{ text-align:end; font-size:0.8rem; background:linear-gradient(90deg, transparent, rgba(122,46,28,0.16)); padding:2px 6px; }
+.po-newspaper.v-evening .npMast::after{ content:"\2605  FINAL  \2605"; color:#7a2e1c; font-weight:800; }
+.po-newspaper.v-evening .npHead{ font-style:italic; text-align:start; border-left:4px solid #7a2e1c; padding-left:8px; }
+.po-newspaper.v-evening .npBody{ column-width:100px; }
+/* Telegraph: a typed strip: dotted rules, capitals, a grey-green tint */
+.po-newspaper.v-telegraph .poSheet{ background-image:repeating-linear-gradient(180deg, transparent 0 17px, rgba(60,70,50,0.12) 17px 18px); background-color:#e4e6d4; }
+.po-newspaper.v-telegraph .npMast{ text-align:start; border-bottom:2px dotted var(--np-rule); font-weight:400; }
+.po-newspaper.v-telegraph .npMast::after{ content:"RECEIVED \00b7 STOP \00b7 URGENT"; }
+.po-newspaper.v-telegraph .poRule, .po-newspaper.v-telegraph .poRule.thin{ border-top:2px dotted var(--np-rule); }
+.po-newspaper.v-telegraph .npBody{ column-count:1; column-width:auto; column-rule:0; text-transform:uppercase; letter-spacing:0.04em; }
+/* Courier: a typed memo: left-aligned, an underlined masthead, one narrow column, plain white stock */
+.po-newspaper.v-courier .poSheet{ background-color:#fbfaf5; border-left:6px solid #2d5a8c; }
+.po-newspaper.v-courier .npMast{ text-align:start; text-transform:none; letter-spacing:0; font-size:0.78rem; text-decoration:underline; text-underline-offset:3px; }
+.po-newspaper.v-courier .npMast::after{ content:"Internal \00b7 not for circulation"; text-decoration:none; }
+.po-newspaper.v-courier .npBody{ column-count:1; column-width:auto; column-rule:0; }
+.po-newspaper.v-courier .poRule{ border-top:1px dashed var(--np-rule); }
+/* Herald: a framed front page: italic masthead, a hairline frame, a ruled subtitle */
+.po-newspaper.v-herald .poSheet{ outline:1px solid #3a372c; outline-offset:-6px; padding:14px 18px 16px; }
+.po-newspaper.v-herald .npMast{ text-transform:none; font-style:italic; font-weight:700; font-size:1.2rem; letter-spacing:0.01em; }
+.po-newspaper.v-herald .npMast::after{ content:"Established upon this very board"; font-style:normal; }
+.po-newspaper.v-herald .npSub{ border-top:1px solid; border-bottom:1px solid; padding:2px 0; text-align:center; }
+.po-newspaper.v-herald .npBody{ column-count:2; }
+/* Modern: sans, a thick colour bar, a big headline, wide air, no column rules */
+.po-newspaper.v-modern .poSheet{ border-top:10px solid #2d6cdf; padding-top:8px; } .po-newspaper.v-modern .npMast{ text-align:start; font-size:0.66rem; letter-spacing:0.3em; color:#2d6cdf; }
+.po-newspaper.v-modern .npMast::after{ content:"Today's brief"; letter-spacing:0.08em; }
+.po-newspaper.v-modern .npHead{ font-size:1.9rem; line-height:1.02; letter-spacing:-0.03em; }
+.po-newspaper.v-modern .npBody{ column-width:auto; column-count:1; column-rule:0; line-height:1.55; }
+.po-newspaper.v-modern .poRule{ border-top:0; margin:4px 0; }
+/* the Style menu: a tiny front page for each look */
+.npSw{ flex:none; margin-inline-start:auto; display:inline-flex; flex-direction:column; gap:2px; width:34px; height:24px; padding:3px; box-sizing:border-box; background:var(--np-paper); border:1px solid rgba(0,0,0,0.3); border-radius:2px; }
+.npSw i{ display:block; height:3px; background:var(--np-ink); opacity:0.75; } .npSw i:nth-child(1){ height:4px; opacity:1; } .npSw i:nth-child(3){ width:70%; height:2px; opacity:0.5; }
+.npSw.v-tabloid i:nth-child(1){ background:#b3261e; } .npSw.v-modern{ border-top:4px solid #2d6cdf; } .npSw.v-courier{ border-left:4px solid #2d5a8c; } .npSw.v-gazette i{ margin-inline:auto; width:80%; } .npSw.v-telegraph i{ background:repeating-linear-gradient(90deg, var(--np-ink) 0 2px, transparent 2px 4px); } .npSw.v-evening i:nth-child(1){ background:#7a2e1c; width:60%; margin-inline-start:auto; }
+.npSw.v-herald{ outline:1px solid #3a372c; outline-offset:-2px; }
+
+/* ===== Piles, one control system (v0.8.3.3) =====
+   Reserved places, so nothing can share a corner:
+     top-left  the kind tab   |  top-right  the index tabs (the paper showing is raised) and the "..." button
+     left/right edges  previous / next tabs (hover or selected only)   |  top-left under the kind tab  Browse
+     bottom-left  Comment     |  bottom-right  reactions     |  the count lives INSIDE the paper (bottom-right corner), never hanging off it */
+.pileObj .pileTabs{ top:-15px; bottom:auto; left:auto; right:42px; justify-content:flex-end; z-index:2; }
+.pileObj .pileTab{ height:16px; border:1px solid rgba(60,45,10,0.25); border-bottom:0; border-radius:6px 6px 0 0; box-shadow:0 -1px 2px rgba(60,45,10,0.22); }
+.pileObj .pileTab.on{ height:21px; margin-top:-5px; }
+.pileObj .pileKind{ top:-15px; left:12px; }
+.pileObj .pileOpen{ position:absolute; left:12px; bottom:auto; top:6px; z-index:3; min-height:22px; padding:0 9px; border:0; border-radius:999px; background:rgba(51,48,31,0.78); color:#fffdf5; font:700 0.64rem 'Sora',sans-serif; cursor:pointer; opacity:0; transition:opacity .12s ease; }
+.pileObj:hover .pileOpen, .pileObj.selected .pileOpen, .pileObj:focus-within .pileOpen{ opacity:1; }
+.pileObj .pileOpen:hover, .pileObj .pileOpen:focus-visible{ background:#33301f; }
+@media (hover:none){ .pileObj .pileOpen{ display:none; } }
+body.multi-sel .pileObj .pileOpen, .pileObj.static .pileOpen, body.read-only .pileObj .pileOpen{ display:none; }
+.pileObj .pileCount{ right:8px; bottom:8px; min-width:0; height:20px; padding:0 8px; border-radius:10px; font-size:0.68rem; line-height:20px; z-index:3; pointer-events:none; box-shadow:none; }
+.pileObj .pMore{ top:-12px; right:6px; z-index:3; }
+.pileObj .pileTop.live{ padding:0; background:transparent !important; box-shadow:none; min-height:0; overflow:visible; }
+.pileObj .pileMember{ position:relative; display:block; }
+.pileObj .pileMember .pbPaper{ box-shadow:0 2px 5px rgba(60,45,10,0.3); }
+.pileObj .pileText[hidden]{ display:none; }
+/* edit-in-place: the paper being edited is drawn over its pile as itself */
+.pileFocused{ box-shadow:0 0 0 3px var(--accent, #8a4f0d), 0 10px 24px rgba(60,45,10,0.35) !important; }
+
+/* ===== SettingsRow: ONE interaction system for every row in Settings (v0.8.3.3) =====
+   Rows that open something (.asAction), rows that hold a control (.asItem, .setRow) and the board panel's system rows (.sysRow) all share:
+   normal = clean paper; hover = a warm tint and a hair of lift; focus-visible = a clear ring; pressed = a slightly stronger press; selected = a left tab;
+   disabled = quieter, no hover; destructive = danger colour. Same height, same padding, no underlines, in light, dark and right-to-left. */
+.asCard .asAction, .asCard .asItem, .setSec .setRow, .asDanger{ --row-pad:12px; }
+.asCard .asAction, .asCard .asItem{ min-height:52px; padding:var(--row-pad) 12px; margin-inline:-12px; width:calc(100% + 24px); border-radius:10px; text-decoration:none; color:inherit; transition:background-color .12s ease, box-shadow .12s ease, transform .08s ease; }
+.asCard .asItem{ cursor:default; }
+.asCard a.asAction{ text-decoration:none; }
+.asCard .asAction:not(:disabled):not([aria-disabled="true"]):hover{ background-color:color-mix(in srgb, var(--accent-soft) 70%, transparent); box-shadow:0 1px 0 rgba(60,45,10,0.08); }
+.asCard .asItem:hover{ background-color:color-mix(in srgb, var(--accent-soft) 35%, transparent); }
+.asCard .asAction:focus-visible, .asCard .asItem:focus-within{ outline:2px solid var(--focus); outline-offset:-2px; }
+.asCard .asItem:focus-within:not(:has(:focus-visible)){ outline:0; }
+.asCard .asAction:not(:disabled):active{ background-color:color-mix(in srgb, var(--accent-soft) 100%, var(--accent) 14%); transform:translateY(1px); }
+.asCard .asAction.on, .asCard .asAction[aria-current="true"], .asCard .asAction[aria-pressed="true"]{ box-shadow:inset 3px 0 0 var(--accent); background-color:color-mix(in srgb, var(--accent-soft) 55%, transparent); }
+[dir="rtl"] .asCard .asAction.on, [dir="rtl"] .asCard .asAction[aria-pressed="true"]{ box-shadow:inset -3px 0 0 var(--accent); }
+.asCard .asAction:disabled, .asCard .asAction[aria-disabled="true"], .asCard .asItem.off{ opacity:0.55; cursor:default; }
+.asCard .asAction.danger, .asCard .asAction.danger .t, .asCard .asAction.danger .lbl{ color:var(--danger, #b3261e); }
+.asCard .asAction.danger:not(:disabled):hover{ background-color:color-mix(in srgb, var(--danger, #b3261e) 10%, transparent); }
+.asCard .asAction .lbl{ text-decoration:none; }
+body.dark .asCard .asAction:not(:disabled):hover{ background-color:rgba(255,180,84,0.12); } body.dark .asCard .asItem:hover{ background-color:rgba(255,180,84,0.06); }
+body.dark .asCard .asAction:not(:disabled):active{ background-color:rgba(255,180,84,0.2); }
+@media (prefers-reduced-motion: reduce){ .asCard .asAction, .asCard .asItem{ transition:none; } .asCard .asAction:active{ transform:none; } }
+html[data-a11y-motion="reduce"] .asCard .asAction{ transition:none; }
+@media (pointer:coarse){ .asCard .asAction, .asCard .asItem{ min-height:56px; } }
+/* SettingsRow separators: a hairline inset from the rounded hover shape, so the corners stay clean */
+.asCard .asAction, .asCard .asItem{ border-top:0; background-image:linear-gradient(color-mix(in srgb, var(--line) 75%, transparent), color-mix(in srgb, var(--line) 75%, transparent)); background-size:calc(100% - 24px) 1px; background-position:center top; background-repeat:no-repeat; }
+.asCard > h4 + .asAction, .asCard > h4 + .asItem, .asCard > h5 + .asItem, .asCard .ccLegalList > .asAction:first-child, .wnBody > :first-child{ background-image:none; }
+.asCard .asAction:not(:disabled):hover, .asCard .asItem:hover{ background-size:0 0; }
+.sharePrintRow{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin:10px 0 0; }
+
+/* ===== Pile browser as a leaf-through (v0.8.3.3): a paper on a desk, edge tabs, a handwritten page marker, ONE control slip ===== */
+.pbCard{ position:relative; width:min(460px, 100%); gap:6px; padding:10px 10px 12px; background:var(--desk, #efe7cd); border-radius:14px; overflow:hidden; }
+body.dark .pbCard{ background:var(--panel); }
+.pbBar{ justify-content:center; }
+.pbIndex{ font:1.35rem 'Patrick Hand','Alef',sans-serif; font-weight:400; min-width:0; padding:0 14px; color:var(--ink); transform:rotate(-1.5deg); border-bottom:2px solid color-mix(in srgb, var(--accent, #8a4f0d) 55%, transparent); }
+.pbDesk{ position:relative; display:flex; align-items:stretch; }
+.pbDesk .pbStage{ flex:1 1 auto; min-width:0; margin-inline:20px; padding:14px 6px 16px; max-height:min(58vh, 500px); }
+.pbStage .pbPaper{ box-shadow:0 2px 3px rgba(60,45,10,0.25), 0 10px 22px rgba(60,45,10,0.22); }
+.pbStage:not(.fan) .pbPaper{ position:relative; }
+/* previous / next: tabs on the paper's side edges */
+.pbNav.pbPrev, .pbNav.pbNext{ position:absolute; top:50%; transform:translateY(-50%); z-index:2; width:26px; height:76px; padding:0; border:1px solid rgba(60,45,10,0.25); background:linear-gradient(#fffdf0, #f0e6c0); color:#4a3a00; font:700 22px/1 'Sora',sans-serif; box-shadow:1px 2px 4px rgba(60,45,10,0.3); }
+.pbNav.pbPrev{ left:0; border-radius:12px 3px 3px 12px; border-right:0; } .pbNav.pbNext{ right:0; border-radius:3px 12px 12px 3px; border-left:0; }
+.pbNav.pbPrev:hover, .pbNav.pbNext:hover{ background:linear-gradient(#fff6c2, #ffe58a); } .pbNav:disabled{ opacity:0.35; cursor:default; }
+body.dark .pbNav.pbPrev, body.dark .pbNav.pbNext{ background:linear-gradient(#4f4730, #453e2a); color:#f2eadb; }
+/* the control slip */
+.pbSlip{ display:flex; flex-direction:column; gap:6px; padding:8px; border-radius:6px 12px 12px 6px; background:#fffdf4; border:1px solid rgba(60,45,10,0.2); box-shadow:0 2px 6px rgba(60,45,10,0.18); position:relative; }
+body.dark .pbSlip{ background:#2b2638; border-color:rgba(255,255,255,0.15); }
+.pbSlip::before{ content:""; position:absolute; top:-8px; left:50%; width:50px; height:13px; margin-left:-25px; background:rgba(255,226,120,0.85); transform:rotate(-2deg); box-shadow:0 1px 2px rgba(60,45,10,0.25); }
+.pbSlip .pbTools{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.pbSlip .pbFoot{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
+.pbSlip .pbTool, .pbSlip .pbTake, .pbSlip .pbBack{ min-height:40px; padding:6px 12px; border-radius:999px; font-size:0.82rem; }
+@media (max-width:480px){
+  .pbBackdrop{ padding:0; align-items:stretch; } .pbCard{ width:100%; max-height:100%; border-radius:0; overflow:auto; }
+  .pbDesk .pbStage{ margin-inline:16px; max-height:52vh; }
+  .pbNav.pbPrev, .pbNav.pbNext{ width:22px; height:64px; }
+  .pbSlip .pbTool, .pbSlip .pbTake, .pbSlip .pbBack{ min-height:44px; }
+  .pbSlip .pbFoot > *{ flex:1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce){ .pbNav, .pbStage *{ transition:none !important; } }
+
+
+/* ===== Owner QA pass (v0.8.3.3) ===== */
+/* pile index tabs: numbers never clip */
+.pileObj .pileTabs{ top:-17px; }
+.pileObj .pileTab{ box-sizing:border-box; height:20px; min-width:24px; padding:3px 5px 0; display:inline-flex; align-items:flex-start; justify-content:center; font:700 0.7rem/1 'Sora',sans-serif; overflow:visible; }
+.pileObj .pileTab.on{ height:25px; margin-top:-5px; padding-top:5px; }
+.pileObj .pileKind{ top:-17px; height:19px; box-sizing:border-box; padding:4px 10px 0; line-height:1; }
+/* Browse: a small paper tab on the pile's left edge, with a pages icon (not a dark pill) */
+.pileObj .pileOpen{ left:-15px; top:26px; width:26px; height:38px; min-height:0; padding:0; border-radius:9px 0 0 9px; background:linear-gradient(#fffdf0, #f1e7c4); color:#4a3a00; border:1px solid rgba(60,45,10,0.28); border-right:0; box-shadow:-1px 2px 4px rgba(60,45,10,0.3); display:flex; align-items:center; justify-content:center; }
+.pileObj .pileOpen::after{ content:""; position:absolute; right:0; bottom:0; width:9px; height:9px; background:linear-gradient(135deg, transparent 50%, rgba(60,45,10,0.18) 50%); }
+.pileObj .pileOpen:hover, .pileObj .pileOpen:focus-visible{ background:linear-gradient(#fff6c2, #ffe58a); color:#33301f; }
+body.dark .pileObj .pileOpen{ background:linear-gradient(#4f4730, #453e2a); color:#f2eadb; border-color:rgba(242,234,219,0.35); }
+@media (hover:none){ .pileObj .pileOpen{ display:flex; opacity:1; } }
+/* browser icon controls */
+.pbSlip .pbTool.ico{ width:44px; min-height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.pbSlip .pbTool.ico svg{ width:20px; height:20px; }
+.pbSlip .pbTool[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); }
+.pbSlip .pbFoot{ flex-wrap:nowrap; }
+.pbSlip .pbFoot .pbBack{ margin-inline-start:auto; flex:0 1 auto; }
+.pbSlip{ flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:6px 10px; }
+.pbSlip .pbTools, .pbSlip .pbFoot{ display:flex; gap:6px; }
+@media (max-width:480px){ .pbSlip{ justify-content:center; } .pbSlip .pbFoot .pbBack{ flex:1 1 auto; } }
+/* Fan: papers spread over a desk; the controls stay small */
+.pbCard.isFan{ background:linear-gradient(#e9dfc2, #d9cda8); }
+body.dark .pbCard.isFan{ background:linear-gradient(#262033, #1a1626); }
+.pbCard:has(.pbStage.fan){ width:min(760px, 100%); padding-bottom:10px; }
+.pbStage.fan{ min-height:0; height:min(46vh, 330px); max-height:none; margin-inline:0; padding:0; }
+.pbFan{ height:100%; }
+.pbFanCard{ width:170px; transform:translate(calc(-50% + var(--fo) * 74px), -48%) rotate(calc(var(--fo) * 5deg)) scale(0.8); transform-origin:50% 130%; filter:drop-shadow(0 4px 6px rgba(60,45,10,0.35)); }
+.pbFanCard:hover{ transform:translate(calc(-50% + var(--fo) * 74px), -56%) rotate(calc(var(--fo) * 5deg)) scale(0.86); z-index:35; }
+.pbFanCard.current{ transform:translate(-50%, -56%) scale(1); }
+@media (max-width:480px){ .pbCard:has(.pbStage.fan){ width:100%; } .pbStage.fan{ height:38vh; } .pbFanCard{ width:130px; transform:translate(calc(-50% + var(--fo) * 44px), -48%) rotate(calc(var(--fo) * 6deg)) scale(0.8); } .pbFanCard:hover{ transform:translate(calc(-50% + var(--fo) * 44px), -52%) rotate(calc(var(--fo) * 6deg)) scale(0.84); } .pbFanCard.current{ transform:translate(-50%, -54%) scale(1); } }
+/* Zone heading: a ledger strip on the paper edge */
+.zone .zoneBar{ margin:-2px -2px 0; padding:3px 8px 3px 12px; min-height:34px; background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 55%, #fffdf4), color-mix(in srgb, var(--zone, #fff3a8) 78%, #ece3c6)); border-bottom:2px solid color-mix(in srgb, var(--zone, #fff3a8) 35%, #5a4a1c 65%); border-radius:6px 6px 0 0; box-shadow:0 2px 3px rgba(60,45,10,0.2); }
+.zone .zoneTitle{ color:#2a2619; text-shadow:0 1px 0 rgba(255,255,255,0.55); font-size:1.25rem; }
+.zone.mat-felt .zoneBar{ background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 60%, #234), color-mix(in srgb, var(--zone, #fff3a8) 45%, #123)); border-bottom-color:rgba(0,0,0,0.45); }
+.zone.mat-felt .zoneTitle{ color:#f8f3e4; text-shadow:0 1px 2px rgba(0,0,0,0.5); }
+body.dark .zone:not(.mat-felt) .zoneBar{ background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 40%, #2b2638), color-mix(in srgb, var(--zone, #fff3a8) 28%, #1c1829)); border-bottom-color:rgba(255,255,255,0.28); }
+body.dark .zone:not(.mat-felt) .zoneTitle{ color:#f4eedf; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
+body.dark .zone:not(.mat-felt) .zoneCount, body.dark .zone:not(.mat-felt) .zoneMin, body.dark .zone:not(.mat-felt) .zoneMore{ color:#f4eedf; }
+.zone .zoneTitle.editable[contenteditable="true"]{ background:rgba(255,255,255,0.85); color:#2a2619; }
+/* Newspaper picture size / fit */
+.npFig{ margin-inline:auto; } .npFig.sz-small{ width:40%; } .npFig.sz-medium{ width:62%; } .npFig.sz-large{ width:82%; } .npFig.sz-full{ width:100%; }
+.npFig.contain img{ object-fit:contain; background:#e9e4d3; }
+/* compact Share window */
+.shareCompact{ display:flex; flex-direction:column; gap:10px; }
+.shareCompact .shareTop{ display:flex; gap:12px; align-items:center; }
+.shareCompact .sharePreview{ flex:0 0 auto; max-width:190px; max-height:120px; overflow:hidden; }
+.shareCompact .shareStat{ display:flex; flex-direction:column; gap:3px; font-size:0.84rem; line-height:1.35; min-width:0; } .shareCompact .shareStat strong{ font-size:0.95rem; }
+.shareCompact .shareActs{ display:flex; flex-wrap:wrap; gap:8px; }
+.shareCompact .shareActs .pillBtn{ flex:1 1 auto; min-height:40px; }
+.shareCompact .shareMore{ border:1px solid var(--line); border-radius:10px; padding:2px 12px; background:color-mix(in srgb, var(--panel) 92%, var(--line)); }
+.shareCompact .shareMore summary{ cursor:pointer; min-height:40px; display:flex; align-items:center; font-weight:600; font-size:0.88rem; }
+.shareCompact .shareMore .shareMsg{ max-height:7em; overflow:auto; font-size:0.84rem; margin:4px 0 8px; }
+.shareCompact .shareMore .shareFine, .shareCompact .shareMore .shareFine.big{ font-size:0.8rem; line-height:1.45; margin:0 0 10px; }
+.shareCompact .shareOff{ align-self:center; margin:2px 0 0 !important; width:auto !important; font-size:0.84rem; color:var(--danger); }
+@media (max-width:480px){ .shareCompact .shareTop{ flex-direction:column; align-items:flex-start; } .shareCompact .shareActs .pillBtn{ flex:1 1 45%; } }
+.pbDesk .pbNav{ z-index:60; }
+.pbFanCard.current{ outline:2px solid var(--accent, #8a4f0d); outline-offset:2px; border-radius:2px; }
+
+/* ===== Final QA cleanup (v0.8.3.3) ===== */
+/* Zone cursors: grab on the rail, grabbing while dragging, a text cursor only while the title is being edited; a pinned zone is not draggable */
+.zoneBar{ cursor:grab; } .zone.dragging .zoneBar, .zoneBar:active{ cursor:grabbing; }
+.zone .zoneTitle, .zone .zoneTitle.editable{ cursor:inherit; }
+.zone .zoneTitle[contenteditable="true"]{ cursor:text; }
+.zone.pinned .zoneBar, .zone.pinned.dragging .zoneBar, .zone.pinned .zoneBar:active{ cursor:default; }
+.zone .zoneCount, .zone .zoneMin, .zone .zoneMore{ cursor:pointer; }
+/* Pile tabs: a fixed-height rail glued to the pile's top edge, one fixed slot per tab. Tabs sit inside their slot, so nothing is clipped, whatever the rotation. */
+.pileObj .pileTabs, .pileObj .pileKind{ top:auto; bottom:calc(100% - 1px); }
+.pileObj .pileTabs{ right:44px; left:auto; height:26px; max-width:none; overflow:visible; display:flex; align-items:flex-end; justify-content:flex-end; gap:2px; z-index:2; }
+.pileObj .pileTab{ flex:0 0 26px; width:26px; min-width:0; height:20px; margin:0; padding:0; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font:700 0.72rem/1 'Sora',sans-serif; border-radius:6px 6px 0 0; }
+.pileObj .pileTab.on{ height:26px; margin:0; padding:0; font-size:0.8rem; background:#ffe58a; }
+body.dark .pileObj .pileTab.on{ background:#8a6d1c; color:#fff; }
+.pileObj .pileKind{ left:12px; height:20px; padding:0 10px; display:flex; align-items:center; line-height:1; box-sizing:border-box; }
+/* Shared links window */
+.lkNote{ margin:0 0 10px; font-size:0.86rem; line-height:1.45; } .lkEmpty{ padding:22px 8px; text-align:center; font-size:0.92rem; opacity:0.8; }
+.lkList{ display:flex; flex-direction:column; gap:8px; max-height:min(56vh, 460px); overflow:auto; padding:2px 4px 4px 2px; overscroll-behavior:contain; }
+.lkCard{ display:flex; align-items:center; gap:12px; padding:10px 12px; border-radius:6px 12px 12px 6px; background:#fffdf4; border:1px solid rgba(60,45,10,0.2); box-shadow:0 1px 3px rgba(60,45,10,0.18); position:relative; }
+.lkCard::before{ content:""; position:absolute; top:-5px; left:18px; width:36px; height:10px; background:rgba(255,226,120,0.8); transform:rotate(-2deg); }
+body.dark .lkCard{ background:#2b2638; border-color:rgba(255,255,255,0.15); }
+.lkIcon{ flex:none; width:34px; height:34px; border-radius:50%; background:var(--accent-soft, #ffe58a); display:flex; align-items:center; justify-content:center; } .lkIcon svg{ width:18px; height:18px; }
+.lkBody{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.lkHead{ display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; } .lkHead strong{ font-size:0.95rem; } .lkBoard{ font-size:0.82rem; opacity:0.75; overflow-wrap:anywhere; }
+.lkMeta{ display:flex; flex-wrap:wrap; gap:4px; } .lkChip{ font-size:0.72rem; padding:1px 8px; border-radius:999px; border:1px solid var(--line, #e4dbb9); background:rgba(0,0,0,0.04); white-space:nowrap; } .lkChip.perm{ border-color:var(--accent, #8a4f0d); }
+.lkOff{ flex:none; min-height:40px; }
+@media (max-width:480px){ .lkCard{ flex-wrap:wrap; } .lkOff{ margin-inline-start:46px; } }
+/* Shortcuts: the name keeps a readable width; the binding wraps under it when there is no room (no word-per-line collapse) */
+.kbdRow{ flex-wrap:wrap; gap:4px 12px; }
+.kbdRow .kbdDesc{ flex:1 1 14rem; min-width:min(14rem, 100%); overflow-wrap:normal; word-break:normal; hyphens:none; }
+.kbdRow .kbdKeys{ flex:0 1 auto; width:auto; max-width:100%; }
+.kbdRebRow .kbdRebCtl{ flex:0 1 auto; max-width:100%; justify-content:flex-start; }
+.kbdGroups{ grid-template-columns:repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); }
+@media (max-width:560px){ .kbdRow .kbdDesc{ flex-basis:100%; } .kbdRebRow .kbdRebCtl{ margin-inline-start:0; } }
+/* Pile browser: compact. The paper is the focus, the card fits it, the actions sit in three labelled groups on one slip */
+.pbCard{ width:min(420px, 100%); gap:4px; padding:8px 8px 10px; }
+.pbCard:has(.pbStage.fan){ width:min(720px, 100%); }
+.pbBar{ min-height:0; } .pbIndex{ font-size:1.2rem; padding:0 10px; }
+.pbDesk .pbStage{ min-height:0; max-height:min(52vh, 440px); padding:8px 4px 10px; margin-inline:18px; }
+.pbStage.fan{ height:min(40vh, 280px); }
+.pbSlip{ gap:6px; padding:5px 8px; justify-content:space-between; }
+.pbSlip .pbGroup{ display:flex; align-items:center; gap:4px; }
+.pbSlip .pbGroup + .pbGroup{ padding-inline-start:8px; border-inline-start:1px solid rgba(60,45,10,0.2); }
+body.dark .pbSlip .pbGroup + .pbGroup{ border-inline-start-color:rgba(255,255,255,0.18); }
+.pbSlip .pbFoot{ margin-inline-start:auto; flex:0 0 auto; } .pbSlip .pbFoot .pbBack{ margin:0; flex:0 0 auto; min-height:44px; padding:0 16px; }
+@media (max-width:480px){ .pbCard{ border-radius:0; } .pbSlip{ justify-content:center; } .pbSlip .pbFoot{ flex:1 1 100%; margin:0; } .pbSlip .pbFoot .pbBack{ width:100%; } .pbSlip .pbGroup + .pbGroup{ padding-inline-start:6px; } }

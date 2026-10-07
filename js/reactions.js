@@ -39,13 +39,14 @@
     return order.filter(function (e) { return cur[e]; }).map(function (e) { return { emoji: e, count: cur[e].length, mine: cur[e].indexOf(uid) !== -1 }; });
   };
   // a broader palette for the "+" picker (native emoji; any emoji above also works when it arrives from another device)
+  var WORDS = { Smileys: "smile happy laugh sad cry face love wow angry think sleep joy", Hands: "hand thumb clap pray strong ok wave hello thanks high five fist", Hearts: "love heart fire party celebrate hundred spark like", Things: "check cross star idea pin date clock target rocket trophy gift coffee pizza apple music", Nature: "sun moon lightning rainbow flower tree dog cat unicorn turtle butterfly earth" };
   R.MORE = [
     ["Smileys", "😀 😃 😄 😁 😆 😅 🤣 😊 🙂 😉 😍 🥰 😘 😎 🤩 🥳 🤔 🤨 😐 😴 😮 😢 😭 😡 🤯 😱 🥺 😬 🙄 😇"],
     ["Hands", "👍 👎 👏 🙌 🙏 💪 👌 ✌️ 🤞 🤝 👋 ☝️ 🫶 🤌 ✋ 👊"],
     ["Hearts", "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 💖 💗 💔 💯 🔥 ✨ 🎉 🎊"],
     ["Things", "✅ ❌ ⭐ 💡 📌 📎 📅 ⏰ 🎯 🚀 🏆 🎁 ☕ 🍕 🍎 🎵"],
     ["Nature", "🌞 🌙 ⚡ 🌈 🌸 🌳 🐶 🐱 🦄 🐢 🦋 🌍"]
-  ].map(function (g) { return { name: g[0], items: g[1].split(" ").filter(R.isEmoji) }; });
+  ].map(function (g) { return { name: g[0], words: WORDS[g[0]] || "", items: g[1].split(" ").filter(R.isEmoji) }; });
   R.total = function (reactions) { return R.summary(reactions, "").reduce(function (t, s) { return t + s.count; }, 0); };
   R.isEmpty = function (reactions) { return R.total(reactions) === 0; };
 })(typeof window !== "undefined" ? window : globalThis);

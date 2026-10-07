@@ -75,7 +75,7 @@
       // an optional picture (v0.8.3.2). The original is kept as it is; Color / Black & white and halftone are only how it is printed.
       var npA = uuid(item.assetId), npI = item.image && h.safeImage ? h.safeImage(item.image) : null;
       if (npI) out.image = npI; if (npA) out.assetId = npA;
-      if (npI || npA) { out.imgRatio = num(item.imgRatio, 0.4, 2.5, 0.667); out.imgMode = pick(item.imgMode, ["bw", "color"], "bw"); if (item.halftone === true) out.halftone = true; }
+      if (npI || npA) { out.imgRatio = num(item.imgRatio, 0.4, 2.5, 0.667); out.imgMode = pick(item.imgMode, ["bw", "color"], "bw"); if (item.halftone === true) out.halftone = true; out.imgSize = pick(item.imgSize, ["small", "medium", "large", "full"], "full"); out.imgFit = pick(item.imgFit, ["cover", "contain"], "cover"); }
     } else if (t === "clipping") {
       out.quote = lines(item.quote, 900, 14); out.sourceTitle = one(item.sourceTitle, 100); out.sourceUrl = safeUrl(item.sourceUrl);
     } else if (t === "postcard") {

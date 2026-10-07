@@ -1,0 +1,30 @@
+/* Print / Save as PDF (js/app.js printObjects, js/print-layout.js). The print root is built on demand and removed afterwards.
+   On screen it is parked off to the side (so it can be measured); in print everything except it is hidden. */
+#printRoot{ position:fixed; left:-12000px; top:0; width:680px; visibility:hidden; pointer-events:none; }
+#printRoot .printSheet{ position:relative; }
+#printRoot .printItem{ position:relative; }
+@page{ margin:14mm; }
+/* These rules apply while body.printing is set, which lasts only from the moment the print window is requested until it closes. That is also what lets the print layout be
+   inspected on screen (Stick.print.objects(list, {preview: true}) keeps it open until Esc). */
+@media all{
+  html:has(body.printing), body.printing{ background:#fff !important; height:auto !important; overflow:visible !important; }
+  body.printing > *:not(#printRoot){ display:none !important; }
+  body.printing #printRoot{ position:static; left:auto; width:auto; visibility:visible; display:block; }
+  body.printing *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  body.printing #printRoot .printSheet{ margin:0 auto; background:transparent; }
+  /* one object, centred */
+  body.printing #printRoot .printSheet.single{ display:block; padding-top:6mm; }
+  body.printing #printRoot .printSheet.single .printItem{ margin:0 auto; }
+  /* several that fit one page: the same arrangement, scaled; kept on one page */
+  body.printing #printRoot .printSheet.spatial{ break-inside:avoid; page-break-inside:avoid; margin-top:6mm; }
+  body.printing #printRoot .printSheet.spatial .printItem{ position:absolute; }
+  /* a compact flow: each object kept whole on a page */
+  body.printing #printRoot .printSheet.flow{ display:flex; flex-wrap:wrap; gap:8mm; align-items:flex-start; justify-content:center; }
+  body.printing #printRoot .printItem{ break-inside:avoid; page-break-inside:avoid; }
+  body.printing #printRoot .printItem.spans{ break-inside:auto; page-break-inside:auto; }
+  /* the objects: no screen-only decoration, no controls */
+  body.printing #printRoot .printObj{ position:absolute !important; animation:none !important; transition:none !important; box-shadow:none; }
+  body.printing #printRoot .printObj *{ animation:none !important; transition:none !important; }
+  body.printing #printRoot .comment, body.printing #printRoot .cmtTab, body.printing #printRoot .reactChips, body.printing #printRoot .reactAdd,
+  body.printing #printRoot .moreBtn, body.printing #printRoot .del, body.printing #printRoot .quickDone, body.printing #printRoot button{ display:none !important; }
+}

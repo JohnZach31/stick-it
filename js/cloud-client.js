@@ -101,10 +101,30 @@
   var cachedProfile = null;
   var inited = null;
 
+  // Where Google (via Supabase) should send the person back to. It is ALWAYS the page they started from: on localhost / 127.0.0.1 that is the local origin and
+  // port (so a sign-in started on a local build comes back to that build), on GitHub Pages it is the Pages URL. A configured REDIRECT_URL (a production value) is
+  // ignored on a loopback host, so it can never pull a local sign-in over to the live site. Nothing is hardcoded.
+  function isLoopback() { var h = root.location && root.location.hostname; return h === "localhost" || h === "127.0.0.1" || h === "[::1]" || h === "::1"; }
+  function redirectUrl() {
+    var own = root.location.origin + root.location.pathname;
+    return isLoopback() ? own : (cfg.REDIRECT_URL || own);
+  }
+  // localhost-only diagnostics ([auth] lines in the console); nothing is logged in production and no token is ever printed
+  function authLog() { if (!isLoopback() || !root.console) return; try { root.console.info.apply(root.console, ["[auth]"].concat([].slice.call(arguments))); } catch (e) { /* no console */ } }
+  Stick.authDiag = { redirectUrl: redirectUrl, isLoopback: isLoopback, log: authLog };
+  if (isLoopback() && root.location) {
+    var q = root.location.search || "", h = root.location.hash || "";
+    authLog("page", root.location.origin + root.location.pathname, "| returning from sign-in:", /[?&]code=/.test(q) ? "yes (?code present)" : /[?&]error/.test(q) ? "error: " + q.slice(0, 120) : "no", "| cached session:", !!cachedSession());
+    if (/access_token=|refresh_token=/.test(h)) authLog("unexpected: tokens in the URL hash (implicit flow). This build uses PKCE.");
+  }
+
   Stick.auth = {
     // true right after Google sends the visitor back with ?code=...
     callbackPending: !!(cfg.CLOUD_CONFIGURED && root.location && /[?&](code|error_description)=/.test(root.location.search || "")),
 
+    staleSession: false,
+    // forget a cached login the server rejected (the account's boards stay in this browser's cache; signing in again brings them back)
+    dropStale: function () { try { root.localStorage.removeItem(AUTH_KEY); } catch (e) { /* storage blocked */ } },
     cachedUser: function () { var s = cachedSession(); return s ? s.user : null; },
     user: function () { return (lastSession && lastSession.user) || Stick.auth.cachedUser(); },
     session: function () { return lastSession; },
@@ -119,6 +139,10 @@
         });
         return c.auth.getSession().then(function (r) {
           lastSession = (r && r.data && r.data.session) || null;
+          // a cached login that the server no longer accepts (an invalid / revoked refresh token) is STALE; a network hiccup is not
+          var er = r && r.error;
+          Stick.auth.staleSession = !!(!lastSession && er && !/Retryable|fetch|network/i.test((er.name || "") + " " + (er.message || "")) && /refresh.?token|invalid.*(grant|jwt|token)|not found|expired/i.test(er.message || er.code || ""));
+          authLog("session restored:", !!lastSession, er ? "| error: " + (er.name || "") + " " + String(er.message || "").slice(0, 100) : "", Stick.auth.staleSession ? "| STALE cached session" : "");
           return lastSession;
         });
       });
@@ -129,7 +153,8 @@
     // provider: "google" | "github" (must be enabled in the Supabase dashboard)
     signInWithProvider: function (provider) {
       return Stick.cloud.load().then(function (c) {
-        var redirectTo = cfg.REDIRECT_URL || (root.location.origin + root.location.pathname);
+        var redirectTo = redirectUrl();
+        authLog("starting", provider, "sign-in; redirectTo =", redirectTo, "(this exact URL must be in Supabase > Authentication > URL Configuration > Redirect URLs, otherwise Supabase falls back to its Site URL, which is the GitHub Pages site)");
         return c.auth.signInWithOAuth({ provider: provider, options: { redirectTo: redirectTo } });
       }).then(function (r) { if (r && r.error) throw r.error; return r; });
     },
@@ -167,7 +192,7 @@
     },
     linkProvider: function (provider) {
       return Stick.cloud.load().then(function (c) {
-        var redirectTo = cfg.REDIRECT_URL || (root.location.origin + root.location.pathname);
+        var redirectTo = redirectUrl();
         return c.auth.linkIdentity({ provider: provider, options: { redirectTo: redirectTo } });
       }).then(function (r) { if (r && r.error) throw Stick.errors.parse(r.error); return r; });
     },

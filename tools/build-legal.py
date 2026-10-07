@@ -150,7 +150,7 @@ TEMPLATE = '''<!DOCTYPE html>
 </head>
 <body data-page="{page}" data-lang="{lang}">
 <a class="skip" href="#main">{skip}</a>
-<header class="top"><a href="{up}index.html" class="brand">Stick-It</a>
+<header class="top"><div class="topMain"><a href="{up}index.html" class="brand">Stick-It</a><span class="topTitle">{navlabel}</span></div>
 <nav aria-label="{navlabel}">{nav} <a class="langSwitch" href="{otherHref}" hreflang="{other}" lang="{other}">{otherLabel}</a></nav></header>
 <div id="draftBanner" class="draftBanner" role="note" hidden></div>
 <main id="main">
@@ -194,7 +194,7 @@ for lang, L in LANGS.items():
         body = convert(fill_contacts(md))
         DOCS.setdefault(lang, {})[page] = {'title': title_en if lang == 'en' else title_he, 'file': dst, 'html': body}
         extra = FORM if (page == 'copyright' and lang == 'en') else ''
-        nav = ' '.join('<a href="%s"%s>%s</a>' % (FILES[pid], ' aria-current="page"' if pid == page else '', label) for pid, label in L['nav'])
+        nav = ' '.join('<a href="%s" data-tab="%d"%s>%s</a>' % (FILES[pid], i % 5, ' aria-current="page"' if pid == page else '', label) for i, (pid, label) in enumerate(L['nav']))
         out = TEMPLATE.format(csp=CSP, title=title_en if lang == 'en' else title_he, page=page, body=body, extra=extra, lang=lang, dir=L['dir'],
                               up=L['up'] if lang == 'he' else '../', cssup='../' if lang == 'he' else '', draft=L['draft'], skip=L['skip'], navlabel=L['navlabel'],
                               nav=nav, other=L['other'], otherLabel=L['otherLabel'], back=L['back'],

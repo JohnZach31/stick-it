@@ -1,6 +1,6 @@
 /* The in-app Legal reader (js/legal-reader.js). Everything is scoped under .lrBackdrop so it cannot touch the board.
    Same notebook-page look as the standalone legal pages: warm cream paper, ruled lines that the text sits on, a red margin line. */
-.lrBackdrop{ position:fixed; inset:0; z-index:10050; background:rgba(40,32,12,0.5); display:flex; align-items:stretch; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
+.lrBackdrop{ position:fixed; inset:0; z-index:var(--z-reader, 10075); background:rgba(40,32,12,0.5); display:flex; align-items:stretch; justify-content:center; padding:max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); }
 .lrSheet{
   --ln:30px; --sheet:#fffdf4; --desk:#efe7cd; --ink:#33301f; --soft:#5b5640; --line:#e4dbb9; --rule:rgba(92,134,184,0.2); --margin:rgba(205,92,92,0.4);
   --accent:#8a4f0d; --focus:#8f5710; --warn:#fff3a8; --warn-ink:#4a3a00; --tape:rgba(255,246,196,0.85);
