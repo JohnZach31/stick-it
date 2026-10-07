@@ -74,7 +74,7 @@ create or replace function public.board_members_notify() returns trigger languag
 begin
   begin
     if to_regprocedure('realtime.send(jsonb,text,text,boolean)') is not null then
-      execute 'select realtime.send($1, $2, $3, false)' using '{}'::jsonb, 'access_changed', 'board:' || old.board_id::text;
+      execute 'select realtime.send($1, $2, $3, true)' using '{}'::jsonb, 'access_changed', 'board:' || old.board_id::text;
     end if;
   exception when others then null;
   end;
@@ -137,3 +137,12 @@ do $$ begin
     execute 'alter publication supabase_realtime add table public.board_objects';
   end if;
 end $$;
+
+-- a guest asks what they are called on this board (their generated friendly name), so presence and the owner's list agree
+create or replace function public.my_guest_alias(p_board uuid) returns text
+language sql security definer stable set search_path = public as $$
+  select u.alias from public.board_invite_uses u
+   where u.board_id = p_board and u.user_id = auth.uid() and u.alias is not null
+   order by u.first_used_at limit 1
+$$;
+grant execute on function public.my_guest_alias(uuid) to authenticated;

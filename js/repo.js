@@ -154,10 +154,14 @@
     },
     // the links this board's owner has made (the secret itself is never stored, so only who/what/how often); and turning one off
     listInvites: function (boardId) {
-      return db().then(function (c) { return guard(c.from("board_invites").select("id,email,role,uses,created_at").eq("board_id", boardId).order("created_at", { ascending: false })); });
+      return db().then(function (c) { return guard(c.rpc("list_invites", { p_board: boardId })); });
     },
+    // turns the link off AND removes the people who got in only through it (the server does both)
     revokeInvite: function (id) {
-      return db().then(function (c) { return guard(c.from("board_invites").delete().eq("id", id)); });
+      return db().then(function (c) { return guard(c.rpc("revoke_invite", { p_invite: id })); });
+    },
+    myGuestAlias: function (boardId) {
+      return db().then(function (c) { return guard(c.rpc("my_guest_alias", { p_board: boardId })); });
     },
     acceptInvite: function (token) {
       return db().then(function (c) { return guard(c.rpc("accept_invite", { p_token: token })); });

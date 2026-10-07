@@ -10,7 +10,7 @@
   // ------------------------------------------------------------------ errors
   var KNOWN = ["BOARD_LIMIT_REACHED", "STORAGE_QUOTA_EXCEEDED", "FILE_TOO_LARGE", "MIME_NOT_ALLOWED", "NOT_AUTHENTICATED",
     "FORBIDDEN", "OBJECT_LIMIT_REACHED", "UNSAFE_HTML", "INVITE_NOT_FOUND", "INVITE_USED", "INVITE_EXPIRED",
-    "INVITE_EMAIL_MISMATCH", "AGE_NOT_CONFIRMED", "PARENT_CONSENT_REQUIRED", "MARKETING_NOT_ALLOWED", "CODE_INVALID", "CODE_RATE_LIMIT", "PREMIUM_REQUIRED", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
+    "INVITE_EMAIL_MISMATCH", "INVITE_REVOKED", "ANONYMOUS_NOT_ALLOWED", "AGE_NOT_CONFIRMED", "PARENT_CONSENT_REQUIRED", "MARKETING_NOT_ALLOWED", "CODE_INVALID", "CODE_RATE_LIMIT", "PREMIUM_REQUIRED", "HANDLE_TAKEN", "NOTHING_TO_SHARE", "SHARE_LIMIT_REACHED", "UPLOAD_NOT_FOUND", "BAD_REQUEST"];
   Stick.errors = {
     // Turns whatever a Supabase call threw/returned into {code, message, offline, retryable}
     parse: function (e) {
@@ -45,7 +45,42 @@
       if (c === "CODE_INVALID") return "That code didn’t work. Check it, or ask for a new one.";
       if (c === "CODE_RATE_LIMIT") return "Please wait a little before asking for another code.";
       if (c === "FORBIDDEN") return "You don't have permission to do that here.";
+      var d = Stick.errors.describe(err); if (d && d.known) return d.message;
       return err && err.message ? err.message : "Something went wrong.";
+    },
+    // The stable, documented application codes (docs/dev/ERROR-CODES.md lists every one; a test keeps the two in step).
+    // id = what people may quote, message = what they read (never a database detail), retry = trying again can help, severity = how loud the message is.
+    catalog: {
+      "AUTH-001": { from: "NOT_AUTHENTICATED", message: "Please sign in again.", retry: false, severity: "warn" },
+      "AUTH-002": { from: "AUTH", message: "Your sign-in has expired. Please sign in again.", retry: false, severity: "warn" },
+      "AUTH-003": { from: "ANONYMOUS_NOT_ALLOWED", message: "That needs an account. Guests can work on the board they joined, but can’t do this.", retry: false, severity: "info" },
+      "AUTH-004": { from: "AGE_NOT_CONFIRMED", message: "Please confirm your age first.", retry: false, severity: "info" },
+      "AUTH-005": { from: "PARENT_CONSENT_REQUIRED", message: "Cloud features need a parent or guardian’s approval first.", retry: false, severity: "info" },
+      "INVITE-001": { from: "INVITE_NOT_FOUND", message: "We couldn’t find that invitation. Check the link, or ask for a new one.", retry: false, severity: "warn" },
+      "INVITE-002": { from: "INVITE_EXPIRED", message: "That invitation has expired. Ask for a new one.", retry: false, severity: "warn" },
+      "INVITE-003": { from: "INVITE_REVOKED", message: "This board access was turned off by the owner.", retry: false, severity: "warn" },
+      "INVITE-004": { from: "INVITE_EMAIL_MISMATCH", message: "That invitation is tied to a different e-mail address. Sign in with the address it was sent to.", retry: false, severity: "warn" },
+      "INVITE-005": { from: "INVITE_USED", message: "That invitation was already used.", retry: false, severity: "warn" },
+      "SHARE-001": { from: "SHARE_LIMIT_REACHED", message: "You’ve reached the limit of share links on your plan.", retry: false, severity: "info" },
+      "SHARE-002": { from: "NOTHING_TO_SHARE", message: "There is nothing to share yet.", retry: false, severity: "info" },
+      "SYNC-001": { from: "OFFLINE", message: "You appear to be offline. Changes are kept and sent when you’re back.", retry: true, severity: "info" },
+      "SYNC-002": { from: "FORBIDDEN", message: "You don’t have permission to do that here.", retry: false, severity: "warn" },
+      "SYNC-003": { from: "UNSAFE_HTML", message: "That content couldn’t be saved because it isn’t allowed.", retry: false, severity: "warn" },
+      "BOARD-001": { from: "BOARD_LIMIT_REACHED", message: "You’ve reached your plan’s board limit.", retry: false, severity: "info" },
+      "BOARD-002": { from: "OBJECT_LIMIT_REACHED", message: "This board has reached its maximum number of items.", retry: false, severity: "info" },
+      "BOARD-003": { from: "ACCESS_REVOKED", message: "This board access was turned off by the owner.", retry: false, severity: "warn" },
+      "ASSET-001": { from: "FILE_TOO_LARGE", message: "That file is too large to upload.", retry: false, severity: "info" },
+      "ASSET-002": { from: "MIME_NOT_ALLOWED", message: "That file type isn’t supported.", retry: false, severity: "info" },
+      "ASSET-003": { from: "STORAGE_QUOTA_EXCEEDED", message: "Your account is out of storage space.", retry: false, severity: "info" },
+      "ASSET-004": { from: "UPLOAD_NOT_FOUND", message: "That upload could not be found. Please try again.", retry: true, severity: "warn" },
+      "PRINT-001": { from: "PRINT_FAILED", message: "Printing didn’t start. Try again, or use Save as PDF.", retry: true, severity: "warn" },
+      "MEDIA-001": { from: "MEDIA_DENIED", message: "The camera or microphone isn’t allowed. Check the browser’s permission for this site.", retry: false, severity: "warn" }
+    },
+    // {id, message, severity, retry, known} for an application error code or a parsed Supabase error; unknown things get a generic, secret-free message
+    describe: function (err) {
+      var c = typeof err === "string" ? err : (err && err.code), cat = Stick.errors.catalog, ids = Object.keys(cat);
+      for (var i = 0; i < ids.length; i++) if (cat[ids[i]].from === c) return { id: ids[i], message: cat[ids[i]].message, severity: cat[ids[i]].severity, retry: cat[ids[i]].retry, known: true };
+      return { id: "SYNC-999", message: "Something went wrong. Please try again.", severity: "warn", retry: true, known: false };
     }
   };
 

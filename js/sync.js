@@ -56,6 +56,7 @@
     var retryTimer = null, retryN = 0;
     var jobs = {};               // media job key -> "running" | "failed"
     var pollTimer = null, started = false;
+    var rtCh = null, rtClient = null, rtStatus = "", rtTimer = null, lastPullAt = 0;     // realtime: a push only SCHEDULES the normal pull, it is never a second sync path
     var readOnlyMode = false;    // viewers: pull only, never write
 
     // ------------------------------------------------------------ status
@@ -161,7 +162,7 @@
           if (!u) return;
           if (r.status === "ok") { known[r.id] = { v: r.version, h: u.h }; delete blocked[r.id]; }
           else if (r.status === "conflict") { if (resolveConflict(r.id, r.server, u) === "resurrect") rerun = true; }
-          else if (r.status === "denied") { blocked[r.id] = u.h; problem = "You don't have permission to change this board."; }
+          else if (r.status === "denied") { blocked[r.id] = u.h; problem = "You don't have permission to change this board."; if (host.onAccessCheck) host.onAccessCheck(); }
           else { blocked[r.id] = u.h; problem = "Some items couldn't be saved."; }
         });
       }
@@ -324,6 +325,7 @@
     }
     async function pull(full) {
       if (!boardId) return false;
+      lastPullAt = Date.now();
       var out = { upserts: [], removes: [] };
       var rows, newMark = watermark;
       if (full || !watermark) {
@@ -354,10 +356,44 @@
       return pull(false).catch(function (e) {
         var err = Stick.errors.parse(e);
         if (err.offline) setStatus("offline");
+        else if (err.code === "FORBIDDEN" || err.status === 403) { if (host.onAccessCheck) host.onAccessCheck(); }
         else if (err.code === "AUTH") { setStatus("problem", "Please sign in again."); if (host.onAuthLost) host.onAuthLost(); }
       });
     }
     S.pull = function (full) { return pull(!!full); };
+
+    // ------------------------------------------------------------ realtime (scoped to the active board)
+    // Supabase tells us a row of THIS board's objects changed (row-level security decides who is told); we then run the ordinary pull, debounced.
+    // Our own writes are skipped when we already know that version. Polling stays as a slow safety net.
+    function schedulePull() {
+      if (rtTimer) return;
+      rtTimer = setTimeout(function () { rtTimer = null; pullQuiet(); }, 250);
+    }
+    S._schedulePull = schedulePull;
+    function stopRealtime() {
+      clearTimeout(rtTimer); rtTimer = null; rtStatus = "";
+      var ch = rtCh, c = rtClient; rtCh = null; rtClient = null;
+      try { if (ch && c) c.removeChannel(ch); } catch (e) {}
+    }
+    function startRealtime() {
+      stopRealtime();
+      if (!boardId || !root.Stick || !root.Stick.cloud || !root.Stick.cloud.load) return;
+      var id = boardId;
+      root.Stick.cloud.load().then(function (c) {
+        if (id !== boardId || !started || rtCh) return;                                   // switched board / stopped while connecting: never leave a subscription behind
+        if (typeof c.channel !== "function") return;
+        rtClient = c;
+        rtCh = c.channel("objects:" + id).on("postgres_changes", { event: "*", schema: "public", table: "board_objects", filter: "board_id=eq." + id }, function (p) {
+          var r = p && p.new; if (r && r.id && known[r.id] && !known[r.id].d && known[r.id].v >= r.version) return;     // our own write, already applied
+          schedulePull();
+        }).subscribe(function (st) {
+          rtStatus = st;
+          if (st === "SUBSCRIBED") pullQuiet();                                           // catch up on anything missed while connecting
+          else if (st === "CHANNEL_ERROR" || st === "TIMED_OUT") setTimeout(function () { if (id === boardId && started && rtStatus !== "SUBSCRIBED") startRealtime(); }, 15000);
+        });
+      }, function () {});
+    }
+    S.realtimeState = function () { return { channel: rtCh ? "objects:" + boardId : null, status: rtStatus }; };
 
     // load image assets for objects that reference them (runtime only; blob URLs are never persisted)
     function hydrate(o) {
@@ -402,12 +438,17 @@
         });
         root.addEventListener("beforeunload", function (e) { if (S.hasPending()) { e.preventDefault(); e.returnValue = ""; } });
       }
+      startRealtime();
+      var poll = cfg.pollMs || 20000;
       pollTimer = setInterval(function () {
         if (root.document && root.document.visibilityState === "hidden") return;
-        if (online()) { pullQuiet(); if (statusVal === "offline") S.flush(); }
-      }, cfg.pollMs || 20000);
+        if (!online()) return;
+        // with realtime connected the poll is only a safety net (once a minute); without it, the old pace
+        if (rtStatus === "SUBSCRIBED" && Date.now() - lastPullAt < poll * 3) { if (statusVal === "offline") S.flush(); return; }
+        pullQuiet(); if (statusVal === "offline") S.flush();
+      }, poll);
     };
-    S.stop = function () { clearInterval(pollTimer); clearTimeout(flushTimer); clearTimeout(retryTimer); started = false; };
+    S.stop = function () { stopRealtime(); clearInterval(pollTimer); clearTimeout(flushTimer); clearTimeout(retryTimer); started = false; };
 
     // ------------------------------------------------------------ board metadata (name, subtitle, cover)
     function loadMeta() { try { return JSON.parse(store.getItem(keys.meta()) || "{}"); } catch (e) { return {}; } }

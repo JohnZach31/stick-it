@@ -73,6 +73,7 @@
       client = c;
       ch = c.channel("board:" + boardId, { config: { private: true, presence: { key: selfKey } } });
       ch.on("presence", { event: "sync" }, gather);
+      ch.on("broadcast", { event: "access_changed" }, function () { try { root.dispatchEvent(new root.CustomEvent("stick:access-changed")); } catch (e) {} });
       ch.subscribe(function (status) {
         if (status === "SUBSCRIBED") { ready = true; if (pending) { ch.track(pending); } }
       });

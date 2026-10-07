@@ -113,7 +113,6 @@
     {name:"Secular One", script:"hebrew", mood:"marker"},
     {name:"Rubik", script:"hebrew", mood:"neat", also:["cyrillic"]},
     {name:"Gveret Levin", script:"hebrew", mood:"script"},
-    {name:"Rubik Scribble", script:"hebrew", mood:"marker", also:["cyrillic"]},
     {name:"Alef", script:"hebrew", mood:"neat", rand:false},
     {name:"Miriam Libre", script:"hebrew", mood:"neat", rand:false},
     {name:"Frank Ruhl Libre", script:"hebrew", mood:"script", rand:false},
@@ -151,6 +150,9 @@
   ];
   var FONT_BY_NAME = {};
   FONTS.forEach(function(f){ FONT_BY_NAME[f.name] = f; });
+  // Retired fonts: never offered or picked at random any more. Notes saved with one keep rendering (in the nearest supported font), so nothing breaks and nothing is rewritten.
+  var LEGACY_FONT = {"Rubik Scribble": "Rubik"};
+  Object.keys(LEGACY_FONT).forEach(function(k){ FONT_BY_NAME[k] = FONT_BY_NAME[LEGACY_FONT[k]]; });
   // mood -> fallback font per script, used to build harmonious stacks
   var MOOD_FALLBACK = {
     pen:    {latin:"Caveat",           hebrew:"Amatic SC",           cyrillic:"Bad Script",  arabic:"Katibeh",    zh:"Long Cang",        ja:"Yomogi",         ko:"Nanum Pen Script"},
@@ -383,18 +385,18 @@
     var mSel = document.createElement("select"); mSel.id = "ageMonth";
     var mo = document.createElement("option"); mo.value = ""; mo.textContent = "Month"; mSel.appendChild(mo);
     months.forEach(function(n, i){ var o = document.createElement("option"); o.value = String(i + 1); o.textContent = n; mSel.appendChild(o); });
-    mLab.appendChild(mSel);
+    var mWrap = makeDiv("ageSel"); mWrap.appendChild(mSel); mLab.appendChild(mWrap);
     var yLab = document.createElement("label"); yLab.textContent = "Year";
     var ySel = document.createElement("select"); ySel.id = "ageYear";
     var yo = document.createElement("option"); yo.value = ""; yo.textContent = "Year"; ySel.appendChild(yo);
     var thisYear = new Date().getFullYear();
     for(var y = thisYear; y >= thisYear - 110; y--){ var o2 = document.createElement("option"); o2.value = String(y); o2.textContent = String(y); ySel.appendChild(o2); }
-    yLab.appendChild(ySel);
+    var yWrap = makeDiv("ageSel"); yWrap.appendChild(ySel); yLab.appendChild(yWrap);
     row.appendChild(mLab); row.appendChild(yLab);
     form.appendChild(row);
     var err = document.createElement("p"); err.className = "asErr"; err.setAttribute("role", "alert"); err.style.minHeight = "1em";
     form.appendChild(err);
-    var acts = makeDiv("modalActions"); acts.style.marginTop = "6px";
+    var acts = makeDiv("modalActions ageActs"); acts.style.marginTop = "6px";
     (opts.extra || []).forEach(function(x){
       var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn"; b.textContent = x.label; b.addEventListener("click", x.fn); acts.appendChild(b);
     });
@@ -436,11 +438,11 @@
   // the screen as a dialog: for an account that reached the app without a recorded band
   function openAgeGateModal(opts){
     var done = false;
-    var m = openModal({title: "How old are you?", content: document.createElement("div"), width: 380, actions: [{label: "Sign out", value: "signout"}],
+    var m = openModal({title: "How old are you?", content: document.createElement("div"), width: 380,
       onClose: function(v){ if(!done && opts.onSignOut) opts.onSignOut(); }});
-    var holder = m.card.querySelector("div:not(.modalActions)");
     var content = m.card.children[2]; content.innerHTML = "";
-    content.appendChild(buildAgeForm({onBand: function(band){ done = true; m.close(true); opts.onBand(band); }}));
+    content.appendChild(buildAgeForm({onBand: function(band){ done = true; m.close(true); opts.onBand(band); },
+      extra: [{label: "Sign out", fn: function(){ m.close("signout"); }}]}));
     return m;
   }
   function ageOkNotice(msg){ toast(msg); }
@@ -544,7 +546,25 @@
     window.__floaterObserver = mo;
   })();
   var toastTimer;
+  // An operational failure: short message, the stable code as small print, a severity colour, an optional Retry, and a close button.
+  // `err` is a catalogue id/app code ("INVITE_REVOKED"), or a parsed error; unknown things get the generic, secret-free message.
+  function errorToast(err, opts){
+    opts = opts || {};
+    var d = Stick.errors.describe(err), msg = opts.message || d.message;
+    toastEl.innerHTML = ""; toastEl.className = "toast errToast sev-" + (d.severity || "warn");
+    var body = document.createElement("span"); body.className = "etBody";
+    var m = document.createElement("span"); m.className = "etMsg"; m.textContent = msg; body.appendChild(m);
+    var code = document.createElement("span"); code.className = "etCode"; code.textContent = d.id; body.appendChild(code);
+    toastEl.appendChild(body);
+    if(opts.retry && d.retry !== false){ var rb = document.createElement("button"); rb.className = "toastAction"; rb.textContent = "Retry"; rb.addEventListener("click", function(){ toastEl.classList.remove("show"); opts.retry(); }); toastEl.appendChild(rb); }
+    var x = document.createElement("button"); x.className = "etClose"; x.setAttribute("aria-label", "Dismiss"); x.textContent = "\u00d7"; x.addEventListener("click", function(){ toastEl.classList.remove("show"); }); toastEl.appendChild(x);
+    toastEl.setAttribute("role", "alert"); toastEl.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 7000);
+    return d;
+  }
+  Stick.errorToast = errorToast;
   function toast(msg, actionLabel, actionFn){
+    toastEl.className = "toast"; toastEl.removeAttribute("role");
     toastEl.innerHTML = "";
     var span = document.createElement("span");
     span.textContent = msg;
@@ -3177,6 +3197,7 @@
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(b.cap.isContentEditable && b.cap.contains(e.target)) return; // editing the caption
+        if(isScrollGesture(e, el)) return;
         e.preventDefault();
         endEditing();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
@@ -3766,6 +3787,7 @@
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(b.cap.isContentEditable && b.cap.contains(e.target)) return;
+        if(isScrollGesture(e, el)) return;
         e.preventDefault();
         endEditing(); closeCaptureMenu();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
@@ -3952,6 +3974,7 @@
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest(".poF.editing")) return;                // typing in a field
         if(e.target.closest && e.target.closest(".poAddPic")) return;
+        if(isScrollGesture(e, el)) return;
         e.preventDefault();
         endEditing(); closeCaptureMenu();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
@@ -4555,6 +4578,7 @@
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest("button, input, a, .shText, .shTitle, .shEdit")) return;
+        if(isScrollGesture(e, el)) return;
         e.preventDefault(); endEditing(); closeCaptureMenu();
         if(searchInput.value.trim()) setTimeout(clearSearch, 0);
         if(e.ctrlKey || e.metaKey){ toggleSelected(n.id); return; }
@@ -8927,12 +8951,27 @@
     });
   }
 
+  // The nearest element under the pointer (below `stop`) that really scrolls vertically: {el, onBar}. Null when there is none.
+  function scrollRegionAt(e, stop){
+    for(var t = e.target; t && t !== stop && t.nodeType === 1 && t !== document.body; t = t.parentNode){
+      var cs = getComputedStyle(t);
+      if(/(auto|scroll)/.test(cs.overflowY) && t.scrollHeight > t.clientHeight + 1){
+        var r = t.getBoundingClientRect();
+        return {el: t, onBar: e.clientX >= r.left + t.clientLeft + t.clientWidth || e.clientX < r.left + t.clientLeft};
+      }
+    }
+    return null;
+  }
+  // A press that is really a scroll (the scrollbar, or a drag/swipe inside content that scrolls) must never start dragging the paper.
+  // The paper is still dragged by its header, its edges and any part that does not scroll.
+  function isScrollGesture(e, root){ return !!scrollRegionAt(e, root); }
+  Stick.scrollRegionAt = scrollRegionAt;
   board.addEventListener("wheel", function(e){
     if(Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
-    var t = e.target.closest && e.target.closest(".note > .text");
-    if(t && t.parentNode.classList.contains("capped")){
-      var atTop = t.scrollTop <= 0, atBottom = t.scrollTop + t.clientHeight >= t.scrollHeight - 1;
-      if((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) return; // native scroll inside the note
+    var reg = scrollRegionAt(e, board);
+    if(reg){
+      var t = reg.el, atTop = t.scrollTop <= 0, atBottom = t.scrollTop + t.clientHeight >= t.scrollHeight - 1;
+      if((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) return;             // it can still scroll that way: scroll it (native). At its edge the board takes over.
     }
     board.scrollLeft += e.deltaY;
     e.preventDefault();
@@ -9569,12 +9608,13 @@
       var card = document.createElement("section"); card.className = "asCard"; card.setAttribute("aria-labelledby", "ccInH");
       card.innerHTML = '<h4 id="ccInH">Input</h4>';
       function row(id, label, help, list, key){
-        var r = document.createElement("div"); r.className = "asItem";
+        var r = document.createElement("div"); r.className = "asItem asItemField";
         var l = document.createElement("label"); l.className = "lbl"; l.setAttribute("for", id); l.textContent = label; var sm = document.createElement("small"); sm.textContent = help; l.appendChild(sm);
         var sel = document.createElement("select"); sel.id = id; sel.className = "asSelect";
         list.forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
         sel.value = uiPref(key); sel.addEventListener("change", function(){ setUiPref(key, sel.value); toast("Saved."); });
-        r.appendChild(l); r.appendChild(sel); card.appendChild(r);
+        var selWrap = document.createElement("span"); selWrap.className = "asSel"; selWrap.appendChild(sel);
+        r.appendChild(l); r.appendChild(selWrap); card.appendChild(r);
       }
       row("inDbl", "Double-click the canvas creates", "What a double-click on empty board makes. Ask me each time opens the add menu where you clicked.", DBL_NODES, "dblNode");
       row("inPaste", "Pasted text becomes", "When you paste plain text onto the board (not into a note you are editing).", PASTE_MODES, "pasteText");
@@ -12191,15 +12231,18 @@
       fill(thumbFor(b, fill));
       row.appendChild(thumb);
       row.appendChild(info);
+      row.addEventListener("pointerenter", function(){ prefetchBoard(b.id); });          // by the time it is clicked the board is usually already on this device
       row.addEventListener("click", async function(){
         if(b.id === activeBoardId) return;
+        perfMark("board switch: clicked"); try{ sessionStorage.setItem("stickit.perf.switch", String(Date.now())); }catch(e){}
         safeSet(boardViewKey(activeBoardId), {cx:viewCenter().x});
         saveThumbNow();
         if(CLOUD && cloudSync){
           // make sure nothing is left behind, and that the board is on this device before we switch to it
           try{
             if(cloudSync.hasPending()) await cloudSync.flush();
-            if(!safeGet(notesKeyFor(b.id))){ cloudOverlay("Opening \u201c" + b.name + "\u201d\u2026"); await cloudSync.fillBoardCache(b.id); }
+            if(!safeGet(notesKeyFor(b.id))){ cloudOverlay("Opening \u201c" + b.name + "\u201d\u2026"); await (prefetching[b.id] || cloudSync.fillBoardCache(b.id)); }
+            perfMark("board switch: board on this device");
           }catch(e){ hideCloudOverlay(); toast(Stick.errors.friendly(Stick.errors.parse(e))); return; }
         }
         safeSet(ACTIVE_BOARD_KEY, b.id);
@@ -12289,6 +12332,16 @@
     setTimeout(function(){ btn.dataset.armed = "0"; btn.innerHTML = ICONS.close; btn.title = "Delete board"; }, 3000);
     return false;
   }
+  // Boards that are not on this device yet are fetched in the background while the board list is open (one at a time, never the current board, never over a
+  // cache that exists), so switching to them is immediate. It is the same fetch the switch would have made, just earlier.
+  var prefetching = {};
+  function prefetchBoard(id){
+    if(!CLOUD || !cloudSync || id === activeBoardId || prefetching[id] || safeGet(notesKeyFor(id)) || (navigator.onLine === false)) return prefetching[id] || null;
+    perfMark("prefetch " + id.slice(0, 6) + ": start");
+    prefetching[id] = cloudSync.fillBoardCache(id).then(function(){ perfMark("prefetch " + id.slice(0, 6) + ": done"); }, function(){}).then(function(){ delete prefetching[id]; });
+    return prefetching[id];
+  }
+  async function prefetchBoards(){ if(boardPanel.hidden) return; for(var i = 0; i < boards.length && i < 6; i++){ if(boardPanel.hidden) return; await prefetchBoard(boards[i].id); } }
   function updateBoardLabel(){
     var cur = boards.filter(function(x){ return x.id === activeBoardId; })[0];
     brandBtn.title = cur && cur.subtitle ? cur.name + " \u00b7 " + cur.subtitle : "Switch board";
@@ -12302,7 +12355,7 @@
       var willOpen = boardPanel.hidden;
       closeOtherPanels(willOpen ? boardPanel : null);
       boardPanel.hidden = !willOpen; if(willOpen) boardLayer.open();
-      if(willOpen) renderBoardList();
+      if(willOpen){ renderBoardList(); setTimeout(prefetchBoards, 400); }
     });
     document.addEventListener("click", function(e){
       if(!boardPanel.hidden && !boardPanel.contains(e.target) && !brandBtn.contains(e.target)){
@@ -13075,7 +13128,8 @@
     },
     mediaBlob: function(mediaId){ return MediaStore.blob(mediaId).catch(function(){ return null; }); },
     toast: function(m){ toast(m); },
-    onAuthLost: function(){ authLost = true; updateSyncPill("problem", "Please sign in again."); }
+    onAuthLost: function(){ authLost = true; updateSyncPill("problem", "Please sign in again."); },
+    onAccessCheck: function(){ checkBoardAccess(); }                 // the server refused something: find out whether the owner turned our access off
   };
   function setupCloudSync(){
     cloudSync = Stick.createSync({
@@ -13341,9 +13395,14 @@
     if(!(window.Stick && Stick.collab) || !CLOUD || !activeBoardId || singleNoteMode) return;
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {}, role = meta.access || "owner";
     var user = Stick.auth.user() || {}, dev = window.Stick && Stick.dev && localStorage.getItem("stickit.dev.presence") === "bc";
+    // a guest who joined without an account is shown under the friendly name the server gave them ("Leaflet #184"), never as an account name
+    if(Stick.auth.isAnonymous && Stick.auth.isAnonymous() && !startCollab._alias){
+      var bid = activeBoardId;
+      Stick.repo.myGuestAlias(bid).then(function(a){ if(a && bid === activeBoardId){ startCollab._alias = a; if(settings.account) settings.account.name = a; startCollab(); } }, function(){});
+    }
     Stick.collab.start({
       boardId: activeBoardId, role: role, canComment: role === "owner" || role === "editor", transport: dev ? "broadcast" : undefined,
-      me: {uid: user.id || "", name: (settings.account && settings.account.name) || getDisplayName()},
+      me: {uid: user.id || "", name: startCollab._alias || (settings.account && settings.account.name) || getDisplayName()},
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
         openPopover: function(anchor){
@@ -13358,11 +13417,19 @@
     });
     document.getElementById("presenceBar").setAttribute("aria-label", "People on this board");
   }
+  // Timing marks for the cloud start-up and board switching (dev diagnostics: add ?perf to the address, or run Stick.perf.report() in the console).
+  // Marks are milliseconds since the page started; nothing is sent anywhere.
+  var perfMarks = [];
+  function perfMark(name){ try{ perfMarks.push({name: name, ms: Math.round(performance.now())}); if(/[?&]perf\b/.test(location.search) || (Stick.dev && localStorage.getItem("stickit.dev.perf"))) console.log("[perf]", name, Math.round(performance.now()) + " ms"); }catch(e){} }
+  Stick.perf = {marks: function(){ return perfMarks.slice(); }, mark: perfMark, report: function(){ var prev = 0; return perfMarks.map(function(m){ var r = {step: m.name, at: m.ms, took: m.ms - prev}; prev = m.ms; return r; }); }};
+  try{ var swT = sessionStorage.getItem("stickit.perf.switch"); if(swT){ sessionStorage.removeItem("stickit.perf.switch"); perfMarks.push({name: "board switch: page reloaded (clicked " + Math.round(Date.now() - Number(swT)) + " ms ago)", ms: Math.round(performance.now())}); } }catch(e){}
   async function startCloud(){
+    perfMark("cloud start");
     setupCloudSync();
     if(viewerMode) cloudSync.setReadOnly(true);
     var session = null;
     try{ session = await Stick.auth.init(); }catch(e){ session = null; }
+    perfMark("auth restored");
     Stick.auth.onChange(function(ev){
       if(ev === "SIGNED_OUT" && !cloudSigningOut){ authLost = true; updateSyncPill("problem", "Please sign in again."); }
       if(ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED"){ if(authLost && cloudSync){ authLost = false; updateSyncPill("saving"); cloudSync.retryAll(); } }
@@ -13416,7 +13483,9 @@
     if(await maybeAcceptInvite()) return;
     cloudSync.attach(activeBoardId);
     updateSyncPill("saved");
+    perfMark("before first board pull");
     watchPhotoLoading(); await cloudSync.start(); watchPhotoLoading();
+    perfMark("first board pull done");
     startCollab();
     refreshBoardsQuietly();
     // Boards made as a guest on this device that were never imported (signed in again later, or the first offer
@@ -13475,20 +13544,10 @@
       '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails (optional)"></div>' +
       '<p class="asHint" id="cbHint">Press Enter or comma after each address. With e-mails, each person gets their own link that only their account can use.</p>' +
       '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>' +
-      '<div class="menuHint" style="margin-top:12px;">Links you made</div><div id="cbList" class="collabOut"></div>';
+      '<div class="menuHint" style="margin-top:12px;">Links you made</div><div id="cbList" class="invList"></div>';
     var listEl = wrap.querySelector("#cbList");
     function loadInvites(){
-      Stick.repo.listInvites(activeBoardId).then(function(rows){
-        listEl.innerHTML = "";
-        if(!rows || !rows.length){ var none = document.createElement("div"); none.className = "asHint"; none.textContent = "None yet."; listEl.appendChild(none); return; }
-        rows.forEach(function(r){
-          var row = makeDiv("inviteRow"), who = document.createElement("div"); who.className = "asHint";
-          who.textContent = (r.role === "viewer" ? "Viewer" : "Editor") + " link" + (r.email ? " for " + r.email : " (anyone with it)") + " · used " + (r.uses || 0) + (r.uses === 1 ? " time" : " times");
-          var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn"; off.textContent = "Turn off";
-          off.addEventListener("click", function(){ off.disabled = true; Stick.repo.revokeInvite(r.id).then(function(){ toast("Link turned off."); loadInvites(); }, function(e){ off.disabled = false; toast(Stick.errors.friendly(Stick.errors.parse(e))); }); });
-          row.appendChild(who); row.appendChild(off); listEl.appendChild(row);
-        });
-      }, function(){ listEl.textContent = ""; });
+      Stick.repo.listInvites(activeBoardId).then(function(rows){ renderInviteCards(listEl, rows || [], loadInvites); }, function(){ listEl.textContent = ""; });
     }
     loadInvites();
     openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
@@ -13500,7 +13559,7 @@
         setBusy(btn, true, "Creating\u2026"); out.innerHTML = "";
         var chain = Promise.resolve();
         targets.forEach(function(email){
-          chain = chain.then(function(){ return Stick.repo.createInvite(activeBoardId, email, role).then(function(r){ showInviteResult(out, email, role, inviteLink(r.token)); loadInvites(); }, function(e){ showInviteResult(out, email, role, "", Stick.errors.friendly(Stick.errors.parse(e))); }); });
+          chain = chain.then(function(){ return Stick.repo.createInvite(activeBoardId, email, role).then(function(r){ rememberInviteToken(r.id, r.token); showInviteResult(out, email, role, inviteLink(r.token)); loadInvites(); }, function(e){ showInviteResult(out, email, role, "", Stick.errors.friendly(Stick.errors.parse(e))); }); });
         });
         chain.then(function(){ setBusy(btn, false); });
         return false;
@@ -13533,6 +13592,52 @@
     input.addEventListener("blur", function(){ if(input.value.trim()) commitPending(); });
     pills.addEventListener("click", function(e){ if(e.target === pills) input.focus(); });
   }
+  // The server keeps only a hash of each link, so a link can be copied again only on the device that made it: that device remembers it (and only the owner's browser ever does).
+  var INV_TOK_KEY = "stickit.inviteTokens";
+  function inviteTokens(){ try{ var o = JSON.parse(localStorage.getItem(INV_TOK_KEY) || "{}"); return o && typeof o === "object" ? o : {}; }catch(e){ return {}; } }
+  function rememberInviteToken(id, t){ if(!id || !t) return; var o = inviteTokens(); o[id] = t; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
+  function forgetInviteToken(id){ var o = inviteTokens(); delete o[id]; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
+  function fmtDay(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}); }catch(e){ return ""; } }
+  // each link as a small slip: what it allows, whether it is on, who came in through it, and Copy / Turn off
+  function renderInviteCards(host, rows, reload){
+    host.innerHTML = "";
+    if(!rows.length){
+      var empty = makeDiv("invEmpty"); empty.innerHTML = '<strong>No links yet</strong><span>Make one above. It will appear here, with the people who join through it.</span>';
+      host.appendChild(empty); return;
+    }
+    var toks = inviteTokens();
+    rows.forEach(function(r){
+      var on = !r.revoked_at, card = makeDiv("invCard" + (on ? "" : " off"));
+      var head = makeDiv("invHead"), role = document.createElement("span"); role.className = "invRole"; role.textContent = r.role === "viewer" ? "Viewer" : "Editor";
+      var state = document.createElement("span"); state.className = "invState " + (on ? "on" : "off"); state.textContent = on ? "On" : "Turned off";
+      head.appendChild(role); head.appendChild(state); card.appendChild(head);
+      var who = makeDiv("invWho"); who.textContent = r.email ? "Only for " + r.email : "Anyone with the link"; card.appendChild(who);
+      var people = r.people || [], active = people.filter(function(x){ return x.active; }).length;
+      var meta = makeDiv("invMeta"); meta.textContent = "Made " + fmtDay(r.created_at) + " \u00b7 joined " + (r.uses || 0) + (r.uses === 1 ? " time" : " times") + (people.length ? " \u00b7 " + active + " here now" : ""); card.appendChild(meta);
+      if(people.length){
+        var chips = makeDiv("invPeople");
+        people.forEach(function(x){ var c = document.createElement("span"); c.className = "invChip" + (x.active ? "" : " gone") + (x.guest ? " guest" : ""); c.textContent = x.name; c.title = (x.guest ? "Guest, joined without an account" : "Member") + (x.active ? "" : " (no longer on the board)"); chips.appendChild(c); });
+        card.appendChild(chips);
+      }
+      var acts = makeDiv("invActs");
+      if(on && toks[r.id]){
+        var cp = document.createElement("button"); cp.type = "button"; cp.className = "pillBtn copyBtn"; cp.textContent = "Copy link";
+        cp.addEventListener("click", function(){ copyText(inviteLink(toks[r.id])).then(function(ok){ flashCopied(cp, ok ? "Copied!" : "Select and copy"); }); });
+        acts.appendChild(cp);
+      } else if(on){ var note = document.createElement("span"); note.className = "asHint"; note.textContent = "Copy is only offered on the device that made the link."; acts.appendChild(note); }
+      if(on){
+        var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn danger"; off.textContent = "Turn off"; var armed = false, t0 = 0;
+        off.addEventListener("click", function(){
+          if(!armed){ armed = true; off.textContent = active ? "Turn off & remove " + active + (active === 1 ? " person" : " people") + "?" : "Really turn off?"; off.classList.add("dangerFill"); t0 = setTimeout(function(){ armed = false; off.textContent = "Turn off"; off.classList.remove("dangerFill"); }, 5000); return; }
+          clearTimeout(t0); off.disabled = true;
+          Stick.repo.revokeInvite(r.id).then(function(res){ forgetInviteToken(r.id); toast("Link turned off" + (res && res.removed ? " and " + res.removed + (res.removed === 1 ? " person was" : " people were") + " removed." : ".")); reload(); },
+            function(e){ off.disabled = false; errorToast(Stick.errors.parse(e)); });
+        });
+        acts.appendChild(off);
+      }
+      card.appendChild(acts); host.appendChild(card);
+    });
+  }
   // one row per address: its own link and its own Copy button
   function showInviteResult(out, email, role, url, err){
     var row = makeDiv("inviteRow"), who = document.createElement("div"); who.className = "asHint"; who.textContent = (role === "viewer" ? "Viewer" : "Editor") + " link" + (email ? " for " + email : "");
@@ -13547,14 +13652,74 @@
   // opening someone's invite link (#invite=...): join once signed in; a signed-out visitor signs in first and is brought back to it
   var INVITE_KEY = "stickit.pendingInvite";
   function inviteTokenFromHash(){ var m = /^#invite=([a-f0-9]{64})$/i.exec(location.hash || ""); return m ? m[1].toLowerCase() : null; }
+  function storeInvite(t){
+    try{ sessionStorage.setItem(INVITE_KEY, t); }catch(e){}
+    try{ localStorage.setItem(INVITE_KEY, JSON.stringify({t: t, at: Date.now()})); }catch(e){}          // survives the trip through Google sign-in even if the tab's session storage does not
+  }
   function rememberInviteFromHash(){
     var t = inviteTokenFromHash();
-    if(t){
-      try{ sessionStorage.setItem(INVITE_KEY, t); }catch(e){}
-      try{ localStorage.setItem(INVITE_KEY, JSON.stringify({t: t, at: Date.now()})); }catch(e){}          // survives the trip through Google sign-in even if the tab's session storage does not
-      try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
-    }
+    if(t){ storeInvite(t); try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){} }
   }
+  // "Join with invite link": a pasted link (or just the code) is checked, then goes through the same flow as opening the link directly
+  function parseInviteInput(text){
+    var m = /(?:#invite=|^|[^a-f0-9])([a-f0-9]{64})(?![a-f0-9])/i.exec(String(text || "").trim());
+    return m ? m[1].toLowerCase() : null;
+  }
+  function openJoinDialog(){
+    var wrap = makeDiv("joinDlg");
+    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Paste the invite link someone sent you.</p>' +
+      '<label class="asLbl" for="jnLink">Invite link</label><input id="jnLink" class="asIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://…#invite=…" aria-describedby="jnErr">' +
+      '<div class="asHint err" id="jnErr" role="alert"></div>';
+    var inp = wrap.querySelector("#jnLink"), err = wrap.querySelector("#jnErr");
+    function go(close){
+      var t = parseInviteInput(inp.value);
+      if(!t){ err.textContent = inp.value.trim() ? "That doesn’t look like a Stick-It invite link. Paste the whole link." : "Paste the invite link first."; inp.setAttribute("aria-invalid", "true"); inp.focus(); return false; }
+      storeInvite(t); close(true);
+      setTimeout(function(){ if(CLOUD) maybeAcceptInvite(); else promptInviteSignIn(); }, 0);
+      return true;
+    }
+    var jm = openModal({title: "Join a board", content: wrap, width: 420, actions: [{label: "Cancel", value: false}, {label: "Join", kind: "primary", onClick: function(close){ go(close); return false; }}]});
+    inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); go(jm.close); } });
+    setTimeout(function(){ inp.focus(); }, 30);
+  }
+  var joinBoardOpen = document.getElementById("joinBoardOpen");
+  if(joinBoardOpen) joinBoardOpen.addEventListener("click", function(){ try{ closeFloatingPopovers(); }catch(e){} var bp = document.getElementById("boardPanel"); if(bp) bp.hidden = true; openJoinDialog(); });
+
+  // ---------- the owner turned our access off ----------
+  // The server is the authority (our membership row is gone, so every read and write is refused). This is only the page noticing: a push from the board's channel,
+  // a refused write, a failed refresh, coming back to the tab, or the slow timer below, each of which asks "am I still on this board?".
+  var accessLost = false, accessCheckBusy = false;
+  async function checkBoardAccess(){
+    if(accessLost || accessCheckBusy || !CLOUD || !cloudSync || !activeBoardId) return;
+    accessCheckBusy = true;
+    try{ var list = await cloudSync.refreshBoards(); if(!list.some(function(b){ return b.id === activeBoardId; })) onAccessLost(); }
+    catch(e){} finally{ accessCheckBusy = false; }
+  }
+  function onAccessLost(){
+    if(accessLost) return; accessLost = true;
+    var lostId = activeBoardId, msg = Stick.errors.describe("ACCESS_REVOKED").message;
+    try{ cloudSync.stop(); }catch(e){} try{ Stick.collab.stop(); }catch(e){}
+    document.body.classList.add("accessLost");                         // the board is hidden and cannot be touched: nothing editable stays on screen
+    var stage = document.getElementById("board"); if(stage) stage.setAttribute("inert", "");
+    var done = false;
+    function leave(){
+      if(done) return; done = true;
+      var anon = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous()), uid = (Stick.auth.user() || {}).id, rest = safeGet(BOARDS_KEY) || [];
+      rest = rest.filter(function(b){ return b.id !== lostId; });
+      try{ localStorage.removeItem(notesKeyFor(lostId)); }catch(e){}
+      try{ sessionStorage.setItem("stickit.bootToast", msg); }catch(e){}
+      Promise.resolve().then(function(){
+        if(anon || !rest.length){ cloudSigningOut = true; return Promise.resolve(Stick.auth.signOut("local")).catch(function(){}).then(function(){ if(uid) wipeCloudCache(uid); settings.account = null; saveSettings(); }); }
+        safeSet(BOARDS_KEY, rest); safeSet(ACTIVE_BOARD_KEY, rest[0].id);
+      }).then(function(){ location.reload(); }, function(){ location.reload(); });
+    }
+    var body = document.createElement("p"); body.className = "acctSub"; body.style.margin = "0"; body.textContent = msg;
+    try{ openModal({title: "Access turned off", content: body, width: 380, actions: [{label: "OK", kind: "primary", value: true}], onClose: leave}); }catch(e){ leave(); }
+    setTimeout(leave, 20000);                                          // nobody pressing OK must not leave a hidden board behind
+  }
+  window.addEventListener("stick:access-changed", function(){ setTimeout(checkBoardAccess, 300); });
+  window.addEventListener("focus", function(){ checkBoardAccess(); });
+  setInterval(function(){ if(document.visibilityState === "visible") checkBoardAccess(); }, 30000);
   function pendingInvite(){
     var t = null; try{ t = sessionStorage.getItem(INVITE_KEY); }catch(e){}
     if(!t){ try{ var o = JSON.parse(localStorage.getItem(INVITE_KEY) || "null"); if(o && o.t && Date.now() - o.at < 3600000) t = o.t; }catch(e){} }
@@ -13605,7 +13770,8 @@
       var er = Stick.errors.parse(e), msg = String(er && er.message || "");
       lastInviteError = msg.slice(0, 120); try{ console.warn("[invite] could not accept:", lastInviteError); }catch(x){}
       hideCloudOverlay();
-      var why = /INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
+      var why = /INVITE_REVOKED/.test(msg) ? Stick.errors.describe("INVITE_REVOKED").message + " [INVITE-003]"
+        : /INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
         : /INVITE_USED/.test(msg) ? "That invitation was already used."
         : /EMAIL_MISMATCH/.test(msg) ? (Stick.auth.isAnonymous && Stick.auth.isAnonymous() ? "That invitation is tied to a specific e-mail address, so you need to sign in with it." : "That invitation was made for a different e-mail address.")
         : /INVITE_NOT_FOUND/.test(msg) ? "We couldn’t find that invitation."

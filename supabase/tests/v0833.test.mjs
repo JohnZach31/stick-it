@@ -145,8 +145,8 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   ok(/v0\.8\.3\.3: the standalone pages now share the in-app reader/.test(lc) && /\.draftBanner::after\{ content:"Draft"/.test(lc) && /html\[lang="he"\] \.draftBanner::after\{ content:"טיוטה"/.test(lc), 'standalone pages share the design system (tabs, draft slip, RTL)');
   ok(fs.readdirSync(path.join(root, 'legal')).filter((f) => f.endsWith('.html')).every((f) => /data-tab="0"/.test(read('legal/' + f))), 'every generated standalone page carries the new tabs');
   const lcn = read('js/legal-content.js'); const docs = JSON.parse(lcn.slice(lcn.indexOf('{"order"'), lcn.lastIndexOf('; })(')));
-  let same = true; for (const [lang, set] of Object.entries(docs.docs)) for (const [pid, d] of Object.entries(set)) { const html = read('legal/' + (lang === 'he' ? 'he/' : '') + d.file); if (!html.includes(d.html)) same = false; }
-  ok(same, 'each standalone page contains exactly the same body HTML as the in-app reader (one canonical source)');
+  let same = true; for (const [lang, set] of Object.entries(docs.docs)) for (const [pid, d] of Object.entries(set)) { const html = read('legal/' + (lang === 'he' ? 'he/' : '') + d.file).replace(/\r\n/g, "\n"); if (!html.includes(d.html.replace(/\r\n/g, "\n"))) same = false; }
+  ok(same, 'each standalone page contains exactly the same body HTML as the in-app reader (one canonical source; compared with line endings normalised, because a Windows checkout turns LF into CRLF in the working copy, which is not a content difference)');
 }
 // ---------------------------------------------------------------- profile, guest, settings rows
 {
