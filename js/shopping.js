@@ -20,7 +20,7 @@
   var S = Stick.shopping = {};
 
   S.MAX_ITEMS = 100;
-  S.LIMITS = { title: 60, text: 120, note: 120, qty: 12, tag: 24, link: 300, price: 99999999 };
+  S.LIMITS = { title: 60, text: 120, note: 120, qty: 24, tag: 24, link: 300, price: 99999999 };
   S.FIELDS = ["qty", "note", "price", "link", "tag"];
   S.FIELD_KEY = { qty: "q", note: "n", price: "p", link: "l", tag: "g" };
   S.FIELD_LABEL = { qty: "Quantity", note: "Subtext", price: "Price", link: "Link", tag: "Tag" };          // "note" is stored as n; people see it as a line of subtext under the item
@@ -240,6 +240,24 @@
     if (!o) return "ltr"; count(o.title); (o.items || []).forEach(function (it) { count(it.t); });
     if (rtl !== ltr) return rtl > ltr ? "rtl" : "ltr";
     return S.textDir(o.title) || "ltr";          // a tie goes to the title
+  };
+  // ---- quantities: "30 g", "2 L", "500 מ״ל", "3". Stored as the text the person chose (so a Hebrew list keeps its Hebrew unit); shown as a number and a unit.
+  // parseQty splits a leading number (1, 2.5, 2,5, 1/2) from the rest; anything else is shown as plain text.
+  S.parseQty = function (q) {
+    var s = String(q == null ? "" : q).trim(), m = /^(\d+\s*\/\s*\d+|\d+(?:[.,]\d+)?)\s*(.*)$/.exec(s);
+    if (!m) return { n: "", u: s, plain: !!s };
+    return { n: m[1].replace(/\s+/g, ""), u: m[2].trim(), plain: false };
+  };
+  S.joinQty = function (n, u) { n = String(n == null ? "" : n).replace(/\s+/g, "").slice(0, 10); u = String(u == null ? "" : u).replace(/\s+/g, " ").trim(); return one((n + (n && u ? " " : "") + u), S.LIMITS.qty); };
+  // unit suggestions (a datalist: any text is still allowed). The set follows the script the list is written in; Latin units are always offered too.
+  var UNIT_SETS = {
+    he: ["\u05d2\u05e8\u05dd", "\u05e7\u05f4\u05d2", "\u05de\u05f4\u05dc", "\u05dc\u05d9\u05d8\u05e8", "\u05d9\u05d7\u05f3", "\u05d7\u05d1\u05d9\u05dc\u05d4", "\u05d1\u05e7\u05d1\u05d5\u05e7", "\u05e9\u05e7\u05d9\u05ea"],
+    ar: ["\u063a", "\u0643\u063a", "\u0645\u0644", "\u0644\u062a\u0631", "\u0642\u0637\u0639\u0629", "\u0639\u0644\u0628\u0629", "\u0632\u062c\u0627\u062c\u0629"],
+    latin: ["g", "kg", "ml", "L", "pcs", "pack", "bottle", "can", "box", "bag", "oz", "lb"]
+  };
+  S.unitSuggestions = function (sample) {
+    var t = String(sample || ""), set = /[\u0590-\u05FF]/.test(t) ? "he" : /[\u0600-\u06FF\u0750-\u077F]/.test(t) ? "ar" : null;
+    return (set ? UNIT_SETS[set] : []).concat(UNIT_SETS.latin);
   };
   S.label = function (o) { return o && o.title ? "Shopping list: " + o.title : "Shopping list"; };
   S.sizeEstimate = function (o) {

@@ -47,7 +47,7 @@ ok(O.hasContent({ type: 'shopping', items: [] }) === true, 'an empty list is nev
   const big = O.normalize({ type: 'shopping', items: Array.from({ length: 150 }, (_, i) => ({ t: 'item ' + i })) }, H);
   ok(big.items.length === 100, 'a list holds at most 100 items');
   const long = O.normalize({ type: 'shopping', items: [{ t: 'y'.repeat(500), n: 'z'.repeat(500), g: 'g'.repeat(99), q: 'q'.repeat(99), p: 1e15 }] }, H).items[0];
-  ok(long.t.length === 120 && long.n.length === 120 && long.g.length === 24 && long.q.length === 12 && long.p === undefined, 'text limits apply and an absurd price is refused');
+  ok(long.t.length === 120 && long.n.length === 120 && long.g.length === 24 && long.q.length === S.LIMITS.qty && long.p === undefined, 'text limits apply and an absurd price is refused');
   const neg = O.normalize({ type: 'shopping', items: [{ t: 'x', p: -5 }] }, H).items[0];
   ok(neg.p === undefined, 'a negative price is refused');
   ok(O.normalize({ type: 'receipt' }, H).type === 'receipt' && O.normalize({ type: 'shopping' }, H).items.length === 0, 'a list with nothing in it is still a list');
@@ -210,6 +210,19 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   ok(/title\.dir = S\.textDir\(n\.title\) \|\| n\._dir/.test(app) && /addRow\.dir = n\._dir/.test(app), 'the title, the summary line and the add-item row follow the list direction');
   ok(/"Add prices"/.test(app) && /!shopHas\(n, "price"\)\) pop\.appendChild\(menuItem\(ICONS\.tick, "Add prices"/.test(app), 'the list menu has a clear Add prices entry while prices are off');
   ok(/width:var\(--pw, 340px\)/.test(css), 'the default paper width is 340px');
+}
+// ---- quantities as number + unit (v0.8.3.7)
+{
+  const J = (x) => JSON.stringify(x);
+  ok(J(S.parseQty('30 גרם')) === J({ n: '30', u: 'גרם', plain: false }), 'a Hebrew unit after a number is split off');
+  ok(S.parseQty('2,5 kg').n === '2,5' && S.parseQty('500g').u === 'g' && S.parseQty('1/2 L').n === '1/2' && S.parseQty('12').u === '', 'decimals (either mark), fractions, no space and a bare number all parse');
+  ok(S.parseQty('a few').plain === true && S.parseQty('').plain === false, 'free text stays plain text');
+  ok(S.joinQty('30', 'גרם') === '30 גרם' && S.joinQty('', 'pack') === 'pack' && S.joinQty('2', '') === '2' && S.joinQty('', '') === '', 'number and unit join back into the stored text');
+  ok(S.unitSuggestions('רשימה')[0] === 'גרם' && S.unitSuggestions('List').indexOf('kg') !== -1 && S.unitSuggestions('قائمة').indexOf('كغ') !== -1, 'unit suggestions follow the list’s script (Hebrew, Arabic) and always include the metric ones');
+  const app = read('js/app.js');
+  ok(/function shopQtyEl/.test(app) && /createElement\("bdi"\)/.test(app), 'a quantity is shown as a bold number and a smaller unit in isolated runs');
+  ok(/qnIn/.test(app) && /quIn/.test(app) && /setAttribute\("list", dl\.id\)/.test(app), 'the editor has a number box and a unit box with suggestions (any text is accepted)');
+  ok(/unicode-bidi:isolate/.test(read('css/spaces.css')), 'digits and a Hebrew unit never scramble');
 }
 console.log(`shopping: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

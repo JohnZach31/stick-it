@@ -4257,6 +4257,15 @@
     shopChange(n, "Add divider", function(items){ var next = Stick.shopping.addDivider(items, "", Date.now()); if(next) id = next[next.length - 1].id; return next; });
     setTimeout(function(){ var t = id && n.el && n.el.querySelector('.shRow[data-id="' + id + '"] .shText'); if(t) t.focus(); }, 40);
   }
+  // a quantity as a number and a unit ("30" "g"), each in its own isolated run so a Hebrew unit next to a number can never scramble; a bare number keeps its "x"
+  function shopQtyEl(q){
+    var p = Stick.shopping.parseQty(q), el = document.createElement("span"); el.className = "shQty"; el.title = "Quantity: " + q;
+    if(p.plain){ var b0 = document.createElement("bdi"); b0.className = "qu"; b0.textContent = p.u; el.appendChild(b0); return el; }
+    if(!p.u){ var x = document.createElement("span"); x.className = "qx"; x.textContent = "\u00d7"; x.setAttribute("aria-hidden", "true"); el.appendChild(x); }
+    var nb = document.createElement("bdi"); nb.className = "qn"; nb.textContent = p.n; el.appendChild(nb);
+    if(p.u){ var ub = document.createElement("bdi"); ub.className = "qu"; ub.textContent = p.u; el.appendChild(ub); }
+    return el;
+  }
   function shopRow(n, it, st){
     if(it.d === 1) return shopDividerRow(n, it, st);
     var S = Stick.shopping, li = document.createElement("li"), inCart = it.c === 1;
@@ -4285,7 +4294,7 @@
     body.appendChild(line);
     // the details this item really has, as tiny receipt annotations under its name; nothing for a detail it lacks or a field that is off
     var meta = makeDiv("shMeta"), open = st.openId === it.id;
-    if(shopHas(n, "qty") && it.q){ var q = document.createElement("span"); q.className = "shQty"; q.textContent = "\u00d7" + it.q; meta.appendChild(q); }
+    if(shopHas(n, "qty") && it.q){ meta.appendChild(shopQtyEl(it.q)); }
     if(shopHas(n, "price") && it.p != null){ var p = document.createElement("span"); p.className = "shPrice"; p.textContent = shopMoney(n, it.p); meta.appendChild(p); }
     if(shopHas(n, "tag") && it.g){ var g = document.createElement("span"); g.className = "shTag"; g.textContent = it.g; meta.appendChild(g); }
     if(shopHas(n, "link") && it.l){
@@ -4320,7 +4329,19 @@
       inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.value = it[key] || ""; inp.blur(); n._openItem = null; repaintShopping(n); } e.stopPropagation(); });
       inp.addEventListener("change", function(){ commit(f, key, inp, function(v){ v = v.replace(/\s+/g, " ").trim(); return v || null; }); });
     }
-    if(shopHas(n, "qty")) text("qty", "q", "Quantity", S.LIMITS.qty, {placeholder: "2 or 500 g"});
+    if(shopHas(n, "qty")){
+      var pq = S.parseQty(it.q), lab = document.createElement("div"); lab.className = "shF f-qty shQtyEd";
+      var pre = document.createElement("span"); pre.className = "shPre"; pre.textContent = "\u00d7"; lab.appendChild(pre);
+      var numI = document.createElement("input"); numI.type = "text"; numI.className = "qnIn"; numI.inputMode = "decimal"; numI.autocomplete = "off"; numI.maxLength = 10; numI.placeholder = "2"; numI.dir = "ltr"; numI.setAttribute("aria-label", "Quantity (number)"); numI.value = pq.n;
+      var unitI = document.createElement("input"); unitI.type = "text"; unitI.className = "quIn"; unitI.autocomplete = "off"; unitI.maxLength = 14; unitI.placeholder = "g, kg, ml, L\u2026"; unitI.dir = "auto"; unitI.setAttribute("aria-label", "Unit (grams, kilos, millilitres, packs, anything)"); unitI.value = pq.u;
+      var dl = document.createElement("datalist"); dl.id = "shUnits-" + it.id; S.unitSuggestions((n.title || "") + " " + (it.t || "")).forEach(function(u){ var o = document.createElement("option"); o.value = u; dl.appendChild(o); }); unitI.setAttribute("list", dl.id);
+      lab.appendChild(numI); lab.appendChild(unitI); lab.appendChild(dl); wrap.appendChild(lab);
+      function qtyCommit(){ var val = S.joinQty(numI.value, unitI.value) || null, cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0]; if(!cur || (cur.q || null) === val) return; shopChange(n, "Edit item", function(items){ return S.update(items, it.id, shopPatch("q", val)); }, {keepOpen: true, focusDetail: n._openItem}); }
+      [numI, unitI].forEach(function(inp){
+        inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); numI.value = pq.n; unitI.value = pq.u; inp.blur(); } e.stopPropagation(); });
+        inp.addEventListener("change", qtyCommit);
+      });
+    }
     if(shopHas(n, "price")){
       var d = shopMinor(n), inp = input("price", "Price (" + n.cur + ")", it.p == null ? "" : (it.p / Math.pow(10, d)).toFixed(d), {inputmode: "decimal", placeholder: d ? "0." + "0".repeat(d) : "0"});
       inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); inp.blur(); } e.stopPropagation(); });
