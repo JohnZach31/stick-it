@@ -1183,7 +1183,7 @@
   var ZONE_TITLE_FONTS = [["Caveat Brush", "Marker"], ["Amatic SC", "Tall"], ["Architects Daughter", "Drafting"], ["Fredoka", "Round"], ["Gloria Hallelujah", "Hand"]];
   function zoneTitleFont(n){ var i = n && n.tf != null ? Number(n.tf) : -1; if(!(i >= 0 && i < ZONE_TITLE_FONTS.length)) i = hashStr(String(n && n.id || "z")) % ZONE_TITLE_FONTS.length; return i; }
   var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","tf"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -2109,7 +2109,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","tf"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -3413,7 +3413,9 @@
     pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls:"danger"}));
   }
   function firstImageFile(dt){
-    return dt && dt.files ? Array.prototype.filter.call(dt.files, function(f){ return f.type.indexOf("image/") === 0; })[0] || null : null;
+    var f = dt && dt.files ? Array.prototype.filter.call(dt.files, function(x){ return x.type.indexOf("image/") === 0; })[0] || null : null;
+    if(!f && dt && dt.items){ for(var i = 0; i < dt.items.length; i++){ var it = dt.items[i]; if(it.kind === "file" && /^image\//.test(it.type)){ f = it.getAsFile(); if(f) break; } } }          // some browsers expose a pasted image only as an item
+    return f;
   }
   // Reads an image into a board-friendly JPEG (kept sharp enough for large prints).
   function loadPhotoFile(file){
@@ -4003,10 +4005,24 @@
     var rg = document.createRange(); rg.selectNodeContents(host); rg.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
     function value(){ return spec.multi ? Stick.objects.clean.lines(host.innerText, spec.max, 14) : Stick.objects.clean.one(host.textContent, spec.max); }
     function key(e){
+      if(e.key === "Tab" && n.type === "newspaper" && !e.ctrlKey && !e.metaKey && !e.altKey){          // headline -> subheading -> story; Shift+Tab goes back; past the ends Tab leaves as usual
+        var order = ["headline", "sub", "body"], at = order.indexOf(f), nx = at + (e.shiftKey ? -1 : 1);
+        if(at !== -1 && nx >= 0 && nx < order.length){
+          e.preventDefault(); e.stopPropagation(); finish(true);
+          setTimeout(function(){ var cur = findNote(n.id), fe = cur && cur.el && cur.el.querySelector('.poF[data-f="' + order[nx] + '"]'); if(fe) editPaperField(cur, fe); }, 0);
+        }
+        return;
+      }
       if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); host.textContent = start; finish(false); }
       else if(e.key === "Enter"){ e.preventDefault(); if(spec.multi && !e.ctrlKey && !e.metaKey){ document.execCommand("insertLineBreak"); } else finish(true); }
     }
-    function paste(e){ e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
+    function paste(e){
+      // in a Newspaper, an image on the clipboard (and no text with it) is the Newspaper's picture; text always pastes as text
+      if(n.type === "newspaper"){
+        var cd = e.clipboardData, img = cd ? firstImageFile(cd) : null, txt = cd ? (cd.getData("text/plain") || "") : "";
+        if(img && !txt.trim()){ e.preventDefault(); e.stopPropagation(); finish(true); setNewspaperImage(findNote(n.id) || n, img); return; }
+      }
+      e.preventDefault(); var t = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, spec.multi ? t : t.replace(/\s+/g, " ")); }
     function finish(commit){
       if(done) return; done = true; activePaperEdit = null;
       if(window.Stick && Stick.collab) Stick.collab.setEditing(null);
@@ -4072,23 +4088,24 @@
   }
 
   // a Newspaper can carry one optional picture. It is added, replaced and removed here; Color / Black & white and halftone are only how it is printed.
+  // the picture comes from the file chooser or from a pasted image (the same path for both)
+  function setNewspaperImage(n, f){
+    if(!f || f.type.indexOf("image/") !== 0){ toast("That doesn't look like a picture."); return; }
+    loadPhotoFile(f).then(function(l){
+      var before = captureState([n.id]), had = !!(n.image || n.assetId);
+      n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState; if(!n.imgMode) n.imgMode = "bw"; if(!n.imgSize) n.imgSize = "full"; if(!n.imgFit) n.imgFit = "cover";
+      saveNotes(); rerenderNote(n); recordChange(had ? "Replace newspaper picture" : "Add newspaper picture", before);
+      if(cloudSync) cloudSync.notesChanged();
+    }, function(){ toast("That image couldn't be read."); });
+  }
   function pickNewspaperImage(n){
     var inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*";
-    inp.onchange = function(){
-      var f = inp.files && inp.files[0]; if(!f) return;
-      if(f.type.indexOf("image/") !== 0){ toast("That doesn't look like a picture."); return; }
-      loadPhotoFile(f).then(function(l){
-        var before = captureState([n.id]), had = !!(n.image || n.assetId);
-        n.image = l.src; n.imgRatio = clampNum(l.ratio, 0.4, 2.5, 0.667); delete n.assetId; delete n.mediaState; if(!n.imgMode) n.imgMode = "bw";
-        saveNotes(); rerenderNote(n); recordChange(had ? "Replace newspaper picture" : "Add newspaper picture", before);
-        if(cloudSync) cloudSync.notesChanged();
-      }, function(){ toast("That image couldn't be read."); });
-    };
+    inp.onchange = function(){ var f = inp.files && inp.files[0]; if(f) setNewspaperImage(n, f); };
     inp.click();
   }
   function removeNewspaperImage(n){
     var before = captureState([n.id]);
-    delete n.image; delete n.assetId; delete n.mediaState; delete n.imgRatio; delete n.imgMode; delete n.halftone;
+    delete n.image; delete n.assetId; delete n.mediaState; delete n.imgRatio; delete n.imgMode; delete n.halftone; delete n.imgSize; delete n.imgFit;
     saveNotes(); rerenderNote(n); recordChange("Remove newspaper picture", before);
   }
 
@@ -4136,6 +4153,10 @@
           body.appendChild(menuItem(n.imgMode === "color" ? ICONS.tick : '<span class="menuGap"></span>', "Color", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "color", "Newspaper picture: color"); }));
           body.appendChild(menuItem(n.imgMode !== "color" ? ICONS.tick : '<span class="menuGap"></span>', "Black & white", function(){ closeFloatingPopovers(); setPaperProp(n, "imgMode", "bw", "Newspaper picture: black and white"); }));
           body.appendChild(menuItem(n.halftone ? ICONS.tick : '<span class="menuGap"></span>', "Halftone print", function(){ closeFloatingPopovers(); setPaperProp(n, "halftone", n.halftone ? undefined : true, "Newspaper picture: halftone"); }, {title: "A printed-dot texture over the picture (the picture itself is unchanged)"}));
+          var sh = makeDiv("menuHint"); sh.textContent = "Size"; body.appendChild(sh);
+          [["small", "Small"], ["medium", "Medium"], ["large", "Large"], ["full", "Full width"]].forEach(function(o){ body.appendChild(menuItem((n.imgSize || "full") === o[0] ? ICONS.tick : '<span class="menuGap"></span>', o[1], function(){ closeFloatingPopovers(); setPaperProp(n, "imgSize", o[0], "Newspaper picture size"); })); });
+          var fh = makeDiv("menuHint"); fh.textContent = "Fit"; body.appendChild(fh);
+          [["cover", "Fill the frame (crop)"], ["contain", "Show the whole picture"]].forEach(function(o){ body.appendChild(menuItem((n.imgFit || "cover") === o[0] ? ICONS.tick : '<span class="menuGap"></span>', o[1], function(){ closeFloatingPopovers(); setPaperProp(n, "imgFit", o[0], "Newspaper picture fit"); })); });
           body.appendChild(menuItem(ICONS.close, "Remove image", function(){ closeFloatingPopovers(); removeNewspaperImage(n); }));
         }
       });
@@ -4148,6 +4169,7 @@
     if(n.type === "photo_strip") pop.appendChild(menuItem(ICONS.image, "Edit strip…", function(){ closeFloatingPopovers(); openStripEditor(n); }));
     pop.appendChild(makeDiv("menuSep"));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this to Done"}));
+    addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes([n.id]); }, {kbd: MOD + "+D"}));
     var moveItem = menuItem(ICONS.move, "Move to board", function(){
@@ -4713,7 +4735,7 @@
     sheet.appendChild(paperField("npHead", "headline", item, true));
     sheet.appendChild(paperField("npSub", "sub", item, true));
     if(item.image || item.assetId){                                 // the optional picture: printed as the paper says (Color / Black & white, halftone); the file itself is never altered
-      var fig = makeDiv("npFig " + (item.imgMode === "color" ? "color" : "bw") + (item.halftone ? " ht" : "")); fig.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
+      var fig = makeDiv("npFig " + (item.imgMode === "color" ? "color" : "bw") + (item.halftone ? " ht" : "") + " sz-" + (item.imgSize || "full") + (item.imgFit === "contain" ? " contain" : "")); fig.style.aspectRatio = "1 / " + (item.imgRatio || 0.667);
       if(item.image){ var pim = document.createElement("img"); PreviewCache.use(pim, item.image, item.w || 320); pim.alt = item.headline ? "Picture for: " + item.headline : "Newspaper picture"; pim.draggable = false; fig.appendChild(pim); }
       else fig.classList.add("pending");
       sheet.appendChild(fig);
@@ -5243,6 +5265,7 @@
       pop.appendChild(menuItem(ICONS.move, "Stack (arrange vertically)", function(){ closeFloatingPopovers(); stackNotes(ids); }, {title: "Lines the notes up one below another. Nothing else changes."}));
       pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
     }
+    addToPileMenu(pop, ids);
     pop.appendChild(menuItem(ICONS.move, "Bring to front", function(){ closeFloatingPopovers(); layerObjects(ids, "front"); }));
     pop.appendChild(menuItem(ICONS.move, "Send to back", function(){ closeFloatingPopovers(); layerObjects(ids, "back"); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
@@ -5660,6 +5683,37 @@
     var h = Math.max(60, Math.round(paper.offsetHeight * sc)); host.style.height = h + "px"; host.style.width = Math.round(mw * sc) + "px";
     host.style.marginInline = "auto"; tp.style.minHeight = h + "px";
   }
+  // ---- add loose papers to a pile that already exists (no dismantling): pile membership is the only thing that changes
+  function pilesOnBoard(){ return notes.filter(function(p){ return isPileObj(p) && p.el && !isHiddenMember(p) && pileLive(p).length >= Stick.pile.MIN_MEMBERS; }); }
+  function pileChoiceLabel(p){ var lv = pileLive(p), t = lv[0]; return (t ? pileSnippet(t).slice(0, 22) : "Pile") + " \u00b7 " + lv.length; }
+  function addToPile(pileId, ids){
+    if(readOnly) return 0;
+    var pile = findNote(pileId); if(!pile || !isPileObj(pile)) return 0;
+    var list = ids.map(findNote).filter(function(m){ return m && m.id !== pile.id && !isPileObj(m) && !m.pileId && !isHiddenMember(m) && Stick.pile.eligible(m); });
+    if(!list.length){ toast("Those can\u2019t go into a pile (pinned, Done, or not a note)."); return 0; }
+    if(pile.members.length + list.length > Stick.pile.MAX_MEMBERS){ toast("A pile holds up to " + Stick.pile.MAX_MEMBERS + " papers."); return 0; }
+    endEditing(); closeFloatingPopovers();
+    var before = captureState(pile.members.concat([pile.id]).concat(list.map(function(m){ return m.id; })));
+    var ordered = Stick.pile.order(list);
+    pile.members = ordered.map(function(m){ return m.id; }).concat(pile.members);          // on top, in reading order
+    ordered.forEach(function(m){ m.pileId = pile.id; selected.delete(m.id); });
+    pileBrowse[pile.id] = 0;
+    finishPileChange(); setSelection([pile.id]);
+    var action = recordChange("Add " + list.length + (list.length === 1 ? " paper" : " papers") + " to a pile", before);
+    toast("Added " + list.length + (list.length === 1 ? " paper" : " papers") + " to the pile.", "Undo", function(){ undoIfTop(action); });
+    return list.length;
+  }
+  // "Add to pile >" in the menus: lists the piles on this board (top paper, count)
+  function addToPileMenu(pop, ids){
+    if(readOnly) return;
+    var targets = pilesOnBoard(), loose = ids.map(findNote).filter(function(m){ return m && !isPileObj(m) && !m.pileId && Stick.pile.eligible(m); });
+    if(!targets.length || !loose.length) return;
+    menuSub(pop, ICONS.move, "Add to pile", function(body){
+      targets.forEach(function(p){
+        body.appendChild(menuItem(ICONS.move, pileChoiceLabel(p), function(){ closeFloatingPopovers(); addToPile(p.id, ids); }, {title: "Put " + (loose.length === 1 ? "this paper" : "these " + loose.length + " papers") + " on top of this pile"}));
+      });
+    });
+  }
   function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
   function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
   var PILE_TABS_MAX = 3;
@@ -5704,7 +5758,7 @@
     el._pileN = n;
     var kind = makeDiv("pileKind"); kind.setAttribute("aria-hidden", "true"); kind.textContent = pileKindName(top); el.appendChild(kind);
     var tabs = makeDiv("pileTabs"); tabs.setAttribute("role", "group"); tabs.setAttribute("aria-label", "Papers in this pile"); el.appendChild(tabs); paintPileTabs(n, el, live, browseIdx(n, live));
-    var openB = document.createElement("button"); openB.type = "button"; openB.className = "pileOpen"; openB.title = "Browse the papers in this pile"; openB.setAttribute("aria-label", "Browse the papers in this pile"); openB.textContent = "Browse";
+    var openB = document.createElement("button"); openB.type = "button"; openB.className = "pileOpen"; openB.title = "Browse the papers in this pile"; openB.setAttribute("aria-label", "Browse the papers in this pile"); openB.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="4" width="11" height="15" rx="1.5"/><path d="M4 8v11a1 1 0 0 0 1 1h9"/></svg>';
     openB.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); openB.addEventListener("mousedown", function(e){ e.preventDefault(); }); openB.addEventListener("click", function(e){ e.stopPropagation(); openPileBrowser(n); });
     el.appendChild(openB);
     var badge = makeDiv("pileCount"); badge.textContent = browseIdx(n, live) ? (browseIdx(n, live) + 1) + " / " + live.length : String(live.length); badge.setAttribute("aria-hidden", "true"); el.appendChild(badge);
@@ -5727,7 +5781,7 @@
       more.addEventListener("click", function(e){ e.stopPropagation(); pileMenu(n, more); });
       el.appendChild(more);
       var pileDownAt = null;
-      el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))){ var lv = pileLive(n), tm = lv[browseIdx(n, lv)]; if(tm) focusPileMember(n, tm.id); } });
+      el.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); openPileBrowser(n); }, true);          // capture phase on the pile itself: nothing inside it (the top paper, a tab, an edge) can swallow it or turn it into a note edit
       el.addEventListener("pointerdown", function(e){
         if(e.pointerType === "mouse" && e.button !== 0) return;
         if(e.target.closest && e.target.closest("button")) return;
@@ -5782,6 +5836,8 @@
 
   function makePile(ids){
     if(readOnly) return;
+    var inSel = ids.map(findNote).filter(isPileObj);
+    if(inSel.length === 1 && ids.length > 1){ addToPile(inSel[0].id, ids); return; }          // a pile plus loose papers selected: add them to that pile
     var list = pileEligibleList(ids), skipped = ids.length - list.length;
     if(list.length < Stick.pile.MIN_MEMBERS){ toast("Select at least two notes (not pinned, not Done) to pile them."); return; }
     if(list.length > Stick.pile.MAX_MEMBERS){ toast("A pile holds up to " + Stick.pile.MAX_MEMBERS + " papers."); return; }
@@ -5941,13 +5997,17 @@
     prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
     prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.classList.add("pbPrev"); next.classList.add("pbNext"); prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
-    function tool(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", fn); return b; }
-    var editB = tool("Edit this paper", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) focusPileMember(pile, m.id); });
-    var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); });
-    var shuf = tool("Shuffle", function(){ shufflePile(pile); paint(); });
-    var earlier = tool("← Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); });
-    var later = tool("Move later →", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); });
-    var fanBtn = tool("Fan", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.textContent = fan ? "Single" : "Fan"; paint(); }); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
+    var SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+    function ic(d){ return SVG + d + "</svg>"; }
+    // compact icon controls where the meaning is universal (each has an aria-label and a tooltip); text stays where an icon would be a guess
+    function tool(label, fn, cls, icon){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); if(icon){ b.innerHTML = icon; b.classList.add("ico"); b.title = label; b.setAttribute("aria-label", label); } else b.textContent = label; b.addEventListener("click", fn); return b; }
+    var editB = tool("Edit this paper", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) focusPileMember(pile, m.id); }, "", ic('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'));
+    var take = tool("Take this one out", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) pileTakeTop(pile, m.id); }, "", ic('<path d="M12 15V4M8 8l4-4 4 4M5 20h14"/>'));
+    var shuf = tool("Shuffle the pile", function(){ shufflePile(pile); paint(); }, "", ic('<path d="M3 7h3c4 0 5 10 9 10h5M3 17h3c1.6 0 2.7-1.2 3.6-2.6M13.5 9.4C14.4 8.2 15.4 7 17 7h3M17 4l3 3-3 3M17 14l3 3-3 3"/>'));
+    var earlier = tool("Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); }, "", ic('<path d="M19 12H5M11 6l-6 6 6 6"/>'));
+    var later = tool("Move later", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); }, "", ic('<path d="M5 12h14M13 6l6 6-6 6"/>'));
+    var FANIC = ic('<rect x="9" y="6" width="6" height="12" rx="1"/><rect x="9" y="6" width="6" height="12" rx="1" transform="rotate(-24 12 20)"/><rect x="9" y="6" width="6" height="12" rx="1" transform="rotate(24 12 20)"/>'), ONEIC = ic('<rect x="7" y="4" width="10" height="16" rx="1.5"/>');
+    var fanBtn = tool("Fan the papers out", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.innerHTML = fan ? ONEIC : FANIC; var lb = fan ? "Back to one paper" : "Fan the papers out"; fanBtn.title = lb; fanBtn.setAttribute("aria-label", lb); card.classList.toggle("isFan", fan); paint(); }, "", FANIC); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
     bar.appendChild(idx);
     desk.appendChild(prev); desk.appendChild(stage); desk.appendChild(next);          // previous / next are tabs on the edges of the paper, not buttons floating around it
     var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
@@ -5973,7 +6033,7 @@
         for(var k = from; k < to; k++){
           (function(k){
             var slot = makeDiv("pbFanCard" + (k === i ? " current" : "")), off = k - i;
-            slot.style.setProperty("--fo", off); slot.setAttribute("role", "button"); slot.tabIndex = -1; slot.setAttribute("aria-label", "Paper " + (k + 1) + " of " + live.length + (k === i ? " (showing)" : ""));
+            slot.style.setProperty("--fo", (k - (from + (to - from - 1) / 2)).toFixed(2));          // spread around the middle of the visible papers, so the fan is centred on the desk slot.setAttribute("role", "button"); slot.tabIndex = -1; slot.setAttribute("aria-label", "Paper " + (k + 1) + " of " + live.length + (k === i ? " (showing)" : ""));
             slot.appendChild(paperOf(live[k]));
             slot.addEventListener("click", function(){ pileBrowse[pile.id] = k; paint(); });
             fanEl.appendChild(slot);
@@ -6464,6 +6524,7 @@
   var draggingIds = null;
   function startDrag(e, primary, group){
     var everyone = group;
+    if(isZone(primary) && isPinned(primary)){ pendingFront = null; pinTug(primary); return; }          // a pinned zone stays put, and (with "Move with notes") does not carry its members off either: they remain independently movable
     if(pileFocus && group.some(function(g){ return g.id === pileFocus.id; })) return;          // a paper being edited out of its pile does not move
     group = group.filter(function(g){ return !isPinned(g); });               // pinned items stay put, even in a group
     if(!group.length){ pendingFront = null; everyone.forEach(pinTug); return; }
@@ -7327,6 +7388,7 @@
     if(!n.image && htmlToText(n.textEl ? n.textEl.innerHTML : (n.html || "")).trim().length >= 20) pop.appendChild(menuItem(ICONS.clipping, "Make clipping", function(){ closeFloatingPopovers(); noteToClipping(n); }, {title: "Keep these words as a clipping, with a place for where they came from"}));
     if(vOnly) pop.appendChild(menuItem(ICONS.video || ICONS.link, "Show link as video", function(){ closeFloatingPopovers(); linkToEmbed(n, vOnly); }, {title: "Shows this " + Stick.embed.PROVIDERS[vOnly.provider].label + " link as a video you can play here"}));
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
+    addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
@@ -8326,29 +8388,22 @@
     }
     var skipped = list.length - shareable.length;
 
-    var content = document.createElement("div");
-    var previewBox = makeDiv("sharePreview");
-    var arr = buildArrangement(items, 330, 230);
-    previewBox.appendChild(arr.el);
-    content.appendChild(previewBox);
-    var msgBox = makeDiv("shareMsg");
-    msgBox.textContent = msg;
-    content.appendChild(msgBox);
-    var copyMsg = document.createElement("button");
-    copyMsg.className = "guestBtn copyBtn";
-    copyMsg.style.cssText = "background:var(--accent-strong);color:var(--on-accent);border-color:var(--accent-strong);";
-    copyMsg.textContent = "Copy message";
-    content.appendChild(copyMsg);
-    var copyLink = document.createElement("button");
-    copyLink.className = "acctBack";
-    copyLink.style.cssText = "display:block;text-align:center;width:100%;margin:12px 0 0;";
-    copyLink.textContent = "Just copy the link";
-    content.appendChild(copyLink);
-    var pr = makeDiv("sharePrintRow"), prBtn = document.createElement("button"), pdfBtn = document.createElement("button");
+    var content = document.createElement("div"); content.className = "shareCompact";
+    var top = makeDiv("shareTop"), previewBox = makeDiv("sharePreview"), stat = makeDiv("shareStat");
+    var arr = buildArrangement(items, 190, 120);
+    previewBox.appendChild(arr.el); top.appendChild(previewBox);
+    var st1 = document.createElement("strong"); st1.textContent = (isGroup ? shareable.length + " items" : "1 item") + " · link ready"; var st2 = document.createElement("span"); st2.textContent = "Anyone with the link can view " + (isGroup ? "them" : "it") + ", no account needed."; stat.appendChild(st1); stat.appendChild(st2); top.appendChild(stat);
+    content.appendChild(top);
+    var acts = makeDiv("shareActs");
+    var copyLink = document.createElement("button"); copyLink.type = "button"; copyLink.className = "pillBtn primary"; copyLink.textContent = "Copy link";
+    var copyMsg = document.createElement("button"); copyMsg.type = "button"; copyMsg.className = "pillBtn"; copyMsg.textContent = "Copy message";
+    var prBtn = document.createElement("button"), pdfBtn = document.createElement("button");
     prBtn.type = pdfBtn.type = "button"; prBtn.className = pdfBtn.className = "pillBtn"; prBtn.textContent = isGroup ? "Print selection" : "Print"; pdfBtn.textContent = "Print / Save as PDF";
-    pdfBtn.title = "Opens your browser\u2019s print window; choose \u201cSave as PDF\u201d there";
+    pdfBtn.title = "Opens your browser’s print window; choose “Save as PDF” there";
     prBtn.addEventListener("click", function(){ printObjects(list); }); pdfBtn.addEventListener("click", function(){ printObjects(list, {pdf: true}); });
-    pr.appendChild(prBtn); pr.appendChild(pdfBtn); content.appendChild(pr);
+    [copyLink, copyMsg, prBtn, pdfBtn].forEach(function(b){ acts.appendChild(b); }); content.appendChild(acts);
+    var more = document.createElement("details"); more.className = "shareMore"; var sum = document.createElement("summary"); sum.textContent = "What will people see?"; more.appendChild(sum);
+    var msgBox = makeDiv("shareMsg"); msgBox.textContent = msg; more.appendChild(msgBox);
     var fine = document.createElement("p");
     fine.className = "shareFine";
     fine.className = "shareFine big";
@@ -8361,14 +8416,14 @@
       (skipped - avLeft > 0 ? " (" + (skipped - avLeft) + " empty note" + (skipped - avLeft > 1 ? "s were" : " was") + " left out.)" : "") +
       (avLeft ? (cloudShare ? " (" + avLeft + " recording" + (avLeft > 1 ? "s" : "") + " still uploading " + (avLeft > 1 ? "were" : "was") + " left out.)" : " Voice memos and videos stay on this device for now, so they aren't included.") : "") +
       (!cloudShare && link.length > 12000 ? " Photos make the link long; a few apps may cut it short." : "")));
-    content.appendChild(fine);
+    more.appendChild(fine);
+    content.appendChild(more);
     if(shareInfo){
       var off = document.createElement("button");
-      off.className = "acctBack";
-      off.style.cssText = "display:block;text-align:center;width:100%;margin:10px 0 0;color:var(--danger);";
+      off.className = "acctBack shareOff";
       off.textContent = "Turn this link off";
       off.addEventListener("click", function(){
-        Stick.share.disable(shareInfo.id).then(function(){ off.textContent = "\u2713 Link turned off"; off.disabled = true; toast("That link no longer works."); })
+        Stick.share.disable(shareInfo.id).then(function(){ off.textContent = "✓ Link turned off"; off.disabled = true; toast("That link no longer works."); })
           .catch(function(){ toast("Couldn't turn it off. Try again."); });
       });
       content.appendChild(off);
@@ -9186,28 +9241,43 @@
       return true;
     }
     // a thump of filtered noise (the stamp) and/or soft sine partials with a quick attack and a short decay (the chime). All low, all short.
+    // a tiny shared bus (soft compressor + a roof at 3.2 kHz) so a chord of several notes can never clip or sound sharp
+    var busNode = null;
+    function out(c){
+      if(busNode && busNode.ctx === c) return busNode;
+      var comp = c.createDynamicsCompressor(); comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.18;
+      var lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 3200; comp.connect(lp); lp.connect(c.destination); comp.ctx = c; busNode = comp; return comp;
+    }
+    // a thump of filtered noise (the paper stamp)
     function thump(c, t0, v, dur, cutoff){
       var n = Math.floor(c.sampleRate * dur), buf = c.createBuffer(1, n, c.sampleRate), d = buf.getChannelData(0);
       for(var i = 0; i < n; i++){ d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3); }
       var src = c.createBufferSource(); src.buffer = buf; var f = c.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = cutoff;
-      var g = c.createGain(); g.gain.value = v; src.connect(f); f.connect(g); g.connect(c.destination); src.start(t0);
+      var g = c.createGain(); g.gain.value = v; src.connect(f); f.connect(g); g.connect(out(c)); src.start(t0);
     }
     function partial(c, t0, freq, v, attack, decay, type){
       var o = c.createOscillator(), g = c.createGain(); o.type = type || "sine"; o.frequency.setValueAtTime(freq, t0);
       g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(Math.max(0.0002, v), t0 + attack); g.gain.exponentialRampToValueAtTime(0.0001, t0 + attack + decay);
-      o.connect(g); g.connect(c.destination); o.start(t0); o.stop(t0 + attack + decay + 0.03);
+      o.connect(g); g.connect(out(c)); o.start(t0); o.stop(t0 + attack + decay + 0.03);
     }
+    // Stick-It's sound language: tiny jazz chords, never beeps. Each is 3-4 notes strummed a few ms apart (like a thumb across a guitar) and gone within about half a second.
+    // Voicings (Hz): see docs/dev/SOUND.md.
+    var CH = {
+      dim7B: [246.94, 293.66, 349.23, 415.30],        // B dim7: B3 D4 F4 Ab4, the tiny "passing" chord
+      c69:   [261.63, 329.63, 440.00, 587.33],        // C6/9 (no 5th): C4 E4 A4 D5, where it comes to rest
+      dim7E: [311.13, 369.99, 440.00, 523.25]         // Eb dim7: Eb4 Gb4 A4 C5, a lighter sting for Restore
+    };
+    function chord(c, t0, notes, v, strum, decay, type){ notes.forEach(function(f, i){ partial(c, t0 + i * strum, f, v, 0.01, decay, type || "triangle"); }); }
     function playCue(name, volume){
       var c = audio(); if(!c) return false;
       if(c.state === "suspended") try{ c.resume(); }catch(e){}
       var v = Math.max(0, Math.min(1, volume / 100)), t0 = c.currentTime + 0.005;
-      if(name === "done"){                                   // stamp: a soft low thump, then two warm chime partials a fifth apart, gently rounded off
-        thump(c, t0, 0.55 * v, 0.07, 700);
-        partial(c, t0 + 0.035, 523.25, 0.16 * v, 0.012, 0.26);
-        partial(c, t0 + 0.075, 784.0, 0.12 * v, 0.012, 0.3);
-        partial(c, t0 + 0.035, 1046.5, 0.035 * v, 0.01, 0.16);
-      } else if(name === "trash"){ thump(c, t0, 0.5 * v, 0.1, 500); partial(c, t0, 150, 0.1 * v, 0.008, 0.12, "triangle"); }
-      else if(name === "restore"){ partial(c, t0, 392, 0.12 * v, 0.01, 0.1); partial(c, t0 + 0.06, 587.33, 0.12 * v, 0.01, 0.16); }
+      if(name === "done"){                                   // paper stamp, a diminished chord that leans forward, and its warm resolution
+        thump(c, t0, 0.35 * v, 0.06, 650);
+        chord(c, t0 + 0.02, CH.dim7B, 0.075 * v, 0.014, 0.16);
+        chord(c, t0 + 0.19, CH.c69, 0.07 * v, 0.016, 0.34, "sine");
+      } else if(name === "trash"){ thump(c, t0, 0.45 * v, 0.1, 480); partial(c, t0, 146.83, 0.09 * v, 0.008, 0.14, "triangle"); }
+      else if(name === "restore"){ chord(c, t0, CH.dim7E, 0.06 * v, 0.012, 0.2, "sine"); }
       else return false;
       return true;
     }
@@ -10234,6 +10304,12 @@
           '<div class="asItem" id="asBioRow"><label class="lbl" for="asShowBio">Show bio</label><input type="checkbox" class="asSw" id="asShowBio" role="switch"></div>' +
           '<div class="asItem"><label class="lbl" for="asBoardMode">New board links<small>Nothing is shared until you make a link.</small></label><span class="asSel"><select class="asSelect" id="asBoardMode"><option value="view">Read only</option><option value="ask">Ask every time</option></select></span></div>' +
           '<div class="asPreview" id="asPreview" aria-live="polite"></div>' +
+        '</section>' +
+// ---------- the links you have made, and what a link is
+        '<section class="asCard" aria-labelledby="asH2b">' +
+          '<h4 id="asH2b">Your links</h4>' +
+          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage active shares<small>See, copy or turn off every link you’ve made.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
+          '<p class="asHint" style="margin-top:6px;">A link to a note or a selection is a <b>frozen copy</b>: changing the original later does not change what people see. A link to a whole board is live and read only unless you choose otherwise. Anyone with a link can view it, no account needed, and you can turn any link off at any time. Printing and saving as a PDF never creates a link.</p>' +
         '</section>');
     P.appearance.insertAdjacentHTML("beforeend",
 // ---------- personalization
@@ -10385,7 +10461,11 @@
       item(eff === "none" ? "Upload photo" : "Upload a new photo", pickPhoto);
       item("Take photo", takePhoto);
       if(providerUrl && eff !== "provider") item("Use " + providerName(provider) + " photo", function(){ setStage({action: "provider", blob: null, url: null}); });
-      if(eff !== "none") item("Remove photo", function(){ setStage({action: "none", blob: null, url: null}); }, "danger");
+      if(eff !== "none") item("Remove photo", function(){
+        // removing is staged until Save, so nothing is destroyed here; Undo puts the previous photo choice straight back (an upload in progress keeps its preview)
+        var prev = stage; stage = {action: "none", blob: null, url: null}; refreshHero();
+        toast("Profile photo removed · Undo", "Undo", function(){ if(stage.action === "none"){ stage = prev; refreshHero(); toast("Photo restored."); } });
+      }, "danger");
       item("Cancel", function(){});
       openMenu($("asPhotoBtn"), menu);
     });
@@ -10527,7 +10607,7 @@
         '<div class="asStat"><small>Storage</small><span class="asSkel"></span></div><div class="asStat"><small>Member since</small><span class="asSkel"></span></div>';
     }
     var activeShares = null;
-    function paintShareCount(){ $("asSharesN").textContent = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); }
+    function paintShareCount(){ var t = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); $("asSharesN").textContent = t; if($("asSharesN2")) $("asSharesN2").textContent = t; }
     function loadUsage(){
       statSkeleton();
       Stick.account.usage().then(function(u){
@@ -10604,7 +10684,8 @@
 
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
-    $("asShares").addEventListener("click", function(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); });
+    function manageShares(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); }
+    $("asShares").addEventListener("click", manageShares); $("asShares2").addEventListener("click", manageShares);
     try{
       var localBoards = Stick.migrate.inspectLocal(localStorage);
       if(localBoards.length){
@@ -10692,6 +10773,34 @@
 
   (function(){ var b = document.getElementById("board"); if(b) b.setAttribute("tabindex", "-1"); })();
   document.getElementById("skipLink").addEventListener("click", function(e){ e.preventDefault(); var b = document.getElementById("board"); if(b) b.focus(); });
+  // the avatar's own menu: right-click on a computer, a long press on a phone (a plain tap still opens the account window, as before)
+  function openAccountMenu(){
+    closeFloatingPopovers();
+    var pop = openFloatingPopover(accountBtn, "noteMenu"); if(!pop) return;
+    if(settings.account){
+      var who = makeDiv("menuHint"); who.textContent = settings.account.name || settings.account.email || "Your account"; pop.appendChild(who);
+      pop.appendChild(menuItem(ICONS.pencil, "Account settings", function(){ closeFloatingPopovers(); openControlCenter("account"); }));
+      pop.appendChild(menuItem(ICONS.move, "Switch account…", function(){
+        closeFloatingPopovers();
+        confirmDialog({title: "Switch account?", body: "You’ll be signed out on this device, then you can choose another account. Your boards stay saved in the account you leave.", confirm: "Switch account"}).then(function(ok){
+          if(!ok) return; try{ sessionStorage.setItem("stickit.switchAccount", "1"); }catch(e){}
+          if(CLOUD) cloudSignOut("local"); else { signOut(); try{ sessionStorage.removeItem("stickit.switchAccount"); }catch(e){} openAccountModal(); }
+        });
+      }, {title: "Sign out here and choose another account"}));
+      pop.appendChild(makeDiv("menuSep"));
+      pop.appendChild(menuItem(ICONS.close, "Sign out", function(){ closeFloatingPopovers(); confirmSignOut(function(){ if(CLOUD) cloudSignOut(); else signOut(); }); }, {cls: "danger"}));
+    } else {
+      pop.appendChild(menuItem(ICONS.share, "Sign in or create an account", function(){ closeFloatingPopovers(); openAccountModal(); }));
+    }
+  }
+  accountBtn.addEventListener("contextmenu", function(e){ e.preventDefault(); openAccountMenu(); });
+  (function(){
+    var t = null, fired = false;
+    accountBtn.addEventListener("pointerdown", function(e){ if(e.pointerType === "mouse") return; fired = false; clearTimeout(t); t = setTimeout(function(){ fired = true; openAccountMenu(); }, 550); });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function(ev){ accountBtn.addEventListener(ev, function(){ clearTimeout(t); }); });
+    accountBtn.addEventListener("click", function(e){ if(fired){ fired = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+  })();
+  try{ if(sessionStorage.getItem("stickit.switchAccount")){ sessionStorage.removeItem("stickit.switchAccount"); setTimeout(function(){ if(!settings.account) openAccountModal(); }, 900); } }catch(e){}
   accountBtn.addEventListener("click", openAccountModal);
   var quickOut = document.getElementById("quickSignOut");
   if(quickOut) quickOut.addEventListener("click", function(){ closeFloatingPopovers(); confirmSignOut(function(){ if(CLOUD) cloudSignOut(); else { settings.account = null; saveSettings(); updateAccountIcon(); toast("Signed out."); } }); });

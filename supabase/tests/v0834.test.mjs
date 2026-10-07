@@ -75,7 +75,7 @@ const P = globalThis.Stick.printLayout;
   ok(/break-inside:avoid/.test(css) && /\.printItem\.spans\{ break-inside:auto/.test(css) && /@page\{ margin:14mm/.test(css), 'small objects are kept whole on a page; only very tall ones may span; sensible margins');
   ok(/print-color-adjust:exact/.test(css) && /background:#fff !important/.test(css), 'colours are kept; the page is white');
   ok(/PRINT_ICON/.test(app) && (app.match(/printObjects\(/g) || []).length >= 8, 'Print is offered from the menus, the selection bar and the share window');
-  const sm = app.slice(app.indexOf('var pr = makeDiv("sharePrintRow")'), app.indexOf('var pr = makeDiv("sharePrintRow")') + 900);
+  const sm = app.slice(app.indexOf('var acts = makeDiv("shareActs")'), app.indexOf('var acts = makeDiv("shareActs")') + 1400);
   ok(/"Print selection" : "Print"/.test(sm) && /"Print \/ Save as PDF"/.test(sm) && /choose .*Save as PDF/.test(sm), 'the share window offers Print (Print selection) and Print / Save as PDF with honest wording');
   ok(/Print selection/.test(app) && /"Print…"/.test(app) || /Print…/.test(app), 'single-object menus say Print… and the multi-selection menu says Print selection…');
   ok(/<script src="js\/print-layout\.js"><\/script>/.test(read('index.html')) && /css\/print\.css/.test(read('index.html')), 'the print layout script and stylesheet are loaded');

@@ -46,7 +46,7 @@ ok(/notes\.concat\(donePile, trashPile\)/.test(app) || /donePile/.test(app), 'Do
   ok((read('js/sync.js').match(/"newspaper"/g) || []).length >= 3, 'the picture is uploaded and loaded like a postcard picture');
   const pm = fn('paperMenu');
   ok(/pickNewspaperImage/.test(pm) && /removeNewspaperImage/.test(pm) && /Halftone print/.test(pm) && /Black & white/.test(pm) && /"Color"/.test(pm), 'the menu can add, replace, remove, switch color / black & white and toggle halftone');
-  ok(/recordChange\("Remove newspaper picture"/.test(fn('removeNewspaperImage')) && /Replace newspaper picture/.test(fn('pickNewspaperImage')), 'each picture change is one undo step');
+  ok(/recordChange\("Remove newspaper picture"/.test(fn('removeNewspaperImage')) && /Replace newspaper picture/.test(fn('setNewspaperImage')), 'each picture change is one undo step');
   ok(/filter:grayscale\(1\)/.test(css) && !/canvas|toDataURL/.test(fn('buildNewspaperSheet')), 'black & white is a print treatment (CSS); the original is never redrawn');
 }
 

@@ -510,3 +510,62 @@ body.dark .pbSlip{ background:#2b2638; border-color:rgba(255,255,255,0.15); }
 }
 @media (prefers-reduced-motion: reduce){ .pbNav, .pbStage *{ transition:none !important; } }
 .pileObj .pileTabs{ max-width:calc(100% - 118px); overflow:hidden; }          /* never reaches under the kind tab, whatever the pile's width */
+
+/* ===== Owner QA pass (v0.8.3.3) ===== */
+/* pile index tabs: numbers never clip */
+.pileObj .pileTabs{ top:-17px; }
+.pileObj .pileTab{ box-sizing:border-box; height:20px; min-width:24px; padding:3px 5px 0; display:inline-flex; align-items:flex-start; justify-content:center; font:700 0.7rem/1 'Sora',sans-serif; overflow:visible; }
+.pileObj .pileTab.on{ height:25px; margin-top:-5px; padding-top:5px; }
+.pileObj .pileKind{ top:-17px; height:19px; box-sizing:border-box; padding:4px 10px 0; line-height:1; }
+/* Browse: a small paper tab on the pile's left edge, with a pages icon (not a dark pill) */
+.pileObj .pileOpen{ left:-15px; top:26px; width:26px; height:38px; min-height:0; padding:0; border-radius:9px 0 0 9px; background:linear-gradient(#fffdf0, #f1e7c4); color:#4a3a00; border:1px solid rgba(60,45,10,0.28); border-right:0; box-shadow:-1px 2px 4px rgba(60,45,10,0.3); display:flex; align-items:center; justify-content:center; }
+.pileObj .pileOpen::after{ content:""; position:absolute; right:0; bottom:0; width:9px; height:9px; background:linear-gradient(135deg, transparent 50%, rgba(60,45,10,0.18) 50%); }
+.pileObj .pileOpen:hover, .pileObj .pileOpen:focus-visible{ background:linear-gradient(#fff6c2, #ffe58a); color:#33301f; }
+body.dark .pileObj .pileOpen{ background:linear-gradient(#4f4730, #453e2a); color:#f2eadb; border-color:rgba(242,234,219,0.35); }
+@media (hover:none){ .pileObj .pileOpen{ display:flex; opacity:1; } }
+/* browser icon controls */
+.pbSlip .pbTool.ico{ width:44px; min-height:44px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:50%; }
+.pbSlip .pbTool.ico svg{ width:20px; height:20px; }
+.pbSlip .pbTool[aria-pressed="true"]{ background:var(--accent-soft); border-color:var(--accent); }
+.pbSlip .pbFoot{ flex-wrap:nowrap; }
+.pbSlip .pbFoot .pbBack{ margin-inline-start:auto; flex:0 1 auto; }
+.pbSlip{ flex-direction:row; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:6px 10px; }
+.pbSlip .pbTools, .pbSlip .pbFoot{ display:flex; gap:6px; }
+@media (max-width:480px){ .pbSlip{ justify-content:center; } .pbSlip .pbFoot .pbBack{ flex:1 1 auto; } }
+/* Fan: papers spread over a desk; the controls stay small */
+.pbCard.isFan{ background:linear-gradient(#e9dfc2, #d9cda8); }
+body.dark .pbCard.isFan{ background:linear-gradient(#262033, #1a1626); }
+.pbCard:has(.pbStage.fan){ width:min(760px, 100%); padding-bottom:10px; }
+.pbStage.fan{ min-height:0; height:min(46vh, 330px); max-height:none; margin-inline:0; padding:0; }
+.pbFan{ height:100%; }
+.pbFanCard{ width:170px; transform:translate(calc(-50% + var(--fo) * 74px), -48%) rotate(calc(var(--fo) * 5deg)) scale(0.8); transform-origin:50% 130%; filter:drop-shadow(0 4px 6px rgba(60,45,10,0.35)); }
+.pbFanCard:hover{ transform:translate(calc(-50% + var(--fo) * 74px), -56%) rotate(calc(var(--fo) * 5deg)) scale(0.86); z-index:35; }
+.pbFanCard.current{ transform:translate(-50%, -56%) scale(1); }
+@media (max-width:480px){ .pbCard:has(.pbStage.fan){ width:100%; } .pbStage.fan{ height:38vh; } .pbFanCard{ width:130px; transform:translate(calc(-50% + var(--fo) * 44px), -48%) rotate(calc(var(--fo) * 6deg)) scale(0.8); } .pbFanCard:hover{ transform:translate(calc(-50% + var(--fo) * 44px), -52%) rotate(calc(var(--fo) * 6deg)) scale(0.84); } .pbFanCard.current{ transform:translate(-50%, -54%) scale(1); } }
+/* Zone heading: a ledger strip on the paper edge */
+.zone .zoneBar{ margin:-2px -2px 0; padding:3px 8px 3px 12px; min-height:34px; background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 55%, #fffdf4), color-mix(in srgb, var(--zone, #fff3a8) 78%, #ece3c6)); border-bottom:2px solid color-mix(in srgb, var(--zone, #fff3a8) 35%, #5a4a1c 65%); border-radius:6px 6px 0 0; box-shadow:0 2px 3px rgba(60,45,10,0.2); }
+.zone .zoneTitle{ color:#2a2619; text-shadow:0 1px 0 rgba(255,255,255,0.55); font-size:1.25rem; }
+.zone.mat-felt .zoneBar{ background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 60%, #234), color-mix(in srgb, var(--zone, #fff3a8) 45%, #123)); border-bottom-color:rgba(0,0,0,0.45); }
+.zone.mat-felt .zoneTitle{ color:#f8f3e4; text-shadow:0 1px 2px rgba(0,0,0,0.5); }
+body.dark .zone:not(.mat-felt) .zoneBar{ background:linear-gradient(color-mix(in srgb, var(--zone, #fff3a8) 40%, #2b2638), color-mix(in srgb, var(--zone, #fff3a8) 28%, #1c1829)); border-bottom-color:rgba(255,255,255,0.28); }
+body.dark .zone:not(.mat-felt) .zoneTitle{ color:#f4eedf; text-shadow:0 1px 2px rgba(0,0,0,0.6); }
+body.dark .zone:not(.mat-felt) .zoneCount, body.dark .zone:not(.mat-felt) .zoneMin, body.dark .zone:not(.mat-felt) .zoneMore{ color:#f4eedf; }
+.zone .zoneTitle.editable[contenteditable="true"]{ background:rgba(255,255,255,0.85); color:#2a2619; }
+/* Newspaper picture size / fit */
+.npFig{ margin-inline:auto; } .npFig.sz-small{ width:40%; } .npFig.sz-medium{ width:62%; } .npFig.sz-large{ width:82%; } .npFig.sz-full{ width:100%; }
+.npFig.contain img{ object-fit:contain; background:#e9e4d3; }
+/* compact Share window */
+.shareCompact{ display:flex; flex-direction:column; gap:10px; }
+.shareCompact .shareTop{ display:flex; gap:12px; align-items:center; }
+.shareCompact .sharePreview{ flex:0 0 auto; max-width:190px; max-height:120px; overflow:hidden; }
+.shareCompact .shareStat{ display:flex; flex-direction:column; gap:3px; font-size:0.84rem; line-height:1.35; min-width:0; } .shareCompact .shareStat strong{ font-size:0.95rem; }
+.shareCompact .shareActs{ display:flex; flex-wrap:wrap; gap:8px; }
+.shareCompact .shareActs .pillBtn{ flex:1 1 auto; min-height:40px; }
+.shareCompact .shareMore{ border:1px solid var(--line); border-radius:10px; padding:2px 12px; background:color-mix(in srgb, var(--panel) 92%, var(--line)); }
+.shareCompact .shareMore summary{ cursor:pointer; min-height:40px; display:flex; align-items:center; font-weight:600; font-size:0.88rem; }
+.shareCompact .shareMore .shareMsg{ max-height:7em; overflow:auto; font-size:0.84rem; margin:4px 0 8px; }
+.shareCompact .shareMore .shareFine, .shareCompact .shareMore .shareFine.big{ font-size:0.8rem; line-height:1.45; margin:0 0 10px; }
+.shareCompact .shareOff{ align-self:center; margin:2px 0 0 !important; width:auto !important; font-size:0.84rem; color:var(--danger); }
+@media (max-width:480px){ .shareCompact .shareTop{ flex-direction:column; align-items:flex-start; } .shareCompact .shareActs .pillBtn{ flex:1 1 45%; } }
+.pbDesk .pbNav{ z-index:60; }
+.pbFanCard.current{ outline:2px solid var(--accent, #8a4f0d); outline-offset:2px; border-radius:2px; }

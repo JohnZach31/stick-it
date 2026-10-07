@@ -54,7 +54,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
 // ---------------------------------------------------------------- done sound
 {
   const sfx = app.slice(app.indexOf('var SoundFx'), app.indexOf('function buildSoundsPane'));
-  ok(/thump\(c, t0, 0\.55 \* v/.test(sfx) && /523\.25/.test(sfx) && /784\.0/.test(sfx), 'Done is a soft stamp thump plus a warm chime (not a beep)');
+  ok(/thump\(c, t0, 0\.35 \* v/.test(sfx) && /CH\.dim7B/.test(sfx) && /CH\.c69/.test(sfx), 'Done is a soft stamp thump plus a tiny diminished chord resolving to a warm 6/9 (not a beep)');
   ok(!/square|sawtooth/.test(sfx), 'no harsh waveforms (no arcade / robotic tones)');
   ok(/preview: function\(\)\{ return playCue\("done"/.test(sfx), 'the Sounds preview plays the Done sound');
   ok(!/SoundFx/.test(read('js/sync.js')), 'sync never plays a sound');
@@ -135,7 +135,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   const fp = fn('focusPileMember'); ok(/pileFocus = \{pileId/.test(fp) && /rebuildHidden\(\); syncPileVisibility\(\)/.test(fp) && /editPaperField\(cur, first\)/.test(fp) && /focusNoScroll\(cur\.textEl\)/.test(fp), 'the visible paper is edited in place (notes, checklists and papers use their own editors)');
   ok(/delete hiddenIds\[pileFocus\.id\]/.test(fn('rebuildHidden')) && !/notes\.splice|members\.splice/.test(fp + fn('endPileFocus')), 'editing never removes or reorders a member');
   ok(/pileFocus && group\.some/.test(fn('startDrag')), 'a paper being edited is not dragged away');
-  ok(/dblclick/.test(app.slice(app.indexOf('function renderPile'), app.indexOf('function renderPile') + 4000)) && /focusPileMember\(n, tm\.id\)/.test(fn('renderPile')), 'double-click edits the top paper');
+  ok(/addEventListener\("dblclick", function\(e\)\{ e\.preventDefault\(\); e\.stopPropagation\(\); openPileBrowser\(n\); \}, true\)/.test(fn('renderPile')) && !/focusPileMember\(n, tm\.id\)/.test(fn('renderPile')), 'double-click anywhere on a pile opens the browser (capture phase); it never edits a member');
   ok(/Edit this paper/.test(fn('pileMenu')) && /Edit this paper/.test(fn('openPileBrowser')), 'Edit is also in the menu and the browser');
 }
 // ---------------------------------------------------------------- standalone legal
