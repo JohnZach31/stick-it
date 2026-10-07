@@ -31,7 +31,7 @@ ok(O.hasContent({ type: 'shopping', items: [] }) === true, 'an empty list is nev
     { id: 'b2', t: 'javascript link', l: 'javascript:alert(1)' },
     'not an item', null
   ] }, H);
-  ok(n.type === 'shopping' && n.w === 420, 'width is clamped');
+  ok(n.type === 'shopping' && n.w === S.WIDTH[1], 'width is clamped to the maximum');
   ok(n.title.length <= 60 && !/[‮\u0007]/.test(n.title), 'the title is cleaned (control and bidi characters gone, length capped)');
   ok(JSON.stringify(n.fields) === '["qty","price"]', 'only known fields are kept, once each, in a fixed order');
   ok(n.cur === 'ILS', 'an unknown currency falls back to the device guess (Israel: ILS)');
@@ -197,5 +197,19 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   ok(/Remove divider/.test(app) && /shopChange\(n, "Add divider"/.test(app), 'adding and removing a divider are undoable list changes');
 }
 
+// ---- right-to-left lists, prices, size (v0.8.3.6)
+{
+  ok(S.textDir('שלום') === 'rtl' && S.textDir('مرحبا') === 'rtl' && S.textDir('ܫܠܡܐ') === 'rtl' && S.textDir('ހަށް') === 'rtl', 'Hebrew, Arabic, Syriac and Thaana are right-to-left');
+  ok(S.textDir('Milk') === 'ltr' && S.textDir('Молоко') === 'ltr' && S.textDir('牛乳') === 'ltr', 'Latin, Cyrillic and CJK are left-to-right');
+  ok(S.textDir('123 חלב') === 'rtl' && S.textDir('4 x') === 'ltr' && S.textDir('12 3') === null && S.textDir('') === null, 'the first letter decides; numbers alone do not');
+  ok(S.listDir({ title: 'רשימת קניות', items: [{ t: 'milk' }] }) === 'rtl' && S.listDir({ title: 'Groceries', items: [{ t: 'חלב' }] }) === 'ltr' && S.listDir({ title: '', items: [] }) === 'ltr', 'a list follows the script most of its words use');
+  ok(S.WIDTH[2] === 340 && S.WIDTH[2] > 290 && S.WIDTH[1] >= 460, 'a new list is a little wider than before (340)');
+  const app = read('js/app.js'), css = read('css/app.css');
+  ok(/li\.dir = S\.textDir\(it\.t\) \|\| n\._dir \|\| "ltr"/.test(app), 'each row takes its direction from its own text, so the tick box is on the right for Hebrew / Arabic and on the left for everything else');
+  ok(/rowEl\.dir !== dd\) rowEl\.dir = dd/.test(app), 'typing a right-to-left word flips the row live');
+  ok(/title\.dir = S\.textDir\(n\.title\) \|\| n\._dir/.test(app) && /addRow\.dir = n\._dir/.test(app), 'the title, the summary line and the add-item row follow the list direction');
+  ok(/"Add prices"/.test(app) && /!shopHas\(n, "price"\)\) pop\.appendChild\(menuItem\(ICONS\.tick, "Add prices"/.test(app), 'the list menu has a clear Add prices entry while prices are off');
+  ok(/width:var\(--pw, 340px\)/.test(css), 'the default paper width is 340px');
+}
 console.log(`shopping: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

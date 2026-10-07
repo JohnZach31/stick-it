@@ -24,7 +24,7 @@
   S.FIELDS = ["qty", "note", "price", "link", "tag"];
   S.FIELD_KEY = { qty: "q", note: "n", price: "p", link: "l", tag: "g" };
   S.FIELD_LABEL = { qty: "Quantity", note: "Subtext", price: "Price", link: "Link", tag: "Tag" };          // "note" is stored as n; people see it as a line of subtext under the item
-  S.WIDTH = [230, 420, 290];                 // min, max, default
+  S.WIDTH = [230, 460, 340];                 // min, max, default (a little roomier than before: prices, quantities and right-to-left rows need the space)
   S.PAPER_MAX_H = 400;                       // the item area scrolls after this
 
   // A preset only chooses which optional fields start switched on. It is a creation template, never a different kind of list.
@@ -225,6 +225,21 @@
       parts.push(bits.join(" ") + (it.c === 1 ? " [x]" : ""));
     });
     return parts.filter(Boolean).join(", ").replace(/\s+/g, " ").trim();
+  };
+  // Text direction from the first strong letter (any right-to-left script: Hebrew, Arabic, Persian, Syriac, Thaana, N'Ko, Adlam, ...; everything else with letters is left-to-right).
+  // Returns "rtl", "ltr", or null when there is no letter to decide on. New languages need no change here.
+  var RTL_CH = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u, LETTER = /\p{L}/u;
+  S.textDir = function (s) {
+    var str = String(s == null ? "" : s);
+    for (var ch of str) { if (RTL_CH.test(ch)) return "rtl"; if (LETTER.test(ch)) return "ltr"; }
+    return null;
+  };
+  // the direction of the whole list: whichever script most of its words (title included) are written in
+  S.listDir = function (o) {
+    var rtl = 0, ltr = 0, count = function (t) { var d = S.textDir(t); if (d === "rtl") rtl++; else if (d === "ltr") ltr++; };
+    if (!o) return "ltr"; count(o.title); (o.items || []).forEach(function (it) { count(it.t); });
+    if (rtl !== ltr) return rtl > ltr ? "rtl" : "ltr";
+    return S.textDir(o.title) || "ltr";          // a tie goes to the title
   };
   S.label = function (o) { return o && o.title ? "Shopping list: " + o.title : "Shopping list"; };
   S.sizeEstimate = function (o) {

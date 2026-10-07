@@ -4240,7 +4240,7 @@
   // ---- building the element
   // a divider row: a label sitting on a rule. No tick box; it can be renamed and removed.
   function shopDividerRow(n, it, st){
-    var li = document.createElement("li"); li.className = "shRow shDiv"; li.dataset.id = it.id; li.dataset.itemId = it.id; li.setAttribute("role", "separator");
+    var li = document.createElement("li"); li.dir = Stick.shopping.textDir(it.t) || n._dir || "ltr"; li.className = "shRow shDiv"; li.dataset.id = it.id; li.dataset.itemId = it.id; li.setAttribute("role", "separator");
     var lab = document.createElement("span"); lab.className = "shText shDivText"; lab.textContent = it.t; lab.dir = "auto"; lab.setAttribute("role", "textbox"); lab.setAttribute("aria-label", "Divider label"); lab.setAttribute("data-ph", "Section");
     if(!st.readOnly){ lab.contentEditable = "true"; lab.spellcheck = true; wireShopText(n, it, lab); }
     li.appendChild(lab); li.appendChild(makeDiv("shDivRule"));
@@ -4261,6 +4261,7 @@
     if(it.d === 1) return shopDividerRow(n, it, st);
     var S = Stick.shopping, li = document.createElement("li"), inCart = it.c === 1;
     li.className = "shRow" + (inCart ? " in" : ""); li.dataset.id = it.id; li.dataset.itemId = it.id;
+    li.dir = S.textDir(it.t) || n._dir || "ltr";          // a Hebrew / Arabic row puts the tick box on the right and reads from the right
     var box = document.createElement("button"); box.type = "button"; box.className = "shBox"; box.innerHTML = SHOP_BOX;
     box.setAttribute("role", "checkbox"); box.setAttribute("aria-checked", inCart ? "true" : "false"); box.setAttribute("aria-label", (inCart ? "In the cart: " : "To buy: ") + (it.t || "item"));
     if(st.readOnly) box.disabled = true;
@@ -4353,6 +4354,7 @@
       if(span.textContent !== t) span.textContent = t;
       shopChange(n, "Edit item", function(items){ return Stick.shopping.update(items, it.id, {t: t.replace(/\s+/g, " ").trim()}); }, {quiet: true});
       var cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0]; if(cur) it = cur;
+      var rowEl = span.closest && span.closest(".shRow"), dd = Stick.shopping.textDir(t); if(rowEl && dd && rowEl.dir !== dd) rowEl.dir = dd;          // typing Hebrew flips the row as you go
     });
     span.addEventListener("paste", function(e){ e.preventDefault(); var tx = (e.clipboardData && e.clipboardData.getData("text/plain")) || ""; document.execCommand("insertText", false, tx.replace(/\s+/g, " ")); });
     span.addEventListener("keydown", function(e){
@@ -4415,14 +4417,16 @@
     var items = n.items || [], toBuy = S.toBuyItems(items), cart = S.cartItems(items), counts = S.counts(items);
     el.setAttribute("aria-label", Stick.objects.label(n));
     el.classList.toggle("allPicked", counts.allPicked); el.classList.toggle("emptyList", !counts.all);
+    n._dir = S.listDir(n);
     var title = el.querySelector(".shTitle"); if(title && document.activeElement !== title) title.textContent = n.title || "";
+    if(title) title.dir = S.textDir(n.title) || n._dir; var sumEl = el.querySelector(".shSummary"); if(sumEl) sumEl.dir = n._dir;
     var sum = el.querySelector(".shSummary"); if(sum) sum.textContent = S.summary(items);
     list.innerHTML = "";
     var ul1 = document.createElement("ul"); ul1.className = "shItems shToBuy"; ul1.setAttribute("aria-label", "To buy");
     toBuy.forEach(function(it){ ul1.appendChild(shopRow(n, it, st)); });
     list.appendChild(ul1);
     if(!ro){
-      var addRow = makeDiv("shAddRow"), plus = document.createElement("span"); plus.className = "shPlus"; plus.setAttribute("aria-hidden", "true"); plus.textContent = "+";
+      var addRow = makeDiv("shAddRow"); addRow.dir = n._dir; var plus = document.createElement("span"); plus.className = "shPlus"; plus.setAttribute("aria-hidden", "true"); plus.textContent = "+";
       var add = document.createElement("input"); add.type = "text"; add.className = "shAddIn"; add.maxLength = S.LIMITS.text; add.autocomplete = "off"; add.setAttribute("dir", "auto");
       add.placeholder = counts.all ? "Add an item" : "Add the first item"; add.setAttribute("aria-label", counts.all ? "Add an item" : "Add the first item");
       add.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
@@ -4541,6 +4545,7 @@
     if(!pop) return;
     var S = Stick.shopping;
     pop.appendChild(menuItem(ICONS.pencil, "Rename list", function(){ closeFloatingPopovers(); var t = n.el && n.el.querySelector(".shTitle"); if(t){ t.focus(); var rg = document.createRange(); rg.selectNodeContents(t); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } }));
+    if(!shopHas(n, "price")) pop.appendChild(menuItem(ICONS.tick, "Add prices", function(){ closeFloatingPopovers(); shopSet(n, "Show price", {fields: S.FIELDS.filter(function(x){ return (n.fields || []).indexOf(x) !== -1 || x === "price"; })}); toast("Prices are on. Open an item\u2019s \u25be to set one."); }, {title: "Let every item have a price; the list shows a total"}));
     pop.appendChild(menuItem(ICONS.move, "Add divider", function(){ closeFloatingPopovers(); shopAddDivider(n); }, {title: "A labelled line to split the list into sections (aisles, stores, days)"}));
     var dh = makeDiv("menuHint"); dh.textContent = "Details"; pop.appendChild(dh);
     S.FIELDS.slice().sort(function(a, b){ return (b === "note") - (a === "note"); }).forEach(function(f){
