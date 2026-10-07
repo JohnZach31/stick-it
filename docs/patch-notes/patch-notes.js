@@ -17,7 +17,8 @@ export const patchNotes = [
       "Things stopped overlapping: pile controls, modals and Zone chrome got a cleanup pass.",
       "Tutorials behave again: keyboard navigation and patch-history replay were repaired.",
       "Paper feels smarter: empty notes skip Trash, trimming is automatic with Undo, and Newspaper editing behaves consistently.",
-      "Same Stick-It, fewer weird bits: reactions, Settings, Legal pages, Video creation and profile controls got polished."
+      "Same Stick-It, fewer weird bits: reactions, Settings, Legal pages, Video creation and profile controls got polished.",
+      "Print what matters: print a note or a selection on its own, or save it as a PDF from the print dialog."
     ],
     "tourMode": "full",
     "tour": [
@@ -44,6 +45,12 @@ export const patchNotes = [
         "title": "Paper feels smarter",
         "body": "Closing a brand-new empty note skips Trash, spare paper trims itself (with Undo), and Newspaper copy and paste behaves consistently.",
         "feature": "paper"
+      },
+      {
+        "target": null,
+        "title": "Print what matters",
+        "body": "Print one note or a whole selection without printing the rest of the board. The system print dialog can also save it as a PDF.",
+        "feature": "print"
       },
       {
         "target": null,

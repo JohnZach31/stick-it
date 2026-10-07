@@ -5662,7 +5662,7 @@
   }
   function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
   function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
-  var PILE_TABS_MAX = 7;
+  var PILE_TABS_MAX = 3;
   function paintPileTabs(n, el, live, at){
     var row = el.querySelector(".pileTabs"); if(!row) return;
     row.textContent = "";
@@ -5726,13 +5726,6 @@
       more.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); more.addEventListener("mousedown", function(e){ e.preventDefault(); });
       more.addEventListener("click", function(e){ e.stopPropagation(); pileMenu(n, more); });
       el.appendChild(more);
-      [["pilePrev", "\u2039", "Previous paper in this pile", -1], ["pileNext", "\u203a", "Next paper in this pile", 1]].forEach(function(d){
-        var nb = document.createElement("button"); nb.type = "button"; nb.className = "pileNav " + d[0]; nb.textContent = d[1]; nb.title = d[2]; nb.setAttribute("aria-label", d[2]);
-        nb.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
-        nb.addEventListener("mousedown", function(e){ e.preventDefault(); });
-        nb.addEventListener("click", function(e){ e.stopPropagation(); pileStep(n, d[3]); });
-        el.appendChild(nb);
-      });
       var pileDownAt = null;
       el.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest("button"))){ var lv = pileLive(n), tm = lv[browseIdx(n, lv)]; if(tm) focusPileMember(n, tm.id); } });
       el.addEventListener("pointerdown", function(e){
@@ -5941,12 +5934,12 @@
   function openPileBrowser(pile){
     if(!pile || !isPileObj(pile) || pileLive(pile).length < Stick.pile.MIN_MEMBERS) return;
     closePileBrowser(); closeFloatingPopovers();
-    var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar");
+    var root = makeDiv("pbBackdrop"), card = makeDiv("pbCard"), stage = makeDiv("pbStage"), bar = makeDiv("pbBar"), desk = makeDiv("pbDesk");
     card.setAttribute("role", "dialog"); card.setAttribute("aria-modal", "true"); card.setAttribute("aria-label", "Browse the pile"); card.tabIndex = -1;
     var fanOK = !(window.matchMedia && matchMedia("(max-width: 700px), (pointer: coarse)").matches), fan = false;
     var prev = document.createElement("button"), next = document.createElement("button"), idx = makeDiv("pbIndex"), back = document.createElement("button");
     prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
-    prev.textContent = "‹"; next.textContent = "›"; prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
+    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.classList.add("pbPrev"); next.classList.add("pbNext"); prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
     function tool(label, fn, cls){ var b = document.createElement("button"); b.type = "button"; b.className = "pbTool" + (cls ? " " + cls : ""); b.textContent = label; b.addEventListener("click", fn); return b; }
     var editB = tool("Edit this paper", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; closePileBrowser(); if(m) focusPileMember(pile, m.id); });
@@ -5955,10 +5948,12 @@
     var earlier = tool("← Move earlier", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, -1); paint(); });
     var later = tool("Move later →", function(){ var live = pileLive(pile), m = live[browseIdx(pile, live)]; if(m) movePileMember(pile, m.id, 1); paint(); });
     var fanBtn = tool("Fan", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.textContent = fan ? "Single" : "Fan"; paint(); }); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
-    bar.appendChild(prev); bar.appendChild(idx); bar.appendChild(next);
+    bar.appendChild(idx);
+    desk.appendChild(prev); desk.appendChild(stage); desk.appendChild(next);          // previous / next are tabs on the edges of the paper, not buttons floating around it
     var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
-    card.appendChild(stage); card.appendChild(bar); card.appendChild(tools);
-    var foot = makeDiv("pbFoot"); foot.appendChild(editB); foot.appendChild(take); foot.appendChild(back); card.appendChild(foot);
+    var foot = makeDiv("pbFoot"); foot.appendChild(editB); foot.appendChild(take); foot.appendChild(back);
+    var slip = makeDiv("pbSlip"); slip.appendChild(tools); slip.appendChild(foot);          // every action on one control slip
+    card.appendChild(bar); card.appendChild(desk); card.appendChild(slip);
     root.appendChild(card); document.body.appendChild(root);
     pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
     pileBrowserLayer.open();
@@ -5986,7 +5981,8 @@
         }
         stage.appendChild(fanEl);
       } else stage.appendChild(paperOf(live[i]));
-      idx.textContent = (i + 1) + " / " + live.length;
+      idx.textContent = "paper " + (i + 1) + " of " + live.length; idx.title = pileKindName(live[i]);
+      prev.disabled = next.disabled = live.length < 2;
       editB.hidden = readOnly || isAV(live[i]) || live[i].type === "embed"; take.hidden = readOnly; shuf.hidden = earlier.hidden = later.hidden = readOnly;
       earlier.disabled = i === 0; later.disabled = i === live.length - 1;
     }

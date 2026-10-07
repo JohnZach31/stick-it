@@ -185,8 +185,8 @@ ok(['.pillBtn.primary', '.btn.primary', '.tourBtns button.primary', '.addBoardRo
 const bw = ['pileStep', 'paintPileShown', 'browseIdx', 'openPileBrowser'].map(fn).join('\n');
 ok(bw.length > 500 && !/notes\.splice|notes\.push|notes\s*=[^=]|saveNotes\(|\.members\s*=|delete\s+\w+\.pileId|\.pileId\s*=|zCounter/.test(bw.replace(/take\.addEventListener[^\n]*\n?/, '')), 'browsing a pile never changes the board data, the member list, any member or the saved state');
 ok(!/pileBrowse/.test(app.match(/var SERIAL_FIELDS = \[[^\]]*\]/)[0]) && !/pileBrowse/.test(fn('persistForm') + fn('serializeNote')), 'the browse position is a view state: never stored or synced');
-ok(/pilePrev/.test(app) && /pileNext/.test(app) && /\(browseIdx\(n, live\) \+ 1\) \+ " \/ " \+ live\.length/.test(app), 'a pile shows previous / next and a "3 / 24" index');
-ok(/@media \(hover:none\)\{ \.pileObj \.pileNav\{ display:none; \} \}/.test(css) && /pileDownAt\.touch/.test(app) && /openPileBrowser\(n\)/.test(app), 'touch: no hover dependence; a tap opens the browser');
+ok(/\(browseIdx\(n, live\) \+ 1\) \+ " \/ " \+ live\.length/.test(app) && !/"pilePrev"/.test(app), 'a pile shows a "3 / 24" index on its badge; the old floating arrows are gone (index tabs and the browser replace them)');
+ok(/pileDownAt\.touch/.test(app) && /openPileBrowser\(n\)/.test(app), 'touch: no hover dependence; a tap opens the browser');
 ok(/e\.key === "ArrowRight"/.test(fn('openPileBrowser')) && /dx < 0 \? 1 : -1/.test(fn('openPileBrowser')) && /Back to the pile/.test(fn('openPileBrowser')) && /pile-browser/.test(app), 'the browser has arrows, swipe, keyboard, an index and a way back (Esc via the layer system)');
 ok(/\.pbCard\{ width:min\(420px, 100%\)/.test(css), 'the phone browser shows one paper at a time in a card, never a fan of giant papers');
 // the data-safety invariant for browsing is enforced again by the sync tests in client.test.mjs (collapsed members are always in the snapshot)

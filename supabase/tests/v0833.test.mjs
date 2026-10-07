@@ -202,4 +202,17 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   ok(iList < iRow && iRow < iSys, '"+ New board" sits with the boards, above the System spaces');
   ok(/newBoardOpen/.test(html) && /newBoardSlip/.test(html) && /e\.key === "Escape"[^}]*show\(false\)/.test(app) && /if\(e\.key === "Enter"\) addBoardBtn\.click\(\)/.test(app), 'a naming slip: Enter creates, Esc cancels');
 }
+// ---- final pass: pile arrows gone, leaf-through browser, print in the update materials, cutout actions
+{
+  ok(!/"pilePrev"|"pileNext"|className = "pileNav/.test(app), 'the on-board pile no longer has the old floating arrows');
+  ok(/PILE_TABS_MAX = 3/.test(app) && /\.pileObj \.pileTabs\{ max-width:calc\(100% - 118px\); overflow:hidden/.test(sp), 'the index tabs never reach under the kind tab');
+  const pb = fn('openPileBrowser');
+  ok(/pbDesk/.test(pb) && /desk\.appendChild\(prev\); desk\.appendChild\(stage\); desk\.appendChild\(next\)/.test(pb) && /pbSlip/.test(pb) && /"paper " \+ \(i \+ 1\) \+ " of "/.test(pb), 'the browser: previous / next are edge tabs on the paper, a handwritten page marker, and one control slip');
+  ok(/pileLive\(pile\)/.test(pb) && (pb.match(/paperOf\(live\[/g) || []).length <= 2 && /Edit this paper/.test(pb), 'only the current paper is built (the fan builds a few); editing stays available');
+  ok(/\.pbNav\.pbPrev, \.pbNav\.pbNext\{[^}]*width:26px/.test(sp) && /max-width:480px\)\{[\s\S]*\.pbCard\{ width:100%/.test(sp) && /min-height:44px/.test(sp.slice(sp.indexOf('Pile browser as a leaf-through'))), 'on a phone the browser fills the width with 44px controls');
+  const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'))[0];
+  ok(pn.tour.some((c) => c.title === 'Print what matters' && /PDF/.test(c.body)), 'the Spotlight has the Print what matters card');
+  ok(/## Print \/ Save as PDF/.test(read('docs/patch-notes/0.8.3.3.md')), 'the full notes have a Print / Save as PDF section');
+  const cm = read('js/cutout-maker.js'); ok(!/Crop instead/.test(cm + app), 'there is no fake Crop button');
+}
 console.log('v0.8.3.3: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

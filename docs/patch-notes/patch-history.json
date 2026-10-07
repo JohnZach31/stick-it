@@ -28,7 +28,8 @@
         "Things stopped overlapping: pile controls, modals and Zone chrome got a cleanup pass.",
         "Tutorials behave again: keyboard navigation and patch-history replay were repaired.",
         "Paper feels smarter: empty notes skip Trash, trimming is automatic with Undo, and Newspaper editing behaves consistently.",
-        "Same Stick-It, fewer weird bits: reactions, Settings, Legal pages, Video creation and profile controls got polished."
+        "Same Stick-It, fewer weird bits: reactions, Settings, Legal pages, Video creation and profile controls got polished.",
+        "Print what matters: print a note or a selection on its own, or save it as a PDF from the print dialog."
       ],
       "notes": [
         {
@@ -149,6 +150,7 @@
             {
               "t": "ul",
               "items": [
+                "The old floating arrows are gone; the index tabs and a physical leaf-through browser replace them",
                 "Cleaner physical browsing",
                 "No overlapping controls",
                 "Mixed node types behave better",
@@ -240,6 +242,20 @@
           ]
         },
         {
+          "heading": "Print / Save as PDF",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Print one note, or only the items you selected",
+                "Share window and menus offer Print and Print / Save as PDF",
+                "The system print dialog can save the result as a PDF",
+                "Comments, reactions and the rest of the board are never printed"
+              ]
+            }
+          ]
+        },
+        {
           "heading": "Better board creation",
           "blocks": [
             {
@@ -273,6 +289,11 @@
             "title": "Paper feels smarter",
             "body": "Closing a brand-new empty note skips Trash, spare paper trims itself (with Undo), and Newspaper copy and paste behaves consistently.",
             "feature": "paper"
+          },
+          {
+            "title": "Print what matters",
+            "body": "Print one note or a whole selection without printing the rest of the board. The system print dialog can also save it as a PDF.",
+            "feature": "print"
           },
           {
             "title": "Same Stick-It, fewer weird bits",
