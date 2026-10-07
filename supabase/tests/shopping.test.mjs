@@ -147,7 +147,7 @@ ok(S.PRESETS.groceries.fields.join() === 'qty' && S.PRESETS.trip.fields.join() =
   ok(/<script src="js\/shopping\.js">/.test(html) && html.indexOf('js/shopping.js') > html.indexOf('js/objects.js'), 'shopping.js loads after objects.js');
   ok(/"fields","cur","createdFromPreset","items"/.test(app), 'the list fields are saved and tracked by undo');
   ok(/if\(n\.type === "shopping"\) return renderShopping\(n, isNew\)/.test(app) && /if\(item\.type === "shopping"\) return buildStaticShopping\(item\)/.test(app), 'the board and shared views both draw a shopping list');
-  ok(/OBJECT_MENUS\.shopping = shoppingMenu/.test(app) && /Details/.test(app) && /S\.FIELDS\.forEach\(function\(f\)\{/.test(app), 'the ... menu has a Details section with the five optional fields');
+  ok(/OBJECT_MENUS\.shopping = shoppingMenu/.test(app) && /Details/.test(app) && /S\.FIELDS\.slice\(\)\.sort\(/.test(app), 'the ... menu has a Details section with the five optional fields');
   ok(!/class="gear"|shGear/.test(app + css), 'there is no permanent gear on the node');
   ok(/\(n\.type && !isPaper\(n\)\)\) return;/.test(app) && /label: "Mark list done"|"Mark list done"/.test(app), 'a whole list can be marked Done, from its own menu');
   ok(!/markDone\(n\)[^;]*shopTick|shopTick[^}]*markDone/.test(app), 'ticking an item never marks the list done');
@@ -177,6 +177,24 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   const clean = O.sanitize(back, H);
   ok(JSON.stringify(clean.items) === JSON.stringify(obj.items) && clean.fields.join() === 'note,price' && clean.cur === 'EUR', 'it comes back from the server with every item, tick, price and the currency intact');
   ok(R.hashRow(row) === R.hashRow(R.toRow(Object.assign({}, clean, { id: 'L1', x: 10, y: 20, z: 5, rot: 1 }))), 'a list that did not change hashes the same, so it is not sent again');
+}
+
+// ---- dividers and subtext (v0.8.3.5)
+{
+  const h = { safeHref: (u) => u, locale: 'en', tz: 'UTC' };
+  let items = S.add([], 'milk', 1); items = S.addDivider(items, 'Dairy', 2); items = S.add(items, 'eggs', 3);
+  ok(items.length === 3 && items[1].d === 1 && items[1].t === 'Dairy', 'a divider is an item with a label');
+  const c = S.counts(items); ok(c.toBuy === 2 && c.inCart === 0 && c.all === 2, 'dividers are never counted as things to buy');
+  ok(S.summary(items) === '2 to buy', 'the summary ignores dividers');
+  ok(S.totals(items).priced === 0 && S.boughtCount(items) === 0, 'dividers have no price and are never bought');
+  ok(/Dairy/.test(S.text({ title: 'T', items })), 'search and sharing text include the divider label');
+  const n = S.normalize({ type: 'shopping', title: 'x', items: [{ id: 'a', t: 'Aisle 1', d: 1, c: 1, q: '3', p: 500, n: 'x' }, { id: 'b', t: 'bread' }] }, h);
+  ok(n.items[0].d === 1 && n.items[0].c === 0 && !('q' in n.items[0]) && !('p' in n.items[0]) && !('n' in n.items[0]), 'a divider keeps only its label (no tick, quantity, price or subtext), even from messy data');
+  ok(n.items[1].d === undefined, 'ordinary items are unchanged');
+  let full = []; for (let i = 0; i < S.MAX_ITEMS; i++) full.push(S.newItem('x', i)); ok(S.addDivider(full, '', 1) === null, 'dividers count towards the item limit');
+  ok(S.FIELD_LABEL.note === 'Subtext', 'the note detail is presented as Subtext');
+  const app = read('js/app.js'); ok(/"Add divider"/.test(app) && /function shopAddDivider/.test(app) && /shopDividerRow\(n, it, st\)/.test(app) && /Add divider/.test(app), 'the list menu offers Add divider, and a divider renders as its own row');
+  ok(/Remove divider/.test(app) && /shopChange\(n, "Add divider"/.test(app), 'adding and removing a divider are undoable list changes');
 }
 
 console.log(`shopping: ${pass} passed, ${fail} failed`);

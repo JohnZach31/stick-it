@@ -623,3 +623,14 @@ body.dark .pbSlip .pbGroup + .pbGroup{ border-inline-start-color:rgba(255,255,25
 .shopObj .shQty{ font:700 1.05rem/1.15 'Courier Prime','Courier New',monospace; color:var(--sInk); letter-spacing:0; }
 .shopObj .shF{ font-size:0.78rem; }
 .shopObj .shF input{ font-size:1rem; }
+
+/* Shopping list: dividers and subtext (v0.8.3.5) */
+.shopObj .shRow.shDiv{ align-items:center; gap:8px; min-height:30px; margin:6px 0 2px; }
+.shopObj .shDivText{ flex:0 1 auto; max-width:70%; font-weight:700; font-size:1.02rem; letter-spacing:0.02em; color:var(--sInk); min-width:5ch; }
+.shopObj .shDivText:empty::before{ content:attr(data-ph); opacity:0.4; font-weight:500; }
+.shopObj .shDivRule{ flex:1 1 20px; height:0; border-top:2px dashed var(--sLine); align-self:center; opacity:0.9; }
+.shopObj .shRow.shDiv .shDel{ opacity:0; } .shopObj .shRow.shDiv:hover .shDel, .shopObj .shRow.shDiv:focus-within .shDel, .shopObj.selected .shRow.shDiv .shDel{ opacity:1; }
+@media (hover:none){ .shopObj .shRow.shDiv .shDel{ opacity:0.7; } }
+/* subtext: a readable line under the item, not a tiny "note:" annotation */
+.shopObj .shNote{ font:italic 500 0.82rem/1.3 'Sora','Alef',sans-serif; color:var(--sSoft); }
+.shopObj .shNote::before{ content:none; }

@@ -4238,7 +4238,27 @@
   }
 
   // ---- building the element
+  // a divider row: a label sitting on a rule. No tick box; it can be renamed and removed.
+  function shopDividerRow(n, it, st){
+    var li = document.createElement("li"); li.className = "shRow shDiv"; li.dataset.id = it.id; li.dataset.itemId = it.id; li.setAttribute("role", "separator");
+    var lab = document.createElement("span"); lab.className = "shText shDivText"; lab.textContent = it.t; lab.dir = "auto"; lab.setAttribute("role", "textbox"); lab.setAttribute("aria-label", "Divider label"); lab.setAttribute("data-ph", "Section");
+    if(!st.readOnly){ lab.contentEditable = "true"; lab.spellcheck = true; wireShopText(n, it, lab); }
+    li.appendChild(lab); li.appendChild(makeDiv("shDivRule"));
+    if(!st.readOnly){
+      var del = document.createElement("button"); del.type = "button"; del.className = "shDel"; del.innerHTML = "\u00d7"; del.title = "Remove divider"; del.setAttribute("aria-label", "Remove divider" + (it.t ? " " + it.t : ""));
+      del.addEventListener("click", function(e){ e.stopPropagation(); shopChange(n, "Remove divider", function(items){ return Stick.shopping.remove(items, it.id); }); });
+      li.appendChild(del);
+    }
+    return li;
+  }
+  function shopAddDivider(n){
+    if((n.items || []).length >= Stick.shopping.MAX_ITEMS){ toast("A list holds up to " + Stick.shopping.MAX_ITEMS + " items."); return; }
+    var id = null;
+    shopChange(n, "Add divider", function(items){ var next = Stick.shopping.addDivider(items, "", Date.now()); if(next) id = next[next.length - 1].id; return next; });
+    setTimeout(function(){ var t = id && n.el && n.el.querySelector('.shRow[data-id="' + id + '"] .shText'); if(t) t.focus(); }, 40);
+  }
   function shopRow(n, it, st){
+    if(it.d === 1) return shopDividerRow(n, it, st);
     var S = Stick.shopping, li = document.createElement("li"), inCart = it.c === 1;
     li.className = "shRow" + (inCart ? " in" : ""); li.dataset.id = it.id; li.dataset.itemId = it.id;
     var box = document.createElement("button"); box.type = "button"; box.className = "shBox"; box.innerHTML = SHOP_BOX;
@@ -4280,7 +4300,7 @@
   }
   function shopDetailInputs(n, it){
     var S = Stick.shopping, wrap = makeDiv("shEdit");
-    var PRE = {qty: "\u00d7", note: "note", tag: "#", link: "link \u2197"};
+    var PRE = {qty: "\u00d7", note: "subtext", tag: "#", link: "link \u2197"};
     function curSymbol(){ var c = S.CURRENCIES.filter(function(x){ return x[0] === n.cur; })[0]; return c ? c[1] : n.cur; }
     function input(f, label, value, attrs){
       var l = document.createElement("label"); l.className = "shF f-" + f; var s = document.createElement("span"); s.className = "shPre"; s.textContent = f === "price" ? curSymbol() : PRE[f]; l.appendChild(s);
@@ -4521,8 +4541,9 @@
     if(!pop) return;
     var S = Stick.shopping;
     pop.appendChild(menuItem(ICONS.pencil, "Rename list", function(){ closeFloatingPopovers(); var t = n.el && n.el.querySelector(".shTitle"); if(t){ t.focus(); var rg = document.createRange(); rg.selectNodeContents(t); var sl = window.getSelection(); sl.removeAllRanges(); sl.addRange(rg); } }));
+    pop.appendChild(menuItem(ICONS.move, "Add divider", function(){ closeFloatingPopovers(); shopAddDivider(n); }, {title: "A labelled line to split the list into sections (aisles, stores, days)"}));
     var dh = makeDiv("menuHint"); dh.textContent = "Details"; pop.appendChild(dh);
-    S.FIELDS.forEach(function(f){
+    S.FIELDS.slice().sort(function(a, b){ return (b === "note") - (a === "note"); }).forEach(function(f){
       var on = shopHas(n, f);
       pop.appendChild(menuItem(on ? ICONS.tick : '<svg viewBox="0 0 24 24"></svg>', S.FIELD_LABEL[f], function(){
         closeFloatingPopovers();

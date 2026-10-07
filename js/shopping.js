@@ -23,7 +23,7 @@
   S.LIMITS = { title: 60, text: 120, note: 120, qty: 12, tag: 24, link: 300, price: 99999999 };
   S.FIELDS = ["qty", "note", "price", "link", "tag"];
   S.FIELD_KEY = { qty: "q", note: "n", price: "p", link: "l", tag: "g" };
-  S.FIELD_LABEL = { qty: "Quantity", note: "Note", price: "Price", link: "Link", tag: "Tag" };
+  S.FIELD_LABEL = { qty: "Quantity", note: "Subtext", price: "Price", link: "Link", tag: "Tag" };          // "note" is stored as n; people see it as a line of subtext under the item
   S.WIDTH = [230, 420, 290];                 // min, max, default
   S.PAPER_MAX_H = 400;                       // the item area scrolls after this
 
@@ -112,6 +112,7 @@
   function cleanItem(it, now, safeHref) {
     if (!it || typeof it !== "object") return null;
     var o = { id: /^[\w-]{1,24}$/.test(String(it.id || "")) ? String(it.id) : id4(), t: one(it.t, S.LIMITS.text) };
+    if (it.d === 1 || it.d === true) { o.c = 0; o.ct = null; o.u = num(it.u, 0, 1e14, now); o.d = 1; return o; }          // a divider: a label on a rule, never ticked, priced or counted
     o.c = it.c === 1 || it.c === true ? 1 : 0;
     o.ct = o.c === 1 ? (num(it.ct, 0, 1e14, now) || now) : null;          // the pick-up time exists only while the item is in the cart
     o.u = num(it.u, 0, 1e14, now);
@@ -156,7 +157,7 @@
   // ---------------------------------------------------------------- derived facts
   S.counts = function (items) {
     var toBuy = 0, inCart = 0;
-    (items || []).forEach(function (it) { if (it.c === 1) inCart++; else toBuy++; });
+    (items || []).forEach(function (it) { if (it.d === 1) return; if (it.c === 1) inCart++; else toBuy++; });
     return { toBuy: toBuy, inCart: inCart, all: toBuy + inCart, allPicked: toBuy === 0 && inCart > 0 };
   };
   // the line under the title: "7 to buy · 3 in cart", "7 in cart · All picked ✓", "Nothing to buy yet"
@@ -203,6 +204,11 @@
       return touch(c, now);
     });
   };
+  // a divider is an item with d:1 whose text is its label (it may be empty: then it is just a rule)
+  S.addDivider = function (items, label, now) {
+    if ((items || []).length >= S.MAX_ITEMS) return null;
+    var it = S.newItem(label, now); it.d = 1; return items.concat([it]);
+  };
   S.remove = function (items, id) { return items.filter(function (it) { return it.id !== id; }); };
   S.clearBought = function (items) { return items.filter(function (it) { return it.c !== 1; }); };
   S.boughtCount = function (items) { return (items || []).filter(function (it) { return it.c === 1; }).length; };
@@ -212,6 +218,7 @@
     if (!o) return "";
     var parts = [o.title];
     (o.items || []).forEach(function (it) {
+      if (it.d === 1) { if (it.t) parts.push("\u2014 " + it.t + " \u2014"); return; }
       var bits = [it.t]; if (it.q) bits.push("×" + it.q);
       if (it.p != null) bits.push(S.formatPrice(it.p, o.cur));
       if (it.n) bits.push("(" + it.n + ")"); if (it.g) bits.push("#" + it.g);
