@@ -13386,7 +13386,8 @@
     }
     var profile = null;
     try{ profile = await Stick.auth.profile(); }catch(e){}
-    if(profile && !(await ensureAgeAttested(profile))) return;      // nothing else loads until the age screen has been passed
+    var anonNow = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous());
+    if((profile || anonNow) && !(await ensureAgeAttested(profile || {age_band: null}))) return;      // nothing else loads until the age screen has been passed (a guest who joined without an account passes it too: the database refuses to add anyone to a board without it)
     rememberAccount(session.user, profile);
     try{ sessionStorage.removeItem("stickit.staleDropped"); }catch(e){}
     refreshAccountData();                               // preferences + photo; the mirror in settings covers offline
@@ -13400,7 +13401,7 @@
       // nothing to join (no saved invitation, or it was refused): an anonymous session is of no use, so go back to plain guest mode
       cloudSigningOut = true; try{ await Stick.auth.signOut("local"); }catch(e){}
       wipeCloudCache(session.user.id); settings.account = null; saveSettings(); hideCloudOverlay();
-      try{ sessionStorage.setItem("stickit.bootToast", "That invitation couldn’t be used (it may have expired, been used, or be tied to an e-mail address). You’re browsing as a guest."); }catch(e){}
+      try{ sessionStorage.setItem("stickit.bootToast", "That invitation couldn’t be used" + (lastInviteError ? " (" + lastInviteError + ")" : " (it may have expired, been used, or be tied to an e-mail address)") + ". You’re browsing as a guest."); }catch(e){}
       location.reload(); return;
     }
     try{
@@ -13569,6 +13570,7 @@
     }
     location.reload();
   }
+  var lastInviteError = "";
   async function maybeAcceptInvite(){
     var t = pendingInvite();
     if(!t) return false;
@@ -13584,6 +13586,7 @@
       }
     }catch(e){
       var er = Stick.errors.parse(e), msg = String(er && er.message || "");
+      lastInviteError = msg.slice(0, 120); try{ console.warn("[invite] could not accept:", lastInviteError); }catch(x){}
       hideCloudOverlay();
       toast(/INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
         : /INVITE_USED/.test(msg) ? "That invitation was already used."

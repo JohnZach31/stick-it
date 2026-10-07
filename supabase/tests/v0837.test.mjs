@@ -29,4 +29,9 @@ ok(/placeholder="Add e-mails \(optional\)"/.test(app), 'the invite e-mail box pl
   ok(/if\(await maybeAcceptInvite\(\)\) return;\s*\/\/ nothing to join/.test(sc), 'a successful join restarts into the joined board');
   ok(/stickit\.bootToast/.test(app) && /Stick\.auth\.signOut\("local"\)/.test(sc.slice(iA, iA + 900)), 'with nothing to join, an anonymous session is dropped and the person is told, back in plain guest mode');
 }
+// ---- the age check cannot be skipped for a guest (v0.8.3.14)
+{
+  ok(/anonNow/.test(app) && /ensureAgeAttested\(profile \|\| \{age_band: null\}\)/.test(app), 'an anonymous guest always goes through the age screen, even if their profile could not be read');
+  ok(/lastInviteError/.test(app) && /console\.warn\("\[invite\] could not accept:"/.test(app), 'a refused invitation reports the real reason');
+}
 console.log('v0.8.3.10 invites: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);
