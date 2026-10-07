@@ -158,6 +158,12 @@
         return c.auth.signInWithOAuth({ provider: provider, options: { redirectTo: redirectTo } });
       }).then(function (r) { if (r && r.error) throw r.error; return r; });
     },
+    // joining a shared board without an account: Supabase "anonymous sign-in" (a real but credential-less user; needs "Allow anonymous sign-ins" switched on in the dashboard)
+    signInAnonymously: function () {
+      return Stick.cloud.load().then(function (c) { authLog("anonymous sign-in (joining a shared board without an account)"); return c.auth.signInAnonymously(); })
+        .then(function (r) { if (r && r.error) throw r.error; return r; });
+    },
+    isAnonymous: function () { var u = Stick.auth.user(); return !!(u && (u.is_anonymous === true || (u.app_metadata && u.app_metadata.provider === "anonymous"))); },
     signInWithGoogle: function () { return Stick.auth.signInWithProvider("google"); },
 
     // passwordless e-mail code (Supabase Auth one-time password). Nothing about the code is stored or generated here.

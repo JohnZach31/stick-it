@@ -9800,6 +9800,9 @@
 
   // Signing out always asks first. Nothing in the account is deleted: boards stay saved there, and this browser's signed-in session and cached copy are cleared.
   function confirmSignOut(run){
+    if(window.Stick && Stick.auth && Stick.auth.isAnonymous && Stick.auth.isAnonymous()){
+      return confirmDialog({title: "Leave without an account?", body: "You joined without an account, so there is nothing to sign back in to. If you leave, you’ll need a new invitation to get back to the board.", confirm: "Leave"}).then(function(ok){ if(ok) run(); return ok; });
+    }
     return confirmDialog({title: "Sign out of Stick-It?", body: CLOUD ? "Your boards stay saved in your account. This browser\u2019s signed-in session and its cached copy of your boards are cleared; sign in again to get them back." : "Your boards on this device stay as they are. You can sign in again at any time.", confirm: "Sign out"}).then(function(ok){ if(ok) run(); return ok; });
   }
   function signOut(){
@@ -13533,9 +13536,25 @@
   function promptInviteSignIn(){
     if(CLOUD || !CLOUD_OK || viewerMode || !pendingInvite()) return;
     var body = document.createElement("p"); body.className = "acctSub"; body.style.margin = "0";
-    body.textContent = "Someone invited you to work on a board. Sign in (or create a free account) to join it. Your invitation stays saved while you sign in.";
-    openModal({title: "You’re invited to a board", content: body, width: 400, actions: [{label: "Not now", value: false}, {label: "Sign in to join", kind: "primary", value: true}],
-      onClose: function(v){ if(v) setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 0); }});
+    body.textContent = "Someone invited you to work on a board. You can join straight away without an account, or sign in to keep it with your own account. Your invitation stays saved.";
+    openModal({title: "You’re invited to a board", content: body, width: 420, actions: [{label: "Not now", value: false}, {label: "Sign in", value: "signin"}, {label: "Join without an account", kind: "primary", value: "anon"}],
+      onClose: function(v){
+        if(v === "signin") setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 0);
+        else if(v === "anon") joinAsGuest();
+      }});
+  }
+  // No account: an anonymous session is made, then the page restarts as a (cloud) session and accepts the saved invitation. The usual age check still comes first.
+  async function joinAsGuest(){
+    cloudOverlay("Getting you in…");
+    try{ await Stick.auth.signInAnonymously(); }
+    catch(e){
+      hideCloudOverlay();
+      var msg = String((e && e.message) || ""), off = /anonymous|disabled|not enabled|signups? not allowed/i.test(msg);
+      toast(off ? "Joining without an account isn’t switched on yet. Please sign in to join." : "Couldn’t get you in. Check your connection and try again.");
+      if(off) setTimeout(function(){ try{ openAccountModal(); }catch(x){} }, 500);
+      return;
+    }
+    location.reload();
   }
   async function maybeAcceptInvite(){
     var t = pendingInvite();
@@ -13555,7 +13574,7 @@
       hideCloudOverlay();
       toast(/INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
         : /INVITE_USED/.test(msg) ? "That invitation was already used."
-        : /EMAIL_MISMATCH/.test(msg) ? "That invitation was made for a different e-mail address."
+        : /EMAIL_MISMATCH/.test(msg) ? (Stick.auth.isAnonymous && Stick.auth.isAnonymous() ? "That invitation is tied to a specific e-mail address, so you need to sign in with it." : "That invitation was made for a different e-mail address.")
         : /INVITE_NOT_FOUND/.test(msg) ? "We couldn’t find that invitation."
         : Stick.errors.friendly(er));
     }
