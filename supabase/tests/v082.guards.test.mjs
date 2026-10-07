@@ -60,7 +60,7 @@ ok(/e\.code === "KeyU"/.test(app), 'Ctrl+U never opens view-source from inside a
 ok(/id="collabBtn" hidden/.test(html) && html.indexOf('id="collabBtn"') > html.indexOf('id="publishBtn"'), 'the Collaborate button sits under Publish in the share panel and starts hidden');
 ok(/function canShowCollab\(\)\{[\s\S]*?!CLOUD[\s\S]*?Stick\.auth\.user\(\)[\s\S]*?!isPremium\(\)[\s\S]*?meta\.access === "owner"/.test(app), 'Collaborate shows only for a signed-in Premium owner of a cloud board');
 ok(/collabBtn\.hidden = !canShowCollab\(\)/.test(app) && /if\(willOpen\) updateCollabButton\(\)/.test(app), 'the button is re-checked every time the share panel opens');
-ok(/Stick\.repo\.createInvite\(activeBoardId, email, role\)/.test(app) && /Stick\.repo\.acceptInvite\(t\)/.test(app) && /#invite=\(\[a-f0-9\]\{64\}\)/.test(app), 'invites are created and accepted through the existing server functions');
+ok(/Stick\.repo\.createInvite\(activeBoardId, email, role\)/.test(app) && /Stick\.repo\.acceptInvite\(t, /.test(app) && /#invite=\(\[a-f0-9\]\{64\}\)/.test(app), 'invites are created and accepted through the existing server functions');
 
 // ---- underline, link look, checklist titles, selection tip, pulling a note
 ok(/ALLOWED_TAGS = \{DIV:1,P:1,BR:1,B:1,STRONG:1,I:1,EM:1,U:1,/.test(app) && /execIn\(text, "underline"\)/.test(app), 'underline is kept by the sanitiser and works from the key and every format control');

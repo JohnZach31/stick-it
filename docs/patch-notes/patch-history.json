@@ -73,7 +73,10 @@
                 "\"On this board now\" shows who is connected; \"People with access\" shows who may open the board",
                 "Settings counts collaboration invites as well as public links",
                 "Edits made while someone else is on the board are saved sooner",
-                "After access is turned off you choose what happens next; nothing signs you in on its own"
+                "After access is turned off you choose what happens next; nothing signs you in on its own",
+                "Everyone connected shows in the board header; the board list shows who is in each board",
+                "A note someone else is editing glows in their colour; you are told, and asked before deleting it",
+                "Guests can choose a name that everyone sees at once, and it follows them as a guest"
               ]
             }
           ]

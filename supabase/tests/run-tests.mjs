@@ -1037,6 +1037,52 @@ group('collaboration management');
   ok((await run(owner, 'select public.my_active_invite_count() as c')).rows[0].c === c1 - 1, 'the count drops when a link is turned off');
   ok((await run(bob, 'select public.my_active_invite_count() as c')).rows[0].c === 0, 'and counts only boards you own');
 }
+// ---------------------------------------------------------------- guest identity, alias reuse, hiding history
+group('guest identity and history');
+{
+  const owner = mallory;
+  const g1 = { id: uuid(), email: null, anonymous: true }, g2 = { id: uuid(), email: null, anonymous: true }, g3 = { id: uuid(), email: null, anonymous: true };
+  for (const g of [g1, g2, g3]) { await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g.id, null, '{}']); await attest(g.id); }
+  const mb = await run(owner, 'select id from public.create_board($1,$2,$3)', ['Identity board', null, 'k-' + uuid()]); if (mb.error) console.log('   (create_board:', mb.error, ')'); const B = mb.rows[0];
+  const inv = (await run(owner, 'select public.create_invite($1,null,$2) as r', [B.id, 'editor'])).rows[0].r;
+  const inv2 = (await run(owner, 'select public.create_invite($1,null,$2) as r', [B.id, 'editor'])).rows[0].r;
+  ok(!(await run(g1, 'select public.accept_invite($1, $2)', [inv.token, 'Leaflet #77'])).error, 'a returning guest can ask to keep the generated name they had');
+  ok((await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g1.id])).rows[0].alias === 'Leaflet #77', 'and gets it');
+  await run(g2, 'select public.accept_invite($1, $2)', [inv.token, 'Leaflet #77']);
+  const a2 = (await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g2.id])).rows[0].alias;
+  ok(a2 && a2 !== 'Leaflet #77', 'but nobody else on the same board can take it: they get a fresh one');
+  await run(g3, 'select public.accept_invite($1, $2)', [inv.token, 'not a valid name; drop table']);
+  ok(/^[A-Z][a-z]+ #\d+$/.test((await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g3.id])).rows[0].alias), 'a made-up alias is ignored: only the generated shape is honoured');
+  ok(!(await run(bob, 'select public.accept_invite($1)', [inv2.token])).error, 'the one-argument call still works (existing callers)');
+
+  const labels = async () => (await run(owner, 'select public.list_board_access($1) as r', [B.id])).rows[0].r;
+  ok((await labels()).find((a) => a.user_id === g1.id).name === 'Leaflet #77', 'before a name is chosen the owner sees the generated name');
+  ok(errIs(await run(bob, 'select public.set_guest_name($1)', ['Bob']), /FORBIDDEN/), 'only guests use set_guest_name (accounts keep their profile name)');
+  const nm = await run(g1, 'select public.set_guest_name($1) as n', ['  Test Guest \u0007 ']);
+  ok(nm.rows[0].n === 'Test Guest', 'a guest chooses a name (trimmed, control characters removed)');
+  const row = (await labels()).find((a) => a.user_id === g1.id);
+  ok(row.name === 'Test Guest' && row.alias === 'Leaflet #77' && row.guest === true, 'the owner sees the chosen name and still has the generated one as the stable identifier');
+  const li = (await run(owner, 'select public.list_invites($1) as r', [B.id])).rows[0].r.find((i) => i.id === inv.id);
+  ok(li.people.some((p) => p.name === 'Test Guest' && p.alias === 'Leaflet #77'), 'the invite history shows the same name');
+  await run(g1, 'select public.set_guest_name($1)', ['']);
+  ok((await labels()).find((a) => a.user_id === g1.id).name === 'Leaflet #77', 'clearing it goes back to the generated name');
+  ok(!(await labels()).some((a) => a.name === 'Member' || a.name === 'Stick-It member'), 'no person is ever labelled with a bare "Member"');
+  await run('su', 'delete from public.board_invite_uses where user_id=$1', [g3.id]);
+  ok((await labels()).find((a) => a.user_id === g3.id).name === 'Unknown member', 'someone the server cannot identify is "Unknown member", never a guess');
+  ok((await labels()).find((a) => a.role === 'owner').name !== 'Member', 'the owner is named from their profile');
+
+  // hiding history keeps the record
+  await run(g1, 'select public.set_guest_name($1)', ['Test Guest']);
+  await run(owner, 'select public.revoke_invite($1)', [inv.id]);
+  const headBefore = (await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [B.id])).rows[0].c;
+  ok((await run(owner, 'select public.delete_invite_history($1) as r', [inv.id])).rows[0].r === true, 'the owner deletes the turned-off link from history');
+  ok((await run(owner, 'select public.list_invites($1) as r', [B.id])).rows[0].r.every((i) => i.id !== inv.id), 'it disappears from the owner list');
+  const kept = (await run('su', 'select i.archived_at is not null as hidden, (select count(*)::int from public.board_invite_uses u where u.invite_id=i.id) as uses from public.board_invites i where i.id=$1', [inv.id])).rows[0];
+  ok(kept && kept.hidden === true && kept.uses >= 1, 'but the record and the people who used it stay in the database (archived, not erased)');
+  ok((await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [B.id])).rows[0].c === headBefore, 'and no membership changed');
+  ok(errIs(await run(g2, 'select public.accept_invite($1)', [inv.token]), /INVITE_REVOKED/), 'a hidden link still cannot be used');
+  ok(errIs(await run(bob, 'select public.delete_invite_history($1)', [inv2.id]), /FORBIDDEN/), 'only the owner can hide history');
+}
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

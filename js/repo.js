@@ -198,8 +198,19 @@
     myGuestAlias: function (boardId) {
       return db().then(function (c) { return guard(c.rpc("my_guest_alias", { p_board: boardId })); });
     },
-    acceptInvite: function (token) {
-      return db().then(function (c) { return guard(c.rpc("accept_invite", { p_token: token })); });
+    // alias: the generated guest name this browser already had ("Leaflet #77"); the server keeps it only if nobody else on that board has it.
+    acceptInvite: function (token, alias) {
+      return db().then(function (c) {
+        var args = { p_token: token }; if (alias) args.p_alias = alias;
+        return c.rpc("accept_invite", args).then(function (r) {
+          if (r.error && alias && /PGRST202|Could not find the function|schema cache/i.test(String(r.error.message || "") + String(r.error.code || ""))) return guard(c.rpc("accept_invite", { p_token: token }));    // older server: no alias argument
+          return guard(Promise.resolve(r));
+        });
+      });
+    },
+    // a guest's chosen display name (anonymous sessions only); empty string goes back to the generated name
+    setGuestName: function (name) {
+      return db().then(function (c) { return guard(c.rpc("set_guest_name", { p_name: name == null ? "" : name })); });
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

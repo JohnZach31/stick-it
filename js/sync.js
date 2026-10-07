@@ -56,7 +56,7 @@
     var retryTimer = null, retryN = 0;
     var jobs = {};               // media job key -> "running" | "failed"
     var pollTimer = null, started = false;
-    var lat = [], pendingEvt = null;          // latency samples for Stick.perf.collab(): numbers only, never data
+    var lat = [], saves = [], pendingEvt = null;          // latency samples for Stick.perf.collab(): numbers only, never data
     var rtCh = null, rtClient = null, rtStatus = "", rtTimer = null, lastPullAt = 0;     // realtime: a push only SCHEDULES the normal pull, it is never a second sync path
     var readOnlyMode = false;    // viewers: pull only, never write
 
@@ -157,7 +157,9 @@
       var rerun = false, problem = null;
       for (var i = 0; i < d.ups.length; i += (cfg.batch || 100)) {
         var chunk = d.ups.slice(i, i + (cfg.batch || 100));
+        var t0 = Date.now();
         var res = await repo.syncObjects(boardId, chunk.map(function (u) { var r = Object.assign({}, u.row); r.base_version = u.base; return r; }), []);
+        saves.push({ rows: chunk.length, ms: Date.now() - t0, at: Date.now() }); if (saves.length > 30) saves.shift();
         (res.results || []).forEach(function (r) {
           var u = chunk.filter(function (c) { return c.id === r.id; })[0];
           if (!u) return;
@@ -381,6 +383,7 @@
     // Where the time goes between "committed on the server" and "drawn here", per remote change (milliseconds):
     //   push: commit -> realtime event received (includes the other device's own save delay only if it committed late; compares two clocks, so allow a little skew)
     //   wait: event -> pull started (our debounce), pull: request/response, draw: applying + hydrating, total: commit -> drawn
+    S.saveStats = function () { return saves.map(function (x) { return { rows: x.rows, ms: x.ms }; }); };       // how long OUR saves took (request + server commit)
     S.latency = function () {
       return lat.map(function (s) {
         var o = { rows: s.rows, wait: s.pullStart - s.evtAt, pull: s.pullEnd - s.pullStart, draw: s.applied - s.pullEnd };

@@ -104,4 +104,21 @@ ok((await run('su', 'select count(*)::int c from public.board_members where boar
   ok((await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c === headBefore && (await run(viewer, 'select id from public.boards where id=$1', [board.id])).rows.length === 1, 'and nobody, including the legacy viewer, lost access');
 }
 
+
+// ---- and the third migration (guest identity, history archiving)
+{
+  const NEW3 = '20261009120000_guest_identity.sql';
+  const sql3 = fs.readFileSync(path.join(migDir, NEW3), 'utf8').replace(/\r\n/g, '\n');
+  ok(!/\bupdate\s+public\.board_members\b/i.test(sql3) && !/\bdelete\s+from\s+public\.board_members\b/i.test(sql3), 'the third migration does not touch memberships either');
+  const pre = await snap();
+  await db.exec(sql3);
+  const post = await snap();
+  ok(JSON.stringify(pre.members) === JSON.stringify(post.members) && JSON.stringify(pre.invites) === JSON.stringify(post.invites), 'AFTER the third migration: memberships and invitations are still identical');
+  ok(!(await run(guest, 'select public.accept_invite($1)', [openLink.token])).error && await wrote(guest), 'an existing guest reopening their link with the old one-argument call still works');
+  ok(!(await run(newGuest, 'select public.accept_invite($1, $2)', [openLink.token, 'Leaflet #5'])).error, 'and the new two-argument call works');
+  const accNames = (await run(owner, 'select public.list_board_access($1) as r', [board.id])).rows[0].r;
+  ok(accNames.every((a) => typeof a.name === 'string' && a.name !== 'Member' && !/@/.test(a.name)), 'nobody is listed as a bare "Member" and no address appears');
+  ok(accNames.length === (await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c, 'the access list matches the real membership');
+}
+
 console.log('migration preserves existing access: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

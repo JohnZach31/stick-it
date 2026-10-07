@@ -21,7 +21,11 @@
   core.cleanState = function (st) {                     // what we accept from the network: short plain strings only
     st = st && typeof st === "object" ? st : {};
     function s(v, n) { return typeof v === "string" ? v.replace(/[\u0000-\u001f‪-‮⁦-⁩]/g, "").slice(0, n) : ""; }
-    return { uid: s(st.uid, 64), name: s(st.name, 40), editing: st.editing ? s(st.editing, 64) : null, active: st.active ? s(st.active, 64) : null, beat: Number(st.beat) || 0 };
+    var hue = Number(st.hue); hue = isFinite(hue) && hue >= 0 && hue < 360 ? Math.round(hue) : null;
+    var role = st.role === "owner" || st.role === "editor" || st.role === "viewer" ? st.role : null;
+    // uid / display name / generated guest name / colour / role hint / which object is being edited / heartbeat. Never an e-mail, a token, a profile or board content.
+    return { uid: s(st.uid, 64), name: s(st.name, 40), alias: st.alias ? s(st.alias, 24) : "", guest: st.guest === true, hue: hue, role: role,
+             editing: st.editing ? s(st.editing, 64) : null, active: st.active ? s(st.active, 64) : null, beat: Number(st.beat) || 0 };
   };
   // merge a fresh list of {key, state} into the known peers; "seenAt" moves only when a peer's heartbeat/state really changed,
   // measured on OUR clock (clock differences between devices never matter)
@@ -29,12 +33,22 @@
     var next = {};
     incoming.forEach(function (p) {
       var st = core.cleanState(p.state), old = known[p.key];
-      var changed = !old || old.state.beat !== st.beat || old.state.editing !== st.editing || old.state.active !== st.active || old.state.name !== st.name;
+      var changed = !old || old.state.beat !== st.beat || old.state.editing !== st.editing || old.state.active !== st.active || old.state.name !== st.name || old.state.hue !== st.hue || old.state.alias !== st.alias;
       next[p.key] = { key: p.key, state: st, seenAt: changed ? now : old.seenAt };
     });
     return next;
   };
   core.fresh = function (peer, now) { return now - peer.seenAt <= STALE_MS; };
+  // An editing lease is much shorter than "is on the board": it needs a heartbeat every few seconds and lapses after LEASE_MS of silence (a crashed tab never locks a note for long).
+  // The person who is editing right now holds it; there is no permanent owner of a note.
+  var LEASE_MS = 8000, LEASE_BEAT_MS = 3000;
+  C.LEASE_MS = LEASE_MS; C.LEASE_BEAT_MS = LEASE_BEAT_MS;
+  core.leaseFresh = function (peer, now) { return now - peer.seenAt <= LEASE_MS; };
+  // how a person is shown: a chosen name over their generated one; guests carry "Guest · <generated name>" as the stable identifier
+  core.label = function (st) {
+    var name = st.name || "Someone";
+    return { name: name, sub: st.guest ? (st.alias && st.alias !== name ? "Guest \u00b7 " + st.alias : "Guest") : "" };
+  };
   // others on the board, one per person (several tabs of one person count once), stale peers dropped
   core.people = function (peers, now, selfKey, selfUid) {
     var byUid = {};
@@ -44,7 +58,7 @@
       var u = p.state.uid || k;
       if (selfUid && u === selfUid) return;
       var cur = byUid[u];
-      if (!cur || (p.state.editing && !cur.editing)) byUid[u] = { uid: u, name: p.state.name || "Someone", editing: p.state.editing, active: p.state.active, hue: core.hue(u), initial: core.initial(p.state.name) };
+      if (!cur || (p.state.editing && !cur.editing)) byUid[u] = { uid: u, name: p.state.name || "Someone", alias: p.state.alias, guest: p.state.guest, role: p.state.role, editing: p.state.editing, active: p.state.active, hue: p.state.hue != null ? p.state.hue : core.hue(u), initial: core.initial(p.state.name) };
       else if (!cur.active && p.state.active) cur.active = p.state.active;
     });
     return Object.keys(byUid).sort().map(function (u) { return byUid[u]; });
@@ -54,15 +68,15 @@
     var best = null;
     Object.keys(peers).forEach(function (k) {
       var p = peers[k];
-      if (k === selfKey || !core.fresh(p, now)) return;
+      if (k === selfKey || !core.leaseFresh(p, now)) return;
       if (p.state.editing === objectId && (!best || p.seenAt > best.seenAt)) best = p;
     });
-    return best ? { uid: best.state.uid || best.key, name: best.state.name || "Someone" } : null;
+    return best ? { uid: best.state.uid || best.key, name: best.state.name || "Someone", alias: best.state.alias, guest: best.state.guest, hue: best.state.hue != null ? best.state.hue : core.hue(best.state.uid || best.key) } : null;
   };
 
   // ================================================================== transports
   function supabaseTransport(boardId, selfKey, onSync) {
-    var ch = null, client = null, ready = false, pending = null, dead = false;
+    var ch = null, client = null, ready = false, pending = null, dead = false, status = "connecting";
     function gather() {
       var st = ch.presenceState(), list = [];
       Object.keys(st).forEach(function (k) { var arr = st[k]; if (arr && arr.length) list.push({ key: k, state: arr[arr.length - 1] }); });
@@ -74,11 +88,13 @@
       ch = c.channel("board:" + boardId, { config: { private: true, presence: { key: selfKey } } });
       ch.on("presence", { event: "sync" }, gather);
       ch.on("broadcast", { event: "access_changed" }, function () { try { root.dispatchEvent(new root.CustomEvent("stick:access-changed")); } catch (e) {} });
-      ch.subscribe(function (status) {
-        if (status === "SUBSCRIBED") { ready = true; if (pending) { ch.track(pending); } }
+      ch.subscribe(function (st) {
+        status = st === "SUBSCRIBED" ? "connected" : (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") ? "unavailable" : status;
+        if (st === "SUBSCRIBED") { ready = true; if (pending) { ch.track(pending); } }
       });
-    }, function () {});
+    }, function () { status = "unavailable"; });
     return {
+      status: function () { return status; },
       track: function (st) { pending = st; if (ready && ch) { try { ch.track(st); } catch (e) {} } },
       leave: function () { dead = true; try { if (ch) { ch.untrack(); if (client) client.removeChannel(ch); } } catch (e) {} }
     };
@@ -112,7 +128,7 @@
     S = { opts: opts, selfKey: selfKey, peers: {}, beat: 0, editing: null, active: null, summary: { comments: {}, reviews: {} }, timers: [], listeners: [] };
     var onSync = function (list) { S.peers = core.merge(S.peers, list, Date.now()); render(); };
     try { S.tp = (opts.transport === "broadcast" && root.BroadcastChannel) ? broadcastTransport(opts.boardId, selfKey, onSync) : (opts.transport === "none" ? null : supabaseTransport(opts.boardId, selfKey, onSync)); } catch (e) { S.tp = null; }
-    function send() { if (!S || !S.tp) return; S.beat++; S.tp.track({ uid: opts.me.uid, name: opts.me.name, editing: S.editing, active: S.active, beat: S.beat }); }
+    function send() { if (!S || !S.tp) return; S.beat++; var me = S.opts.me; S.tp.track({ uid: me.uid, name: me.name, alias: me.alias || "", guest: !!me.guest, hue: me.hue != null ? me.hue : core.hue(me.uid), role: S.opts.role || null, editing: S.editing, active: S.active, beat: S.beat }); }
     S.send = send; send();
     S.timers.push(setInterval(function () { send(); render(); }, BEAT_MS));
     S.timers.push(setInterval(function () { render(); }, 5000));                     // so a silent peer's lock really does expire on screen
@@ -128,14 +144,44 @@
     var host = S.opts.host; lastSig = "";
     S.timers.forEach(clearInterval);
     if (S.tp) S.tp.leave();
-    S = null; drawPeople();
+    clearInterval(S.leaseT);
+    S = null; drawPeople(); listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (host && host.refresh) host.refresh();
   };
   C.active = function () { return !!S; };
   C.canComment = function () { return !!S && S.opts.canComment !== false && S.opts.comments !== false; };
-  C.setEditing = function (id) { if (!S || S.editing === id) return; S.editing = id || null; S.send(); };
+  // Start or end an editing lease. While it is held a heartbeat goes out every few seconds (presence only: lightweight, nothing is written to the board's data).
+  C.setEditing = function (id) {
+    if (!S || S.editing === id) return;
+    S.editing = id || null; clearInterval(S.leaseT); S.leaseT = null;
+    if (S.editing) { var sess = S; S.leaseT = setInterval(function () { if (S === sess && S.editing) S.send(); else clearInterval(sess.leaseT); }, LEASE_BEAT_MS); }
+    S.send();
+  };
+  // a guest renames themself: everyone connected sees it at the next presence update, no reload
+  C.setMe = function (patch) { if (!S) return; Object.keys(patch || {}).forEach(function (k) { S.opts.me[k] = patch[k]; }); S.send(); render(); };
+  // Observe who is connected on OTHER boards (for the board list). Read-only: nothing is tracked, so watching never makes anyone appear to be on a board.
+  // cb(boardId, [{uid, name, hue, guest, initial}]) on every change; returns stop().
+  C.watch = function (boardIds, cb) {
+    var chans = [], client = null, dead = false;
+    Stick.cloud.load().then(function (c) {
+      if (dead) return; client = c;
+      (boardIds || []).forEach(function (id) {
+        var ch = c.channel("board:" + id, { config: { private: true } });
+        ch.on("presence", { event: "sync" }, function () {
+          var st = ch.presenceState(), seen = {}, list = [];
+          Object.keys(st).forEach(function (k) { var arr = st[k]; if (!arr || !arr.length) return; var s = core.cleanState(arr[arr.length - 1]), u = s.uid || k; if (seen[u]) return; seen[u] = 1; list.push({ uid: u, name: s.name || "Someone", guest: s.guest, hue: s.hue != null ? s.hue : core.hue(u), initial: core.initial(s.name) }); });
+          try { cb(id, list); } catch (e) {}
+        });
+        ch.subscribe(); chans.push(ch);
+      });
+    }, function () {});
+    return function () { dead = true; chans.forEach(function (ch) { try { if (client) client.removeChannel(ch); } catch (e) {} }); chans = []; };
+  };
+  C.status = function () { return S && S.tp && S.tp.status ? S.tp.status() : (S ? "off" : "stopped"); };
+  // who holds the lease on an object right now (name, colour, guest alias), or null
+  C.holder = function (id) { return S ? core.lockOwner(S.peers, String(id), Date.now(), S.selfKey) : null; };
   C.setActive = function (id) { if (!S || S.active === id) return; S.active = id || null; S.send(); };
-  C.blockedBy = function (id) { if (!S) return null; var o = core.lockOwner(S.peers, String(id), Date.now(), S.selfKey); return o ? o.name : null; };
+  C.blockedBy = function (id) { if (!S) return null; var o = core.lockOwner(S.peers, String(id), Date.now(), S.selfKey); return o ? o.name : null; };       // the name only (callers say "<name> is editing this note.")
   C.people = function () { return S ? core.people(S.peers, Date.now(), S.selfKey, S.opts.me.uid) : []; };
   C.summaryFor = function (id) {
     if (!S) return { count: 0, review: null };
@@ -220,13 +266,13 @@
   C.online = function () {
     if (!S) return [];
     var me = S.opts.me || {};
-    return [{ uid: me.uid || "", name: me.name || "You", self: true, editing: S.editing, hue: core.hue(me.uid || "me"), initial: core.initial(me.name) }].concat(C.people().map(function (p) { p.self = false; return p; }));
+    return [{ uid: me.uid || "", name: me.name || "You", alias: me.alias || "", guest: !!me.guest, role: S.opts.role || null, self: true, editing: S.editing, hue: me.hue != null ? me.hue : core.hue(me.uid || "me"), initial: core.initial(me.name) }].concat(C.people().map(function (p) { p.self = false; return p; }));
   };
   function render() {
     drawPeople();
     listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (!S || !S.opts.host || !S.opts.host.refresh) return;
-    var sig = JSON.stringify([C.people().map(function (p) { return [p.uid, p.editing, p.active]; }), S.summary]);
+    var sig = JSON.stringify([C.people().map(function (p) { return [p.uid, p.editing, p.active, p.name, p.hue]; }), S.summary]);
     if (sig === lastSig) return;                        // nothing visible changed: leave the board's elements alone
     lastSig = sig; S.opts.host.refresh();
   }
@@ -235,14 +281,19 @@
     var bar = root.document.getElementById("presenceBar");
     if (!bar) return;
     barEl = bar;
-    var people = C.people(); bar.innerHTML = "";
-    bar.hidden = !people.length;
-    people.slice(0, 5).forEach(function (p) {
-      var a = el("span", "presAv", p.initial); a.style.setProperty("--h", p.hue);
-      a.title = p.name + (p.editing ? " is editing" : " is here"); a.setAttribute("role", "img"); a.setAttribute("aria-label", p.name + (p.editing ? " is editing a note" : " is on this board"));
+    var others = C.people(), all = S && others.length ? C.online() : [];       // alone on the board: nothing to show
+    bar.innerHTML = ""; bar.hidden = !all.length;
+    var MAX = 4;
+    all.slice(0, MAX).forEach(function (p) {
+      var a = el("button", "presAv" + (p.self ? " self" : "") + (p.guest ? " guest" : "") + (p.editing ? " editing" : ""), p.initial); a.type = "button"; a.style.setProperty("--h", p.hue);
+      var lab = core.label(p), role = p.role === "owner" ? "Owner" : p.role === "viewer" ? "Viewer" : p.role === "editor" ? "Editor" : "";
+      a.title = lab.name + (p.self ? " (you)" : "") + (lab.sub ? " \u00b7 " + lab.sub : "") + (role ? " \u00b7 " + role : "") + (p.editing ? " \u00b7 editing" : "");
+      a.setAttribute("aria-label", a.title);
+      a.addEventListener("click", function () { if (S && S.opts.host && S.opts.host.showPeople) S.opts.host.showPeople(a); });
       bar.appendChild(a);
     });
-    if (people.length > 5) { var more = el("span", "presAv presMore", "+" + (people.length - 5)); more.setAttribute("aria-label", (people.length - 5) + " more people here"); bar.appendChild(more); }
+    if (all.length > MAX) { var more = el("button", "presAv presMore", "+" + (all.length - MAX)); more.type = "button"; more.setAttribute("aria-label", (all.length - MAX) + " more people here"); more.title = more.getAttribute("aria-label");
+      more.addEventListener("click", function () { if (S && S.opts.host && S.opts.host.showPeople) S.opts.host.showPeople(more); }); bar.appendChild(more); }
   }
 
   // called for every object element the app draws (or redraws)
@@ -250,19 +301,23 @@
     if (!S || !node || !n || !n.id) return;
     var old = node.querySelectorAll(":scope > .cmtTab, :scope > .peerBadge");
     Array.prototype.forEach.call(old, function (x) { x.remove(); });
-    node.classList.remove("peerActive", "peerEditing");
+    node.classList.remove("peerActive", "peerEditing"); node.style.removeProperty("--ph");
     var now = Date.now();
     // someone else is working on it
     Object.keys(S.peers).forEach(function (k) {
       var p = S.peers[k];
       if (k === S.selfKey || !core.fresh(p, now)) return;
       if (p.state.uid && p.state.uid === S.opts.me.uid) return;
-      var hit = p.state.editing === n.id ? "editing" : p.state.active === n.id ? "active" : null;
+      var hit = p.state.editing === n.id && core.leaseFresh(p, now) ? "editing" : p.state.active === n.id ? "active" : null;
       if (!hit || node.querySelector(":scope > .peerBadge")) return;
       node.classList.add(hit === "editing" ? "peerEditing" : "peerActive");
-      var b = el("span", "peerBadge", core.initial(p.state.name)); b.style.setProperty("--h", core.hue(p.state.uid || k));
-      b.title = (p.state.name || "Someone") + (hit === "editing" ? " is editing this" : " is moving this"); b.setAttribute("aria-label", b.title);
+      var hue = p.state.hue != null ? p.state.hue : core.hue(p.state.uid || k);
+      node.style.setProperty("--ph", hue);                                         // the editor's own colour: the glow, the tab and the label all use it
+      var b = el("span", "peerBadge", core.initial(p.state.name)); b.style.setProperty("--h", hue);
+      var lab = core.label(p.state);
+      b.title = lab.name + (hit === "editing" ? " is editing this" : " is moving this") + (lab.sub ? " \u00b7 " + lab.sub : ""); b.setAttribute("aria-label", b.title);
       node.appendChild(b);
+      if (hit === "editing") { var tag = el("span", "peerBadge peerTag", lab.name + " is editing"); tag.style.setProperty("--h", hue); tag.setAttribute("aria-hidden", "true"); node.appendChild(tag); }
     });
     // comments and review
     if (S.opts.comments === false) return;

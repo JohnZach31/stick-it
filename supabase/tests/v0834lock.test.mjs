@@ -74,7 +74,7 @@ ok(/id="joinBoardOpen"/.test(read('index.html')) && /function openJoinDialog\(\)
   ok(f('https://x.github.io/stick-it/#invite=' + tok) === tok && f(tok) === tok && f('  ' + tok.toUpperCase() + '  ') === tok, 'the join box accepts a whole link, a bare code, or either in capitals');
   ok(f('hello') === null && f('#invite=' + 'a'.repeat(63)) === null && f('#invite=' + 'a'.repeat(70)) === null && f('') === null, 'and rejects anything else (too short, too long, empty)');
 }
-ok(/startCollab\._alias/.test(app) && /myGuestAlias/.test(app) && /my_guest_alias/.test(read('js/repo.js')), 'a guest is shown under the server-given friendly name');
+ok(/guestSave\(\{alias: al\}\)/.test(app) && /myGuestAlias/.test(app) && /my_guest_alias/.test(read('js/repo.js')), 'a guest is shown under the server-given friendly name (kept in the local guest identity)');
 
 // ---------------------------------------------------------------- scroll / drag
 ok(/function scrollRegionAt\(e, stop\)/.test(app) && /var reg = scrollRegionAt\(e, board\);/.test(app), 'the wheel handler asks what scrolls under the pointer (any scrollable node, not just text notes)');
@@ -195,7 +195,7 @@ ok(/Stick\.perf = \{/.test(app) && /perfMark\("board switch: clicked"\)/.test(ap
 {
   const ms = app.slice(app.indexOf('async function openManageShares'), app.indexOf('function openDeleteAccount'));
   ok(/tabInv = mkTab\("Collaboration invites", activeInv, invWrap\); tabPub = mkTab\("Public links", act\.length, pubWrap\)/.test(ms) && /role", "tablist"/.test(ms) && /role", "tab"/.test(ms), 'the manager has two tabs (collaboration invites, public links) with counts, kept apart');
-  ok(/activeInv \+ act\.length/.test(ms) && /collaboration " \+ \(activeInv === 1/.test(ms), 'its summary counts both kinds of link');
+  ok(/nInv \+ nPub/.test(ms) && /collaboration " \+ \(nInv === 1/.test(ms), 'its summary counts both kinds of link');
   ok(/pickTab\(activeInv \|\| !act\.length \? tabInv : tabPub\)/.test(ms), 'it opens on collaboration invites when there are any (so they can never look absent)');
   ok(/presence: set\.b\.id === activeBoardId, people: true/.test(ms), 'live presence is shown only for the board you are on; people-with-access for each board');
   ok(/activeShares \|\| 0\) \+ \(activeInvites \|\| 0/.test(app) && /Stick\.repo\.myActiveInviteCount\(\)/.test(app) && /Public share links " \+ \(activeShares \|\| 0\)/.test(app), 'Settings counts public links AND collaboration invites, with the breakdown');
@@ -221,7 +221,7 @@ ok(/Stick\.perf = \{/.test(app) && /perfMark\("board switch: clicked"\)/.test(ap
   ok(/stickit\.afterLeave/.test(al) && /al === "signin"\) openAccountModal\(\)/.test(app), 'sign-in opens only after the person chose it');
   ok((app.match(/idlsScroll/g) || []).length === 2 && /wrap\.classList\.add\("idlsScroll"\)/.test(app) && /content\.classList\.add\("idlsScroll", "accDlg"\)/.test(app), 'the Stick-It scrollbar class is applied to exactly two surfaces: the Collaborate and Sharing & access windows');
   ok(/^\.idlsScroll\{/m.test(css) && read('css/spaces.css').slice(read('css/spaces.css').indexOf('collaboration management')).split('\n').filter((l) => /::-webkit-scrollbar/.test(l)).every((l) => /\.idlsScroll/.test(l)), 'and every scrollbar rule in it is scoped to that class (no global override)');
-  ok(/Stick\.perf\.collab = function/.test(app) && /median: \{push: med\("push"\)/.test(app), 'Stick.perf.collab() reports event, wait, pull, draw and total latency');
+  ok(/Stick\.perf\.collab = function/.test(app) && /push: med\("push"\)/.test(app) && /save: svs\.length/.test(app), 'Stick.perf.collab() reports save, event, wait, pull, draw and total latency');
   ok(/live \? \(cfg\.liveDebounceMs \|\| 150\)/.test(read('js/sync.js')) && /host\.hasPeers && host\.hasPeers\(\)/.test(read('js/sync.js')), 'saves are quicker (150 ms) only while someone else is on the board; alone, the 700 ms settle remains');
   ok(/cfg\.pullDebounceMs == null \? 80 : cfg\.pullDebounceMs/.test(read('js/sync.js')), 'the realtime pull debounce is 80 ms and still coalesces a burst');
 }

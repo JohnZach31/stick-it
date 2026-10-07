@@ -491,7 +491,22 @@
     });
   }
 
+  // The local GUEST IDENTITY (who this browser is when it has no account): a stable id and colour, the generated name the server gave it ("Leaflet #253"), and an optional chosen name.
+  // It is deliberately separate from any board access: turning a link off removes the access, never this. It lives only in this browser.
+  var GUEST_KEY = "stickit.guest";
+  function guestId(){
+    var g = safeGet(GUEST_KEY);
+    if(!g || typeof g !== "object" || !g.id){
+      var id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : "g" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      g = {id: id, hue: Math.floor(Math.random() * 360), alias: "", name: "", asked: false}; safeSet(GUEST_KEY, g);
+    }
+    return g;
+  }
+  function guestSave(patch){ var g = guestId(); Object.keys(patch).forEach(function(k){ g[k] = patch[k]; }); safeSet(GUEST_KEY, g); return g; }
+  function guestAliasHint(){ var g = safeGet(GUEST_KEY); return g && /^[A-Z][a-z]{2,11} #[0-9]{1,4}$/.test(g.alias || "") ? g.alias : ""; }
+  function guestLabel(){ var g = safeGet(GUEST_KEY); return g ? (g.name || g.alias || "") : ""; }
   function getAnonName(){
+    var gl = guestLabel(); if(gl) return gl;
     var anon = safeGet("stickyboard.anonId");
     if(!anon){
       anon = "Anon-" + Math.floor(1000 + Math.random()*9000);
@@ -1627,7 +1642,7 @@
   var focusLayer = OV.layer("focus-mode", function(){ exitFocus(); }, function(){ return !!focusState; });
   var recLayer = OV.layer("recording", function(){ if(recording) recording.cancel(); }, function(){ return !!recording; });
   var menuLayer = OV.layer("menu", function(){ closeMenu(true); }, function(){ return !!openMenuState; });
-  var POP_WIDTHS = {reactPop:236, cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
+  var POP_WIDTHS = {presPop:300, reactPop:236, cmtPop:300, notePop:230, calPop:250, dateCal:216, kbdPop:270, noteMenu:216, linkPop:260, datePop:250};
   function openFloatingPopoverAt(r, className, triggerBtn){
     closeFloatingPopovers();
     var pop = document.createElement("div");
@@ -6704,6 +6719,14 @@
   function deleteNotes(ids, opts){
     opts = opts || {};
     var list = ids.map(findNote).filter(Boolean);
+    if(!opts.lockOk && window.Stick && Stick.collab && Stick.collab.active && Stick.collab.active()){
+      var held = list.map(function(n){ return Stick.collab.holder(n.id); }).filter(Boolean);
+      if(held.length){
+        var who = held[0].name + (held.length > 1 ? " and others are" : " is");
+        confirmDialog({title: "Delete anyway?", body: who + " editing " + (list.length > 1 ? "one of these" : "this note") + " right now. Delete anyway?", confirm: "Delete anyway", danger: true}).then(function(go){ if(go) deleteNotes(ids, Object.assign({}, opts, {lockOk: true})); });
+        return;
+      }
+    }
     if(!opts.force && list.some(isPileObj)){          // deleting a pile means opening it: its papers are never deleted by accident
       list.filter(isPileObj).forEach(unpilePile);
       list = list.filter(function(n){ return !isPileObj(n); });
@@ -10350,8 +10373,15 @@
       tabInv = mkTab("Collaboration invites", activeInv, invWrap); tabPub = mkTab("Public links", act.length, pubWrap);
       function pickTab(t){ [tabInv, tabPub].forEach(function(b){ var on2 = b === t; b.setAttribute("aria-selected", on2 ? "true" : "false"); b.classList.toggle("on", on2); b._wrap.hidden = !on2; }); }
       [tabInv, tabPub].forEach(function(b){ b.addEventListener("click", function(){ pickTab(b); }); tabBar.appendChild(b); });
-      var sum = makeDiv("accSummary"); sum.textContent = (activeInv + act.length) + (activeInv + act.length === 1 ? " active link" : " active links") + " \u00b7 " + activeInv + " collaboration " + (activeInv === 1 ? "invite" : "invites") + " \u00b7 " + act.length + " public"; content.appendChild(sum);
-      content.appendChild(tabBar); content.appendChild(invWrap); content.appendChild(pubWrap);
+      var sum = makeDiv("accSummary"); content.appendChild(sum);
+      var bi0 = Stick.build, bTag = makeDiv("accBuild"); bTag.textContent = "Stick-It v" + ((Stick.config && Stick.config.APP_VERSION) || "") + (bi0 && bi0.n ? " \u00b7 build " + bi0.n : ""); content.appendChild(bTag);
+      var nInv = activeInv, nPub = act.length;
+      function paintCounts(){
+        sum.textContent = (nInv + nPub) + (nInv + nPub === 1 ? " active link" : " active links") + " \u00b7 " + nInv + " collaboration " + (nInv === 1 ? "invite" : "invites") + " \u00b7 " + nPub + " public";
+        tabInv.querySelector(".accCount").textContent = nInv; tabPub.querySelector(".accCount").textContent = nPub;
+      }
+      function bump(d, kind){ if(kind === "invite") nInv = Math.max(0, nInv + d); else nPub = Math.max(0, nPub + d); paintCounts(); if(onChange) onChange(d, kind); }
+      content.appendChild(tabBar); content.appendChild(invWrap); content.appendChild(pubWrap); paintCounts();
       var contentRoot = content; content = pubWrap;
       var pubH = document.createElement("div"); pubH.className = "menuHint lkSecHead"; pubH.textContent = "Public links"; pubH.hidden = true; content.appendChild(pubH);
       if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "No public share links."; content.appendChild(none); }
@@ -10377,7 +10407,7 @@
         var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn danger lkOff"; b.textContent = "Turn off"; b.setAttribute("aria-label", "Turn off this " + kind.textContent.toLowerCase() + " link");
         b.addEventListener("click", function(){
           b.disabled = true;
-          Stick.share.disable(x.id).then(function(){ card.remove(); if(onChange) onChange(-1); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "No public share links."; listEl.appendChild(n2); } },
+          Stick.share.disable(x.id).then(function(){ card.remove(); bump(-1, "public"); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "No public share links."; listEl.appendChild(n2); } },
             function(){ b.disabled = false; toast("Couldn't turn it off. Try again."); });
         });
         card.appendChild(ic); card.appendChild(body); card.appendChild(b); listEl.appendChild(card);
@@ -10391,7 +10421,7 @@
         var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH board"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
         content.appendChild(sec);
         if(!set.ok){ var bad = makeDiv("accNone"); bad.textContent = "Couldn\u2019t load this board\u2019s invitations."; sec.appendChild(bad); return; }
-        var pnl = buildAccessPanel(set.b.id, {presence: set.b.id === activeBoardId, people: true, onChange: function(d, kind){ if(onChange) onChange(d, kind); }});
+        var pnl = buildAccessPanel(set.b.id, {presence: set.b.id === activeBoardId, people: true, onChange: bump});
         sec.appendChild(pnl.el); panels.push(pnl);
       });
       if(!anyInv){ var ne = makeDiv("invEmpty"); ne.innerHTML = '<strong>No collaboration invites</strong><span>Open a board, then Share \u2192 Collaborate to make one.</span>'; content.appendChild(ne); }
@@ -10872,8 +10902,9 @@
       $("asSharesN").textContent = t; if($("asSharesN2")) $("asSharesN2").textContent = t;
       [].forEach.call(card.querySelectorAll(".asSharesSub"), function(x){ x.textContent = sub || x.getAttribute("data-default"); });
     }
+    function loadInviteCount(){ Stick.repo.myActiveInviteCount().then(function(n){ if(n != null && card.isConnected){ activeInvites = n; paintShareCount(); } }, function(){}); }
     function loadUsage(){
-      statSkeleton();
+      statSkeleton(); loadInviteCount();          // collaboration invitations are counted on their own: a slow or failed usage call can never make them look absent
       Stick.account.usage().then(function(u){
         if(!card.isConnected) return;
         var pl = u.plan === "premium" ? "premium" : "free"; $("asPlanName").textContent = pl.charAt(0).toUpperCase() + pl.slice(1);
@@ -10886,7 +10917,6 @@
         if(u.member_since) cells.push('<div class="asStat"><small>Member since</small>' + escapeHtml(monthYear(u.member_since)) + '</div>');
         $("asStats").innerHTML = cells.join("");
         activeShares = u.active_shares; paintShareCount();
-        Stick.repo.myActiveInviteCount().then(function(n){ if(n != null){ activeInvites = n; paintShareCount(); } }, function(){});
       }, function(){
         if(!card.isConnected) return;
         $("asStats").innerHTML = '<div class="asStat wide" style="font-weight:400;color:var(--ink-soft);">Couldn\u2019t load your numbers. <button type="button" class="asLink" id="asRetry">Try again</button></div>';
@@ -12309,8 +12339,27 @@
   }
 
   // ---------- board switcher ----------
+  // who is connected in each board, shown quietly under its name ("2 here"). Other boards are watched read-only while the list is open; the open board uses live presence.
+  var rowPres = {}, boardPres = {}, stopBoardWatch = null, offBoardPres = null;
+  function paintBoardPres(id){
+    var el = rowPres[id]; if(!el) return;
+    var list = id === activeBoardId ? ((window.Stick && Stick.collab && Stick.collab.active() ? Stick.collab.people() : []) || []) : (boardPres[id] || []);
+    el.innerHTML = ""; el.hidden = !list.length; if(!list.length) return;
+    list.slice(0, 3).forEach(function(p){ var a = document.createElement("span"); a.className = "presAv sm" + (p.guest ? " guest" : ""); a.textContent = p.initial || "?"; a.style.setProperty("--h", p.hue); a.title = p.name; el.appendChild(a); });
+    var t = document.createElement("span"); t.className = "bRowPresN"; t.textContent = list.length + " here"; el.appendChild(t);
+    el.setAttribute("aria-label", list.length + (list.length === 1 ? " person is" : " people are") + " in this board right now");
+  }
+  function startBoardWatch(){
+    if(stopBoardWatch || !CLOUD || !(window.Stick && Stick.collab && Stick.collab.watch)) return;
+    var ids = boards.filter(function(b){ return b.id !== activeBoardId && b.cloud !== false; }).slice(0, 8).map(function(b){ return b.id; });
+    if(ids.length) stopBoardWatch = Stick.collab.watch(ids, function(id, list){ boardPres[id] = list; paintBoardPres(id); });
+    if(Stick.collab.onChange) offBoardPres = Stick.collab.onChange(function(){ paintBoardPres(activeBoardId); });
+  }
+  function endBoardWatch(){ if(stopBoardWatch){ stopBoardWatch(); stopBoardWatch = null; } if(offBoardPres){ offBoardPres(); offBoardPres = null; } boardPres = {}; }
+  new MutationObserver(function(){ if(boardPanel.hidden) endBoardWatch(); else startBoardWatch(); }).observe(boardPanel, {attributes: true, attributeFilter: ["hidden"]});
   function renderBoardList(){
     hideTruncTip();
+    rowPres = {};
     boardList.innerHTML = "";
     if(activeBoardId) saveThumbNow();
     boards.forEach(function(b){
@@ -12339,6 +12388,7 @@
         meta.textContent = rec.count + (rec.count === 1 ? " note" : " notes") + (rec.count ? " \u00b7 " + timeAgo(rec.ts) : "");
       }
       fill(thumbFor(b, fill));
+      var presEl = makeDiv("bRowPres"); presEl.hidden = true; info.appendChild(presEl); rowPres[b.id] = presEl; paintBoardPres(b.id);
       row.appendChild(thumb);
       row.appendChild(info);
       row.addEventListener("pointerenter", function(){ prefetchBoard(b.id); });          // by the time it is clicked the board is usually already on this device
@@ -13538,18 +13588,63 @@
   }
 
   // ---- collaboration (presence, comments, review): only for a cloud board, never for guests
+  // "What should we call you?": optional, quick, never an account. Skip keeps the generated name.
+  function openGuestNameDialog(){
+    var gi = guestId(), wrap = makeDiv("joinDlg");
+    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">This is how other people on the board see you. It is not an account, and only this browser remembers it.</p>' +
+      '<label class="asLbl" for="gnName">Your name</label><input id="gnName" class="asIn" type="text" maxlength="40" autocomplete="off" spellcheck="false">' +
+      '<div class="asHint">Your generated name stays as your guest ID' + (gi.alias ? ": " + gi.alias : "") + '.</div>';
+    var inp = wrap.querySelector("#gnName"); inp.value = gi.name || gi.alias || ""; inp.placeholder = gi.alias || "Your name";
+    var m = openModal({title: "What should we call you?", content: wrap, width: 380, actions: [
+      {label: "Keep " + (gi.alias || "generated name"), value: false, onClick: function(close){ guestSave({asked: true}); return true; }},
+      {label: "Continue", kind: "primary", onClick: function(close){ applyGuestName(inp.value); close(true); return false; }}]});
+    inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); applyGuestName(inp.value); m.close(true); } });
+    setTimeout(function(){ inp.focus(); inp.select(); }, 30);
+  }
+  function applyGuestName(raw){
+    var nm = String(raw || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40), gi = guestId(), custom = nm && nm !== gi.alias ? nm : "";
+    guestSave({name: custom, asked: true});
+    var shown = custom || gi.alias || getAnonName();
+    if(settings.account) settings.account.name = shown;
+    try{ Stick.collab.setMe({name: shown}); }catch(e){}                                  // everyone connected sees it now, no reload
+    if(CLOUD) Stick.repo.setGuestName(custom).catch(function(){});                       // and the owner's lists show it too
+    toast(custom ? "You’re now “" + custom + "”." : "Back to " + (gi.alias || "your generated name") + ".");
+  }
+  function openPresencePopover(anchor){
+    if(!(window.Stick && Stick.collab && Stick.collab.online)) return;
+    closeFloatingPopovers();
+    var r = anchor.getBoundingClientRect(), pop = openFloatingPopoverAt(r, "presPop", anchor);
+    pop.style.bottom = "auto"; pop.style.top = (r.bottom + 6) + "px"; pop.style.maxHeight = Math.max(160, window.innerHeight - r.bottom - 16) + "px";
+    var h = makeDiv("menuHint"); h.textContent = "On this board now"; pop.appendChild(h);
+    Stick.collab.online().forEach(function(p){
+      var row = makeDiv("accRow"), lab = Stick.collab.core.label(p);
+      row.appendChild(idChip({name: lab.name + (p.self ? " (you)" : ""), uid: p.uid, guest: p.guest, title: lab.name + (lab.sub ? " \u00b7 " + lab.sub : "")}));
+      var role = p.role === "owner" ? "Owner" : p.role === "viewer" ? "Viewer" : p.role === "editor" ? "Editor" : "";
+      if(role){ var rl = document.createElement("span"); rl.className = "accRole"; rl.textContent = role; row.appendChild(rl); }
+      if(lab.sub){ var sb = document.createElement("div"); sb.className = "accSub"; sb.style.flexBasis = "100%"; sb.textContent = lab.sub; row.appendChild(sb); }
+      if(p.self && p.guest){ var cn = document.createElement("button"); cn.type = "button"; cn.className = "pillBtn"; cn.textContent = "Change my name"; cn.addEventListener("click", function(){ closeFloatingPopovers(); openGuestNameDialog(); }); row.appendChild(cn); }
+      pop.appendChild(row);
+    });
+  }
   function startCollab(){
     if(!(window.Stick && Stick.collab) || !CLOUD || !activeBoardId || singleNoteMode) return;
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {}, role = meta.access || "owner";
     var user = Stick.auth.user() || {}, dev = window.Stick && Stick.dev && localStorage.getItem("stickit.dev.presence") === "bc";
-    // a guest who joined without an account is shown under the friendly name the server gave them ("Leaflet #184"), never as an account name
-    if(Stick.auth.isAnonymous && Stick.auth.isAnonymous() && !startCollab._alias){
-      var bid = activeBoardId;
-      Stick.repo.myGuestAlias(bid).then(function(a){ if(a && bid === activeBoardId){ startCollab._alias = a; if(settings.account) settings.account.name = a; startCollab(); } }, function(){});
+    // Who I am in presence: an account by its profile name; a guest by the name they chose, else the generated one ("Leaflet #253"), with the generated name kept as the stable identifier.
+    var isGuest = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous()), gi = isGuest ? guestId() : null;
+    if(isGuest && !gi.alias && !startCollab._asked){
+      startCollab._asked = true; var bid = activeBoardId;
+      Stick.repo.myGuestAlias(bid).then(function(al){ if(al && bid === activeBoardId){ guestSave({alias: al}); if(settings.account && !guestLabel().length) settings.account.name = al; startCollab(); } }, function(){});
+    }
+    var myName = isGuest ? (gi.name || gi.alias || (settings.account && settings.account.name) || getDisplayName()) : ((settings.account && settings.account.name) || getDisplayName());
+    if(isGuest && settings.account) settings.account.name = myName;
+    if(isGuest && gi.alias && !gi.asked && !gi.name && !startCollab._prompted){
+      startCollab._prompted = true; guestSave({asked: true});
+      setTimeout(function(){ toast("You\u2019re \u201c" + gi.alias + "\u201d here. Want a different name?", "Set name", openGuestNameDialog); }, 1500);
     }
     Stick.collab.start({
       boardId: activeBoardId, role: role, canComment: role === "owner" || role === "editor", transport: dev ? "broadcast" : undefined,
-      me: {uid: user.id || "", name: startCollab._alias || (settings.account && settings.account.name) || getDisplayName()},
+      me: {uid: user.id || "", name: myName, alias: isGuest ? (gi.alias || "") : "", guest: isGuest, hue: isGuest ? gi.hue : undefined},
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
         openPopover: function(anchor){
@@ -13558,6 +13653,7 @@
           return pop;
         },
         modal: function(o){ return openModal(o); },
+        showPeople: function(anchor){ openPresencePopover(anchor); },
         // your own comments show your own picture; other people show their initial (their pictures are not shared with the board)
         paintAvatar: function(elm, uid){ var me = Stick.auth.user(); if(me && uid === me.id && settings.account){ paintAvatar(elm, accountAvatarSpec()); return true; } return false; }
       }
@@ -13573,7 +13669,8 @@
   Stick.perf.collab = function(){
     var smp = (cloudSync && cloudSync.latency) ? cloudSync.latency() : [];
     function med(k){ var v = smp.map(function(x){ return x[k]; }).filter(function(n){ return typeof n === "number" && !isNaN(n); }).sort(function(a, b){ return a - b; }); return v.length ? v[Math.floor(v.length / 2)] : null; }
-    return {samples: smp, median: {push: med("push"), wait: med("wait"), pull: med("pull"), draw: med("draw"), total: med("total")},
+    var sv = (cloudSync && cloudSync.saveStats) ? cloudSync.saveStats() : [], svs = sv.map(function(x){ return x.ms; }).sort(function(a, b){ return a - b; });
+    return {samples: smp, saves: sv, median: {save: svs.length ? svs[Math.floor(svs.length / 2)] : null, push: med("push"), wait: med("wait"), pull: med("pull"), draw: med("draw"), total: med("total")},
       note: "push = server commit -> event here (two clocks, allow skew); wait = our debounce; pull = request+response; draw = applying; total = commit -> drawn"};
   };
   try{ var swT = sessionStorage.getItem("stickit.perf.switch"); if(swT){ sessionStorage.removeItem("stickit.perf.switch"); perfMarks.push({name: "board switch: page reloaded (clicked " + Math.round(Date.now() - Number(swT)) + " ms ago)", ms: Math.round(performance.now())}); } }catch(e){}
@@ -13851,7 +13948,9 @@
       if(!o.presence) return;
       onList.innerHTML = "";
       var people = (window.Stick && Stick.collab && Stick.collab.online) ? Stick.collab.online() : [];
-      if(!people.length){ var n = makeDiv("accNone"); n.textContent = "Just you for now."; onList.appendChild(n); return; }
+      var st = (window.Stick && Stick.collab && Stick.collab.status) ? Stick.collab.status() : "off";
+      if(st === "unavailable"){ var un = makeDiv("accNone accWarn"); un.textContent = "Live presence isn\u2019t connecting, so this list may be empty even when people are here. If it stays like this, the Realtime policies need to be applied once (supabase/ops/realtime-policies.sql)."; onList.appendChild(un); }
+      if(!people.length){ var n = makeDiv("accNone"); n.textContent = st === "connecting" ? "Connecting\u2026" : "Just you for now."; onList.appendChild(n); return; }
       people.forEach(function(p){
         var a = roleOf(p.uid), row = makeDiv("accRow"), dot = document.createElement("span"); dot.className = "accDot"; dot.setAttribute("aria-hidden", "true"); row.appendChild(dot);
         row.appendChild(idChip({name: p.self ? (p.name + " (you)") : p.name, uid: p.uid, guest: !!(a && a.guest), title: p.name}));
@@ -13885,7 +13984,14 @@
     }
     paintOnline(); paintPeople(); refresh();
     if(o.presence && window.Stick && Stick.collab && Stick.collab.onChange){
-      offPresence = Stick.collab.onChange(function(){ if(!el.isConnected){ destroyed = true; if(offPresence) offPresence(); return; } paintOnline(); paintPeople(); });
+      var lastNames = "", nameT = null;
+      offPresence = Stick.collab.onChange(function(){
+        if(!el.isConnected){ destroyed = true; if(offPresence) offPresence(); return; }
+        paintOnline(); paintPeople();
+        var sig = Stick.collab.online().map(function(x){ return x.uid + ":" + x.name; }).join("|");
+        if(lastNames && sig !== lastNames){ clearTimeout(nameT); nameT = setTimeout(function(){ if(!destroyed) refresh(); }, 900); }       // a rename also updates the server-side lists (People with access, invite history)
+        lastNames = sig;
+      });
     }
     return {el: el, refresh: refresh, destroy: function(){ destroyed = true; if(offPresence) offPresence(); }};
   }
@@ -14022,7 +14128,14 @@
     clearPendingInvite();
     cloudOverlay("Joining the board…");
     try{
-      var boardId = await Stick.repo.acceptInvite(t);
+      var anonJoin = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous());
+      var boardId = await Stick.repo.acceptInvite(t, anonJoin ? guestAliasHint() : "");
+      if(boardId && anonJoin){
+        try{                                                       // same browser, new session: the generated name and the chosen name carry over (the board access itself never does)
+          guestId(); var al = await Stick.repo.myGuestAlias(boardId); if(al) guestSave({alias: al});
+          var gn = guestLabel() && safeGet(GUEST_KEY).name; if(gn) await Stick.repo.setGuestName(gn);
+        }catch(e){}
+      }
       if(boardId){
         await cloudSync.refreshBoards();             // saves the list of boards; without it the reload still looks like a first load and an anonymous guest is dropped again
         await cloudSync.fillBoardCache(boardId);

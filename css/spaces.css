@@ -826,3 +826,38 @@ body.dark .idAv{ color:#1c1829; }
 .accTabBtn:focus-visible{ outline:2px solid var(--focus, var(--accent)); outline-offset:-2px; }
 .accCount{ min-width:20px; text-align:center; padding:0 6px; border-radius:999px; font-size:0.72rem; font-weight:700; background:var(--accent-soft); color:var(--ink); }
 .accTab[hidden]{ display:none; }
+
+/* ===== v0.8.3.4 presence, editing leases, guest identity ===== */
+/* header: everyone connected, as small overlapping coloured circles (me with a ring, guests with a dashed one) */
+button.presAv{ cursor:pointer; padding:0; width:26px; height:26px; margin-left:-7px; background:hsl(var(--h, 200) 62% 80%); color:#2a2619; border:2px solid var(--panel); font:700 0.74rem 'Sora',sans-serif; box-shadow:0 1px 2px rgba(0,0,0,0.25), 0 0 0 1.5px hsl(var(--h, 200) 50% 45% / .7); }
+body.dark button.presAv{ color:#1c1829; }
+button.presAv:first-child{ margin-left:0; }
+button.presAv.self{ box-shadow:0 1px 2px rgba(0,0,0,0.25), 0 0 0 2.5px var(--accent); }
+button.presAv.guest{ box-shadow:0 1px 2px rgba(0,0,0,0.25), 0 0 0 1.5px var(--panel), 0 0 0 3px hsl(var(--h, 200) 50% 45% / .8); border-style:dashed; }
+button.presAv.editing{ animation:presEdit 1.6s ease-in-out infinite; }
+button.presAv:hover{ transform:translateY(-1px); z-index:2; }
+button.presAv:focus-visible{ outline:2px solid var(--focus, var(--accent)); outline-offset:2px; z-index:3; }
+button.presMore{ background:var(--accent-soft); color:var(--ink); }
+.presAv.sm{ width:18px; height:18px; margin-left:-4px; font-size:0.6rem; background:hsl(var(--h, 200) 62% 80%); color:#2a2619; }
+@keyframes presEdit{ 0%,100%{ transform:none; } 50%{ transform:translateY(-1.5px); } }
+html[data-a11y-motion="reduce"] button.presAv.editing{ animation:none; }
+@media (prefers-reduced-motion: reduce){ button.presAv.editing{ animation:none; } }
+@media (max-width:520px){ button.presAv{ width:24px; height:24px; } .presenceBar{ margin-left:4px; } }
+.presPop{ padding:10px 12px; max-width:min(300px, calc(100vw - 24px)); display:flex; flex-direction:column; gap:6px; }
+.presPop .accRow{ background:transparent; }
+
+/* board list: who is in a board right now, quiet */
+.bRowPres{ display:flex; align-items:center; gap:3px; margin-top:2px; font-size:0.7rem; color:var(--ink-soft); }
+.bRowPres[hidden]{ display:none; }
+.bRowPresN{ margin-inline-start:6px; font-weight:600; }
+
+/* a node someone else is editing right now: a glow in THEIR colour on the paper's edge, a coloured tab and a small label (never over the text) */
+.peerEditing{ outline:2px solid hsl(var(--ph, 200) 70% 50%); outline-offset:4px; box-shadow:0 0 0 6px hsl(var(--ph, 200) 80% 55% / .22), 0 0 18px hsl(var(--ph, 200) 80% 55% / .45); transition:box-shadow .2s ease, outline-color .2s ease; }
+.peerActive{ outline:1.5px solid hsl(var(--ph, 200) 60% 50% / .7); }
+.peerBadge{ background:hsl(var(--h, 200) 62% 80%); color:#2a2619; }
+.peerEditing .peerBadge{ box-shadow:0 0 0 2px hsl(var(--h, 200) 70% 50%); }
+.peerBadge.peerTag{ width:auto; height:auto; min-width:0; padding:2px 9px; border-radius:999px; top:auto; bottom:-14px; left:50%; font:600 0.68rem 'Sora',sans-serif; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.25), 0 0 0 1.5px hsl(var(--h, 200) 70% 50%); opacity:0; transition:opacity .15s ease; }
+.peerEditing:hover .peerBadge.peerTag, .peerEditing:focus-within .peerBadge.peerTag{ opacity:1; }
+.peerEditing .peerBadge.peerTag::after{ content:none; }
+.accWarn{ color:#8a5a00; background:color-mix(in srgb, #ffd85a 25%, transparent); padding:6px 9px; border-radius:8px; font-size:0.76rem; line-height:1.35; }
+.accBuild{ font-size:0.68rem; color:var(--ink-soft); margin:-4px 0 8px; letter-spacing:.03em; }
