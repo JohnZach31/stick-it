@@ -761,3 +761,68 @@ body.dark .truncTip{ background:#3a3226; color:#f4eedf; border-color:rgba(255,20
 .idlsSelOpt.active{ background:var(--accent-soft); }
 @media (pointer:coarse){ .idlsSelOpt{ padding:12px 14px; } .idlsSelBtn{ min-height:44px; } }
 @media (prefers-reduced-motion:no-preference){ .idlsSelList{ animation:idlsIn .12s ease-out; } @keyframes idlsIn{ from{ opacity:0; transform:translateY(-3px); } to{ opacity:1; transform:none; } } }
+
+/* ===== v0.8.3.4 collaboration management ===== */
+/* Stick-It scroll surface: a thin ink track and a paper-coloured thumb. Applied only where the class is set (the Collaborate and Sharing & access windows); native behaviour is untouched. */
+.idlsScroll{ scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--ink) 38%, var(--panel)) transparent; }
+.idlsScroll::-webkit-scrollbar{ width:11px; height:11px; }
+.idlsScroll::-webkit-scrollbar-track{ background:color-mix(in srgb, var(--line) 35%, transparent); border-radius:999px; margin:6px 0; }
+.idlsScroll::-webkit-scrollbar-thumb{ background:color-mix(in srgb, var(--ink) 38%, var(--panel)); border:3px solid transparent; background-clip:content-box; border-radius:999px; min-height:36px; }
+.idlsScroll::-webkit-scrollbar-thumb:hover{ background:color-mix(in srgb, var(--ink) 58%, var(--panel)); background-clip:content-box; }
+.idlsScroll::-webkit-scrollbar-thumb:active{ background:var(--accent); background-clip:content-box; }
+body.dark .idlsScroll{ scrollbar-color:color-mix(in srgb, var(--ink) 55%, var(--panel)) transparent; }
+body.dark .idlsScroll::-webkit-scrollbar-thumb{ background:color-mix(in srgb, var(--ink) 55%, var(--panel)); background-clip:content-box; }
+.collabDlg.idlsScroll, .accDlg.idlsScroll{ padding-inline-end:6px; }
+.accDlg{ max-height:min(72vh, 620px); overflow-y:auto; overflow-x:hidden; }
+
+/* section hierarchy */
+.accH{ margin:0; font-family:var(--hand, inherit); font-size:1.12rem; font-weight:700; letter-spacing:.01em; color:var(--ink); }
+.accH.first{ margin-bottom:6px; }
+.accH.board{ font-size:1.02rem; margin:14px 0 2px; padding-bottom:4px; border-bottom:1.5px solid var(--line); }
+.accRule{ border:0; height:0; margin:18px 0 6px; border-top:2px dashed color-mix(in srgb, var(--line) 85%, var(--ink) 15%); }
+.accSec{ margin-top:16px; }
+.accSecHead{ display:flex; flex-direction:column; gap:1px; margin-bottom:8px; }
+.accSub{ margin:0; font-size:0.76rem; color:var(--ink-soft); }
+.accNone{ font-size:0.8rem; color:var(--ink-soft); padding:4px 0; }
+.accList{ display:flex; flex-direction:column; gap:6px; }
+.accRow{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:6px 10px; border-radius:10px; background:color-mix(in srgb, var(--accent-soft) 28%, transparent); border:1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.accRole{ margin-inline-start:auto; font-size:0.74rem; font-weight:700; letter-spacing:.03em; color:var(--ink-soft); text-transform:uppercase; }
+.accSrc, .accEdit{ font-size:0.72rem; color:var(--ink-soft); }
+.accDot{ flex:none; width:9px; height:9px; border-radius:50%; background:#3a9a5b; box-shadow:0 0 0 3px color-mix(in srgb, #3a9a5b 22%, transparent); }
+.accDot.on{ background:#3a9a5b; }
+.accRow .accDot:not(.on){ }
+
+/* identity chips: avatar + name (+ a plain Guest tag) */
+.idChip{ display:inline-flex; align-items:center; gap:6px; min-width:0; max-width:100%; padding:2px 10px 2px 3px; border-radius:999px; background:var(--panel); border:1px solid color-mix(in srgb, var(--line) 80%, transparent); font-size:0.8rem; color:var(--ink); }
+.idAv{ flex:none; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:0.72rem; font-weight:700; color:#2a2619; background:hsl(var(--h, 40) 70% 82%); border:1px solid hsl(var(--h, 40) 45% 55% / 0.55); }
+body.dark .idAv{ color:#1c1829; }
+.idName{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; }
+.idTag{ flex:none; font-size:0.62rem; letter-spacing:.06em; text-transform:uppercase; padding:1px 6px; border-radius:999px; background:color-mix(in srgb, #ffd85a 40%, transparent); color:var(--ink); }
+.idSub{ flex:none; font-size:0.7rem; color:var(--ink-soft); font-style:italic; }
+.idChip.gone{ opacity:0.7; }
+.idChip.gone .idName{ text-decoration:line-through; text-decoration-thickness:1px; }
+
+/* invitation slips, re-spaced */
+.invList{ gap:14px; }
+.invCard{ gap:8px; padding:14px 16px 13px; }
+.invHead{ align-items:baseline; }
+.invRole{ font-size:1rem; }
+.invWho{ font-size:0.84rem; color:var(--ink); }
+.invMeta{ font-size:0.76rem; color:var(--ink-soft); line-height:1.5; }
+.invKept{ font-style:italic; }
+.invPeopleH{ margin-top:4px; font-size:0.66rem; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink-soft); }
+.invPeople{ gap:6px; }
+.invActs{ margin-top:6px; padding-top:10px; border-top:1px dashed color-mix(in srgb, var(--line) 80%, transparent); justify-content:space-between; }
+.invCard.off{ opacity:0.78; }
+.invCard.off .invRole, .invCard.off .invWho{ color:var(--ink-soft); }
+.invState.off{ letter-spacing:.07em; }
+
+/* Sharing & access: summary line + two tabs */
+.accSummary{ font-size:0.8rem; color:var(--ink-soft); margin:0 0 10px; }
+.accTabs{ display:flex; gap:4px; margin-bottom:12px; border-bottom:1.5px solid var(--line); }
+.accTabBtn{ display:inline-flex; align-items:center; gap:7px; padding:8px 14px; margin-bottom:-1.5px; border:0; border-bottom:3px solid transparent; background:transparent; color:var(--ink-soft); font:inherit; font-size:0.88rem; font-weight:600; cursor:pointer; border-radius:8px 8px 0 0; }
+.accTabBtn:hover{ color:var(--ink); background:color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.accTabBtn.on{ color:var(--ink); border-bottom-color:var(--accent); }
+.accTabBtn:focus-visible{ outline:2px solid var(--focus, var(--accent)); outline-offset:-2px; }
+.accCount{ min-width:20px; text-align:center; padding:0 6px; border-radius:999px; font-size:0.72rem; font-weight:700; background:var(--accent-soft); color:var(--ink); }
+.accTab[hidden]{ display:none; }

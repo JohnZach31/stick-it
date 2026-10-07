@@ -124,7 +124,7 @@ ok(/Stick\.perf = \{/.test(app) && /perfMark\("board switch: clicked"\)/.test(ap
   ok(/c\.from\("board_invites"\)\.select\("id,board_id,email,role,uses,created_at"\)/.test(rp) && /list_invites\|PGRST202/.test(rp), 'the invite list falls back to reading the table when the server has no v0.8.3.4 function yet (so existing links always show)');
   ok(/revoke_invite\|PGRST202/.test(rp), 'and Turn off falls back to deleting the row on an older server');
   const ms = app.slice(app.indexOf('async function openManageShares'), app.indexOf('function openDeleteAccount'));
-  ok(/Public links/.test(ms) && /Collaboration invites/.test(ms) && /Stick\.repo\.listInvites\(b\.id\)/.test(ms) && /renderInviteCards\(host, set\.rows/.test(ms), 'the Shared links window lists collaboration invitations as well as public share links');
+  ok(/Public links/.test(ms) && /Collaboration invites/.test(ms) && /Stick\.repo\.listInvites\(b\.id\)/.test(ms) && /buildAccessPanel\(set\.b\.id/.test(ms) && /Sharing & access/.test(ms), 'the Shared links window (now Sharing & access) lists collaboration invitations as well as public share links');
   ok(!/You have no active shared links/.test(app), 'it no longer claims "no active shared links" when a collaboration invite exists');
   ok(/Legacy collaboration invite/.test(app) && /Created before invite tracking/.test(app) && /stay on the board if you turn this link off/.test(app), 'old (pre-tracking) invitations appear, labelled as legacy, with an honest note');
   ok(/r\.tracked === false/.test(app) && /Stick\.repo\.revokeInvite\(r\.id\)/.test(app), 'a legacy invitation can still be turned off');
@@ -188,6 +188,63 @@ ok(/Stick\.perf = \{/.test(app) && /perfMark\("board switch: clicked"\)/.test(ap
   btn.click(); const p3 = document.querySelector('[role=listbox]'); p3.querySelectorAll('[role=option]').forEach((o) => { o.scrollIntoView = () => {}; });
   p3.querySelectorAll('[role=option]')[1].click(); ok(val() === 'b' && changes === 2, 'clicking an option chooses it');
   key(btn, 'ArrowDown'); ok(!!document.querySelector('[role=listbox]'), 'ArrowDown on the button opens the list'); key(document.querySelector('[role=listbox]'), 'Escape');
+}
+
+
+// ---------------------------------------------------------------- collaboration management pass
+{
+  const ms = app.slice(app.indexOf('async function openManageShares'), app.indexOf('function openDeleteAccount'));
+  ok(/tabInv = mkTab\("Collaboration invites", activeInv, invWrap\); tabPub = mkTab\("Public links", act\.length, pubWrap\)/.test(ms) && /role", "tablist"/.test(ms) && /role", "tab"/.test(ms), 'the manager has two tabs (collaboration invites, public links) with counts, kept apart');
+  ok(/activeInv \+ act\.length/.test(ms) && /collaboration " \+ \(activeInv === 1/.test(ms), 'its summary counts both kinds of link');
+  ok(/pickTab\(activeInv \|\| !act\.length \? tabInv : tabPub\)/.test(ms), 'it opens on collaboration invites when there are any (so they can never look absent)');
+  ok(/presence: set\.b\.id === activeBoardId, people: true/.test(ms), 'live presence is shown only for the board you are on; people-with-access for each board');
+  ok(/activeShares \|\| 0\) \+ \(activeInvites \|\| 0/.test(app) && /Stick\.repo\.myActiveInviteCount\(\)/.test(app) && /Public share links " \+ \(activeShares \|\| 0\)/.test(app), 'Settings counts public links AND collaboration invites, with the breakdown');
+  ok(/kind === "invite"/.test(app), 'turning off an invitation updates the Settings count');
+  ok(!/See and turn off every link you/.test(app), 'the Settings row no longer promises only "shared links"');
+  const pan = app.slice(app.indexOf('function buildAccessPanel'), app.indexOf('// one row per address: its own link'));
+  ok(/accSecHead\("On this board now"/.test(pan) && /accSecHead\("People with access"/.test(pan) && /accSecHead\("Links you made"\)/.test(pan), 'three separate sections: On this board now (presence), People with access (authorization), Links you made');
+  ok(/Connected right now\. This is who is here, not who is allowed in\./.test(pan), 'presence is explained as presence, not permission');
+  ok(/Stick\.collab\.online/.test(pan) && /Stick\.collab\.onChange/.test(pan) && /el\.isConnected/.test(pan), 'the live list follows the board presence channel and stops following when the window closes');
+  ok(/Stick\.repo\.listBoardAccess\(boardId\)/.test(pan) && /roleOf\(p\.uid\)/.test(pan), 'roles come from the server access list (matched by account id), never from what a client says about itself');
+  ok(/<h3 class="accH first">Invite people<\/h3>/.test(app) && /<hr class="accRule" role="separator">/.test(app), 'the Collaborate window has an Invite people heading and a divider before the lists');
+  ok(/t\.className = "accH"/.test(pan.slice(0, pan.indexOf('function roleLabel')) + app.slice(app.indexOf('function accSecHead'), app.indexOf('function roleLabel'))) && /\.accH\{[^}]*font-size:1\.12rem; font-weight:700/.test(css), '"Links you made" is a real heading, not a form label');
+  const ic = app.slice(app.indexOf('function idChip(p)'), app.indexOf('// each link as a slip'));
+  ok(/idTag/.test(ic) && /"Guest"/.test(ic) && !/email/i.test(ic), 'chips mark guests plainly and never show an e-mail');
+  const rc = app.slice(app.indexOf('function renderInviteCards'), app.indexOf('// ---- the three things an owner wants to know'));
+  ok(/"Turned off"/.test(rc) && /join history kept/.test(rc), 'a turned-off card reads Turned off and keeps its history');
+  ok(/if\(on\)\{\s*if\(toks\[r\.id\]\)/.test(rc) && /Delete from history/.test(rc) && rc.indexOf('Copy link') < rc.indexOf('var del = document'), 'Copy and Turn off exist only for active links; turned-off links offer Delete from history');
+  ok(/Delete this invite from your history\?/.test(rc) && /access to the board changes/.test(rc), 'deleting history asks first and says it changes nobody\'s access');
+  ok(/sub = x\.active \? "" : "access removed"/.test(rc) && /gone: !x\.active/.test(rc), 'a removed guest stays in the link history, marked "access removed"');
+  const al = app.slice(app.indexOf('function onAccessLost()'), app.indexOf('window.addEventListener("stick:access-changed"'));
+  ok(/Continue as guest/.test(al) && /Sign in or create account/.test(al) && /Go to my boards/.test(al), 'the exit screen offers choices: boards / continue as guest / sign in');
+  ok(/onClose: function\(v\)\{ leave\(v\); \}/.test(al) && /if\(next !== "signin" && next !== "boards"\) next = null;/.test(al), 'closing the dialog never signs anyone in: only an explicit "Sign in" choice asks for it');
+  ok(/stickit\.afterLeave/.test(al) && /al === "signin"\) openAccountModal\(\)/.test(app), 'sign-in opens only after the person chose it');
+  ok((app.match(/idlsScroll/g) || []).length === 2 && /wrap\.classList\.add\("idlsScroll"\)/.test(app) && /content\.classList\.add\("idlsScroll", "accDlg"\)/.test(app), 'the Stick-It scrollbar class is applied to exactly two surfaces: the Collaborate and Sharing & access windows');
+  ok(/^\.idlsScroll\{/m.test(css) && read('css/spaces.css').slice(read('css/spaces.css').indexOf('collaboration management')).split('\n').filter((l) => /::-webkit-scrollbar/.test(l)).every((l) => /\.idlsScroll/.test(l)), 'and every scrollbar rule in it is scoped to that class (no global override)');
+  ok(/Stick\.perf\.collab = function/.test(app) && /median: \{push: med\("push"\)/.test(app), 'Stick.perf.collab() reports event, wait, pull, draw and total latency');
+  ok(/live \? \(cfg\.liveDebounceMs \|\| 150\)/.test(read('js/sync.js')) && /host\.hasPeers && host\.hasPeers\(\)/.test(read('js/sync.js')), 'saves are quicker (150 ms) only while someone else is on the board; alone, the 700 ms settle remains');
+  ok(/cfg\.pullDebounceMs == null \? 80 : cfg\.pullDebounceMs/.test(read('js/sync.js')), 'the realtime pull debounce is 80 ms and still coalesces a burst');
+}
+// latency samples, run for real
+{
+  const channels = [];
+  const client = { channel(name) { const ch = { name, handlers: [], on(kind, filter, fn) { ch.handlers.push({ kind, filter, fn }); return ch; }, subscribe(cb) { ch.cb = cb; return ch; } }; channels.push(ch); return ch; }, removeChannel() {} };
+  const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, navigator: { onLine: true }, Promise, Date, JSON, Object, Array, Math });
+  ctx.window = ctx; ctx.Stick = { config: {}, cloud: { load: () => Promise.resolve(client) }, repo: {}, assets: {}, errors: { parse: (e) => ({ message: String(e) }) } };
+  vm.runInContext(read('js/sync.js'), ctx, { filename: 'sync.js' });
+  let first = true; const applied = []; const store = new Map();
+  const repo = { toRow: (x) => x, fromRow: (x) => x, hashRow: (x) => JSON.stringify(x), fetchObjects: async () => [], syncObjects: async () => ({ results: [] }),
+    fetchChanges: async () => { if (first) { first = false; return []; } await sleep(30); return [{ id: 'n1', version: 2, updated_at: new Date().toISOString(), type: 'note', x: 1, y: 1, width: 1, height: 1, rotation: 0, z_index: 1, data: { html: 'SECRET TEXT' } }]; } };
+  const s = ctx.Stick.createSync({ host: { snapshot: () => [], getObject: () => null, applyRemote: (o) => applied.push(o), hasPeers: () => true },
+    storage: { getItem: (k) => store.get(k) || null, setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) }, keys: { sync: (i) => 's' + i, meta: () => 'm', notes: (i) => 'n' + i, boards: () => 'b', cover: (i) => 'c' + i }, config: { pollMs: 1e9 }, repo, assets: {} });
+  s.attach('b1'); await s.start(); await sleep(30); first = false;
+  channels[0].handlers[0].fn({ new: { id: 'n1', version: 2 }, commit_timestamp: new Date(Date.now() - 40).toISOString() });
+  await sleep(300);
+  const lat = s.latency();
+  ok(lat.length === 1 && lat[0].rows === 1 && ['wait', 'pull', 'draw', 'push', 'total'].every((k) => typeof lat[0][k] === 'number' && lat[0][k] >= 0), 'a remote change produces one latency sample: wait, pull, draw, push and total, all numbers');
+  ok(lat[0].wait >= 60 && lat[0].wait < 250 && lat[0].pull >= 25 && lat[0].total >= lat[0].pull, 'the numbers are sensible (80 ms debounce, ~30 ms fetch)');
+  ok(JSON.stringify(lat).indexOf('SECRET') === -1 && Object.keys(lat[0]).every((k) => ['rows', 'wait', 'pull', 'draw', 'push', 'total'].includes(k)), 'samples contain timings only: no note content, ids or tokens');
+  s.stop();
 }
 
 // ---------------------------------------------------------------- legal (line endings)

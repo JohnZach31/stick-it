@@ -84,4 +84,24 @@ ok((await run(g4, 'select id from public.boards where id=$1', [board.id])).rows.
 ok((await run(guest, 'select id from public.boards where id=$1', [board.id])).rows.length === 1 && (await run(twoLinks, 'select id from public.boards where id=$1', [board.id])).rows.length === 1, 'and no existing collaborator was affected by turning off a different link');
 ok((await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c === 6 + 1 /* newGuest */ + 1 /* g4 */, 'final head count: exactly the existing 6, plus the new guest and g4; only g3 left');
 
+
+// ---- the second migration (collaboration management) is just as harmless to existing access
+{
+  const NEW2 = '20261009110000_collab_management.sql';
+  const sql2 = fs.readFileSync(path.join(migDir, NEW2), 'utf8').replace(/\r\n/g, '\n');
+  ok(!/\bdelete\s+from\s+public\.board_members\b/i.test(sql2.replace(/create or replace function public\.remove_invite_members[\s\S]*?end \$\$;/i, '')) && !/\bupdate\s+public\.board_members\b/i.test(sql2), 'the second migration has no direct change to memberships either');
+  const pre = await snap();
+  await db.exec(sql2);
+  const post = await snap();
+  ok(JSON.stringify(pre.members) === JSON.stringify(post.members) && JSON.stringify(pre.invites) === JSON.stringify(post.invites), 'AFTER the second migration: memberships and invitations are identical');
+  const li2 = (await run(owner, 'select public.list_invites($1) as r', [board.id])).rows[0].r;
+  ok(li2.length >= 4 && li2.every((i) => i.people.every((p) => typeof p.name === 'string' && !/@/.test(p.name))), 'the owner list still shows every link, with names only');
+  ok((await run('su', "select count(*)::int c from public.board_invite_uses where alias is not null")).rows[0].c >= 0, 'legacy guests get names without any access change');
+  ok(!!(await run(guest, 'select id from public.boards where id=$1', [board.id])).rows.length && await wrote(guest2) && await wrote(editor), 'existing guests and editors still read and write');
+  // deleting the history of a turned-off LEGACY link changes nobody's access
+  const headBefore = (await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c;
+  ok((await run(owner, 'select public.delete_invite_history($1) as r', [viewLink.id])).rows[0]?.r === true, 'the owner deletes the turned-off viewer link from history');
+  ok((await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c === headBefore && (await run(viewer, 'select id from public.boards where id=$1', [board.id])).rows.length === 1, 'and nobody, including the legacy viewer, lost access');
+}
+
 console.log('migration preserves existing access: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

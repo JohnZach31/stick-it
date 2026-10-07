@@ -181,6 +181,20 @@
         });
       });
     },
+    // who has access to a board right now (owner only). null when the server does not have the function yet.
+    listBoardAccess: function (boardId) {
+      return db().then(function (c) {
+        return c.rpc("list_board_access", { p_board: boardId }).then(function (r) { return r.error ? null : (r.data || []); });
+      });
+    },
+    // remove a TURNED-OFF link from the owner's history (never touches anyone's access)
+    deleteInviteHistory: function (id) {
+      return db().then(function (c) { return guard(c.rpc("delete_invite_history", { p_invite: id })); });
+    },
+    // how many collaboration invitations are on across the boards I own; null when unknown
+    myActiveInviteCount: function () {
+      return db().then(function (c) { return c.rpc("my_active_invite_count").then(function (r) { return r.error ? null : Number(r.data) || 0; }); });
+    },
     myGuestAlias: function (boardId) {
       return db().then(function (c) { return guard(c.rpc("my_guest_alias", { p_board: boardId })); });
     },

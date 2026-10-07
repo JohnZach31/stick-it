@@ -68,7 +68,12 @@
                 "Each shows what it allows, when it was made, how many times it was used and who joined, with Copy and Turn off",
                 "Links made before this update appear too, marked as made before tracking",
                 "Guests who join without an account get a friendly name such as \"Leaflet #184\"",
-                "\"Join with invite link\" in the board list takes a pasted link"
+                "\"Join with invite link\" in the board list takes a pasted link",
+                "Turned-off links stay in your history (with who joined) until you delete them",
+                "\"On this board now\" shows who is connected; \"People with access\" shows who may open the board",
+                "Settings counts collaboration invites as well as public links",
+                "Edits made while someone else is on the board are saved sooner",
+                "After access is turned off you choose what happens next; nothing signs you in on its own"
               ]
             }
           ]

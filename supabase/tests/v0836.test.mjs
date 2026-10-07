@@ -54,7 +54,7 @@ function fn(name) { const i = app.search(new RegExp('(async )?function ' + name 
 // ---- shared links
 {
   const ms = fn('openManageShares');
-  ok(/title: "Shared links"/.test(ms) && /Whole board/.test(ms) && /Selection of notes/.test(ms) && /Single note/.test(ms), 'the window is Shared links, and each kind has a plain name');
+  ok(/title: "Sharing & access"/.test(ms) && /Whole board/.test(ms) && /Selection of notes/.test(ms) && /Single note/.test(ms), 'the window is Sharing & access (public links keep a plain name for each kind)');
   ok(/lkCard/.test(ms) && /lkHead/.test(ms) && /lkMeta/.test(ms) && /chip\("Created /.test(ms) && /"Shown as "/.test(ms) && /"Read only"/.test(ms) && /"Frozen copy"/.test(ms), 'each link is a card: what it is, which board, when, as whom, and its permission');
   ok(/Turn off/.test(ms) && /Stick\.share\.disable\(x\.id\)/.test(ms), 'Turn off still revokes the link');
   ok(/\.lkList\{[^}]*max-height:min\(56vh, 460px\); overflow:auto/.test(sp), 'many links scroll inside the window');

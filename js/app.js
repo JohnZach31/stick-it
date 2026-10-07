@@ -9876,6 +9876,7 @@
     var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
     if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev" + buildTag() + " · localhost"; }
     try{ var bt = sessionStorage.getItem("stickit.bootToast"); if(bt){ sessionStorage.removeItem("stickit.bootToast"); setTimeout(function(){ toast(bt); }, 800); } }catch(e){}
+    try{ var al = sessionStorage.getItem("stickit.afterLeave"); if(al){ sessionStorage.removeItem("stickit.afterLeave"); setTimeout(function(){ try{ if(al === "signin") openAccountModal(); else if(al === "boards") document.getElementById("brandBtn").click(); }catch(e){} }, 1400); } }catch(e){}
     try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
@@ -10328,7 +10329,8 @@
   async function openManageShares(onChange){
     var content = document.createElement("div");
     content.className = "acctSub"; content.style.textAlign = "left";
-    var modal = openModal({title: "Shared links", content: content, width: 520, actions: [{label: "Done", kind: "primary", value: true}]});
+    content.classList.add("idlsScroll", "accDlg");
+    var modal = openModal({title: "Sharing & access", content: content, width: 560, actions: [{label: "Done", kind: "primary", value: true}]});
     var ld = localLoader(content, "Loading your links\u2026");
     try{
       var list = await Stick.share.list();
@@ -10340,8 +10342,19 @@
       var inviteSets = await Promise.all(ownedBoards.map(function(b){ return Stick.repo.listInvites(b.id).then(function(rows){ return {b: b, rows: rows, ok: true}; }, function(){ return {b: b, rows: [], ok: false}; }); }));
       await new Promise(function(r){ ld.stop(r); });
       content.innerHTML = "";
-      var pubH = document.createElement("div"); pubH.className = "menuHint lkSecHead"; pubH.textContent = "Public links"; content.appendChild(pubH);
-      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "No public share links. (Collaboration invites are listed below.)"; content.appendChild(none); }
+      // two kinds of link, kept apart (they live in different tables) but managed from one place
+      var activeInv = inviteSets.reduce(function(n, set){ return n + set.rows.filter(function(r){ return !r.revoked_at; }).length; }, 0);
+      var tabBar = makeDiv("accTabs"); tabBar.setAttribute("role", "tablist");
+      var invWrap = makeDiv("accTab"), pubWrap = makeDiv("accTab"), tabInv, tabPub;
+      function mkTab(label, n, wrapEl){ var b = document.createElement("button"); b.type = "button"; b.className = "accTabBtn"; b.setAttribute("role", "tab"); b.innerHTML = ""; b.appendChild(document.createTextNode(label)); var c = document.createElement("span"); c.className = "accCount"; c.textContent = n; b.appendChild(c); b._wrap = wrapEl; return b; }
+      tabInv = mkTab("Collaboration invites", activeInv, invWrap); tabPub = mkTab("Public links", act.length, pubWrap);
+      function pickTab(t){ [tabInv, tabPub].forEach(function(b){ var on2 = b === t; b.setAttribute("aria-selected", on2 ? "true" : "false"); b.classList.toggle("on", on2); b._wrap.hidden = !on2; }); }
+      [tabInv, tabPub].forEach(function(b){ b.addEventListener("click", function(){ pickTab(b); }); tabBar.appendChild(b); });
+      var sum = makeDiv("accSummary"); sum.textContent = (activeInv + act.length) + (activeInv + act.length === 1 ? " active link" : " active links") + " \u00b7 " + activeInv + " collaboration " + (activeInv === 1 ? "invite" : "invites") + " \u00b7 " + act.length + " public"; content.appendChild(sum);
+      content.appendChild(tabBar); content.appendChild(invWrap); content.appendChild(pubWrap);
+      var contentRoot = content; content = pubWrap;
+      var pubH = document.createElement("div"); pubH.className = "menuHint lkSecHead"; pubH.textContent = "Public links"; pubH.hidden = true; content.appendChild(pubH);
+      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "No public share links."; content.appendChild(none); }
       var note = document.createElement("p"); note.className = "lkNote"; note.hidden = !act.length;
       note.textContent = "Anyone with one of these links can view it. Turn a link off and it stops working straight away.";
       content.appendChild(note);
@@ -10369,20 +10382,21 @@
         });
         card.appendChild(ic); card.appendChild(body); card.appendChild(b); listEl.appendChild(card);
       });
-      var invH = document.createElement("div"); invH.className = "menuHint lkSecHead"; invH.textContent = "Collaboration invites"; content.appendChild(invH);
-      var invNote = document.createElement("p"); invNote.className = "lkNote"; invNote.textContent = "Links that let people work on a board with you. They stay on until you turn them off.";
-      content.appendChild(invNote);
-      var anyInv = false;
+      content = invWrap;
+      var invNote = document.createElement("p"); invNote.className = "lkNote"; invNote.textContent = "Links that let people work on a board with you. They stay on until you turn them off. Turned-off links keep their history until you delete it."; content.appendChild(invNote);
+      var anyInv = false, panels = [];
       inviteSets.forEach(function(set){
         if(!set.rows.length && set.ok) return;
         anyInv = true;
-        var sec = makeDiv("invSection"), t = document.createElement("div"); t.className = "invBoard"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
-        var host = makeDiv("invList"); sec.appendChild(host); content.appendChild(sec);
-        if(!set.ok){ host.textContent = "Couldn\u2019t load this board\u2019s invitations."; return; }
-        var reloadSet = function(){ Stick.repo.listInvites(set.b.id).then(function(rows){ renderInviteCards(host, rows || [], reloadSet, {noBoard: true}); }, function(){}); };
-        renderInviteCards(host, set.rows, reloadSet, {noBoard: true});
+        var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH board"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
+        content.appendChild(sec);
+        if(!set.ok){ var bad = makeDiv("accNone"); bad.textContent = "Couldn\u2019t load this board\u2019s invitations."; sec.appendChild(bad); return; }
+        var pnl = buildAccessPanel(set.b.id, {presence: set.b.id === activeBoardId, people: true, onChange: function(d, kind){ if(onChange) onChange(d, kind); }});
+        sec.appendChild(pnl.el); panels.push(pnl);
       });
       if(!anyInv){ var ne = makeDiv("invEmpty"); ne.innerHTML = '<strong>No collaboration invites</strong><span>Open a board, then Share \u2192 Collaborate to make one.</span>'; content.appendChild(ne); }
+      content = contentRoot;
+      pickTab(activeInv || !act.length ? tabInv : tabPub);
     }catch(e){ if(!modal.card.isConnected){ ld.stop(); return; } ld.fail("Couldn\u2019t load your links. " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ modal.close(false); setTimeout(function(){ openManageShares(onChange); }, 0); }); }
   }
 
@@ -10553,7 +10567,7 @@
 // ---------- the links you have made, and what a link is
         '<section class="asCard" aria-labelledby="asH2b">' +
           '<h4 id="asH2b">Your links</h4>' +
-          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage shared links<small>See and turn off every link you’ve made.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
+          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage shared links<small class="asSharesSub" data-default="Public share links and collaboration invites.">Public share links and collaboration invites.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
           '<p class="asHint" style="margin-top:6px;">A link to a note or a selection is a <b>frozen copy</b>: changing the original later does not change what people see. A link to a whole board is live and read only unless you choose otherwise. Anyone with a link can view it, no account needed, and you can turn any link off at any time. Printing and saving as a PDF never creates a link.</p>' +
         '</section>');
     P.appearance.insertAdjacentHTML("beforeend",
@@ -10582,7 +10596,7 @@
           '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by email<small>Occasional Stick-It news and feature updates. You can unsubscribe anytime.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
-          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage shared links<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
+          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage shared links<small class="asSharesSub" data-default="Public share links and collaboration invites.">Public share links and collaboration invites.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
           '<button type="button" class="asAction" id="asCorrect"><span class="lbl">Correct my profile details<small>Change your name, username or bio at the top of this page, then Save.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
@@ -10851,8 +10865,13 @@
       $("asStats").innerHTML = '<div class="asStat"><small>Boards</small><span class="asSkel"></span></div><div class="asStat"><small>Items</small><span class="asSkel"></span></div>' +
         '<div class="asStat"><small>Storage</small><span class="asSkel"></span></div><div class="asStat"><small>Member since</small><span class="asSkel"></span></div>';
     }
-    var activeShares = null;
-    function paintShareCount(){ var t = activeShares == null ? "" : activeShares + (activeShares === 1 ? " link" : " links"); $("asSharesN").textContent = t; if($("asSharesN2")) $("asSharesN2").textContent = t; }
+    var activeShares = null, activeInvites = null;
+    function paintShareCount(){
+      var total = (activeShares || 0) + (activeInvites || 0), known = activeShares != null || activeInvites != null;
+      var t = !known ? "" : total + " active", sub = !known ? "" : "Public share links " + (activeShares || 0) + " \u00b7 Collaboration invites " + (activeInvites || 0);
+      $("asSharesN").textContent = t; if($("asSharesN2")) $("asSharesN2").textContent = t;
+      [].forEach.call(card.querySelectorAll(".asSharesSub"), function(x){ x.textContent = sub || x.getAttribute("data-default"); });
+    }
     function loadUsage(){
       statSkeleton();
       Stick.account.usage().then(function(u){
@@ -10867,6 +10886,7 @@
         if(u.member_since) cells.push('<div class="asStat"><small>Member since</small>' + escapeHtml(monthYear(u.member_since)) + '</div>');
         $("asStats").innerHTML = cells.join("");
         activeShares = u.active_shares; paintShareCount();
+        Stick.repo.myActiveInviteCount().then(function(n){ if(n != null){ activeInvites = n; paintShareCount(); } }, function(){});
       }, function(){
         if(!card.isConnected) return;
         $("asStats").innerHTML = '<div class="asStat wide" style="font-weight:400;color:var(--ink-soft);">Couldn\u2019t load your numbers. <button type="button" class="asLink" id="asRetry">Try again</button></div>';
@@ -10929,7 +10949,7 @@
 
     // ---------- immediate actions (never staged)
     $("asExport").addEventListener("click", function(){ exportAllCloud($("asExport").querySelector(".lbl")); });
-    function manageShares(){ openManageShares(function(d){ if(activeShares != null){ activeShares += d; paintShareCount(); } }); }
+    function manageShares(){ openManageShares(function(d, kind){ if(kind === "invite"){ if(activeInvites != null){ activeInvites += d; paintShareCount(); } } else if(activeShares != null){ activeShares += d; paintShareCount(); } }); }
     $("asShares").addEventListener("click", manageShares); $("asShares2").addEventListener("click", manageShares);
     try{
       var localBoards = Stick.migrate.inspectLocal(localStorage);
@@ -13255,6 +13275,7 @@
     mediaBlob: function(mediaId){ return MediaStore.blob(mediaId).catch(function(){ return null; }); },
     toast: function(m){ toast(m); },
     onAuthLost: function(){ authLost = true; updateSyncPill("problem", "Please sign in again."); },
+    hasPeers: function(){ return !!(window.Stick && Stick.collab && Stick.collab.active && Stick.collab.active() && Stick.collab.people().length); },     // someone else is on the board: save sooner
     onAccessCheck: function(){ checkBoardAccess(); }                 // the server refused something: find out whether the owner turned our access off
   };
   function setupCloudSync(){
@@ -13548,6 +13569,13 @@
   var perfMarks = [];
   function perfMark(name){ try{ perfMarks.push({name: name, ms: Math.round(performance.now())}); if(/[?&]perf\b/.test(location.search) || (Stick.dev && localStorage.getItem("stickit.dev.perf"))) console.log("[perf]", name, Math.round(performance.now()) + " ms"); }catch(e){} }
   Stick.perf = {marks: function(){ return perfMarks.slice(); }, mark: perfMark, report: function(){ var prev = 0; return perfMarks.map(function(m){ var r = {step: m.name, at: m.ms, took: m.ms - prev}; prev = m.ms; return r; }); }};
+  // Stick.perf.collab(): where the time goes for edits made by someone else (numbers only, no content). Medians over the last changes seen on this page.
+  Stick.perf.collab = function(){
+    var smp = (cloudSync && cloudSync.latency) ? cloudSync.latency() : [];
+    function med(k){ var v = smp.map(function(x){ return x[k]; }).filter(function(n){ return typeof n === "number" && !isNaN(n); }).sort(function(a, b){ return a - b; }); return v.length ? v[Math.floor(v.length / 2)] : null; }
+    return {samples: smp, median: {push: med("push"), wait: med("wait"), pull: med("pull"), draw: med("draw"), total: med("total")},
+      note: "push = server commit -> event here (two clocks, allow skew); wait = our debounce; pull = request+response; draw = applying; total = commit -> drawn"};
+  };
   try{ var swT = sessionStorage.getItem("stickit.perf.switch"); if(swT){ sessionStorage.removeItem("stickit.perf.switch"); perfMarks.push({name: "board switch: page reloaded (clicked " + Math.round(Date.now() - Number(swT)) + " ms ago)", ms: Math.round(performance.now())}); } }catch(e){}
   async function startCloud(){
     perfMark("cloud start");
@@ -13663,19 +13691,19 @@
     if(!canShowCollab()){ updateCollabButton(); return; }
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {};
     var wrap = makeDiv("collabDlg");
-    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. A link never expires and can be used again and again. Anyone who holds it can join, until you turn it off below.</p>' +
+    wrap.classList.add("idlsScroll");
+    wrap.innerHTML = '<h3 class="accH first">Invite people</h3>' +
+      '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. A link never expires and can be used again and again. Anyone who holds it can join, until you turn it off below.</p>' +
       '<label class="asLbl" for="cbRole">They can</label>' +
       '<select id="cbRole" class="asIn"><option value="editor">Add, move and edit notes</option><option value="viewer">Look, but not change anything</option></select>' +
       '<label class="asLbl" for="cbEmail">E-mails (optional)</label>' +
       '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails (optional)"></div>' +
       '<p class="asHint" id="cbHint">Press Enter or comma after each address. With e-mails, each person gets their own link that only their account can use.</p>' +
       '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>' +
-      '<div class="menuHint" style="margin-top:12px;">Links you made</div><div id="cbList" class="invList"></div>';
-    var listEl = wrap.querySelector("#cbList");
-    function loadInvites(){
-      Stick.repo.listInvites(activeBoardId).then(function(rows){ renderInviteCards(listEl, rows || [], loadInvites); }, function(){ listEl.textContent = ""; });
-    }
-    loadInvites();
+      '<hr class="accRule" role="separator">';
+    var panel = buildAccessPanel(activeBoardId, {presence: true, people: true});
+    wrap.appendChild(panel.el);
+    var loadInvites = panel.refresh;
     openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
       {label: "Close", value: false},
       {label: "Create invite link", kind: "primary", id: "cbCreate", onClick: function(close, btn){
@@ -13724,7 +13752,21 @@
   function rememberInviteToken(id, t){ if(!id || !t) return; var o = inviteTokens(); o[id] = t; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
   function forgetInviteToken(id){ var o = inviteTokens(); delete o[id]; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
   function fmtDay(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}); }catch(e){ return ""; } }
-  // each link as a small slip: what it allows, whether it is on, who came in through it, and Copy / Turn off
+  // ---- identity chips: a small avatar (initial on the person's own colour) and the name. Guests carry a plain "Guest" tag; nobody's e-mail is ever shown.
+  function idChip(p){
+    var core = (window.Stick && Stick.collab && Stick.collab.core) || null;
+    var c = makeDiv("idChip" + (p.guest ? " guest" : "") + (p.gone ? " gone" : ""));
+    var av = document.createElement("span"); av.className = "idAv"; av.setAttribute("aria-hidden", "true");
+    av.textContent = core ? core.initial(p.name) : String(p.name || "?").charAt(0).toUpperCase(); av.style.setProperty("--h", core ? core.hue(p.uid || p.name) : 40);
+    var nm = document.createElement("span"); nm.className = "idName"; nm.textContent = p.name; c.appendChild(av); c.appendChild(nm);
+    if(p.guest){ var g = document.createElement("span"); g.className = "idTag"; g.textContent = "Guest"; c.appendChild(g); }
+    if(p.sub){ var sb = document.createElement("span"); sb.className = "idSub"; sb.textContent = p.sub; c.appendChild(sb); }
+    c.title = p.title || (p.name + (p.guest ? " \u00b7 joined without an account" : ""));
+    return c;
+  }
+  // each link as a slip, in this order: what it allows + state, who it is for, when / how often, who came in, then its actions.
+  //   on:         [Copy link] [Turn off]
+  //   turned off: faded but readable, history kept, [Delete from history]
   function renderInviteCards(host, rows, reload, opts){
     opts = opts || {};
     host.innerHTML = "";
@@ -13734,38 +13776,118 @@
     }
     var toks = inviteTokens();
     rows.forEach(function(r){
-      var on = !r.revoked_at, card = makeDiv("invCard" + (on ? "" : " off"));
-      var legacy = r.tracked === false;
-      var head = makeDiv("invHead"), role = document.createElement("span"); role.className = "invRole"; role.textContent = (legacy ? "Legacy collaboration invite \u00b7 " : "") + (r.role === "viewer" ? "Viewer" : "Editor") + (legacy ? " access" : (opts.noBoard ? "" : " invite"));
+      var on = !r.revoked_at, legacy = r.tracked === false, card = makeDiv("invCard" + (on ? "" : " off"));
+      var head = makeDiv("invHead"), role = document.createElement("span"); role.className = "invRole";
+      role.textContent = (r.role === "viewer" ? "Viewer" : "Editor") + (legacy ? " \u00b7 legacy" : "");
       var state = document.createElement("span"); state.className = "invState " + (on ? "on" : "off"); state.textContent = on ? "On" : "Turned off";
       head.appendChild(role); head.appendChild(state); card.appendChild(head);
-      var who = makeDiv("invWho"); who.textContent = r.email ? "Only for " + r.email : "Anyone with the link"; card.appendChild(who);
-      var people = r.people || [], active = people.filter(function(x){ return x.active; }).length;
-      var meta = makeDiv("invMeta"); meta.textContent = (legacy ? "Created before invite tracking" : "Made " + fmtDay(r.created_at)) + (legacy ? " (" + fmtDay(r.created_at) + ")" : "") + " \u00b7 joined " + (r.uses || 0) + (r.uses === 1 ? " time" : " times") + (people.length ? " \u00b7 " + active + " with access" : ""); card.appendChild(meta);
-      if(legacy){ var ln = makeDiv("invMeta invLegacy"); ln.textContent = "People who joined before this was tracked stay on the board if you turn this link off; nobody new can use it."; card.appendChild(ln); }
+      var who = makeDiv("invWho"); who.textContent = legacy ? "Legacy collaboration invite" : (r.email ? "Only for the invited e-mail address" : "Anyone with the link"); card.appendChild(who);
+      var people = r.people || [], here = people.filter(function(x){ return x.active; }).length;
+      var meta = makeDiv("invMeta");
+      meta.innerHTML = "";
+      var l1 = document.createElement("div"); l1.textContent = legacy ? "Created before invite tracking \u00b7 " + fmtDay(r.created_at) : "Made " + fmtDay(r.created_at); meta.appendChild(l1);
+      var l2 = document.createElement("div"); l2.textContent = "Joined " + (r.uses || 0) + (r.uses === 1 ? " time" : " times") + (on && people.length ? " \u00b7 " + here + " here now" : ""); meta.appendChild(l2);
+      card.appendChild(meta);
+      if(!on){ var kept = makeDiv("invMeta invKept"); kept.textContent = "Turned off \u2014 join history kept."; card.appendChild(kept); }
+      if(legacy && on){ var ln = makeDiv("invMeta invLegacy"); ln.textContent = "People who joined before this was tracked stay on the board if you turn this link off; nobody new can use it."; card.appendChild(ln); }
       if(people.length){
+        var ph = document.createElement("div"); ph.className = "invPeopleH"; ph.textContent = "People"; card.appendChild(ph);
         var chips = makeDiv("invPeople");
-        people.forEach(function(x){ var c = document.createElement("span"); c.className = "invChip" + (x.active ? "" : " gone") + (x.guest ? " guest" : ""); c.textContent = x.name; c.title = (x.guest ? "Guest, joined without an account" : "Member") + (x.active ? "" : " (no longer on the board)") + (x.legacy && x.active ? " \u00b7 joined before tracking: stays if the link is turned off" : ""); chips.appendChild(c); });
+        people.forEach(function(x){
+          var sub = x.active ? "" : "access removed";
+          var c = idChip({name: x.name, guest: x.guest, gone: !x.active, sub: sub, uid: x.name,
+            title: x.name + (x.guest ? " \u00b7 guest, joined without an account" : " \u00b7 Stick-It member") + (x.joined_at ? " \u00b7 joined " + fmtDay(x.joined_at) : "") + (x.active ? (x.legacy ? " \u00b7 joined before tracking: stays if the link is turned off" : "") : " \u00b7 access removed")});
+          chips.appendChild(c);
+        });
         card.appendChild(chips);
       }
       var acts = makeDiv("invActs");
-      if(on && toks[r.id]){
-        var cp = document.createElement("button"); cp.type = "button"; cp.className = "pillBtn copyBtn"; cp.textContent = "Copy link";
-        cp.addEventListener("click", function(){ copyText(inviteLink(toks[r.id])).then(function(ok){ flashCopied(cp, ok ? "Copied!" : "Select and copy"); }); });
-        acts.appendChild(cp);
-      } else if(on){ var note = document.createElement("span"); note.className = "asHint"; note.textContent = "Copy is only offered on the device that made the link."; acts.appendChild(note); }
       if(on){
+        if(toks[r.id]){
+          var cp = document.createElement("button"); cp.type = "button"; cp.className = "pillBtn copyBtn"; cp.textContent = "Copy link";
+          cp.addEventListener("click", function(){ copyText(inviteLink(toks[r.id])).then(function(ok){ flashCopied(cp, ok ? "Copied!" : "Select and copy"); }); });
+          acts.appendChild(cp);
+        } else { var note = document.createElement("span"); note.className = "asHint"; note.textContent = "Copy is only offered on the device that made the link."; acts.appendChild(note); }
         var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn danger"; off.textContent = "Turn off"; var armed = false, t0 = 0, removable = people.filter(function(x){ return x.active && !x.legacy; }).length;
         off.addEventListener("click", function(){
           if(!armed){ armed = true; off.textContent = removable ? "Turn off & remove " + removable + (removable === 1 ? " person" : " people") + "?" : "Really turn off?"; off.classList.add("dangerFill"); t0 = setTimeout(function(){ armed = false; off.textContent = "Turn off"; off.classList.remove("dangerFill"); }, 5000); return; }
           clearTimeout(t0); off.disabled = true;
-          Stick.repo.revokeInvite(r.id).then(function(res){ forgetInviteToken(r.id); toast("Link turned off" + (res && res.removed ? " and " + res.removed + (res.removed === 1 ? " person was" : " people were") + " removed." : ".")); reload(); },
+          Stick.repo.revokeInvite(r.id).then(function(res){ toast("Link turned off" + (res && res.removed ? " and " + res.removed + (res.removed === 1 ? " person was" : " people were") + " removed." : ".")); if(opts.onChange) opts.onChange(-1, "invite"); reload(); },
             function(e){ off.disabled = false; errorToast(Stick.errors.parse(e)); });
         });
         acts.appendChild(off);
+      } else {
+        var del = document.createElement("button"); del.type = "button"; del.className = "pillBtn"; del.textContent = "Delete from history";
+        del.addEventListener("click", async function(){
+          var go = await confirmDialog({title: "Delete this invite from your history?", body: "The link stays turned off. Only this record disappears from your list; nobody\u2019s access to the board changes.", confirm: "Delete", danger: true});
+          if(!go) return; del.disabled = true;
+          Stick.repo.deleteInviteHistory(r.id).then(function(){ forgetInviteToken(r.id); toast("Removed from your history."); reload(); }, function(e){ del.disabled = false; errorToast(Stick.errors.parse(e)); });
+        });
+        acts.appendChild(del);
       }
       card.appendChild(acts); host.appendChild(card);
     });
+  }
+  // ---- the three things an owner wants to know, kept apart:
+  //   On this board now  = presence (who is connected right now; nothing to do with permission)
+  //   People with access = authorization (who may open the board)
+  //   Links you made     = invitations (what can still let someone in, and its history)
+  function accSecHead(text, sub){
+    var h = makeDiv("accSecHead"), t = document.createElement("h3"); t.className = "accH"; t.textContent = text; h.appendChild(t);
+    if(sub){ var d = document.createElement("p"); d.className = "accSub"; d.textContent = sub; h.appendChild(d); }
+    return h;
+  }
+  function roleLabel(r){ return r === "owner" ? "Owner" : r === "viewer" ? "Viewer" : "Editor"; }
+  function buildAccessPanel(boardId, o){
+    o = o || {};
+    var el = makeDiv("accPanel"), access = null, offPresence = null, destroyed = false;
+    var secOn = makeDiv("accSec"), secPeople = makeDiv("accSec"), secLinks = makeDiv("accSec");
+    var onList = makeDiv("accList"), peopleList = makeDiv("accList"), linkList = makeDiv("invList");
+    if(o.presence){ secOn.appendChild(accSecHead("On this board now", "Connected right now. This is who is here, not who is allowed in.")); secOn.appendChild(onList); el.appendChild(secOn); }
+    if(o.people){ secPeople.appendChild(accSecHead("People with access", "Who can open this board.")); secPeople.appendChild(peopleList); el.appendChild(secPeople); }
+    secLinks.appendChild(accSecHead("Links you made")); secLinks.appendChild(linkList); el.appendChild(secLinks);
+    function roleOf(uid){ var a = (access || []).filter(function(x){ return x.user_id === uid; })[0]; return a || null; }
+    function paintOnline(){
+      if(!o.presence) return;
+      onList.innerHTML = "";
+      var people = (window.Stick && Stick.collab && Stick.collab.online) ? Stick.collab.online() : [];
+      if(!people.length){ var n = makeDiv("accNone"); n.textContent = "Just you for now."; onList.appendChild(n); return; }
+      people.forEach(function(p){
+        var a = roleOf(p.uid), row = makeDiv("accRow"), dot = document.createElement("span"); dot.className = "accDot"; dot.setAttribute("aria-hidden", "true"); row.appendChild(dot);
+        row.appendChild(idChip({name: p.self ? (p.name + " (you)") : p.name, uid: p.uid, guest: !!(a && a.guest), title: p.name}));
+        var rl = document.createElement("span"); rl.className = "accRole";
+        rl.textContent = a ? (a.guest && a.role !== "owner" ? "Guest " + roleLabel(a.role).toLowerCase() : roleLabel(a.role)) : (p.self ? "Owner" : "Here now");
+        row.appendChild(rl); if(p.editing){ var ed = document.createElement("span"); ed.className = "accEdit"; ed.textContent = "editing"; row.appendChild(ed); }
+        onList.appendChild(row);
+      });
+    }
+    function paintPeople(){
+      if(!o.people) return;
+      peopleList.innerHTML = "";
+      if(access == null){ var n = makeDiv("accNone"); n.textContent = "Not available yet."; peopleList.appendChild(n); return; }
+      var here = {}; if(window.Stick && Stick.collab && Stick.collab.online) Stick.collab.online().forEach(function(p){ here[p.uid] = true; });
+      access.forEach(function(a){
+        var row = makeDiv("accRow");
+        row.appendChild(idChip({name: a.name, uid: a.user_id, guest: a.guest, title: a.name + (a.guest ? " \u00b7 guest, joined without an account" : "")}));
+        var rl = document.createElement("span"); rl.className = "accRole"; rl.textContent = roleLabel(a.role); row.appendChild(rl);
+        var src = document.createElement("span"); src.className = "accSrc"; src.textContent = a.source === "owner" ? "" : a.source === "invite" ? "via invite" : "joined before tracking"; if(src.textContent) row.appendChild(src);
+        if(here[a.user_id]){ var d = document.createElement("span"); d.className = "accDot on"; d.title = "Here now"; d.setAttribute("aria-label", "Here now"); row.insertBefore(d, row.firstChild); }
+        peopleList.appendChild(row);
+      });
+    }
+    function loadLinks(){
+      return Stick.repo.listInvites(boardId).then(function(rows){ if(!destroyed) renderInviteCards(linkList, rows || [], refresh, {onChange: o.onChange}); }, function(){ if(!destroyed) linkList.textContent = ""; });
+    }
+    function refresh(){
+      var jobs = [loadLinks()];
+      if(o.people || o.presence) jobs.push(Stick.repo.listBoardAccess(boardId).then(function(a){ if(destroyed) return; access = a; paintPeople(); paintOnline(); }, function(){}));
+      return Promise.all(jobs);
+    }
+    paintOnline(); paintPeople(); refresh();
+    if(o.presence && window.Stick && Stick.collab && Stick.collab.onChange){
+      offPresence = Stick.collab.onChange(function(){ if(!el.isConnected){ destroyed = true; if(offPresence) offPresence(); return; } paintOnline(); paintPeople(); });
+    }
+    return {el: el, refresh: refresh, destroy: function(){ destroyed = true; if(offPresence) offPresence(); }};
   }
   // one row per address: its own link and its own Copy button
   function showInviteResult(out, email, role, url, err){
@@ -13840,20 +13962,24 @@
     document.body.classList.add("accessLost");                         // the board is hidden and cannot be touched: nothing editable stays on screen
     var stage = document.getElementById("board"); if(stage) stage.setAttribute("inert", "");
     var done = false;
-    function leave(){
+    var anonNow = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous());
+    function leave(next){
       if(done) return; done = true;
-      var anon = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous()), uid = (Stick.auth.user() || {}).id, rest = safeGet(BOARDS_KEY) || [];
+      if(next !== "signin" && next !== "boards") next = null;
+      var anon = anonNow, uid = (Stick.auth.user() || {}).id, rest = safeGet(BOARDS_KEY) || [];
       rest = rest.filter(function(b){ return b.id !== lostId; });
       try{ localStorage.removeItem(notesKeyFor(lostId)); }catch(e){}
-      try{ sessionStorage.setItem("stickit.bootToast", msg); }catch(e){}
+      try{ sessionStorage.setItem("stickit.bootToast", msg); if(next) sessionStorage.setItem("stickit.afterLeave", next); }catch(e){}
       Promise.resolve().then(function(){
         if(anon || !rest.length){ cloudSigningOut = true; return Promise.resolve(Stick.auth.signOut("local")).catch(function(){}).then(function(){ if(uid) wipeCloudCache(uid); settings.account = null; saveSettings(); }); }
         safeSet(BOARDS_KEY, rest); safeSet(ACTIVE_BOARD_KEY, rest[0].id);
       }).then(function(){ location.reload(); }, function(){ location.reload(); });
     }
     var body = document.createElement("p"); body.className = "acctSub"; body.style.margin = "0"; body.textContent = msg;
-    try{ openModal({title: "Access turned off", content: body, width: 380, actions: [{label: "OK", kind: "primary", value: true}], onClose: leave}); }catch(e){ leave(); }
-    setTimeout(leave, 20000);                                          // nobody pressing OK must not leave a hidden board behind
+    // What next is the person's choice: nothing opens by itself. A signed-in person goes to their boards; a guest can carry on as a guest or choose to sign in.
+    var acts = anonNow ? [{label: "Continue as guest", value: "guest"}, {label: "Sign in or create account", kind: "primary", value: "signin"}] : [{label: "Go to my boards", kind: "primary", value: "boards"}];
+    try{ openModal({title: "Access turned off", content: body, width: 400, actions: acts, onClose: function(v){ leave(v); }}); }catch(e){ leave(); }
+    setTimeout(function(){ leave(); }, 60000);                                          // nobody pressing OK must not leave a hidden board behind
   }
   window.addEventListener("stick:access-changed", function(){ setTimeout(checkBoardAccess, 300); });
   window.addEventListener("focus", function(){ checkBoardAccess(); });

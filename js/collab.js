@@ -213,9 +213,18 @@
 
   // ================================================================== drawing
   function el(tag, cls, text) { var e = root.document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-  var lastSig = "";
+  var lastSig = "", listeners = [];
+  // the page can follow who is online (for the "On this board now" list). Presence only: nothing here says who is allowed on the board.
+  C.onChange = function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; };
+  // everyone connected right now, me first. Entries come from the board's presence channel (a person who closes the tab or loses connection drops out as soon as the channel says so, and a silent peer expires after STALE_MS).
+  C.online = function () {
+    if (!S) return [];
+    var me = S.opts.me || {};
+    return [{ uid: me.uid || "", name: me.name || "You", self: true, editing: S.editing, hue: core.hue(me.uid || "me"), initial: core.initial(me.name) }].concat(C.people().map(function (p) { p.self = false; return p; }));
+  };
   function render() {
     drawPeople();
+    listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (!S || !S.opts.host || !S.opts.host.refresh) return;
     var sig = JSON.stringify([C.people().map(function (p) { return [p.uid, p.editing, p.active]; }), S.summary]);
     if (sig === lastSig) return;                        // nothing visible changed: leave the board's elements alone

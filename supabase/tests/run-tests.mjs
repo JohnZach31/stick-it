@@ -988,6 +988,55 @@ group('invite revocation');
   await run(owner, 'delete from public.board_invites where id=$1', [Z.id]);
   ok((await run(g2, 'select id from public.boards where id=$1', [A.id])).rows.length === 0, 'deleting the invitation row also removes the people who came in through it');
 }
+// ---------------------------------------------------------------- collaboration management: history, identity, who has access
+group('collaboration management');
+{
+  const owner = mallory;
+  await run('su', "update public.profiles set plan='premium' where id=$1", [owner.id]);      // room for another board
+  const gA = { id: uuid(), email: null, anonymous: true }, gB = { id: uuid(), email: null, anonymous: true };
+  for (const g of [gA, gB]) { await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g.id, null, '{}']); await attest(g.id); }
+  const mb = await run(owner, 'select id from public.create_board($1,$2,$3)', ['Mgmt board', null, 'k-' + uuid()]); if (mb.error) console.log('   (create_board:', mb.error, ')'); const B = mb.rows[0];
+  const mkInv = async (role = 'editor') => (await run(owner, 'select public.create_invite($1,null,$2) as r', [B.id, role])).rows[0].r;
+  const X = await mkInv(), Y = await mkInv();
+  await run(gA, 'select public.accept_invite($1)', [X.token]); await run(gB, 'select public.accept_invite($1)', [X.token]); await run(gB, 'select public.accept_invite($1)', [Y.token]);
+  await run(bob, 'select public.accept_invite($1)', [Y.token]);          // an ordinary account
+
+  const accQ = await run(owner, 'select public.list_board_access($1) as r', [B.id]); if (accQ.error) console.log('   (list_board_access:', accQ.error, ')');
+  const acc = accQ.rows[0].r;
+  ok(acc.length === 4 && acc.filter((a) => a.role === 'owner').length === 1, 'the owner sees who has access: owner + 3');
+  ok(acc.find((a) => a.user_id === gA.id).guest === true && /^[A-Z][a-z]+ #\d+$/.test(acc.find((a) => a.user_id === gA.id).name), 'a guest is shown under a stable generated name, flagged as a guest');
+  ok(acc.find((a) => a.user_id === bob.id).guest === false && acc.find((a) => a.user_id === bob.id).name === 'bob Example', 'a signed-in account is shown under their profile display name');
+  ok(acc.every((a) => !('email' in a)) && !JSON.stringify(acc).includes('@'), 'no e-mail address or provider data is exposed');
+  ok(acc.find((a) => a.user_id === gA.id).source === 'invite' && acc.find((a) => a.role === 'owner').source === 'owner', 'each person\'s source is shown (owner / invite / legacy)');
+  ok(errIs(await run(bob, 'select public.list_board_access($1)', [B.id]), /FORBIDDEN/), 'only the owner can read it');
+  const aliasA = acc.find((a) => a.user_id === gA.id).name;
+
+  const rv = (await run(owner, 'select public.revoke_invite($1) as r', [X.id])).rows[0].r;
+  ok(rv.removed === 1, 'turning X off removes guest A (their only link) and keeps guest B (who also holds Y)');
+  const li = (await run(owner, 'select public.list_invites($1) as r', [B.id])).rows[0].r;
+  const lx = li.find((i) => i.id === X.id);
+  ok(lx.revoked_at && lx.people.some((p) => p.name === aliasA && p.active === false) && lx.uses === 2, 'the turned-off link keeps its history: A is still listed by name, now marked as no longer on the board');
+  ok(!(await run(owner, 'select public.list_board_access($1) as r', [B.id])).rows[0].r.some((a) => a.user_id === gA.id), 'and A is gone from who has access');
+
+  const before = (await run('su', 'select user_id, role from public.board_members where board_id=$1 order by user_id', [B.id])).rows;
+  ok(errIs(await run(owner, 'select public.delete_invite_history($1)', [Y.id]), /BAD_REQUEST/), 'a link that is still on cannot be deleted from history (turn it off first)');
+  ok(errIs(await run(bob, 'select public.delete_invite_history($1)', [X.id]), /FORBIDDEN/), 'only the owner can delete history');
+  ok((await run(owner, 'select public.delete_invite_history($1) as r', [X.id])).rows[0].r === true, 'the owner deletes the turned-off link from history');
+  const after = (await run('su', 'select user_id, role from public.board_members where board_id=$1 order by user_id', [B.id])).rows;
+  ok(JSON.stringify(before) === JSON.stringify(after), 'deleting history changed nobody\'s access');
+  ok((await run(owner, 'select public.list_invites($1) as r', [B.id])).rows[0].r.every((i) => i.id !== X.id), 'the record is gone from the list');
+  const w = await run(gB, 'select public.sync_objects($1,$2::jsonb,$3::jsonb) as r', [B.id, '[]', '[]']);
+  ok(!w.error, 'guest B (second link) still has access after the history of X was deleted');
+  const twice = await run(owner, 'select public.revoke_invite($1) as r', [Y.id]);
+  ok(twice.rows[0].r.removed === 2, 'turning Y off removes B and bob (their only valid link)');
+  const again = (await run(owner, 'select public.revoke_invite($1) as r', [Y.id])).rows[0].r;
+  ok(again.removed === 0, 'turning an already-off link off again removes nobody');
+  const Z = await mkInv('viewer');
+  const c1 = (await run(owner, 'select public.my_active_invite_count() as c')).rows[0].c;
+  await run(owner, 'select public.revoke_invite($1)', [Z.id]);
+  ok((await run(owner, 'select public.my_active_invite_count() as c')).rows[0].c === c1 - 1, 'the count drops when a link is turned off');
+  ok((await run(bob, 'select public.my_active_invite_count() as c')).rows[0].c === 0, 'and counts only boards you own');
+}
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

@@ -56,6 +56,7 @@
     var retryTimer = null, retryN = 0;
     var jobs = {};               // media job key -> "running" | "failed"
     var pollTimer = null, started = false;
+    var lat = [], pendingEvt = null;          // latency samples for Stick.perf.collab(): numbers only, never data
     var rtCh = null, rtClient = null, rtStatus = "", rtTimer = null, lastPullAt = 0;     // realtime: a push only SCHEDULES the normal pull, it is never a second sync path
     var readOnlyMode = false;    // viewers: pull only, never write
 
@@ -220,7 +221,10 @@
       if (!boardId || readOnlyMode) return;
       if (!firstDirty) firstDirty = Date.now();
       clearTimeout(flushTimer);
-      var wait = Math.min(cfg.debounceMs || 700, Math.max(0, (cfg.maxWaitMs || 3000) - (Date.now() - firstDirty)));
+      // alone on the board: settle for 700 ms before writing (fewer requests). With someone else here (host.hasPeers), write after 150 ms and never hold a change longer than 800 ms.
+      var live = !!(host.hasPeers && host.hasPeers());
+      var base = live ? (cfg.liveDebounceMs || 150) : (cfg.debounceMs || 700), cap = live ? (cfg.liveMaxWaitMs || 800) : (cfg.maxWaitMs || 3000);
+      var wait = Math.min(base, Math.max(0, cap - (Date.now() - firstDirty)));
       flushTimer = setTimeout(function () { S.flush(); }, wait);
       if (statusVal === "saved") setStatus("saving");
     };
@@ -326,6 +330,7 @@
     async function pull(full) {
       if (!boardId) return false;
       lastPullAt = Date.now();
+      var sample = pendingEvt; pendingEvt = null; if (sample) sample.pullStart = lastPullAt;
       var out = { upserts: [], removes: [] };
       var rows, newMark = watermark;
       if (full || !watermark) {
@@ -345,9 +350,11 @@
       }
       watermark = newMark;
       saveKnown();
+      if (sample) sample.pullEnd = Date.now();
       if (out.upserts.length || out.removes.length) {
         host.applyRemote(out);
         out.upserts.forEach(hydrate);
+        if (sample) { sample.applied = Date.now(); sample.rows = out.upserts.length + out.removes.length; lat.push(sample); if (lat.length > 30) lat.shift(); }
         return true;
       }
       return false;
@@ -365,10 +372,22 @@
     // ------------------------------------------------------------ realtime (scoped to the active board)
     // Supabase tells us a row of THIS board's objects changed (row-level security decides who is told); we then run the ordinary pull, debounced.
     // Our own writes are skipped when we already know that version. Polling stays as a slow safety net.
-    function schedulePull() {
+    // A short debounce (80 ms) that still folds a burst of pushes into one pull; the first push of a burst is never held longer than that.
+    function schedulePull(evt) {
+      if (evt && !pendingEvt) pendingEvt = evt;
       if (rtTimer) return;
-      rtTimer = setTimeout(function () { rtTimer = null; pullQuiet(); }, 250);
+      rtTimer = setTimeout(function () { rtTimer = null; pullQuiet(); }, cfg.pullDebounceMs == null ? 80 : cfg.pullDebounceMs);
     }
+    // Where the time goes between "committed on the server" and "drawn here", per remote change (milliseconds):
+    //   push: commit -> realtime event received (includes the other device's own save delay only if it committed late; compares two clocks, so allow a little skew)
+    //   wait: event -> pull started (our debounce), pull: request/response, draw: applying + hydrating, total: commit -> drawn
+    S.latency = function () {
+      return lat.map(function (s) {
+        var o = { rows: s.rows, wait: s.pullStart - s.evtAt, pull: s.pullEnd - s.pullStart, draw: s.applied - s.pullEnd };
+        if (s.commit) { o.push = s.evtAt - s.commit; o.total = s.applied - s.commit; } else o.total = s.applied - s.evtAt;
+        return o;
+      });
+    };
     S._schedulePull = schedulePull;
     function stopRealtime() {
       clearTimeout(rtTimer); rtTimer = null; rtStatus = "";
@@ -385,7 +404,8 @@
         rtClient = c;
         rtCh = c.channel("objects:" + id).on("postgres_changes", { event: "*", schema: "public", table: "board_objects", filter: "board_id=eq." + id }, function (p) {
           var r = p && p.new; if (r && r.id && known[r.id] && !known[r.id].d && known[r.id].v >= r.version) return;     // our own write, already applied
-          schedulePull();
+          var ct = p && p.commit_timestamp ? Date.parse(p.commit_timestamp) : 0;
+          schedulePull({ evtAt: Date.now(), commit: isNaN(ct) ? 0 : ct });
         }).subscribe(function (st) {
           rtStatus = st;
           if (st === "SUBSCRIBED") pullQuiet();                                           // catch up on anything missed while connecting

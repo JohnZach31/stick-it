@@ -24,3 +24,21 @@ Cleaning up abandoned anonymous users (a scheduled job deleting anonymous users 
 * **Copying a link again.** The server keeps only a hash of each token, so the owner's own device remembers the links it made (`localStorage`, `stickit.inviteTokens`); "Copy link" is offered only there.
 
 Migration: `supabase/migrations/20261009100000_lock_it_down.sql`.
+
+## v0.8.3.4 (collaboration management pass)
+
+Three different questions, three different answers. They are kept apart on purpose:
+
+| Question | Source | Where it shows |
+| --- | --- | --- |
+| Who is on the board **right now**? (presence) | the board's private presence channel (`Stick.collab.online()`); a closed tab drops out when the channel reports it, and a silent peer expires after 40 s | "On this board now" |
+| Who **may open** the board? (authorization) | `board_members`, via `list_board_access()` (owner only) | "People with access" (owner / via invite / joined before tracking) |
+| What can still **let someone in**, and its history? | `board_invites` + `board_invite_uses`, via `list_invites()` | "Links you made" cards |
+
+* **Identity.** A signed-in account is shown by its profile display name; a guest by the generated friendly name stored in `board_invite_uses.alias` (stable per guest per board, including guests who joined before names existed). No e-mail address, provider data or private metadata is ever returned. A guest is never matched to a person by guesswork. Profile photos are not shown in these lists yet (a coloured initial is used) so that no photo-privacy setting can be bypassed.
+* **History.** Turning a link off keeps the card (state "Turned off", join count, and the guests who used it, marked "access removed"). `delete_invite_history()` removes only that record, only for a link that is already off, and `remove_invite_members()` does nothing for a turned-off link, so deleting history can never change a membership.
+* **Leaving.** When access is turned off the dialog offers "Go to my boards" (signed in) or "Continue as guest" / "Sign in or create account" (guest). Nothing opens by itself; sign-in appears only if chosen.
+* **Settings.** Settings > Sharing counts public share links and collaboration invitations together (`my_active_invite_count()`), and "Manage shared links" opens Sharing & access with a tab for each kind.
+* **Live speed.** `Stick.perf.collab()` returns, for edits made by others: wait (our 80 ms realtime debounce), pull (request and response), draw (applying), push (server commit to event; compares two clocks) and total. While another person is on the board a change is saved after 150 ms instead of 700 ms; alone, the 700 ms settle is unchanged.
+
+Migration: `supabase/migrations/20261009110000_collab_management.sql` (also non-destructive to memberships).
