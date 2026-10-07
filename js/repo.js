@@ -152,6 +152,13 @@
     createInvite: function (boardId, email, role) {
       return db().then(function (c) { return guard(c.rpc("create_invite", { p_board: boardId, p_email: email || null, p_role: role || "editor" })); });
     },
+    // the links this board's owner has made (the secret itself is never stored, so only who/what/how often); and turning one off
+    listInvites: function (boardId) {
+      return db().then(function (c) { return guard(c.from("board_invites").select("id,email,role,uses,created_at").eq("board_id", boardId).order("created_at", { ascending: false })); });
+    },
+    revokeInvite: function (id) {
+      return db().then(function (c) { return guard(c.from("board_invites").delete().eq("id", id)); });
+    },
     acceptInvite: function (token) {
       return db().then(function (c) { return guard(c.rpc("accept_invite", { p_token: token })); });
     }

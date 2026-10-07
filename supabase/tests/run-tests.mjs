@@ -130,12 +130,15 @@ let inviteBob, inviteCarol;
 
   ok(errIs(await run(dave, 'select public.accept_invite($1)', [inviteBob.token]), /INVITE_EMAIL_MISMATCH/), 'invite for bob cannot be used by dave');
   ok(!(await run(bob, 'select public.accept_invite($1) as b', [inviteBob.token])).error, 'bob accepts as editor');
-  ok(errIs(await run(bob, 'select public.accept_invite($1)', [inviteBob.token]), /INVITE_USED/), 'an invite is single-use');
+  ok(!(await run(bob, 'select public.accept_invite($1)', [inviteBob.token])).error, 'a link can be used again (it is not single-use)');
+  ok((await run('su', 'select uses from public.board_invites where id=$1', [inviteBob.id])).rows[0].uses === 2, 'and each use is counted');
+  ok((await run('su', 'select expires_at from public.board_invites where id=$1', [inviteBob.id])).rows[0].expires_at === null, 'a link never expires by itself');
   ok(!(await run(carol, 'select public.accept_invite($1)', [inviteCarol.token])).error, 'carol accepts as viewer');
   ok(errIs(await run(dave, 'select public.accept_invite($1)', ['x'.repeat(64)]), /INVITE_NOT_FOUND/), 'unknown token rejected');
   const expired = (await run(alice, 'select public.create_invite($1,null,$2) as r', [A1.id, 'viewer'])).rows[0].r;
   await run('su', "update public.board_invites set expires_at = now() - interval '1 hour' where id=$1", [expired.id]);
   ok(errIs(await run(dave, 'select public.accept_invite($1)', [expired.token]), /INVITE_EXPIRED/), 'expired invite rejected');
+  ok(!(await run(alice, 'delete from public.board_invites where id=$1', [expired.id])).error && errIs(await run(dave, 'select public.accept_invite($1)', [expired.token]), /INVITE_NOT_FOUND/), 'turning a link off (deleting it) stops it working at once');
 
   ok(errIs(await run(bob, 'select public.create_invite($1,null,$2)', [A1.id, 'editor']), /FORBIDDEN/), 'editor cannot invite');
   ok(denied(await run(alice, 'insert into public.board_members (board_id,user_id,role) values ($1,$2,$3)', [A1.id, dave.id, 'viewer'])), 'nobody can be added to a board without accepting an invite');

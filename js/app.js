@@ -13440,7 +13440,7 @@
 
   // ---------- Collaborate (Premium): invite people to your board ----------
   // The button exists only for a signed-in Premium owner of the board they are looking at; for everyone else it stays hidden (not greyed out).
-  // An invite is a link that works once, for 7 days, for one chosen person (by e-mail) or anyone who holds it. People accepting an invite do not
+  // An invite is a link that keeps working, with no expiry, until its owner turns it off, for one chosen person (by e-mail) or anyone who holds it. People accepting an invite do not
   // need Premium. The server checks who may create and accept invites; this only decides what to show.
   var collabBtn = document.getElementById("collabBtn");
   function canShowCollab(){
@@ -13468,13 +13468,29 @@
     if(!canShowCollab()){ updateCollabButton(); return; }
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {};
     var wrap = makeDiv("collabDlg");
-    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. Each link works once and expires after 7 days.</p>' +
+    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">Invite someone to work on this board with you. A link never expires and can be used again and again. Anyone who holds it can join, until you turn it off below.</p>' +
       '<label class="asLbl" for="cbRole">They can</label>' +
       '<select id="cbRole" class="asIn"><option value="editor">Add, move and edit notes</option><option value="viewer">Look, but not change anything</option></select>' +
       '<label class="asLbl" for="cbEmail">E-mails (optional)</label>' +
       '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails (optional)"></div>' +
       '<p class="asHint" id="cbHint">Press Enter or comma after each address. With e-mails, each person gets their own link that only their account can use.</p>' +
-      '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>';
+      '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>' +
+      '<div class="menuHint" style="margin-top:12px;">Links you made</div><div id="cbList" class="collabOut"></div>';
+    var listEl = wrap.querySelector("#cbList");
+    function loadInvites(){
+      Stick.repo.listInvites(activeBoardId).then(function(rows){
+        listEl.innerHTML = "";
+        if(!rows || !rows.length){ var none = document.createElement("div"); none.className = "asHint"; none.textContent = "None yet."; listEl.appendChild(none); return; }
+        rows.forEach(function(r){
+          var row = makeDiv("inviteRow"), who = document.createElement("div"); who.className = "asHint";
+          who.textContent = (r.role === "viewer" ? "Viewer" : "Editor") + " link" + (r.email ? " for " + r.email : " (anyone with it)") + " · used " + (r.uses || 0) + (r.uses === 1 ? " time" : " times");
+          var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn"; off.textContent = "Turn off";
+          off.addEventListener("click", function(){ off.disabled = true; Stick.repo.revokeInvite(r.id).then(function(){ toast("Link turned off."); loadInvites(); }, function(e){ off.disabled = false; toast(Stick.errors.friendly(Stick.errors.parse(e))); }); });
+          row.appendChild(who); row.appendChild(off); listEl.appendChild(row);
+        });
+      }, function(){ listEl.textContent = ""; });
+    }
+    loadInvites();
     openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
       {label: "Close", value: false},
       {label: "Create invite link", kind: "primary", id: "cbCreate", onClick: function(close, btn){
@@ -13484,7 +13500,7 @@
         setBusy(btn, true, "Creating\u2026"); out.innerHTML = "";
         var chain = Promise.resolve();
         targets.forEach(function(email){
-          chain = chain.then(function(){ return Stick.repo.createInvite(activeBoardId, email, role).then(function(r){ showInviteResult(out, email, role, inviteLink(r.token)); }, function(e){ showInviteResult(out, email, role, "", Stick.errors.friendly(Stick.errors.parse(e))); }); });
+          chain = chain.then(function(){ return Stick.repo.createInvite(activeBoardId, email, role).then(function(r){ showInviteResult(out, email, role, inviteLink(r.token)); loadInvites(); }, function(e){ showInviteResult(out, email, role, "", Stick.errors.friendly(Stick.errors.parse(e))); }); });
         });
         chain.then(function(){ setBusy(btn, false); });
         return false;
@@ -13588,11 +13604,16 @@
       var er = Stick.errors.parse(e), msg = String(er && er.message || "");
       lastInviteError = msg.slice(0, 120); try{ console.warn("[invite] could not accept:", lastInviteError); }catch(x){}
       hideCloudOverlay();
-      toast(/INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
+      var why = /INVITE_EXPIRED/.test(msg) ? "That invitation has expired. Ask for a new one."
         : /INVITE_USED/.test(msg) ? "That invitation was already used."
         : /EMAIL_MISMATCH/.test(msg) ? (Stick.auth.isAnonymous && Stick.auth.isAnonymous() ? "That invitation is tied to a specific e-mail address, so you need to sign in with it." : "That invitation was made for a different e-mail address.")
         : /INVITE_NOT_FOUND/.test(msg) ? "We couldn’t find that invitation."
-        : Stick.errors.friendly(er));
+        : /AGE_NOT_CONFIRMED/.test(msg) ? "Please confirm your age first, then open the link again."
+        : Stick.errors.friendly(er) + " [" + lastInviteError + "]";
+      // a modal, not a toast: this is the one thing the person needs to read (and to tell us if it keeps happening)
+      var wb = document.createElement("p"); wb.className = "acctSub"; wb.style.margin = "0"; wb.textContent = why;
+      openModal({title: "Couldn’t join the board", content: wb, width: 420, actions: [{label: "OK", kind: "primary", value: true}]});
+      return false;
     }
     return false;
   }
