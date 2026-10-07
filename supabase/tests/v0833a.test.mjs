@@ -17,7 +17,7 @@ ok(!/github\.io/.test(cc.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), 'no GitHub 
 ok(/redirectTo = redirectUrl\(\)/.test(cc) && (cc.match(/redirectUrl\(\)/g) || []).length >= 3, 'both sign-in and link-identity use the environment-aware address');
 ok(/Stick\.auth\.staleSession = /.test(cc) && /Retryable\|fetch\|network/.test(cc) && /dropStale: function/.test(cc), 'a rejected cached login is detected as stale; a network failure is not');
 ok(/Stick\.auth\.staleSession && navigator\.onLine && !Stick\.auth\.callbackPending/.test(app) && /stickit\.staleDropped/.test(app) && /location\.reload\(\)/.test(app.slice(app.indexOf('staleSession && navigator'), app.indexOf('staleSession && navigator') + 700)), 'a stale login falls back to guest by reloading once (no reload loop)');
-ok(/Local Development/.test(app) && /dev . localhost/.test(app) && /isLoopback\(\)/.test(app), 'a local build shows its own title and version marker; production does not');
+ok(/Local Development/.test(app) && /localhost"; \}/.test(app) && /isLoopback\(\)/.test(app), 'a local build shows its own title and version marker; production does not');
 ok(fs.existsSync(path.join(root, 'tools/dev-server.mjs')) && /no-store/.test(read('tools/dev-server.mjs')), 'a no-cache dev server is in the repo');
 ok(/Redirect URLs/.test(read('docs/dev/LOCAL-AUTH.md')) && /localhost:8123\/\*\*/.test(read('docs/dev/LOCAL-AUTH.md')), 'the Supabase allow-list step is documented');
 console.log('v0.8.3.3a: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

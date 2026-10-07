@@ -9759,8 +9759,11 @@
   (function(){ var v = document.getElementById("verTag"), c = (window.Stick && Stick.config) || {};
     if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + " · " + (c.APP_CODENAME || ""); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (c.APP_STATUS ? " (" + c.APP_STATUS + ")" : ""); }
     // a local build says so, in the tab title and beside the version, so it is never mistaken for the live site (production shows neither)
+    // the corner tag always carries the build number and time, so any copy of the site can be told apart from another (the number goes up with every commit)
+    var bi = window.Stick && Stick.build; function buildTag(){ return bi && bi.n ? " · build " + bi.n + (bi.at ? " · " + bi.at : "") : ""; }
+    if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + buildTag(); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (bi && bi.n ? ", build " + bi.n + ", " + bi.at : ""); }
     var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
-    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev · localhost"; }
+    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev" + buildTag() + " · localhost"; }
     try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
