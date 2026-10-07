@@ -8490,8 +8490,8 @@
     var st1 = document.createElement("strong"); st1.textContent = (isGroup ? shareable.length + " items" : "1 item") + " · link ready"; var st2 = document.createElement("span"); st2.textContent = "Anyone with the link can view " + (isGroup ? "them" : "it") + ", no account needed."; stat.appendChild(st1); stat.appendChild(st2); top.appendChild(stat);
     content.appendChild(top);
     var acts = makeDiv("shareActs");
-    var copyLink = document.createElement("button"); copyLink.type = "button"; copyLink.className = "pillBtn primary"; copyLink.textContent = "Copy link";
-    var copyMsg = document.createElement("button"); copyMsg.type = "button"; copyMsg.className = "pillBtn"; copyMsg.textContent = "Copy message";
+    var copyLink = document.createElement("button"); copyLink.type = "button"; copyLink.className = "pillBtn primary copyBtn"; copyLink.textContent = "Copy link";
+    var copyMsg = document.createElement("button"); copyMsg.type = "button"; copyMsg.className = "pillBtn copyBtn"; copyMsg.textContent = "Copy message";
     var prBtn = document.createElement("button"), pdfBtn = document.createElement("button");
     prBtn.type = pdfBtn.type = "button"; prBtn.className = pdfBtn.className = "pillBtn"; prBtn.textContent = isGroup ? "Print selection" : "Print"; pdfBtn.textContent = "Print / Save as PDF";
     pdfBtn.title = "Opens your browser’s print window; choose “Save as PDF” there";
@@ -8536,11 +8536,8 @@
       else toast("Couldn't copy automatically. Select the text above.");
     });
     copyLink.addEventListener("click", async function(){
-      if(await copyText(link)){
-        copyLink.textContent = "\u2713 Link copied";
-        clearTimeout(copyLink._t);
-        copyLink._t = setTimeout(function(){ copyLink.textContent = "Just copy the link"; }, 1500);
-      } else toast("Couldn't copy automatically.");
+      if(await copyText(link)) flashCopied(copyLink, "Link copied");
+      else toast("Couldn't copy automatically.");
     });
   }
 
@@ -13509,7 +13506,7 @@
     row.appendChild(who);
     if(err){ var er = document.createElement("div"); er.className = "asHint err"; er.textContent = err; row.appendChild(er); out.appendChild(row); return; }
     var inp = document.createElement("input"); inp.className = "asIn"; inp.readOnly = true; inp.value = url; inp.setAttribute("aria-label", "Invite link" + (email ? " for " + email : ""));
-    var copy = document.createElement("button"); copy.type = "button"; copy.className = "pillBtn"; copy.textContent = "Copy link";
+    var copy = document.createElement("button"); copy.type = "button"; copy.className = "pillBtn copyBtn"; copy.textContent = "Copy link";
     copy.addEventListener("click", function(){ copyText(url).then(function(ok){ flashCopied(copy, ok ? "Copied!" : "Select and copy"); }); });
     row.appendChild(inp); row.appendChild(copy); out.appendChild(row);
   }

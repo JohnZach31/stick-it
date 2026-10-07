@@ -239,5 +239,12 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   ok(/e\.key === "Backspace" && inp\.value === "" && inp\.selectionStart === 0/.test(app) && /boxes\[i - 1\]/.test(app), 'Backspace in an empty box steps back to the previous one, and out of the panel from the first');
   ok(/wrap\.addEventListener\("keydown", function\(e\)\{[\s\S]*\}, true\)/.test(app), 'handled in the capture phase, so every detail box (quantity, unit, price, subtext, link, tag) behaves the same');
 }
+// ---- the "Copied" tick is never giant (v0.8.3.9)
+{
+  const app = read('js/app.js'), sp = read('css/spaces.css');
+  ok(/button \.ok svg\{ width:15px; height:15px; flex:none; \}/.test(sp), 'the tick inside any copy button is 15px, whichever dialog the button is in');
+  ok(/copyMsg\.className = "pillBtn copyBtn"/.test(app) && /copyLink\.className = "pillBtn primary copyBtn"/.test(app) && /copy\.className = "pillBtn copyBtn"/.test(app), 'the Share window and the invite link buttons use the copy-button style');
+  ok(/flashCopied\(copyLink, "Link copied"\)/.test(app) && !/Just copy the link/.test(app), 'Copy link flashes like the others and keeps its label afterwards');
+}
 console.log(`shopping: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

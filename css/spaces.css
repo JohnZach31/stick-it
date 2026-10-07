@@ -652,3 +652,10 @@ body.dark .pbSlip .pbGroup + .pbGroup{ border-inline-start-color:rgba(255,255,25
 .shopObj .shQtyClear:hover{ background:rgba(0,0,0,0.08); color:var(--sWarn); }
 .shopObj .shQtyClear:focus-visible{ outline:2px solid var(--accent, #c9871f); }
 @media (hover:none){ .shopObj .shMore, .shopObj .shDel{ min-width:36px; min-height:36px; } }
+/* the "Copied" flash inside the compact Share window: a small tick beside the words, never a giant one */
+.shareCompact .copyBtn .ok{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.shareCompact .copyBtn .ok svg{ width:15px; height:15px; flex:none; }
+/* Any button that flashes "Copied!" (flashCopied) shows a small tick beside the words, wherever it is: a tick can never be bigger than the label */
+button .ok{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+button .ok svg{ width:15px; height:15px; flex:none; }
+button.copyBtn{ position:relative; overflow:hidden; }
