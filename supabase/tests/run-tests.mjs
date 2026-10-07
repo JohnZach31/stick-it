@@ -944,6 +944,50 @@ group('anonymous guests');
   ok(denied(await run(guest, "insert into public.boards (owner_id, name) values ($1, 'x')", [guest.id])), 'nor insert a board directly');
   ok(errIs(await run(alice, "select id from public.create_board($1,$2,$3)", ['Alice again', null, 'k-' + uuid()]), /^$/) === false, 'accounts are unaffected');
 }
+// ---------------------------------------------------------------- turning an invitation off removes the access it gave
+group('invite revocation');
+{
+  const owner = mallory;                          // a fresh owner (alice is at her board limit by now)
+  const g1 = { id: uuid(), email: null, anonymous: true }, g2 = { id: uuid(), email: null, anonymous: true };
+  for (const g of [g1, g2]) { await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g.id, null, '{}']); await attest(g.id); }
+  const A = (await run(owner, 'select id from public.create_board($1,$2,$3)', ['Revoke board', null, 'k-' + uuid()])).rows[0];
+  const X = (await run(owner, 'select public.create_invite($1,null,$2) as r', [A.id, 'editor'])).rows[0].r;
+  const Y = (await run(owner, 'select public.create_invite($1,null,$2) as r', [A.id, 'editor'])).rows[0].r;
+  const write = (who, oid) => run(who, 'select public.sync_objects($1, $2::jsonb, $3::jsonb) as r', [A.id, JSON.stringify([{ id: oid, type: 'note', x: 1, y: 1, width: 200, height: 100, rotation: 0, z_index: 1, data: { html: 'hi' } }]), '[]']);
+  ok(!(await run(g1, 'select public.accept_invite($1)', [X.token])).error, 'guest 1 joins through link X');
+  ok(!(await run(g2, 'select public.accept_invite($1)', [X.token])).error && !(await run(g2, 'select public.accept_invite($1)', [Y.token])).error, 'guest 2 joins through both X and Y');
+  ok(!(await run(bob, 'select public.accept_invite($1)', [Y.token])).error, 'an account holder joins through Y');
+  ok(!(await write(g1, uuid())).error, 'guest 1 can write before the link is turned off');
+
+  ok(errIs(await run(bob, 'select public.revoke_invite($1)', [X.id]), /FORBIDDEN/), 'only the owner can turn a link off');
+  const rv = await run(owner, 'select public.revoke_invite($1) as r', [X.id]);
+  ok(!rv.error && rv.rows[0].r.removed === 1, 'the owner turns X off and exactly one person loses access');
+  ok((await run(g1, 'select id from public.boards where id=$1', [A.id])).rows.length === 0, 'guest 1 no longer sees the board');
+  { const w = await write(g1, uuid()); ok(!!w.error || w.rows?.[0]?.r?.results?.[0]?.status === 'denied', 'guest 1 cannot write any more, even with the old tab open'); }
+  ok((await run(g1, 'select id from public.board_objects where board_id=$1', [A.id])).rows.length === 0, 'and cannot read new changes');
+  ok((await write(g2, uuid())).rows?.[0]?.r?.results?.[0]?.status === 'ok', 'guest 2 keeps access through the other valid link Y');
+  ok((await write(bob, uuid())).rows?.[0]?.r?.results?.[0]?.status === 'ok', 'the account holder who joined through Y is unaffected');
+  ok(errIs(await run(g1, 'select public.accept_invite($1)', [X.token]), /INVITE_REVOKED/), 'a turned-off link cannot be used again');
+  ok(!(await run(g1, 'select public.accept_invite($1)', [Y.token])).error, 'but the same guest can come back through a different, valid link');
+
+  // revoking Y as well takes guest 2 and bob (their only remaining grant) out; an explicit non-invite member is never touched
+  await run('su', "insert into public.board_members (board_id,user_id,role,granted_via_invite) values ($1,$2,'editor',false)", [A.id, carol.id]);
+  const li = (await run(owner, 'select public.list_invites($1) as r', [A.id])).rows[0].r;
+  ok(li.length === 2 && li.find(i => i.id === X.id).revoked_at && !li.find(i => i.id === Y.id).revoked_at, 'the owner sees which links are on and which are off');
+  ok(li.find(i => i.id === Y.id).people.filter(p => p.guest).every(p => /^[A-Z][a-z]+ #\d+$/.test(p.name)), 'guests are listed under a friendly generated name');
+  ok(errIs(await run(bob, 'select public.list_invites($1)', [A.id]), /FORBIDDEN/), 'only the owner can read who joined through which link');
+  const al1 = (await run('su', 'select alias from public.board_invite_uses where user_id=$1 and invite_id=$2', [g1.id, X.id])).rows[0].alias;
+  const al1b = (await run('su', 'select alias from public.board_invite_uses where user_id=$1 and invite_id=$2', [g1.id, Y.id])).rows[0].alias;
+  ok(al1 && al1 === al1b, 'a guest keeps the same name when they return through another link');
+  ok(!(await run(owner, 'select public.revoke_invite($1)', [Y.id])).error, 'Y is turned off too');
+  ok((await run('su', 'select user_id from public.board_members where board_id=$1 and role<>$2', [A.id, 'owner'])).rows.map(r => r.user_id).join() === carol.id, 'only the member who did not come through a link remains');
+  // deleting the row has the same effect as turning it off
+  const Z = (await run(owner, 'select public.create_invite($1,null,$2) as r', [A.id, 'viewer'])).rows[0].r;
+  await run(g2, 'select public.accept_invite($1)', [Z.token]);
+  ok((await run(g2, 'select id from public.boards where id=$1', [A.id])).rows.length === 1, 'guest 2 joins as a viewer through Z');
+  await run(owner, 'delete from public.board_invites where id=$1', [Z.id]);
+  ok((await run(g2, 'select id from public.boards where id=$1', [A.id])).rows.length === 0, 'deleting the invitation row also removes the people who came in through it');
+}
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }
