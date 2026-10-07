@@ -4357,6 +4357,20 @@
       li.addEventListener("change", function(){ commit("link", "l", li, function(v){ v = v.trim(); if(!v) return null; if(!/^[a-z][a-z0-9+.-]*:/i.test(v)) v = "https://" + v; var ok = safeHref(v); return ok || false; }); });
     }
     if(shopHas(n, "tag")) text("tag", "g", "Tag", S.LIMITS.tag, {});
+    // keys inside the details: Enter saves and closes (back to the item's words), Esc discards what you typed and closes, Backspace in an empty box steps back to the previous box (and out of the panel from the first one)
+    var boxes = Array.prototype.slice.call(wrap.querySelectorAll("input")); boxes.forEach(function(b){ b.dataset.orig = b.value; });
+    function closeDetails(){ n._openItem = null; repaintShopping(n, {focusId: it.id, focusEnd: true}); }
+    wrap.addEventListener("keydown", function(e){
+      var inp = e.target; if(!inp || inp.tagName !== "INPUT" || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+      var i = boxes.indexOf(inp); if(i < 0) return;
+      if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); if(inp.value !== inp.dataset.orig) inp.dispatchEvent(new Event("change", {bubbles: true})); inp.blur(); setTimeout(closeDetails, 0); }          // saved explicitly: the browser only fires "change" for typed edits
+      else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); boxes.forEach(function(b){ b.value = b.dataset.orig; }); inp.blur(); setTimeout(closeDetails, 0); }
+      else if(e.key === "Backspace" && inp.value === "" && inp.selectionStart === 0 && inp.selectionEnd === 0){
+        e.preventDefault(); e.stopPropagation();
+        if(i > 0){ var pv = boxes[i - 1]; pv.focus(); try{ pv.setSelectionRange(pv.value.length, pv.value.length); }catch(x){} }
+        else { inp.blur(); setTimeout(closeDetails, 0); }
+      }
+    }, true);
     return wrap;
   }
   function shopFieldValue(n, it, f){ return f === "qty" ? (it.q || "") : f === "note" ? (it.n || "") : f === "tag" ? (it.g || "") : f === "link" ? (it.l || "") : (it.p == null ? "" : String(it.p)); }

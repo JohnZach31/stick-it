@@ -231,5 +231,13 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   ok(/shQtyClear/.test(app) && /Remove the quantity/.test(app) && /numI\.value = ""; unitI\.value = ""; qtyCommit\(\)/.test(app), 'the quantity editor has its own clear button that removes the quantity');
   ok(/pre\.textContent = "Qty"/.test(app), 'the editor label says Qty, not a lookalike × button');
 }
+// ---- keys in the details panel (v0.8.3.8)
+{
+  const app = read('js/app.js');
+  ok(/e\.key === "Enter"\)\{ e\.preventDefault\(\); e\.stopPropagation\(\); if\(inp\.value !== inp\.dataset\.orig\)/.test(app) && /setTimeout\(closeDetails, 0\)/.test(app), 'Enter saves what was typed and closes the details, returning to the item');
+  ok(/e\.key === "Escape"\)\{[^}]*b\.value = b\.dataset\.orig/.test(app), 'Esc discards the typing and closes the details');
+  ok(/e\.key === "Backspace" && inp\.value === "" && inp\.selectionStart === 0/.test(app) && /boxes\[i - 1\]/.test(app), 'Backspace in an empty box steps back to the previous one, and out of the panel from the first');
+  ok(/wrap\.addEventListener\("keydown", function\(e\)\{[\s\S]*\}, true\)/.test(app), 'handled in the capture phase, so every detail box (quantity, unit, price, subtext, link, tag) behaves the same');
+}
 console.log(`shopping: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
