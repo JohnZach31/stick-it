@@ -9764,6 +9764,7 @@
     if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + buildTag(); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (bi && bi.n ? ", build " + bi.n + ", " + bi.at : ""); }
     var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
     if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev" + buildTag() + " · localhost"; }
+    try{ var bt = sessionStorage.getItem("stickit.bootToast"); if(bt){ sessionStorage.removeItem("stickit.bootToast"); setTimeout(function(){ toast(bt); }, 800); } }catch(e){}
     try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
   var CROWN_SVG = '<svg viewBox="0 0 24 16" aria-hidden="true" focusable="false" shape-rendering="geometricPrecision"><path d="M2.6 13.6 1.6 4.4 7 8.3 12 2.1 17 8.3 22.4 4.4 21.4 13.6z" fill="#f5b800" stroke="#7a4f00" stroke-width="1.4" stroke-linejoin="round"></path><path d="M3.2 11.4h17.6" stroke="#7a4f00" stroke-width="1" opacity=".55" fill="none"></path><circle cx="1.6" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="12" cy="2.1" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle><circle cx="22.4" cy="4.4" r="1.25" fill="#fff4b8" stroke="#7a4f00" stroke-width=".9"></circle></svg>';
   function updateAccountIcon(){
@@ -13393,6 +13394,15 @@
     document.addEventListener("visibilitychange", function(){
       if(document.visibilityState === "visible" && Date.now() - lastAcctRefresh > 120000){ lastAcctRefresh = Date.now(); refreshAccountData(); }
     });
+    if(needsCloudBootstrap && Stick.auth.isAnonymous && Stick.auth.isAnonymous()){
+      // A guest who joined without an account owns no board and cannot make one (the database refuses): join the invited board instead of creating "My Board".
+      if(await maybeAcceptInvite()) return;
+      // nothing to join (no saved invitation, or it was refused): an anonymous session is of no use, so go back to plain guest mode
+      cloudSigningOut = true; try{ await Stick.auth.signOut("local"); }catch(e){}
+      wipeCloudCache(session.user.id); settings.account = null; saveSettings(); hideCloudOverlay();
+      try{ sessionStorage.setItem("stickit.bootToast", "That invitation couldn’t be used (it may have expired, been used, or be tied to an e-mail address). You’re browsing as a guest."); }catch(e){}
+      location.reload(); return;
+    }
     try{
       if(needsCloudBootstrap){ await firstCloudLoad(session.user, profile); return; }
       if(needsBoardFill){ await fillBoardAndReload(activeBoardId); return; }

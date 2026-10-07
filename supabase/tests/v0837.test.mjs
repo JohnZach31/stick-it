@@ -21,4 +21,12 @@ ok(/placeholder="Add e-mails \(optional\)"/.test(app), 'the invite e-mail box pl
   ok(/tied to a specific e-mail address/.test(app), 'an e-mail-bound invitation gives a clear message to an anonymous visitor');
   ok(/Allow anonymous sign-ins/.test(read('docs/dev/GUEST-JOIN.md')), 'the Supabase switch is documented');
 }
+// ---- an anonymous guest never tries to create a board (v0.8.3.13)
+{
+  const sc = app.slice(app.indexOf('async function startCloud'));
+  const iA = sc.indexOf('needsCloudBootstrap && Stick.auth.isAnonymous'), iF = sc.indexOf('await firstCloudLoad(session.user, profile)');
+  ok(iA > 0 && iF > iA, 'for an anonymous session, joining the invited board is tried BEFORE the first-load step that creates "My Board"');
+  ok(/if\(await maybeAcceptInvite\(\)\) return;\s*\/\/ nothing to join/.test(sc), 'a successful join restarts into the joined board');
+  ok(/stickit\.bootToast/.test(app) && /Stick\.auth\.signOut\("local"\)/.test(sc.slice(iA, iA + 900)), 'with nothing to join, an anonymous session is dropped and the person is told, back in plain guest mode');
+}
 console.log('v0.8.3.10 invites: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);
