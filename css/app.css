@@ -2379,7 +2379,7 @@ body.dark .text a{ color:var(--link, #8fb4ff); }
 /* ---------- Shopping List (v0.8.2): the receipt is the surface, the cart is a small hand-drawn accent ----------
    Three looks are being compared (v-a, v-b, v-c); everything shared is written once, only the cart and the paper's edges differ. */
 .shopObj{ --sInk:#3a3526; --sSoft:#6b6550; --sLine:rgba(58,53,38,0.3); --sPaper:#fffdf6; --sCartFill:#fbf6e6; --sTick:#2f7a45; --sPrice:#245f37; --sWarn:#b3402a;
-  width:var(--pw, 290px); color:var(--sInk); font-family:'Caveat','Patrick Hand',cursive; touch-action:pan-y; }
+  width:var(--pw, 290px); color:var(--sInk); font-family:'Caveat','Patrick Hand','Playpen Sans Hebrew','Gveret Levin','Alef',cursive; touch-action:pan-y; }          /* Latin: Caveat; Hebrew falls through to a hand-written Hebrew face (Playpen Sans Hebrew), not a newspaper serif */
 .shopObj .shCart, .shopObj .shHead{ touch-action:none; }
 .shopObj .shPaper{ position:relative; z-index:1; background:var(--sPaper); border-radius:2px; padding:11px 13px 13px; box-shadow:0 1px 2px rgba(60,45,10,0.2), 0 5px 12px rgba(60,45,10,0.12); }
 /* one deliberate title: handwritten, with a hand-ruled line under the header block */

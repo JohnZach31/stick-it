@@ -615,3 +615,11 @@ body.dark .lkCard{ background:#2b2638; border-color:rgba(255,255,255,0.15); }
 body.dark .pbSlip .pbGroup + .pbGroup{ border-inline-start-color:rgba(255,255,255,0.18); }
 .pbSlip .pbFoot{ margin-inline-start:auto; flex:0 0 auto; } .pbSlip .pbFoot .pbBack{ margin:0; flex:0 0 auto; min-height:44px; padding:0 16px; }
 @media (max-width:480px){ .pbCard{ border-radius:0; } .pbSlip{ justify-content:center; } .pbSlip .pbFoot{ flex:1 1 100%; margin:0; } .pbSlip .pbFoot .pbBack{ width:100%; } .pbSlip .pbGroup + .pbGroup{ padding-inline-start:6px; } }
+
+/* Shopping list (v0.8.3.4): friendlier Hebrew, and a quantity you can actually read */
+.shopObj .shTitle:lang(he), .shopObj .shTitle[dir="rtl"]{ font-weight:600; letter-spacing:0; }
+.shopObj .shLine{ font-size:1.18rem; }
+.shopObj .shMeta{ align-items:baseline; }
+.shopObj .shQty{ font:700 1.05rem/1.15 'Courier Prime','Courier New',monospace; color:var(--sInk); letter-spacing:0; }
+.shopObj .shF{ font-size:0.78rem; }
+.shopObj .shF input{ font-size:1rem; }
