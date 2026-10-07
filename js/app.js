@@ -4331,11 +4331,14 @@
     }
     if(shopHas(n, "qty")){
       var pq = S.parseQty(it.q), lab = document.createElement("div"); lab.className = "shF f-qty shQtyEd";
-      var pre = document.createElement("span"); pre.className = "shPre"; pre.textContent = "\u00d7"; lab.appendChild(pre);
+      var pre = document.createElement("span"); pre.className = "shPre"; pre.textContent = "Qty"; lab.appendChild(pre);
       var numI = document.createElement("input"); numI.type = "text"; numI.className = "qnIn"; numI.inputMode = "decimal"; numI.autocomplete = "off"; numI.maxLength = 10; numI.placeholder = "2"; numI.dir = "ltr"; numI.setAttribute("aria-label", "Quantity (number)"); numI.value = pq.n;
       var unitI = document.createElement("input"); unitI.type = "text"; unitI.className = "quIn"; unitI.autocomplete = "off"; unitI.maxLength = 14; unitI.placeholder = "g, kg, ml, L\u2026"; unitI.dir = "auto"; unitI.setAttribute("aria-label", "Unit (grams, kilos, millilitres, packs, anything)"); unitI.value = pq.u;
       var dl = document.createElement("datalist"); dl.id = "shUnits-" + it.id; S.unitSuggestions((n.title || "") + " " + (it.t || "")).forEach(function(u){ var o = document.createElement("option"); o.value = u; dl.appendChild(o); }); unitI.setAttribute("list", dl.id);
-      lab.appendChild(numI); lab.appendChild(unitI); lab.appendChild(dl); wrap.appendChild(lab);
+      lab.appendChild(numI); lab.appendChild(unitI); lab.appendChild(dl);
+      var clr = document.createElement("button"); clr.type = "button"; clr.className = "shQtyClear"; clr.textContent = "\u00d7"; clr.title = "Remove the quantity"; clr.setAttribute("aria-label", "Remove the quantity");
+      clr.addEventListener("click", function(e){ e.stopPropagation(); numI.value = ""; unitI.value = ""; qtyCommit(); });
+      lab.appendChild(clr); wrap.appendChild(lab);
       function qtyCommit(){ var val = S.joinQty(numI.value, unitI.value) || null, cur = (n.items || []).filter(function(x){ return x.id === it.id; })[0]; if(!cur || (cur.q || null) === val) return; shopChange(n, "Edit item", function(items){ return S.update(items, it.id, shopPatch("q", val)); }, {keepOpen: true, focusDetail: n._openItem}); }
       [numI, unitI].forEach(function(inp){
         inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); inp.blur(); } else if(e.key === "Escape"){ e.stopPropagation(); numI.value = pq.n; unitI.value = pq.u; inp.blur(); } e.stopPropagation(); });

@@ -224,5 +224,12 @@ ok(/\.shopObj \.shNote::before\{ content:"note: "/.test(css) && /\.shopObj \.shM
   ok(/qnIn/.test(app) && /quIn/.test(app) && /setAttribute\("list", dl\.id\)/.test(app), 'the editor has a number box and a unit box with suggestions (any text is accepted)');
   ok(/unicode-bidi:isolate/.test(read('css/spaces.css')), 'digits and a Hebrew unit never scramble');
 }
+// ---- row buttons and removing a quantity (v0.8.3.7)
+{
+  const app = read('js/app.js'), sp = read('css/spaces.css');
+  ok(/\.shopObj \.shMore, \.shopObj \.shDel\{ flex:none; min-width:26px; min-height:26px/.test(sp), 'the details and remove buttons can never be squeezed to a few pixels by a long (right-to-left) item');
+  ok(/shQtyClear/.test(app) && /Remove the quantity/.test(app) && /numI\.value = ""; unitI\.value = ""; qtyCommit\(\)/.test(app), 'the quantity editor has its own clear button that removes the quantity');
+  ok(/pre\.textContent = "Qty"/.test(app), 'the editor label says Qty, not a lookalike × button');
+}
 console.log(`shopping: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

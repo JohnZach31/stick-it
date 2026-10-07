@@ -646,3 +646,9 @@ body.dark .pbSlip .pbGroup + .pbGroup{ border-inline-start-color:rgba(255,255,25
 .shopObj .shQtyEd .quIn{ width:9ch; }
 .shopObj .shQtyEd input{ font-size:1rem; border:0; border-bottom:1px dotted var(--sLine); background:transparent; color:var(--sInk); padding:1px 2px; outline:none; }
 .shopObj .shQtyEd input:focus-visible{ border-bottom:1px solid var(--accent, #c9871f); background:rgba(255,224,130,0.3); }
+/* the row buttons must never be squeezed by a long item (they were shrinking to ~5px in right-to-left rows) */
+.shopObj .shMore, .shopObj .shDel{ flex:none; min-width:26px; min-height:26px; display:inline-flex; align-items:center; justify-content:center; font-size:1rem; }
+.shopObj .shQtyClear{ flex:none; width:26px; height:26px; border:0; border-radius:50%; background:transparent; color:var(--sSoft); font:600 1rem 'Sora',sans-serif; cursor:pointer; padding:0; }
+.shopObj .shQtyClear:hover{ background:rgba(0,0,0,0.08); color:var(--sWarn); }
+.shopObj .shQtyClear:focus-visible{ outline:2px solid var(--accent, #c9871f); }
+@media (hover:none){ .shopObj .shMore, .shopObj .shDel{ min-width:36px; min-height:36px; } }
