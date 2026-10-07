@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.3.4",
+    "codename": "Lock It Down",
+    "title": "Stick-It v0.8.3.4 — Lock It Down",
+    "date": "2026-10-08",
+    "status": "released",
+    "tldr": "Turning off an invite link now really removes the access it gave, board edits show up almost instantly, and a round of fixes for the invite screens, scrolling nodes and settings.",
+    "file": "0.8.3.4.md"
+  },
+  {
     "version": "0.8.3.3",
     "codename": "Sand the Edges",
     "title": "Stick-It v0.8.3.3 — Sand the Edges",

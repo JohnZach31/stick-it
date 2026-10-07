@@ -58,6 +58,7 @@ async function device(email, opts = {}) {
     mediaBlob: async (id) => dev.mediaBlobs.get(id) || null,
     toast: (m) => dev.toasts.push(m),
     onAuthLost: () => { dev.authLost++; },
+    onAccessCheck: () => { dev.accessChecks = (dev.accessChecks || 0) + 1; },
   };
   dev.keys = { sync: (id) => `sync.${id}`, meta: () => 'meta', notes: (id) => `notes.${id}`, boards: () => 'boards', cover: (id) => `cover.${id}` };
   dev.open = (boardId) => {
@@ -222,6 +223,29 @@ try {
   ok(V.sync.status().state === 'problem', 'a viewer\'s write is refused and reported');
   ok((await admin("select 1 from public.board_objects where data->>'html'='viewer attempt'")).rows.length === 0, 'nothing was written');
   ok((await V.Stick.repo.listBoards()).length === 1, 'the viewer sees only that board');
+
+  // ============================================================ a collaborator joins by an open link; the owner turns it off (real client modules, real migrations)
+  {
+    const E = await device('link.editor@example.com');
+    const open = await A.Stick.repo.createInvite(board.id, null, 'editor');
+    await E.Stick.repo.acceptInvite(open.token);
+    E.open(board.id); await E.sync.start();
+    const mine = note({ html: 'from the collaborator' }); E.notes.push(mine); E.sync.notesChanged(); await sleep(150); await E.sync.flush();
+    await A.sync.pull(false);
+    ok(A.notes.some((n) => n.id === mine.id), 'a collaborator edit reaches the owner');
+    const theirs = note({ html: 'from the owner' }); A.notes.push(theirs); A.sync.notesChanged(); await sleep(150); await A.sync.flush();
+    await E.sync.pull(false);
+    ok(E.notes.some((n) => n.id === theirs.id), 'an owner edit reaches the collaborator');
+    const list = await A.Stick.repo.listInvites(board.id);
+    ok(list.some((i) => i.id === open.id && !i.revoked_at && i.people.length === 1 && /^[A-Za-z]+ #\d+$|Member|link\.editor|Example/i.test(i.people[0].name)), 'the owner sees the link, active, with the person who joined through it');
+    const res = await A.Stick.repo.revokeInvite(open.id);
+    ok(res && res.removed === 1, 'Turn off removes the one person who came in only through that link');
+    E.notes.push(note({ html: 'after revoke' })); E.sync.notesChanged(); await sleep(150); await E.sync.flush();
+    ok((await admin("select 1 from public.board_objects where data->>'html'='after revoke'")).rows.length === 0, 'their next write is rejected by the server');
+    ok((E.accessChecks || 0) >= 1, 'and the page is told to check whether access was turned off');
+    ok((await E.Stick.repo.listBoards()).length === 0, 'they no longer see the board at all');
+    E.sync.stop();
+  }
 
   // ============================================================ board metadata + cover through the queue
   const cover = { mode: 'upload', url: tinyJpeg(4), ts: 1 };

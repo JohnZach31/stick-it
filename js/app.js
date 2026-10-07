@@ -8971,7 +8971,8 @@
     var reg = scrollRegionAt(e, board);
     if(reg){
       var t = reg.el, atTop = t.scrollTop <= 0, atBottom = t.scrollTop + t.clientHeight >= t.scrollHeight - 1;
-      if((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) return;             // it can still scroll that way: scroll it (native). At its edge the board takes over.
+      if((e.deltaY < 0 && !atTop) || (e.deltaY > 0 && !atBottom)) return;             // it can still scroll that way: scroll it (native)
+      e.preventDefault(); return;                                                     // at its top/bottom edge: the wheel is still the node's. The board only moves once the pointer is outside the node.
     }
     board.scrollLeft += e.deltaY;
     e.preventDefault();
@@ -9604,16 +9605,86 @@
     return sec;
   }
   // "Input": two small choices (what a double-click on the board creates, what pasted text becomes), saved the moment they change. Lives with the other personal preferences in Appearance.
+  // A choice list in the Stick-It look: a button that opens a paper menu (role=listbox / option, aria-selected, arrow keys, Home/End, type-ahead, Esc, Enter/Space).
+  // The real <select> stays in the page (visually hidden, out of the tab order) as the single source of the value, so forms, tests and assistive tech that read it still work.
+  var idlsSelSeq = 0;
+  function idlsSelect(sel, btnId){
+    var wrap = makeDiv("idlsSel"), seq = ++idlsSelSeq;
+    var btn = document.createElement("button"); btn.type = "button"; btn.className = "idlsSelBtn"; btn.id = btnId || ("idlsSel" + seq);
+    btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
+    var val = document.createElement("span"); val.className = "idlsSelVal"; btn.appendChild(val);
+    var chev = document.createElement("span"); chev.className = "idlsSelChev"; chev.setAttribute("aria-hidden", "true"); btn.appendChild(chev);
+    sel.classList.add("idlsNative"); sel.tabIndex = -1; sel.setAttribute("aria-hidden", "true"); if(sel.id === btn.id) sel.id = btn.id + "Native";
+    function label(){ var o = sel.options[sel.selectedIndex]; return o ? o.textContent : ""; }
+    function sync(){ val.textContent = label(); }
+    sync(); sel.addEventListener("change", sync);
+    var pop = null, active = -1, typed = "", typedT = null, items = [];
+    function setActive(i, scroll){
+      if(!items.length) return; active = Math.max(0, Math.min(items.length - 1, i));
+      items.forEach(function(li, k){ li.classList.toggle("active", k === active); });
+      pop.setAttribute("aria-activedescendant", items[active].id); if(scroll !== false) items[active].scrollIntoView({block: "nearest"});
+    }
+    function closeList(focusBtn){
+      if(!pop) return; pop.remove(); pop = null; items = []; btn.setAttribute("aria-expanded", "false");
+      document.removeEventListener("pointerdown", outside, true); window.removeEventListener("resize", closeList); window.removeEventListener("scroll", closeList, true);
+      if(focusBtn !== false) btn.focus();
+    }
+    function outside(e){ if(pop && !pop.contains(e.target) && !btn.contains(e.target)) closeList(false); }
+    function choose(i){ var o = sel.options[i]; if(!o) return; var changed = sel.selectedIndex !== i; sel.selectedIndex = i; sync(); closeList(true); if(changed) sel.dispatchEvent(new Event("change", {bubbles: true})); }
+    function openList(){
+      if(pop || sel.disabled) return;
+      pop = document.createElement("ul"); pop.className = "idlsSelList"; pop.setAttribute("role", "listbox"); pop.tabIndex = -1; pop.id = btn.id + "List";
+      var lab = btn.getAttribute("aria-labelledby"); if(lab) pop.setAttribute("aria-labelledby", lab); else pop.setAttribute("aria-label", btn.getAttribute("aria-label") || "Choose");
+      pop.dir = getComputedStyle(btn).direction;
+      items = [].map.call(sel.options, function(o, i){
+        var li = document.createElement("li"); li.id = btn.id + "Opt" + i; li.setAttribute("role", "option"); li.className = "idlsSelOpt";
+        li.setAttribute("aria-selected", i === sel.selectedIndex ? "true" : "false"); li.textContent = o.textContent;
+        li.addEventListener("pointerdown", function(e){ e.preventDefault(); });
+        li.addEventListener("click", function(){ choose(i); });
+        li.addEventListener("pointermove", function(){ if(active !== i) setActive(i, false); });
+        pop.appendChild(li); return li;
+      });
+      document.body.appendChild(pop);
+      var r = btn.getBoundingClientRect(), w = Math.max(r.width, 190); pop.style.minWidth = w + "px";
+      var ph = pop.getBoundingClientRect().height, below = window.innerHeight - r.bottom - 10, top = (below >= Math.min(ph, 160) || r.top < ph + 10) ? r.bottom + 4 : r.top - ph - 4;
+      pop.style.maxHeight = Math.max(120, (top > r.top ? below : r.top - 14)) + "px";
+      var left = pop.dir === "rtl" ? r.right - w : r.left; pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, left)) + "px"; pop.style.top = top + "px";
+      btn.setAttribute("aria-expanded", "true"); setActive(sel.selectedIndex < 0 ? 0 : sel.selectedIndex);
+      pop.addEventListener("keydown", function(e){
+        if(e.key === "ArrowDown"){ e.preventDefault(); setActive(active + 1); }
+        else if(e.key === "ArrowUp"){ e.preventDefault(); setActive(active - 1); }
+        else if(e.key === "Home"){ e.preventDefault(); setActive(0); }
+        else if(e.key === "End"){ e.preventDefault(); setActive(items.length - 1); }
+        else if(e.key === "Enter" || e.key === " "){ e.preventDefault(); choose(active); }
+        else if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); closeList(true); }
+        else if(e.key === "Tab"){ closeList(false); }
+        else if(e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey){
+          typed += e.key.toLowerCase(); clearTimeout(typedT); typedT = setTimeout(function(){ typed = ""; }, 600);
+          for(var k = 0; k < items.length; k++){ var idx = (active + 1 + k) % items.length; if(items[idx].textContent.toLowerCase().indexOf(typed) === 0){ setActive(idx); break; } }
+        }
+      });
+      document.addEventListener("pointerdown", outside, true); window.addEventListener("resize", closeList); window.addEventListener("scroll", closeList, true);
+      pop.focus();
+    }
+    btn.addEventListener("click", function(){ if(pop) closeList(true); else openList(); });
+    btn.addEventListener("keydown", function(e){
+      if(e.key === "ArrowDown" || e.key === "ArrowUp"){ e.preventDefault(); openList(); }
+      else if(pop && e.key === "Escape"){ e.stopPropagation(); closeList(true); }
+    });
+    wrap.appendChild(btn); wrap.appendChild(sel);
+    return wrap;
+  }
   function buildInputCard(){
       var card = document.createElement("section"); card.className = "asCard"; card.setAttribute("aria-labelledby", "ccInH");
       card.innerHTML = '<h4 id="ccInH">Input</h4>';
       function row(id, label, help, list, key){
         var r = document.createElement("div"); r.className = "asItem asItemField";
-        var l = document.createElement("label"); l.className = "lbl"; l.setAttribute("for", id); l.textContent = label; var sm = document.createElement("small"); sm.textContent = help; l.appendChild(sm);
+        var l = document.createElement("label"); l.className = "lbl"; l.setAttribute("for", id); l.id = id + "Lbl"; l.textContent = label; var sm = document.createElement("small"); sm.textContent = help; l.appendChild(sm);
         var sel = document.createElement("select"); sel.id = id; sel.className = "asSelect";
         list.forEach(function(o){ var op = document.createElement("option"); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
         sel.value = uiPref(key); sel.addEventListener("change", function(){ setUiPref(key, sel.value); toast("Saved."); });
-        var selWrap = document.createElement("span"); selWrap.className = "asSel"; selWrap.appendChild(sel);
+        var selWrap = document.createElement("span"); selWrap.className = "asSel idlsHost"; selWrap.appendChild(idlsSelect(sel, id));
+        selWrap.querySelector(".idlsSelBtn").setAttribute("aria-labelledby", l.id + " " + id);
         r.appendChild(l); r.appendChild(selWrap); card.appendChild(r);
       }
       row("inDbl", "Double-click the canvas creates", "What a double-click on empty board makes. Ask me each time opens the add menu where you clicked.", DBL_NODES, "dblNode");
@@ -10264,10 +10335,14 @@
       var names = {};
       try{ (await Stick.repo.listBoards()).forEach(function(b){ names[b.id] = b.name; }); }catch(e){}
       var act = list.filter(function(x){ return x.is_active; });
+      // Collaboration invitations are a different thing from public share links: they live in their own table (board_invites), so this window used to show only the public ones.
+      var ownedBoards = []; try{ ownedBoards = (await Stick.repo.listBoards()).filter(function(b){ return b.role === "owner" || b.owner_id === (Stick.auth.user() || {}).id; }); }catch(e){}
+      var inviteSets = await Promise.all(ownedBoards.map(function(b){ return Stick.repo.listInvites(b.id).then(function(rows){ return {b: b, rows: rows, ok: true}; }, function(){ return {b: b, rows: [], ok: false}; }); }));
       await new Promise(function(r){ ld.stop(r); });
       content.innerHTML = "";
-      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "You have no active shared links."; content.appendChild(none); return; }
-      var note = document.createElement("p"); note.className = "lkNote";
+      var pubH = document.createElement("div"); pubH.className = "menuHint lkSecHead"; pubH.textContent = "Public links"; content.appendChild(pubH);
+      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "No public share links. (Collaboration invites are listed below.)"; content.appendChild(none); }
+      var note = document.createElement("p"); note.className = "lkNote"; note.hidden = !act.length;
       note.textContent = "Anyone with one of these links can view it. Turn a link off and it stops working straight away.";
       content.appendChild(note);
       var listEl = makeDiv("lkList"); content.appendChild(listEl);
@@ -10289,11 +10364,25 @@
         var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn danger lkOff"; b.textContent = "Turn off"; b.setAttribute("aria-label", "Turn off this " + kind.textContent.toLowerCase() + " link");
         b.addEventListener("click", function(){
           b.disabled = true;
-          Stick.share.disable(x.id).then(function(){ card.remove(); if(onChange) onChange(-1); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "You have no active shared links."; listEl.appendChild(n2); } },
+          Stick.share.disable(x.id).then(function(){ card.remove(); if(onChange) onChange(-1); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "No public share links."; listEl.appendChild(n2); } },
             function(){ b.disabled = false; toast("Couldn't turn it off. Try again."); });
         });
         card.appendChild(ic); card.appendChild(body); card.appendChild(b); listEl.appendChild(card);
       });
+      var invH = document.createElement("div"); invH.className = "menuHint lkSecHead"; invH.textContent = "Collaboration invites"; content.appendChild(invH);
+      var invNote = document.createElement("p"); invNote.className = "lkNote"; invNote.textContent = "Links that let people work on a board with you. They stay on until you turn them off.";
+      content.appendChild(invNote);
+      var anyInv = false;
+      inviteSets.forEach(function(set){
+        if(!set.rows.length && set.ok) return;
+        anyInv = true;
+        var sec = makeDiv("invSection"), t = document.createElement("div"); t.className = "invBoard"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
+        var host = makeDiv("invList"); sec.appendChild(host); content.appendChild(sec);
+        if(!set.ok){ host.textContent = "Couldn\u2019t load this board\u2019s invitations."; return; }
+        var reloadSet = function(){ Stick.repo.listInvites(set.b.id).then(function(rows){ renderInviteCards(host, rows || [], reloadSet, {noBoard: true}); }, function(){}); };
+        renderInviteCards(host, set.rows, reloadSet, {noBoard: true});
+      });
+      if(!anyInv){ var ne = makeDiv("invEmpty"); ne.innerHTML = '<strong>No collaboration invites</strong><span>Open a board, then Share \u2192 Collaborate to make one.</span>'; content.appendChild(ne); }
     }catch(e){ if(!modal.card.isConnected){ ld.stop(); return; } ld.fail("Couldn\u2019t load your links. " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ modal.close(false); setTimeout(function(){ openManageShares(onChange); }, 0); }); }
   }
 
@@ -12201,6 +12290,7 @@
 
   // ---------- board switcher ----------
   function renderBoardList(){
+    hideTruncTip();
     boardList.innerHTML = "";
     if(activeBoardId) saveThumbNow();
     boards.forEach(function(b){
@@ -12295,9 +12385,45 @@
         row.appendChild(delBtn);
       }
 
+      attachTruncTip(row, info, b);
       boardList.appendChild(row);
     });
   }
+  // A board card shows its name / subtitle / meta with an ellipsis. When something is cut off, the full text appears in a small paper label on hover, on keyboard focus,
+  // and after a long press on a phone (the card also carries the full text as its accessible name). The label is fixed-position, so nothing moves or jumps.
+  var truncTipEl = null, truncTipFor = null;
+  function hideTruncTip(){ if(truncTipEl){ truncTipEl.remove(); truncTipEl = null; } truncTipFor = null; }
+  function showTruncTip(row, info){
+    var parts = [];
+    [].forEach.call(info.children, function(c){ if(c.scrollWidth > c.clientWidth + 1 && c.textContent) parts.push({cls: c.className, text: c.textContent}); });
+    if(!parts.length){ hideTruncTip(); return; }
+    if(truncTipFor === row && truncTipEl) return;
+    hideTruncTip();
+    var tip = makeDiv("truncTip"); tip.setAttribute("role", "tooltip");
+    parts.forEach(function(p){ var d = document.createElement("div"); d.className = "tt " + p.cls; d.textContent = p.text; tip.appendChild(d); });
+    document.body.appendChild(tip);
+    var r = row.getBoundingClientRect(), t = tip.getBoundingClientRect(), top = r.top - t.height - 6;
+    if(top < 8) top = r.bottom + 6;
+    tip.style.left = Math.max(8, Math.min(window.innerWidth - t.width - 8, r.left)) + "px"; tip.style.top = top + "px";
+    truncTipEl = tip; truncTipFor = row;
+  }
+  function attachTruncTip(row, info, b){
+    row.tabIndex = 0; row.setAttribute("role", "button");
+    row.setAttribute("aria-label", (b.name || "Board") + (b.subtitle ? ", " + b.subtitle : "") + (b.id === activeBoardId ? " (open)" : ""));
+    row.addEventListener("pointerenter", function(e){ if(e.pointerType !== "touch") showTruncTip(row, info); });
+    row.addEventListener("pointerleave", hideTruncTip);
+    row.addEventListener("focus", function(){ showTruncTip(row, info); });
+    row.addEventListener("blur", hideTruncTip);
+    row.addEventListener("keydown", function(e){
+      if(e.target !== row) return;
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); row.click(); }
+      else if(e.key === "Escape" && truncTipEl){ e.stopPropagation(); hideTruncTip(); }
+    });
+    var lp = null;                                                                       // long press on a touch screen
+    row.addEventListener("pointerdown", function(e){ if(e.pointerType === "touch"){ clearTimeout(lp); lp = setTimeout(function(){ showTruncTip(row, info); setTimeout(hideTruncTip, 3500); }, 520); } });
+    ["pointerup", "pointercancel", "pointermove"].forEach(function(ev){ row.addEventListener(ev, function(){ clearTimeout(lp); }); });
+  }
+  boardPanel.addEventListener("scroll", hideTruncTip, true);
   function finishLocalBoardRemoval(b){
     boards = boards.filter(function(x){ return x.id !== b.id; });
     safeSet(BOARDS_KEY, boards);
@@ -13599,7 +13725,8 @@
   function forgetInviteToken(id){ var o = inviteTokens(); delete o[id]; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
   function fmtDay(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}); }catch(e){ return ""; } }
   // each link as a small slip: what it allows, whether it is on, who came in through it, and Copy / Turn off
-  function renderInviteCards(host, rows, reload){
+  function renderInviteCards(host, rows, reload, opts){
+    opts = opts || {};
     host.innerHTML = "";
     if(!rows.length){
       var empty = makeDiv("invEmpty"); empty.innerHTML = '<strong>No links yet</strong><span>Make one above. It will appear here, with the people who join through it.</span>';
@@ -13608,15 +13735,17 @@
     var toks = inviteTokens();
     rows.forEach(function(r){
       var on = !r.revoked_at, card = makeDiv("invCard" + (on ? "" : " off"));
-      var head = makeDiv("invHead"), role = document.createElement("span"); role.className = "invRole"; role.textContent = r.role === "viewer" ? "Viewer" : "Editor";
+      var legacy = r.tracked === false;
+      var head = makeDiv("invHead"), role = document.createElement("span"); role.className = "invRole"; role.textContent = (legacy ? "Legacy collaboration invite \u00b7 " : "") + (r.role === "viewer" ? "Viewer" : "Editor") + (legacy ? " access" : (opts.noBoard ? "" : " invite"));
       var state = document.createElement("span"); state.className = "invState " + (on ? "on" : "off"); state.textContent = on ? "On" : "Turned off";
       head.appendChild(role); head.appendChild(state); card.appendChild(head);
       var who = makeDiv("invWho"); who.textContent = r.email ? "Only for " + r.email : "Anyone with the link"; card.appendChild(who);
       var people = r.people || [], active = people.filter(function(x){ return x.active; }).length;
-      var meta = makeDiv("invMeta"); meta.textContent = "Made " + fmtDay(r.created_at) + " \u00b7 joined " + (r.uses || 0) + (r.uses === 1 ? " time" : " times") + (people.length ? " \u00b7 " + active + " here now" : ""); card.appendChild(meta);
+      var meta = makeDiv("invMeta"); meta.textContent = (legacy ? "Created before invite tracking" : "Made " + fmtDay(r.created_at)) + (legacy ? " (" + fmtDay(r.created_at) + ")" : "") + " \u00b7 joined " + (r.uses || 0) + (r.uses === 1 ? " time" : " times") + (people.length ? " \u00b7 " + active + " with access" : ""); card.appendChild(meta);
+      if(legacy){ var ln = makeDiv("invMeta invLegacy"); ln.textContent = "People who joined before this was tracked stay on the board if you turn this link off; nobody new can use it."; card.appendChild(ln); }
       if(people.length){
         var chips = makeDiv("invPeople");
-        people.forEach(function(x){ var c = document.createElement("span"); c.className = "invChip" + (x.active ? "" : " gone") + (x.guest ? " guest" : ""); c.textContent = x.name; c.title = (x.guest ? "Guest, joined without an account" : "Member") + (x.active ? "" : " (no longer on the board)"); chips.appendChild(c); });
+        people.forEach(function(x){ var c = document.createElement("span"); c.className = "invChip" + (x.active ? "" : " gone") + (x.guest ? " guest" : ""); c.textContent = x.name; c.title = (x.guest ? "Guest, joined without an account" : "Member") + (x.active ? "" : " (no longer on the board)") + (x.legacy && x.active ? " \u00b7 joined before tracking: stays if the link is turned off" : ""); chips.appendChild(c); });
         card.appendChild(chips);
       }
       var acts = makeDiv("invActs");
@@ -13626,9 +13755,9 @@
         acts.appendChild(cp);
       } else if(on){ var note = document.createElement("span"); note.className = "asHint"; note.textContent = "Copy is only offered on the device that made the link."; acts.appendChild(note); }
       if(on){
-        var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn danger"; off.textContent = "Turn off"; var armed = false, t0 = 0;
+        var off = document.createElement("button"); off.type = "button"; off.className = "pillBtn danger"; off.textContent = "Turn off"; var armed = false, t0 = 0, removable = people.filter(function(x){ return x.active && !x.legacy; }).length;
         off.addEventListener("click", function(){
-          if(!armed){ armed = true; off.textContent = active ? "Turn off & remove " + active + (active === 1 ? " person" : " people") + "?" : "Really turn off?"; off.classList.add("dangerFill"); t0 = setTimeout(function(){ armed = false; off.textContent = "Turn off"; off.classList.remove("dangerFill"); }, 5000); return; }
+          if(!armed){ armed = true; off.textContent = removable ? "Turn off & remove " + removable + (removable === 1 ? " person" : " people") + "?" : "Really turn off?"; off.classList.add("dangerFill"); t0 = setTimeout(function(){ armed = false; off.textContent = "Turn off"; off.classList.remove("dangerFill"); }, 5000); return; }
           clearTimeout(t0); off.disabled = true;
           Stick.repo.revokeInvite(r.id).then(function(res){ forgetInviteToken(r.id); toast("Link turned off" + (res && res.removed ? " and " + res.removed + (res.removed === 1 ? " person was" : " people were") + " removed." : ".")); reload(); },
             function(e){ off.disabled = false; errorToast(Stick.errors.parse(e)); });
@@ -13692,7 +13821,16 @@
   async function checkBoardAccess(){
     if(accessLost || accessCheckBusy || !CLOUD || !cloudSync || !activeBoardId) return;
     accessCheckBusy = true;
-    try{ var list = await cloudSync.refreshBoards(); if(!list.some(function(b){ return b.id === activeBoardId; })) onAccessLost(); }
+    // Never act on one odd answer: a board is only treated as lost when the server twice returns a board list that does not contain it (and the list call itself succeeded).
+    // An error, an offline phone or an empty reply from a hiccup can therefore never throw a real collaborator off their board.
+    try{
+      var list = await cloudSync.refreshBoards();
+      if(!list.some(function(b){ return b.id === activeBoardId; })){
+        await new Promise(function(r){ setTimeout(r, 2500); });
+        list = await cloudSync.refreshBoards();
+        if(!list.some(function(b){ return b.id === activeBoardId; })) onAccessLost();
+      }
+    }
     catch(e){} finally{ accessCheckBusy = false; }
   }
   function onAccessLost(){

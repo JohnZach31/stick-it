@@ -80,7 +80,7 @@ ok(/startCollab\._alias/.test(app) && /myGuestAlias/.test(app) && /my_guest_alia
 ok(/function scrollRegionAt\(e, stop\)/.test(app) && /var reg = scrollRegionAt\(e, board\);/.test(app), 'the wheel handler asks what scrolls under the pointer (any scrollable node, not just text notes)');
 {
   const w = /var reg = scrollRegionAt\(e, board\);\n([\s\S]*?)board\.scrollLeft \+= e\.deltaY;/.exec(app)[1];
-  ok(/deltaY < 0 && !atTop/.test(w) && /deltaY > 0 && !atBottom/.test(w) && /return;/.test(w), 'wheel scrolls the node while it can, and hands over to the board at its edge');
+  ok(/deltaY < 0 && !atTop/.test(w) && /deltaY > 0 && !atBottom/.test(w) && /e\.preventDefault\(\); return;/.test(w), 'wheel scrolls the node while it can; at its edge the wheel is still consumed (the board does not start moving)');
 }
 ok((app.match(/if\(isScrollGesture\(e, el\)\) return;/g) || []).length === 4, 'all four paper pointerdown handlers skip dragging for a scroll gesture (scrollbar or swipe inside scrolling content)');
 {
@@ -96,7 +96,7 @@ ok((app.match(/if\(isScrollGesture\(e, el\)\) return;/g) || []).length === 4, 'a
 }
 
 // ---------------------------------------------------------------- settings layout
-ok(/asItem asItemField/.test(app) && /selWrap\.className = "asSel"/.test(app), 'Input rows use the field layout with the shared select wrapper');
+ok(/asItem asItemField/.test(app) && /selWrap\.className = "asSel idlsHost"/.test(app), 'Input rows use the field layout with the shared select wrapper');
 ok(/\.asItem\.asItemField\{ display:grid; grid-template-columns:minmax\(0,1fr\) minmax\(150px,max-content\)/.test(css) && /@media \(max-width:480px\)\{ \.asItem\.asItemField\{ grid-template-columns:minmax\(0,1fr\)/.test(css), 'two real columns on desktop, stacked on narrow screens');
 ok(!css.split('\n').filter((l) => /asItemField/.test(l)).some((l) => /word-break|overflow-wrap:\s*anywhere/.test(l)), 'no word-break hack');
 
@@ -116,6 +116,79 @@ ok(/\.modalActions\.ageActs\{ flex-wrap:nowrap; justify-content:space-between/.t
 ok(/function errorToast\(err, opts\)/.test(app) && /etClose/.test(app) && /etCode/.test(app) && /opts\.retry && d\.retry !== false/.test(app), 'compact error component: dismissible, shows the code, optional Retry');
 ok(/\.toast\.errToast\{[^}]*env\(safe-area-inset-bottom/.test(css) && /@media \(max-width:600px\)\{\s*\.toast\{ max-width:calc\(100vw - 20px\)/.test(css), 'safe-area aware and compact on phones');
 ok(/Stick\.perf = \{/.test(app) && /perfMark\("board switch: clicked"\)/.test(app) && /prefetchBoard\(b\.id\)/.test(app) && /prefetching\[b\.id\] \|\|/.test(app), 'board switching is instrumented and boards are prefetched while the list is open');
+
+
+// ---------------------------------------------------------------- final pass: invisibility of collaboration invites, legacy cards, tooltip, zone pin, IDLS select, wheel
+{
+  const rp = read('js/repo.js');
+  ok(/c\.from\("board_invites"\)\.select\("id,board_id,email,role,uses,created_at"\)/.test(rp) && /list_invites\|PGRST202/.test(rp), 'the invite list falls back to reading the table when the server has no v0.8.3.4 function yet (so existing links always show)');
+  ok(/revoke_invite\|PGRST202/.test(rp), 'and Turn off falls back to deleting the row on an older server');
+  const ms = app.slice(app.indexOf('async function openManageShares'), app.indexOf('function openDeleteAccount'));
+  ok(/Public links/.test(ms) && /Collaboration invites/.test(ms) && /Stick\.repo\.listInvites\(b\.id\)/.test(ms) && /renderInviteCards\(host, set\.rows/.test(ms), 'the Shared links window lists collaboration invitations as well as public share links');
+  ok(!/You have no active shared links/.test(app), 'it no longer claims "no active shared links" when a collaboration invite exists');
+  ok(/Legacy collaboration invite/.test(app) && /Created before invite tracking/.test(app) && /stay on the board if you turn this link off/.test(app), 'old (pre-tracking) invitations appear, labelled as legacy, with an honest note');
+  ok(/r\.tracked === false/.test(app) && /Stick\.repo\.revokeInvite\(r\.id\)/.test(app), 'a legacy invitation can still be turned off');
+  ok(/removable = people\.filter\(function\(x\)\{ return x\.active && !x\.legacy; \}\)/.test(app), 'the Turn off confirmation only promises to remove people the server will actually remove');
+  ok(/twice returns a board list that does not contain it/.test(app) && /setTimeout\(r, 2500\)/.test(app), 'access loss is confirmed twice before the page leaves a board (no false kick on a hiccup)');
+  ok(/function attachTruncTip\(row, info, b\)/.test(app) && /scrollWidth > c\.clientWidth \+ 1/.test(app) && /row\.tabIndex = 0/.test(app) && /\}, 520\)/.test(app), 'board cards show cut-off text on hover, keyboard focus and long press');
+  ok(/\.truncTip\{ position:fixed/.test(css), 'the label is fixed-position (no layout jump)');
+  ok(/\.zone > \.pinTack, \.zone > \.pinBadge\{ z-index:10000; \}/.test(css) && /\.zone \.zoneBar\{ position:relative; z-index:9999; \}/.test(css) && !/\.zone\{[^}]*z-index:\d{3,}/.test(css), 'the zone tack and bar sit above its papers, while the zone itself is not raised');
+  ok(/function idlsSelect\(sel, btnId\)/.test(app) && /role", "listbox"/.test(app) && /role", "option"/.test(app) && /aria-selected/.test(app) && /aria-activedescendant/.test(app) && /e\.key === "ArrowDown"/.test(app) && /e\.key === "Home"/.test(app) && /e\.key === "Escape"/.test(app), 'the Input choices use a keyboard-navigable listbox');
+  ok(/idlsNative/.test(css) && /\.idlsSelBtn:focus-visible/.test(css) && /body\.dark/.test(css) && /border-inline-end/.test(css) && /pop\.dir = getComputedStyle\(btn\)\.direction/.test(app) && /pointer:coarse\)\{ \.idlsSelOpt/.test(css), 'focus ring, dark mode, RTL and touch sizes are handled; the real <select> stays as the value holder');
+  const nIn = /var DBL_NODES/.test(app) && (app.match(/row\("in(Dbl|Paste)"/g) || []).length === 2; ok(nIn, 'both Input preferences use it');
+  // wheel at the middle / top / bottom / outside, with the real handler body and a stub region
+  const w = /board\.addEventListener\("wheel", function\(e\)\{\n([\s\S]*?)\n  \}, \{passive:false\}\);/.exec(app)[1];
+  const mkEl = (st, ch, sh) => ({ scrollTop: st, clientHeight: ch, scrollHeight: sh });
+  function wheel(region, deltaY) {
+    const calls = { prevented: false, scrolled: 0 }; const board = { scrollLeft: 0 };
+    const fn = new Function('e', 'board', 'scrollRegionAt', 'dismissHint', w);
+    const ev = { deltaX: 0, deltaY, target: {}, preventDefault() { calls.prevented = true; } };
+    const r = fn(ev, board, () => region ? { el: region } : null, () => {});
+    return { returned: r === undefined && !calls.prevented && board.scrollLeft === 0 ? 'native' : 'handled', prevented: calls.prevented, boardMoved: board.scrollLeft !== 0 };
+  }
+  const mid = mkEl(200, 400, 900), top = mkEl(0, 400, 900), bottom = mkEl(500, 400, 900);
+  ok(wheel({ ...mid }.valueOf ? mid : mid, 120).boardMoved === false && wheel(mid, 120).prevented === false, 'wheel in the middle: the node scrolls (native), the board does not move');
+  ok(wheel(top, -120).boardMoved === false && wheel(top, -120).prevented === true, 'wheel up at the top edge: consumed, the board does NOT move');
+  ok(wheel(bottom, 120).boardMoved === false && wheel(bottom, 120).prevented === true, 'wheel down at the bottom edge: consumed, the board does NOT move');
+  ok(wheel(top, 120).prevented === false && wheel(bottom, -120).prevented === false, 'the other direction still scrolls the node');
+  const out = wheel(null, 120); ok(out.boardMoved === true && out.prevented === true, 'pointer just outside the node: the board scrolls as before');
+}
+
+
+// ---- the IDLS choice list, run for real in a DOM
+{
+  const { parseHTML } = await import('linkedom');
+  const { window, document } = parseHTML('<!doctype html><html><body><select id="s"><option value="a">Alpha</option><option value="b">Beta</option><option value="c">Gamma</option></select></body></html>');
+  const start = app.indexOf('  var idlsSelSeq = 0;'), end = app.indexOf('  function buildInputCard(){');
+  const body = app.slice(start, end);
+  const makeDiv = (c) => { const d = document.createElement('div'); d.className = c; return d; };
+  const rect = () => ({ left: 10, right: 210, top: 10, bottom: 48, width: 200, height: 38 });
+  window.innerHeight = 800; window.innerWidth = 1000;
+  window.HTMLElement.prototype.scrollIntoView = function () {};
+  const fnSrc = new Function('document', 'window', 'makeDiv', 'getComputedStyle', 'Event', body + '\nreturn idlsSelect;');
+  const idlsSelect = fnSrc(document, window, makeDiv, () => ({ direction: 'ltr' }), window.Event);
+  const sel = document.getElementById('s'); sel.id = 'inTest'; sel.selectedIndex = 0; const val = () => sel.options[sel.selectedIndex].value;
+  let changes = 0; sel.addEventListener('change', () => changes++);
+  const wrap = idlsSelect(sel, 'inTest'); document.body.appendChild(wrap);
+  const btn = wrap.querySelector('button'); btn.getBoundingClientRect = rect; document.body.getBoundingClientRect = rect;
+  ok(btn.id === 'inTest' && btn.getAttribute('aria-haspopup') === 'listbox' && btn.getAttribute('aria-expanded') === 'false' && btn.textContent.includes('Alpha'), 'the button shows the current choice and announces a listbox');
+  ok(sel.getAttribute('aria-hidden') === 'true' && sel.tabIndex === -1 && sel.id === 'inTestNative', 'the real select is kept (hidden from the tab order) as the value holder');
+  const key = (el, k) => { const ev = new window.Event('keydown', { bubbles: true, cancelable: true }); ev.key = k; el.dispatchEvent(ev); };
+  btn.click();
+  const pop = document.querySelector('[role=listbox]');
+  ok(!!pop && btn.getAttribute('aria-expanded') === 'true' && pop.querySelectorAll('[role=option]').length === 3 && pop.querySelector('[aria-selected=true]').textContent === 'Alpha', 'clicking opens a listbox with one option per choice and the current one selected');
+  pop.querySelectorAll('[role=option]').forEach((o) => { o.scrollIntoView = () => {}; });
+  key(pop, 'ArrowDown'); key(pop, 'ArrowDown'); ok(pop.getAttribute('aria-activedescendant') === 'inTestOpt2', 'arrow keys move the active option');
+  key(pop, 'ArrowDown'); ok(pop.getAttribute('aria-activedescendant') === 'inTestOpt2', 'and stop at the last one');
+  key(pop, 'Home'); ok(pop.getAttribute('aria-activedescendant') === 'inTestOpt0', 'Home goes to the first');
+  key(pop, 'End'); key(pop, 'Enter');
+  ok(val() === 'c' && changes === 1 && !document.querySelector('[role=listbox]') && btn.textContent.includes('Gamma') && btn.getAttribute('aria-expanded') === 'false', 'Enter chooses: the select changes once, the menu closes, the button updates');
+  btn.click(); const p2 = document.querySelector('[role=listbox]'); p2.querySelectorAll('[role=option]').forEach((o) => { o.scrollIntoView = () => {}; });
+  key(p2, 'Escape'); ok(!document.querySelector('[role=listbox]') && val() === 'c' && changes === 1, 'Escape closes without changing anything');
+  btn.click(); const p3 = document.querySelector('[role=listbox]'); p3.querySelectorAll('[role=option]').forEach((o) => { o.scrollIntoView = () => {}; });
+  p3.querySelectorAll('[role=option]')[1].click(); ok(val() === 'b' && changes === 2, 'clicking an option chooses it');
+  key(btn, 'ArrowDown'); ok(!!document.querySelector('[role=listbox]'), 'ArrowDown on the button opens the list'); key(document.querySelector('[role=listbox]'), 'Escape');
+}
 
 // ---------------------------------------------------------------- legal (line endings)
 ok(/replace\(\/\\r\\n\/g, "\\n"\)/.test(read('supabase/tests/v0833.test.mjs')), 'the legal comparison normalises line endings instead of being disabled');

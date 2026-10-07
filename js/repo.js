@@ -153,12 +153,33 @@
       return db().then(function (c) { return guard(c.rpc("create_invite", { p_board: boardId, p_email: email || null, p_role: role || "editor" })); });
     },
     // the links this board's owner has made (the secret itself is never stored, so only who/what/how often); and turning one off
+    // The owner's collaboration invitations for one board (a different thing from public share links, which live in `shares`).
+    // If the server has not got the v0.8.3.4 functions yet, fall back to reading the table directly (owner-only by row-level security): the links still show, just without who joined.
     listInvites: function (boardId) {
-      return db().then(function (c) { return guard(c.rpc("list_invites", { p_board: boardId })); });
+      return db().then(function (c) {
+        return c.rpc("list_invites", { p_board: boardId }).then(function (r) {
+          if (!r.error) return r.data || [];
+          if (/list_invites|PGRST202|Could not find the function|schema cache/i.test(String(r.error.message || "") + String(r.error.code || ""))) {
+            return c.from("board_invites").select("id,board_id,email,role,uses,created_at").eq("board_id", boardId).order("created_at", { ascending: false }).then(function (t) {
+              if (t.error) throw Stick.errors.parse(t.error);
+              return (t.data || []).map(function (x) { x.revoked_at = null; x.tracked = false; x.people = []; return x; });
+            });
+          }
+          throw Stick.errors.parse(r.error);
+        });
+      });
     },
     // turns the link off AND removes the people who got in only through it (the server does both)
     revokeInvite: function (id) {
-      return db().then(function (c) { return guard(c.rpc("revoke_invite", { p_invite: id })); });
+      return db().then(function (c) {
+        return c.rpc("revoke_invite", { p_invite: id }).then(function (r) {
+          if (!r.error) return r.data;
+          if (/revoke_invite|PGRST202|Could not find the function|schema cache/i.test(String(r.error.message || "") + String(r.error.code || ""))) {
+            return c.from("board_invites").delete().eq("id", id).then(function (t) { if (t.error) throw Stick.errors.parse(t.error); return { id: id, removed: 0 }; });
+          }
+          throw Stick.errors.parse(r.error);
+        });
+      });
     },
     myGuestAlias: function (boardId) {
       return db().then(function (c) { return guard(c.rpc("my_guest_alias", { p_board: boardId })); });

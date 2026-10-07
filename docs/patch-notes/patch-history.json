@@ -11,6 +11,123 @@
   ],
   "versions": [
     {
+      "version": "0.8.3.4",
+      "slug": "v0-8-3-4",
+      "codename": "Lock It Down",
+      "title": "Stick-It v0.8.3.4 — Lock It Down",
+      "status": "released",
+      "date": "2026-10-08",
+      "summary": "Turning off an invite link now really removes the access it gave, board edits show up almost instantly, and a round of fixes for the invite screens, scrolling nodes and settings.",
+      "tags": [
+        "Sharing",
+        "Privacy",
+        "Performance",
+        "Mobile"
+      ],
+      "highlights": [
+        "Turn off means off: when you turn off an invite link, the people who came in only through it lose access straight away. Everyone else keeps theirs.",
+        "Live boards: edits from other people appear within a moment, not twenty seconds later.",
+        "Every link in one place: collaboration invites now show up under Shared links, with who joined and a Turn off button.",
+        "Join with invite link: a button in the board list takes a pasted link.",
+        "Smoother scrolling: scrolling inside a list or a long note no longer drags the board or the note along."
+      ],
+      "notes": [
+        {
+          "heading": "Turning a link off now works",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Turn off an invitation link and the people who got in only through it lose access straight away, even if their page is still open",
+                "People who have another valid link, and anyone you did not add through a link, are never removed",
+                "People already on your board before this update stay on it; only a future, deliberate Turn off can remove anyone",
+                "A page whose access was turned off leaves the board and says so"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Live boards",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Other people's edits show up almost immediately instead of after a short wait",
+                "Stick-It still checks in the background in case a live update is missed"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Your links, in one place",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Collaboration invites are listed under Shared links, next to public links, and in the Collaborate window",
+                "Each shows what it allows, when it was made, how many times it was used and who joined, with Copy and Turn off",
+                "Links made before this update appear too, marked as made before tracking",
+                "Guests who join without an account get a friendly name such as \"Leaflet #184\"",
+                "\"Join with invite link\" in the board list takes a pasted link"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Fixes and polish",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Long invite links no longer stretch the dialog",
+                "Error messages are compact, dismissible and carry a short code (see docs/dev/ERROR-CODES.md)",
+                "Age screen: Sign out and Continue share a row, with calmer Month and Year pickers",
+                "Settings > Input has a proper layout and a Stick-It styled choice menu",
+                "Scrolling inside a list or note no longer scrolls the board at its edges, and no longer drags the note",
+                "A cut-off board name shows in full on hover, focus or long press",
+                "A Zone's pin stays above the papers inside it",
+                "Rubik Scribble was retired from the font choices (notes that used it keep working)",
+                "Switching boards is faster: boards are fetched ahead of time while the list is open"
+              ]
+            }
+          ]
+        }
+      ],
+      "tour": {
+        "mode": "full",
+        "cards": [
+          {
+            "title": "Lock It Down",
+            "body": "A security and reliability update for boards you share. This takes about thirty seconds."
+          },
+          {
+            "title": "Turn off means off",
+            "body": "Turn off an invite link and the people who came in only through it lose access straight away. Everyone else keeps theirs.",
+            "feature": "invites"
+          },
+          {
+            "title": "Live boards",
+            "body": "What other people change on a shared board now shows up almost at once.",
+            "feature": "realtime"
+          },
+          {
+            "title": "Every link in one place",
+            "body": "Collaboration invites now appear under Shared links, with who joined and a Turn off button. A new Join with invite link button takes a pasted link.",
+            "feature": "sharedLinks"
+          },
+          {
+            "title": "Smoother scrolling",
+            "body": "Scrolling a list or a long note stays inside it, and no longer drags the board or the note along.",
+            "feature": "scroll"
+          }
+        ]
+      },
+      "media": [],
+      "notesFile": "0.8.3.4.md",
+      "newer": null,
+      "older": "0.8.3.3"
+    },
+    {
       "version": "0.8.3.3",
       "slug": "v0-8-3-3",
       "codename": "Sand the Edges",
@@ -305,7 +422,7 @@
       },
       "media": [],
       "notesFile": "0.8.3.3.md",
-      "newer": null,
+      "newer": "0.8.3.4",
       "older": "0.8.3.2"
     },
     {

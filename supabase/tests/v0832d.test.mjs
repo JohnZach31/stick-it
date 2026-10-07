@@ -10,8 +10,8 @@ ok(S.patchReader.versions().join() === idx.map((e) => e.version).join(), 'the re
 ok(H.versions.every((v) => v.notes && v.notes.length && v.title && v.version), 'every patch has readable sections');
 ok(H.versions.every((v) => v.tour && Array.isArray(v.tour.cards) && v.tour.cards.length >= 1), 'every patch has a tour (its own, or one derived from its notes)');
 ok(pn.every((e) => H.versions.some((v) => v.version === e.version)), 'patch-notes.json and the history agree');
-const latest = H.versions[0]; ok(latest.version === '0.8.3.3' && latest.status === 'development' && latest.date == null, 'the newest patch is v0.8.3.3, still development, no release date');
-ok(S.patchReader.matches(latest, 'zones', '') && !S.patchReader.matches(latest, 'zzzzqq', ''), 'search matches notes text');
+const latest = H.versions[0]; ok(latest.version === '0.8.3.4' && latest.status === 'released' && latest.date === '2026-10-08', 'the newest patch is v0.8.3.4 "Lock It Down", released 2026-10-08'); { const p33 = H.versions.find((v) => v.version === '0.8.3.3'); ok(p33 && p33.status === 'development' && p33.date == null, 'v0.8.3.3 stays recorded as development (not released by this patch)'); }
+ok(S.patchReader.matches(latest, 'invite', '') && !S.patchReader.matches(latest, 'zzzzqq', ''), 'search matches notes text');
 ok(S.patchReader.matches(latest, '', latest.tags[0]) && !S.patchReader.matches(latest, '', 'NoSuchTag'), 'category filter works');
 const reader = read('js/patch-reader.js');
 ok(/openTour/.test(reader) && !/markSeen|ptMarkSeen|\.status\s*=[^=]/.test(reader), 'replaying a tour never marks a patch seen or changes its status');

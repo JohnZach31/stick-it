@@ -1,3 +1,6 @@
+-- NON-DESTRUCTIVE TO EXISTING ACCESS: this migration never deletes or changes a board_members row, never touches a token or an invitation's validity, and
+-- adds nothing that can remove anyone by itself. People already on a board (legacy / "unattributed") stay on it until the OWNER presses Turn off on the
+-- invitation that is the only way they hold access AND they were recorded as joining through it after this release. See docs/dev/GUEST-JOIN.md.
 -- v0.8.3.4 "Lock it down": turning an invite link off now also removes the access that CAME FROM that link (server-side, not just in the page).
 --  * board_members.granted_via_invite marks members who got in through an invitation (owners and anything else stay untouched)
 --  * board_invite_uses remembers who joined through which link (and gives each guest a stable friendly name)
@@ -5,6 +8,14 @@
 --  * deleting an invite row does the same (trigger), so there is no way to turn a link off and leave its guests behind
 --  * a removed member's open page is told (a content-free broadcast ping; it re-checks its own membership)
 alter table public.board_invites add column if not exists revoked_at timestamptz;
+-- invitations that existed before this release did not record who joined through them: mark them legacy ("tracked" = false). New invitations are tracked.
+do $$ begin
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'board_invites' and column_name = 'tracked') then
+    alter table public.board_invites add column tracked boolean;
+    update public.board_invites set tracked = false;
+    alter table public.board_invites alter column tracked set not null, alter column tracked set default true;
+  end if;
+end $$;
 alter table public.board_members add column if not exists granted_via_invite boolean not null default false;
 
 create table if not exists public.board_invite_uses (
@@ -20,9 +31,9 @@ create index if not exists board_invite_uses_board_idx on public.board_invite_us
 alter table public.board_invite_uses enable row level security;      -- no client policy: only the security-definer functions below read or write it
 revoke all on public.board_invite_uses from anon, authenticated;
 
--- people who joined by an invitation before this release
-update public.board_members m set granted_via_invite = true
- where m.role <> 'owner' and exists (select 1 from public.board_invites i where i.board_id = m.board_id and i.accepted_by = m.user_id);
+-- People who joined before this release keep granted_via_invite = false ("legacy / unattributed"): the old data cannot say reliably which link let whom in
+-- (a reusable link only remembered its last user), so we never guess. Such people are NEVER removed by Turn off. We only RECORD the last known user of each
+-- old link so the owner can see them in the list; this changes nothing about their access.
 insert into public.board_invite_uses (invite_id, user_id, board_id)
 select i.id, i.accepted_by, i.board_id from public.board_invites i
  where i.accepted_by is not null and exists (select 1 from public.board_members m where m.board_id = i.board_id and m.user_id = i.accepted_by)
@@ -102,7 +113,8 @@ begin
   on conflict (board_id, user_id) do nothing;
   get diagnostics added = row_count;
   -- remember the link they used (only people who got their access from an invitation, never an owner or an earlier member)
-  if added > 0 or exists (select 1 from public.board_members m where m.board_id = inv.board_id and m.user_id = uid and m.granted_via_invite) then
+  -- (a member who was already on the board before this release is recorded as having used the link, but NOT marked as invitation-granted: their access stays theirs)
+  if added > 0 or exists (select 1 from public.board_members m where m.board_id = inv.board_id and m.user_id = uid and m.role <> 'owner') then
     -- a guest keeps one name for the board, whichever link they come back through
     select u.alias into al from public.board_invite_uses u where u.board_id = inv.board_id and u.user_id = uid and u.alias is not null limit 1;
     if al is null and anon then al := public.guest_alias(); end if;
@@ -121,22 +133,17 @@ begin
   if not public.is_board_owner(p_board) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;
   return coalesce((select jsonb_agg(r order by (r ->> 'created_at') desc) from (
     select jsonb_build_object(
-      'id', i.id, 'email', i.email, 'role', i.role, 'uses', i.uses, 'created_at', i.created_at, 'revoked_at', i.revoked_at,
+      'id', i.id, 'board_id', i.board_id, 'email', i.email, 'role', i.role, 'uses', i.uses, 'created_at', i.created_at, 'revoked_at', i.revoked_at, 'tracked', i.tracked,
       'people', coalesce((select jsonb_agg(jsonb_build_object(
           'name', coalesce(u.alias, p.display_name, 'Member'), 'guest', u.alias is not null,
+          'legacy', not exists (select 1 from public.board_members m2 where m2.board_id = u.board_id and m2.user_id = u.user_id and m2.granted_via_invite),
           'active', exists (select 1 from public.board_members m where m.board_id = u.board_id and m.user_id = u.user_id)) order by u.first_used_at)
         from public.board_invite_uses u left join public.profiles p on p.id = u.user_id where u.invite_id = i.id), '[]'::jsonb)) as r
     from public.board_invites i where i.board_id = p_board) s), '[]'::jsonb);
 end $$;
 grant execute on function public.list_invites(uuid) to authenticated;
 
--- realtime: edits to a board's objects are pushed to the people who can read it (row-level security still decides who gets which row)
-do $$ begin
-  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
-     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'board_objects') then
-    execute 'alter publication supabase_realtime add table public.board_objects';
-  end if;
-end $$;
+-- (Realtime needs no change here: board_objects, boards, board_members and comments were already added to the supabase_realtime publication by 20260930120400_realtime.sql.)
 
 -- a guest asks what they are called on this board (their generated friendly name), so presence and the owner's list agree
 create or replace function public.my_guest_alias(p_board uuid) returns text

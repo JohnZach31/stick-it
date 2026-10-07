@@ -729,3 +729,35 @@ body.accessLost #board, body.accessLost .topbar .presenceBar{ visibility:hidden;
 @media (max-width:600px){
   .toast{ max-width:calc(100vw - 20px); font-size:0.8rem; padding:8px 12px; border-radius:16px; bottom:calc(60px + env(safe-area-inset-bottom, 0px)); line-height:1.3; }
 }
+
+/* ===== v0.8.3.4 (final pass) ===== */
+/* Zone: its tack, resize handle and bar sit above the papers inside it; the zone itself does not */
+.zone > .pinTack, .zone > .pinBadge{ z-index:10000; }
+.zone > .zoneHandle{ z-index:9999; }
+
+/* board cards: the full text of a cut-off name / subtitle, as a small paper label that never moves the layout */
+.truncTip{ position:fixed; z-index:10020; max-width:min(300px, calc(100vw - 16px)); padding:7px 11px 8px; border-radius:4px 9px 6px 9px; background:#fff8e1; color:#2a2619; border:1px solid rgba(110,80,20,0.28); box-shadow:0 5px 14px rgba(50,35,10,0.22); font-size:0.8rem; line-height:1.35; pointer-events:none; overflow-wrap:anywhere; }
+.truncTip .tt + .tt{ margin-top:3px; }
+.truncTip .tt.name{ font-weight:700; }
+.truncTip .tt.sub, .truncTip .tt.meta{ font-size:0.74rem; opacity:0.85; }
+body.dark .truncTip{ background:#3a3226; color:#f4eedf; border-color:rgba(255,200,120,0.25); }
+.boardRow:focus-visible{ outline:2px solid var(--focus, var(--accent)); outline-offset:-2px; }
+
+/* the choice list: a button that opens a paper menu */
+.idlsSel{ position:relative; display:block; width:100%; min-width:0; }
+.idlsNative{ position:absolute !important; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); border:0; opacity:0; pointer-events:none; }
+.asSel.idlsHost::after{ display:none; }
+.idlsSelBtn{ display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; min-height:38px; padding:7px 12px; border-radius:10px; border:1.5px solid var(--line); background:var(--panel); color:var(--ink); font:inherit; font-size:0.88rem; text-align:start; cursor:pointer; box-shadow:0 1px 0 rgba(0,0,0,0.04); }
+.idlsSelBtn:hover{ border-color:var(--accent); background:color-mix(in srgb, var(--accent-soft) 40%, var(--panel)); }
+.idlsSelBtn:focus-visible{ outline:2px solid var(--focus, var(--accent)); outline-offset:2px; }
+.idlsSelBtn[aria-expanded="true"]{ border-color:var(--accent); }
+.idlsSelVal{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.idlsSelChev{ flex:none; width:7px; height:7px; border-inline-end:1.8px solid var(--ink-soft); border-bottom:1.8px solid var(--ink-soft); transform:rotate(45deg) translateY(-2px); }
+.idlsSelList{ position:fixed; z-index:10030; margin:0; padding:5px; list-style:none; overflow-y:auto; border-radius:6px 12px 8px 12px; background:var(--panel, #fffdf4); color:var(--ink, #2a2619); border:1px solid var(--line); box-shadow:0 10px 26px rgba(50,35,10,0.28); outline:0; }
+.idlsSelOpt{ display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:8px; font-size:0.88rem; cursor:pointer; text-align:start; }
+.idlsSelOpt::before{ content:""; flex:none; width:7px; height:7px; border-radius:50%; background:transparent; }
+.idlsSelOpt[aria-selected="true"]{ font-weight:700; }
+.idlsSelOpt[aria-selected="true"]::before{ background:var(--accent); }
+.idlsSelOpt.active{ background:var(--accent-soft); }
+@media (pointer:coarse){ .idlsSelOpt{ padding:12px 14px; } .idlsSelBtn{ min-height:44px; } }
+@media (prefers-reduced-motion:no-preference){ .idlsSelList{ animation:idlsIn .12s ease-out; } @keyframes idlsIn{ from{ opacity:0; transform:translateY(-3px); } to{ opacity:1; transform:none; } } }

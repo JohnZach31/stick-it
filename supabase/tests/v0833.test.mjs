@@ -10,8 +10,8 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
 {
   const pn = JSON.parse(read('docs/patch-notes/patch-notes.json')), v = pn.find((e) => e.version === '0.8.3.3');
   ok(v && v.codename === 'Sand the Edges' && v.status === 'development' && v.date === null, 'v0.8.3.3 "Sand the Edges" is recorded, development, not released');
-  ok(/APP_VERSION: "0\.8\.3\.3", APP_CODENAME: "Sand the Edges", APP_STATUS: "development"/.test(read('js/config.js')), 'the app says 0.8.3.3, development');
-  ok(JSON.parse(read('docs/patch-notes/index.json'))[0].file === '0.8.3.3.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.3.md')), 'index and notes are in step');
+  ok(/APP_VERSION: "0\.8\.3\.4", APP_CODENAME: "Lock It Down", APP_STATUS: "released"/.test(read('js/config.js')), 'the app says 0.8.3.4 Lock It Down, released (0.8.3.3 is still recorded as development in the patch data)');
+  ok(JSON.parse(read('docs/patch-notes/index.json')).some((e) => e.version === '0.8.3.3' && e.file === '0.8.3.3.md') && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.3.md')), 'index and notes are in step');
   const md = read('docs/patch-notes/0.8.3.3.md'); ok(['## Tutorial fixes', '## Patch history is easier to find', '## Done feels better', '## Reactions got redesigned', '## Zones cleaned up', '## Empty means empty', '## Piles rebuilt visually', '## Legal pages caught up', '## Modal layering fixed', '## Clean Up understands Zones', '## Better board creation'].every((h) => md.includes(h)), 'the patch note follows the agreed structure');
   let check = true; try { execFileSync('node', ['tools/build-patch-data.mjs', '--check'], { cwd: root, stdio: 'pipe' }); } catch (e) { check = false; } ok(check, 'generated patch files match the source');
   ok(/Sand the Edges/.test(read('js/patch-data.js')) && !/Finish the Flow/.test(read('js/patch-data.js').replace(/Finish the Flow/g, '')) || true, 'the Spotlight data is the new release');
@@ -23,8 +23,8 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   ok(/Stick\.patchReader\.open\(\)/.test(wn) && /openTour\(v\.version\)/.test(wn), 'those buttons open the history and replay the tour');
   const pr = read('js/patch-reader.js'); ok(/prMap/.test(pr) && /function paintMap/.test(pr) && /slice\(\)\.reverse\(\)/.test(pr), 'a visual release map pins every version oldest to newest');
   const H = (() => { const c = vm.createContext({}); c.window = c; vm.runInContext(read('js/patch-history.js'), c); return c.Stick.patchHistory; })();
-  const want = ['0.8.0', '0.8.1', '0.8.2', '0.8.2.1', '0.8.2.2', '0.8.3', '0.8.3.1', '0.8.3.2', '0.8.3.3'];
-  ok(want.every((x) => H.versions.some((v) => v.version === x)) && H.versions.length === want.length, 'the map shows all nine versions from the canonical source');
+  const want = ['0.8.0', '0.8.1', '0.8.2', '0.8.2.1', '0.8.2.2', '0.8.3', '0.8.3.1', '0.8.3.2', '0.8.3.3', '0.8.3.4'];
+  ok(want.every((x) => H.versions.some((v) => v.version === x)) && H.versions.length === want.length, 'the map shows every version (ten) from the canonical source');
   ok(/prMap/.test(read('css/patch-reader.css')), 'the map is styled');
 }
 // ---------------------------------------------------------------- tutorial keys
@@ -210,7 +210,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   ok(/pbDesk/.test(pb) && /desk\.appendChild\(prev\); desk\.appendChild\(stage\); desk\.appendChild\(next\)/.test(pb) && /pbSlip/.test(pb) && /"paper " \+ \(i \+ 1\) \+ " of "/.test(pb), 'the browser: previous / next are edge tabs on the paper, a handwritten page marker, and one control slip');
   ok(/pileLive\(pile\)/.test(pb) && (pb.match(/paperOf\(live\[/g) || []).length <= 2 && /Edit this paper/.test(pb), 'only the current paper is built (the fan builds a few); editing stays available');
   ok(/\.pbNav\.pbPrev, \.pbNav\.pbNext\{[^}]*width:26px/.test(sp) && /max-width:480px\)\{[\s\S]*\.pbCard\{ width:100%/.test(sp) && /min-height:44px/.test(sp.slice(sp.indexOf('Pile browser as a leaf-through'))), 'on a phone the browser fills the width with 44px controls');
-  const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'))[0];
+  const pn = JSON.parse(read('docs/patch-notes/patch-notes.json')).find((e) => e.version === '0.8.3.3');
   ok(pn.tour.some((c) => c.title === 'Print what matters' && /PDF/.test(c.body)), 'the Spotlight has the Print what matters card');
   ok(/## Print \/ Save as PDF/.test(read('docs/patch-notes/0.8.3.3.md')), 'the full notes have a Print / Save as PDF section');
   const cm = read('js/cutout-maker.js'); ok(!/Crop instead/.test(cm + app), 'there is no fake Crop button');
