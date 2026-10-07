@@ -34,4 +34,8 @@ ok(/placeholder="Add e-mails \(optional\)"/.test(app), 'the invite e-mail box pl
   ok(/anonNow/.test(app) && /ensureAgeAttested\(profile \|\| \{age_band: null\}\)/.test(app), 'an anonymous guest always goes through the age screen, even if their profile could not be read');
   ok(/lastInviteError/.test(app) && /console\.warn\("\[invite\] could not accept:"/.test(app), 'a refused invitation reports the real reason');
 }
+// ---- joining saves the boards list before restarting (v0.8.3.15)
+ok(/await cloudSync\.refreshBoards\(\);[^
+]*
+\s*await cloudSync\.fillBoardCache\(boardId\)/.test(app), 'after a successful join the boards list is saved first, so the restart does not mistake the guest for a first-time load and drop them');
 console.log('v0.8.3.10 invites: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

@@ -13595,6 +13595,7 @@
     try{
       var boardId = await Stick.repo.acceptInvite(t);
       if(boardId){
+        await cloudSync.refreshBoards();             // saves the list of boards; without it the reload still looks like a first load and an anonymous guest is dropped again
         await cloudSync.fillBoardCache(boardId);
         safeSet(ACTIVE_BOARD_KEY, boardId);
         stickLoaderDone("You’re in.", function(){ location.reload(); });
