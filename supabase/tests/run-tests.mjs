@@ -36,7 +36,7 @@ async function run(actor, sql, params = []) {
     else if (actor !== 'su') {
       await db.query('set local role authenticated');
       await db.query("select set_config('request.jwt.claims', $1, true)",
-        [JSON.stringify({ sub: actor.id, role: 'authenticated', email: actor.email })]);
+        [JSON.stringify({ sub: actor.id, role: 'authenticated', email: actor.anonymous ? undefined : actor.email, is_anonymous: !!actor.anonymous })]);
     }
     const r = await db.query(sql, params);
     await db.query('commit');
@@ -817,7 +817,7 @@ group('M. collaboration: private presence channels, review states, comment summa
     await db.query('begin');
     try {
       await db.query('set local role authenticated');
-      await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: actor.id, role: 'authenticated', email: actor.email })]);
+      await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: actor.id, role: 'authenticated', email: actor.anonymous ? undefined : actor.email, is_anonymous: !!actor.anonymous })]);
       await db.query("select set_config('realtime.topic', $1, true)", [t]);
       const r = await db.query(sql); await db.query('commit'); return { rows: r.rows };
     } catch (x) { await db.query('rollback'); return { error: String(x.message), rows: [] }; }
@@ -919,6 +919,28 @@ group('O. deleting comments: author, owner, and nobody else');
   ok(denied(await run(a, 'update public.comments set deleted_at = now() where id=$1', [byA3])) || (await live(byA3)), 'and cannot reach it by updating the row either');
 }
 
+
+// ---------------------------------------------------------------- anonymous guests (join by invitation, no account)
+group('anonymous guests');
+{
+  const guest = { id: uuid(), email: null, anonymous: true };
+  await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [guest.id, null, '{}']);
+  await attest(guest.id);
+  const A = (await run(alice, 'select id from public.create_board($1,$2,$3)', ['Guest board', null, 'k-' + uuid()])).rows[0];
+  const open = (await run(alice, 'select public.create_invite($1,null,$2) as r', [A.id, 'editor'])).rows[0].r;
+  const tied = (await run(alice, 'select public.create_invite($1,$2,$3) as r', [A.id, 'bob@example.com', 'editor'])).rows[0].r;
+  ok(errIs(await run(guest, 'select public.accept_invite($1)', [tied.token]), /INVITE_EMAIL_MISMATCH/), 'an invitation tied to an e-mail address cannot be joined anonymously');
+  ok(errIs(await run(guest, 'select id from public.boards where id = $1', [A.id]), /^$/) || (await run(guest, 'select id from public.boards where id = $1', [A.id])).rows.length === 0, 'before joining, a guest sees nothing of the board');
+  ok(!(await run(guest, 'select public.accept_invite($1) as b', [open.token])).error, 'an anonymous guest can join with an open invitation');
+  ok((await run(guest, 'select id from public.boards where id = $1', [A.id])).rows.length === 1, 'and then sees that board');
+  const oid = uuid();
+  ok(!(await run(guest, 'select public.sync_objects($1, $2::jsonb, $3::jsonb) as r', [A.id, JSON.stringify([{ id: oid, type: 'note', x: 1, y: 1, width: 200, height: 100, rotation: 0, z_index: 1, data: { html: 'hi' } }]), '[]'])).error, 'as an editor the guest can add notes');
+  ok(errIs(await run(guest, 'select id from public.create_board($1,$2,$3)', ['Mine', null, 'k-' + uuid()]), /ANONYMOUS_NOT_ALLOWED/), 'a guest cannot create a board');
+  ok(errIs(await run(guest, 'select public.create_invite($1,null,$2)', [A.id, 'viewer']), /ANONYMOUS_NOT_ALLOWED|FORBIDDEN/), 'a guest cannot create invitations');
+  ok(errIs(await run(guest, "select public.create_share('group_snapshot', $1, array[$2::uuid], 'G', 'named', false, false)", [A.id, oid]), /ANONYMOUS_NOT_ALLOWED|FORBIDDEN|function/i), 'a guest cannot create share links');
+  ok(denied(await run(guest, "insert into public.boards (owner_id, name) values ($1, 'x')", [guest.id])), 'nor insert a board directly');
+  ok(errIs(await run(alice, "select id from public.create_board($1,$2,$3)", ['Alice again', null, 'k-' + uuid()]), /^$/) === false, 'accounts are unaffected');
+}
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }
