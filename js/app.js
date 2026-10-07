@@ -13361,7 +13361,7 @@
       if(ev === "SIGNED_IN" || ev === "TOKEN_REFRESHED"){ if(authLost && cloudSync){ authLost = false; updateSyncPill("saving"); cloudSync.retryAll(); } }
     });
     if(!session && !viewerMode){
-      try{ if(sessionStorage.getItem(INVITE_KEY)){ toast("Sign in to accept your invitation."); setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 600); } }catch(e){}
+      try{ if(pendingInvite()){ toast("Sign in to accept your invitation."); setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 600); } }catch(e){}
     }
     if(!session && Stick.auth.staleSession && navigator.onLine && !Stick.auth.callbackPending){
       // The cached login is dead (the server rejected its refresh token). Booting into cloud mode on it left people behind a red loader with nothing to press.
@@ -13455,7 +13455,7 @@
       '<label class="asLbl" for="cbRole">They can</label>' +
       '<select id="cbRole" class="asIn"><option value="editor">Add, move and edit notes</option><option value="viewer">Look, but not change anything</option></select>' +
       '<label class="asLbl" for="cbEmail">E-mails (optional)</label>' +
-      '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails, or leave empty for a link anyone can use"></div>' +
+      '<div class="pillField" id="cbPills"><input id="cbEmail" class="pillIn" type="text" inputmode="email" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Add e-mails (optional)"></div>' +
       '<p class="asHint" id="cbHint">Press Enter or comma after each address. With e-mails, each person gets their own link that only their account can use.</p>' +
       '<div id="cbOut" class="collabOut" role="status" aria-live="polite"></div>';
     openModal({title: "Collaborate on “" + (meta.name || "this board") + "”", content: wrap, width: 420, actions: [
@@ -13516,12 +13516,31 @@
   function inviteTokenFromHash(){ var m = /^#invite=([a-f0-9]{64})$/i.exec(location.hash || ""); return m ? m[1].toLowerCase() : null; }
   function rememberInviteFromHash(){
     var t = inviteTokenFromHash();
-    if(t){ try{ sessionStorage.setItem(INVITE_KEY, t); }catch(e){} try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){} }
+    if(t){
+      try{ sessionStorage.setItem(INVITE_KEY, t); }catch(e){}
+      try{ localStorage.setItem(INVITE_KEY, JSON.stringify({t: t, at: Date.now()})); }catch(e){}          // survives the trip through Google sign-in even if the tab's session storage does not
+      try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+    }
+  }
+  function pendingInvite(){
+    var t = null; try{ t = sessionStorage.getItem(INVITE_KEY); }catch(e){}
+    if(!t){ try{ var o = JSON.parse(localStorage.getItem(INVITE_KEY) || "null"); if(o && o.t && Date.now() - o.at < 3600000) t = o.t; }catch(e){} }
+    return t && /^[a-f0-9]{64}$/.test(t) ? t : null;
+  }
+  function clearPendingInvite(){ try{ sessionStorage.removeItem(INVITE_KEY); }catch(e){} try{ localStorage.removeItem(INVITE_KEY); }catch(e){} }
+  // Someone opens an invite link while signed out: they used to land on an ordinary empty guest board with no hint. Now they are told, and sent to sign in; the invitation is kept
+  // (an hour) and accepted as soon as they are signed in.
+  function promptInviteSignIn(){
+    if(CLOUD || !CLOUD_OK || viewerMode || !pendingInvite()) return;
+    var body = document.createElement("p"); body.className = "acctSub"; body.style.margin = "0";
+    body.textContent = "Someone invited you to work on a board. Sign in (or create a free account) to join it. Your invitation stays saved while you sign in.";
+    openModal({title: "You’re invited to a board", content: body, width: 400, actions: [{label: "Not now", value: false}, {label: "Sign in to join", kind: "primary", value: true}],
+      onClose: function(v){ if(v) setTimeout(function(){ try{ openAccountModal(); }catch(e){} }, 0); }});
   }
   async function maybeAcceptInvite(){
-    var t = null; try{ t = sessionStorage.getItem(INVITE_KEY); }catch(e){}
-    if(!t || !/^[a-f0-9]{64}$/.test(t)) return false;
-    try{ sessionStorage.removeItem(INVITE_KEY); }catch(e){}
+    var t = pendingInvite();
+    if(!t) return false;
+    clearPendingInvite();
     cloudOverlay("Joining the board…");
     try{
       var boardId = await Stick.repo.acceptInvite(t);
@@ -13543,6 +13562,7 @@
     return false;
   }
   rememberInviteFromHash();
+  setTimeout(promptInviteSignIn, 900);
 
   // ---------- What's New / patch tour ----------
   // The words come from docs/patch-notes/patch-notes.json (through js/patch-data.js), so the app, the website and the Markdown notes tell the same
