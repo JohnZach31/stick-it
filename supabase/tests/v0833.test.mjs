@@ -152,7 +152,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
 {
   const prof = app.slice(app.indexOf('ONE way to change the photo'), app.indexOf('ONE way to change the photo') + 900);
   ok(/act\.remove\(\)/.test(prof) && /Change profile photo/.test(prof), 'the "Change photo" pill is removed; the avatar pencil is the one entry point, labelled Change profile photo');
-  ok(/#quickSignOut\[hidden\][^{]*\{ display:none !important/.test(sp) && /qs\.hidden = !settings\.account/.test(app), 'a guest never sees the header Sign out (the [hidden] attribute was being overridden)');
+  ok(!/id="quickSignOut"/.test(read('index.html')) && /qs\.remove\(\)/.test(app), 'the standalone header Sign out is gone (the avatar menu has Sign out); a guest never sees one');
   ok(/if\(acc\)\{ b\.className = "pillBtn danger"; b\.textContent = "Sign out"/.test(app) && /confirmSignOut\(/.test(app), 'Sign out exists only when signed in, and asks first');
   ok(/SettingsRow: ONE interaction system/.test(sp) && /\.asCard \.asAction:focus-visible/.test(sp) && /\.asCard \.asAction:not\(:disabled\):active/.test(sp) && /\.asCard \.asAction\.danger/.test(sp) && /body\.dark \.asCard \.asAction/.test(sp) && /\[dir="rtl"\] \.asCard \.asAction\.on/.test(sp), 'settings rows share normal / hover / focus / pressed / selected / disabled / destructive states, dark mode and RTL');
 }
@@ -205,7 +205,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
 // ---- final pass: pile arrows gone, leaf-through browser, print in the update materials, cutout actions
 {
   ok(!/"pilePrev"|"pileNext"|className = "pileNav/.test(app), 'the on-board pile no longer has the old floating arrows');
-  ok(/PILE_TABS_MAX = 3/.test(app) && /\.pileObj \.pileTabs\{ max-width:calc\(100% - 118px\); overflow:hidden/.test(sp), 'the index tabs never reach under the kind tab');
+  ok(/PILE_TABS_MAX = 3/.test(app) && /function pileTabSlots\(n\)/.test(app), 'the index tabs never reach under the kind tab (slots are computed from the pile width)');
   const pb = fn('openPileBrowser');
   ok(/pbDesk/.test(pb) && /desk\.appendChild\(prev\); desk\.appendChild\(stage\); desk\.appendChild\(next\)/.test(pb) && /pbSlip/.test(pb) && /"paper " \+ \(i \+ 1\) \+ " of "/.test(pb), 'the browser: previous / next are edge tabs on the paper, a handwritten page marker, and one control slip');
   ok(/pileLive\(pile\)/.test(pb) && (pb.match(/paperOf\(live\[/g) || []).length <= 2 && /Edit this paper/.test(pb), 'only the current paper is built (the fan builds a few); editing stays available');

@@ -1473,6 +1473,7 @@
   window.addEventListener("pagehide", flushTypingNotify);
   function saveNotes(){
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
+    if(typeof zoneFitAll === "function") zoneFitAll();          // a zone's paper grows to cover a member that has grown past it
     clearTimeout(typingNotifyT); typingNotifyT = null; typingFirst = 0;
     safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
@@ -2207,7 +2208,7 @@
       var a = undoStack.pop();
       var ok = a.custom ? a.undo() : applySide(a.changes, "before");
       redoStack.push(a);
-      if(ok){ afterHistoryApply(); toast("Undid: " + lowerFirst(a.label)); return true; }
+      if(ok){ afterHistoryApply(); try{ SoundFx.cue("undo"); }catch(e){} toast("Undid: " + lowerFirst(a.label)); return true; }
     }
     toast("Nothing to undo.");
     return false;
@@ -5716,15 +5717,17 @@
   }
   function pileKindName(top){ return top && top.type ? (Stick.objects.LABELS[top.type] || "Object") : "Note"; }
   function paintPileKind(el, top){ var k = el.querySelector(".pileKind"); if(k) k.textContent = pileKindName(top); }
-  var PILE_TABS_MAX = 3;
+  var PILE_TABS_MAX = 3, PILE_TAB_SLOT = 28;
+  // the rail above the pile has a fixed height and one fixed slot per tab. How many slots fit is worked out from the pile's width (room is kept for the kind tab and the "..." button).
+  function pileTabSlots(n){ return Math.max(1, Math.min(PILE_TABS_MAX, Math.floor(((n.w || 200) - 12 - 58 - 44) / PILE_TAB_SLOT))); }
   function paintPileTabs(n, el, live, at){
     var row = el.querySelector(".pileTabs"); if(!row) return;
     row.textContent = "";
-    var count = live.length, from = 0, to = count;
-    if(count > PILE_TABS_MAX){ from = Math.max(0, Math.min(count - PILE_TABS_MAX, at - Math.floor(PILE_TABS_MAX / 2))); to = from + PILE_TABS_MAX; }
+    var count = live.length, from = 0, to = count, slots = pileTabSlots(n);
+    if(count > slots){ from = Math.max(0, Math.min(count - slots, at - Math.floor(slots / 2))); to = from + slots; }
     for(var i = from; i < to; i++){
       (function(i){
-        var t = document.createElement("button"); t.type = "button"; t.className = "pileTab" + (i === at ? " on" : ""); t.setAttribute("aria-label", "Paper " + (i + 1) + " of " + count + ": " + pileKindName(live[i]));
+        var t = document.createElement("button"); t.type = "button"; t.className = "pileTab" + (i === at ? " on" : ""); t.title = "Paper " + (i + 1) + " of " + count; t.setAttribute("aria-label", "Paper " + (i + 1) + " of " + count + ": " + pileKindName(live[i]));
         t.setAttribute("aria-current", i === at ? "true" : "false"); t.textContent = String(i + 1);
         var top = live[i]; if(top && !top.type && top.bg) t.style.setProperty("--tab", document.body.classList.contains("dark") ? dimPaperColor(top.bg) : top.bg);
         t.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); t.addEventListener("mousedown", function(e){ e.preventDefault(); });
@@ -5995,7 +5998,7 @@
     var fanOK = !(window.matchMedia && matchMedia("(max-width: 700px), (pointer: coarse)").matches), fan = false;
     var prev = document.createElement("button"), next = document.createElement("button"), idx = makeDiv("pbIndex"), back = document.createElement("button");
     prev.type = next.type = back.type = "button"; prev.className = next.className = "pbNav"; back.className = "pbBack";
-    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.classList.add("pbPrev"); next.classList.add("pbNext"); prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper");
+    prev.textContent = "\u2039"; next.textContent = "\u203a"; prev.classList.add("pbPrev"); next.classList.add("pbNext"); prev.setAttribute("aria-label", "Previous paper"); next.setAttribute("aria-label", "Next paper"); prev.title = "Previous paper"; next.title = "Next paper";
     back.textContent = "Back to the pile"; idx.setAttribute("role", "status"); idx.setAttribute("aria-live", "polite");
     var SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
     function ic(d){ return SVG + d + "</svg>"; }
@@ -6010,9 +6013,11 @@
     var fanBtn = tool("Fan the papers out", function(){ fan = !fan; fanBtn.setAttribute("aria-pressed", fan ? "true" : "false"); fanBtn.innerHTML = fan ? ONEIC : FANIC; var lb = fan ? "Back to one paper" : "Fan the papers out"; fanBtn.title = lb; fanBtn.setAttribute("aria-label", lb); card.classList.toggle("isFan", fan); paint(); }, "", FANIC); fanBtn.setAttribute("aria-pressed", "false"); fanBtn.hidden = !fanOK;
     bar.appendChild(idx);
     desk.appendChild(prev); desk.appendChild(stage); desk.appendChild(next);          // previous / next are tabs on the edges of the paper, not buttons floating around it
-    var tools = makeDiv("pbTools"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
-    var foot = makeDiv("pbFoot"); foot.appendChild(editB); foot.appendChild(take); foot.appendChild(back);
-    var slip = makeDiv("pbSlip"); slip.appendChild(tools); slip.appendChild(foot);          // every action on one control slip
+    // one slip, grouped by meaning: arrange the pile | work on this paper | leave (previous / next are the edge tabs on the paper itself)
+    var tools = makeDiv("pbTools pbGroup"); tools.setAttribute("role", "group"); tools.setAttribute("aria-label", "Arrange the pile"); [earlier, later, shuf, fanBtn].forEach(function(b){ tools.appendChild(b); });
+    var onPaper = makeDiv("pbOnPaper pbGroup"); onPaper.setAttribute("role", "group"); onPaper.setAttribute("aria-label", "This paper"); onPaper.appendChild(editB); onPaper.appendChild(take);
+    var foot = makeDiv("pbFoot pbGroup"); foot.appendChild(back);
+    var slip = makeDiv("pbSlip"); slip.appendChild(tools); slip.appendChild(onPaper); slip.appendChild(foot);          // every action on one control slip
     card.appendChild(bar); card.appendChild(desk); card.appendChild(slip);
     root.appendChild(card); document.body.appendChild(root);
     pileBrowserState = {id: pile.id, root: root, opener: document.activeElement};
@@ -7439,6 +7444,31 @@
     return notes.filter(function(o){ return o !== z && !isZone(o) && o.el && o.el.isConnected && inBox(noteCenter(o), box); });
   }
   function insideAnyZone(n){ if(isZone(n)) return false; var c = noteCenter(n); return notes.some(function(z){ return isZone(z) && z.el && z.el.isConnected && inBox(c, zoneBox(z)); }); }
+  // A zone's paper always covers its members: if a member grows (a bigger photo, a longer newspaper, a rotation) past the zone's edge, the zone's visible surface grows to cover it. It never
+  // ejects the member and never shrinks by itself. Only the zone's own size (and, for a member that overhangs the left or top, its origin) changes; members, their positions and the count are untouched.
+  var ZONE_PAD = 10, zoneFitting = false;
+  function memberBounds(o){
+    var sz = objSize(o), a = Math.abs((o.rot || 0) * Math.PI / 180), w = sz.w, h = sz.h;
+    var bw = w * Math.cos(a) + h * Math.sin(a), bh = w * Math.sin(a) + h * Math.cos(a), cx = o.x + w / 2, cy = o.y + h / 2;
+    return {l: cx - bw / 2, t: cy - bh / 2, r: cx + bw / 2, b: cy + bh / 2};
+  }
+  function zoneFitOne(z){
+    if(!isZone(z) || z.min === true || !z.el || !z.el.isConnected) return false;
+    var members = zoneContents(z); if(!members.length) return false;
+    var L = z.x, T = z.y, R = z.x + (z.w || 360), B = z.y + (z.h || 240);
+    members.forEach(function(o){ var b = memberBounds(o); L = Math.min(L, b.l - ZONE_PAD); T = Math.min(T, b.t - ZONE_PAD - 30); R = Math.max(R, b.r + ZONE_PAD); B = Math.max(B, b.b + ZONE_PAD); });
+    L = Math.max(0, Math.floor(L)); T = Math.max(0, Math.floor(T)); R = Math.ceil(R); B = Math.ceil(B);
+    var nw = Math.min(ZONE_MAX_W, R - L), nh = Math.min(ZONE_MAX_H, B - T);
+    if(L === z.x && T === z.y && nw <= (z.w || 360) && nh <= (z.h || 240)) return false;
+    z.x = L; z.y = T; z.w = Math.max(z.w || 360, nw); z.h = Math.max(z.h || 240, nh);
+    z.el.style.left = z.x + "px"; z.el.style.top = z.y + "px"; z.el.style.width = z.w + "px"; z.el.style.height = z.h + "px";
+    return true;
+  }
+  function zoneFitAll(){
+    if(zoneFitting) return false; zoneFitting = true; var any = false;
+    try{ notes.forEach(function(z){ if(isZone(z) && zoneFitOne(z)) any = true; }); }finally{ zoneFitting = false; }
+    return any;
+  }
   function zoneLabel(n){ return n.title ? "Zone: " + n.title : "Untitled zone"; }
   function renderZone(n, isNew){
     var el = document.createElement("div");
@@ -7483,7 +7513,7 @@
         base.forEach(function(b){ if(isZone(b) && (b.carry === true || b.min === true)) (b.min === true ? zoneHeld(b) : zoneContents(b)).forEach(function(o){ if(!seen[o.id]){ seen[o.id] = 1; all.push(o); } }); });
         startDrag(e, n, all);
       });
-      bar.addEventListener("dblclick", function(e){ e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
+      bar.addEventListener("dblclick", function(e){ if(!(e.target.closest && e.target.closest(".zoneTitle"))) return; e.preventDefault(); e.stopPropagation(); editZoneTitle(n); });
       el.addEventListener("keydown", function(e){
         if(e.target !== el) return;
         if(e.key === "Enter"){ e.preventDefault(); editZoneTitle(n); }
@@ -7527,7 +7557,8 @@
     });
   }
   var zonePaintT = null;
-  function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; syncZoneMembership(); }, 120); }
+  function scheduleZonePaint(){ if(zonePaintT || !notes.some(isZone)) return; zonePaintT = setTimeout(function(){ zonePaintT = null; if(!readOnly && zoneFitAll()) saveNotes(); syncZoneMembership(); }, 120); }
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(function(){ if(typeof scheduleZonePaint === "function") scheduleZonePaint(); });
   // the count is a handle on the zone's contents: select them all (a minimized zone is restored first so there is something to see)
   function selectZoneMembers(z){
     if(!isZone(z)) return;
@@ -9189,6 +9220,7 @@
     var signedIn = ccSignedIn();
     cc.adopt(document.getElementById("secAppearance"), cc.panes.appearance);
     buildLookSection(cc, cc.panes.appearance);
+    cc.panes.appearance.appendChild(buildInputCard());
     if(!signedIn) cc.adopt(document.getElementById("sharingSec"), cc.panes.sharing);
     if(signedIn) buildAccountParts(cc); else buildGuestAccount(cc, cc.panes.account);
     cc.adopt(document.getElementById("secBoardData"), cc.panes.privacy);
@@ -9265,7 +9297,8 @@
     var CH = {
       dim7B: [246.94, 293.66, 349.23, 415.30],        // B dim7: B3 D4 F4 Ab4, the tiny "passing" chord
       c69:   [261.63, 329.63, 440.00, 587.33],        // C6/9 (no 5th): C4 E4 A4 D5, where it comes to rest
-      dim7E: [311.13, 369.99, 440.00, 523.25]         // Eb dim7: Eb4 Gb4 A4 C5, a lighter sting for Restore
+      dim7E: [311.13, 369.99, 440.00, 523.25],        // Eb dim7: Eb4 Gb4 A4 C5, a lighter sting for Restore
+      dim7Blow: [207.65, 174.61, 146.83, 123.47]      // B dim7 an octave and a half down, listed top to bottom: Ab3 F3 D3 B2 (strummed downwards for Trash)
     };
     function chord(c, t0, notes, v, strum, decay, type){ notes.forEach(function(f, i){ partial(c, t0 + i * strum, f, v, 0.01, decay, type || "triangle"); }); }
     function playCue(name, volume){
@@ -9276,7 +9309,14 @@
         thump(c, t0, 0.35 * v, 0.06, 650);
         chord(c, t0 + 0.02, CH.dim7B, 0.075 * v, 0.014, 0.16);
         chord(c, t0 + 0.19, CH.c69, 0.07 * v, 0.016, 0.34, "sine");
-      } else if(name === "trash"){ thump(c, t0, 0.45 * v, 0.1, 480); partial(c, t0, 146.83, 0.09 * v, 0.008, 0.14, "triangle"); }
+      } else if(name === "trash"){                          // a darker, descending dismissal: the low dim7 strummed downwards, settling a semitone lower on A2
+        thump(c, t0, 0.4 * v, 0.08, 420);
+        chord(c, t0 + 0.01, CH.dim7Blow, 0.085 * v, 0.018, 0.2);
+        partial(c, t0 + 0.11, 110.00, 0.07 * v, 0.012, 0.26, "sine");
+      } else if(name === "undo"){                           // Done played backwards: the 6/9 leans back into the diminished chord, both strummed downwards and soft
+        chord(c, t0, CH.c69.slice().reverse(), 0.055 * v, 0.012, 0.13, "sine");
+        chord(c, t0 + 0.15, CH.dim7B.slice().reverse(), 0.05 * v, 0.014, 0.22);
+      }
       else if(name === "restore"){ chord(c, t0, CH.dim7E, 0.06 * v, 0.012, 0.2, "sine"); }
       else return false;
       return true;
@@ -9463,10 +9503,8 @@
     rebinderEl = sec; sec._cleanup = endCapture;
     return sec;
   }
-  function buildShortcutsPane(cc, pane){
-    pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
-    var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
-    (function(){                                                          // "Input": two small choices, saved the moment they change
+  // "Input": two small choices (what a double-click on the board creates, what pasted text becomes), saved the moment they change. Lives with the other personal preferences in Appearance.
+  function buildInputCard(){
       var card = document.createElement("section"); card.className = "asCard"; card.setAttribute("aria-labelledby", "ccInH");
       card.innerHTML = '<h4 id="ccInH">Input</h4>';
       function row(id, label, help, list, key){
@@ -9479,8 +9517,11 @@
       }
       row("inDbl", "Double-click the canvas creates", "What a double-click on empty board makes. Ask me each time opens the add menu where you clicked.", DBL_NODES, "dblNode");
       row("inPaste", "Pasted text becomes", "When you paste plain text onto the board (not into a note you are editing).", PASTE_MODES, "pasteText");
-      pane.insertBefore(card, box);
-    })();
+      return card;
+  }
+  function buildShortcutsPane(cc, pane){
+    pane.innerHTML = '<div class="kbdSearch"><label class="sr-only" for="kbdQ">Search shortcuts</label><input type="search" id="kbdQ" class="asIn" placeholder="Search shortcuts…" autocomplete="off" spellcheck="false"><p class="kbdCount" id="kbdCount" role="status" aria-live="polite"></p></div><div class="kbdGroups" id="kbdGroups"></div><p class="asHint kbdNone" id="kbdNone" hidden>No shortcut matches that. Try another word.</p>';
+    var box = pane.querySelector("#kbdGroups"), q = pane.querySelector("#kbdQ"), none = pane.querySelector("#kbdNone"), count = pane.querySelector("#kbdCount"), groups = [];
     if(KB) buildRebinder(box, groups);
     SHORTCUT_GROUPS.forEach(function(g){
       var sec = document.createElement("section"); sec.className = "asCard kbdGroup"; var h = document.createElement("h4"); h.textContent = g.title; sec.appendChild(h);
@@ -9665,8 +9706,7 @@
     updateAccountIcon0();
     var old = accountBtn.querySelector(".crown");
     if(old) old.remove();
-    var qs = document.getElementById("quickSignOut");
-    if(qs) qs.hidden = !settings.account;
+    var qs = document.getElementById("quickSignOut"); if(qs) qs.remove();          // the avatar's own menu (right-click / long-press) has Sign out; no second button
     if(settings.account && isPremium()){
       var c = makeDiv("crown"); c.innerHTML = CROWN_SVG; c.title = "Premium";
       accountBtn.appendChild(c);
@@ -10109,7 +10149,7 @@
   async function openManageShares(onChange){
     var content = document.createElement("div");
     content.className = "acctSub"; content.style.textAlign = "left";
-    var modal = openModal({title: "Your active links", content: content, width: 460, actions: [{label: "Done", kind: "primary", value: true}]});
+    var modal = openModal({title: "Shared links", content: content, width: 520, actions: [{label: "Done", kind: "primary", value: true}]});
     var ld = localLoader(content, "Loading your links\u2026");
     try{
       var list = await Stick.share.list();
@@ -10118,25 +10158,33 @@
       var act = list.filter(function(x){ return x.is_active; });
       await new Promise(function(r){ ld.stop(r); });
       content.innerHTML = "";
-      if(!act.length){ content.textContent = "You have no active share links."; return; }
-      var note = document.createElement("p"); note.style.margin = "0 0 10px";
+      if(!act.length){ var none = makeDiv("lkEmpty"); none.textContent = "You have no active shared links."; content.appendChild(none); return; }
+      var note = document.createElement("p"); note.className = "lkNote";
       note.textContent = "Anyone with one of these links can view it. Turn a link off and it stops working straight away.";
       content.appendChild(note);
+      var listEl = makeDiv("lkList"); content.appendChild(listEl);
+      // one compact card per link: what it is, where it came from, when, and as whom; then its one action
       act.forEach(function(x){
-        var row = makeDiv("asRow");
-        var t = document.createElement("div");
-        var kind = x.share_type === "board_live" ? "Live board" : x.share_type === "group_snapshot" ? "Group of items" : "Single item";
-        t.innerHTML = "<span></span><small></small>";
-        t.firstChild.textContent = kind + (x.board_id && names[x.board_id] ? " \u00b7 " + names[x.board_id] : "");
-        t.lastChild.textContent = "Created " + new Date(x.created_at).toLocaleDateString() + (x.by_name ? " \u00b7 shown as " + x.by_name : "") +
-          (x.by_avatar_asset_id ? " \u00b7 with photo" : "") + (x.by_bio ? " \u00b7 with bio" : "");
-        var b = document.createElement("button"); b.className = "pillBtn danger"; b.textContent = "Turn off";
+        var card = makeDiv("lkCard"), live = x.share_type === "board_live", group = x.share_type === "group_snapshot";
+        var ic = makeDiv("lkIcon"); ic.setAttribute("aria-hidden", "true"); ic.innerHTML = live ? ICONS.share : group ? ICONS.copy : ICONS.sticky;
+        var body = makeDiv("lkBody"), head = makeDiv("lkHead"), kind = document.createElement("strong");
+        kind.textContent = live ? "Whole board" : group ? "Selection of notes" : "Single note"; head.appendChild(kind);
+        var bn = x.board_id && names[x.board_id]; if(bn){ var bs = document.createElement("span"); bs.className = "lkBoard"; bs.textContent = "from " + bn; head.appendChild(bs); }
+        body.appendChild(head);
+        var meta = makeDiv("lkMeta");
+        function chip(txt, cls){ var c = document.createElement("span"); c.className = "lkChip" + (cls ? " " + cls : ""); c.textContent = txt; meta.appendChild(c); }
+        chip("Created " + new Date(x.created_at).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}));
+        if(live) chip("Read only", "perm"); else chip("Frozen copy");
+        if(x.by_name) chip("Shown as " + x.by_name);
+        if(x.by_avatar_asset_id) chip("With photo"); if(x.by_bio) chip("With bio");
+        body.appendChild(meta);
+        var b = document.createElement("button"); b.type = "button"; b.className = "pillBtn danger lkOff"; b.textContent = "Turn off"; b.setAttribute("aria-label", "Turn off this " + kind.textContent.toLowerCase() + " link");
         b.addEventListener("click", function(){
           b.disabled = true;
-          Stick.share.disable(x.id).then(function(){ row.remove(); if(onChange) onChange(-1); toast("That link no longer works."); },
+          Stick.share.disable(x.id).then(function(){ card.remove(); if(onChange) onChange(-1); toast("That link no longer works."); if(!listEl.children.length){ var n2 = makeDiv("lkEmpty"); n2.textContent = "You have no active shared links."; listEl.appendChild(n2); } },
             function(){ b.disabled = false; toast("Couldn't turn it off. Try again."); });
         });
-        row.appendChild(t); row.appendChild(b); content.appendChild(row);
+        card.appendChild(ic); card.appendChild(body); card.appendChild(b); listEl.appendChild(card);
       });
     }catch(e){ if(!modal.card.isConnected){ ld.stop(); return; } ld.fail("Couldn\u2019t load your links. " + Stick.errors.friendly(Stick.errors.parse(e)), function(){ modal.close(false); setTimeout(function(){ openManageShares(onChange); }, 0); }); }
   }
@@ -10308,7 +10356,7 @@
 // ---------- the links you have made, and what a link is
         '<section class="asCard" aria-labelledby="asH2b">' +
           '<h4 id="asH2b">Your links</h4>' +
-          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage active shares<small>See, copy or turn off every link you’ve made.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
+          '<button type="button" class="asAction" id="asShares2"><span class="lbl">Manage shared links<small>See and turn off every link you’ve made.</small></span><span class="go"><span id="asSharesN2"></span><span aria-hidden="true">›</span></span></button>' +
           '<p class="asHint" style="margin-top:6px;">A link to a note or a selection is a <b>frozen copy</b>: changing the original later does not change what people see. A link to a whole board is live and read only unless you choose otherwise. Anyone with a link can view it, no account needed, and you can turn any link off at any time. Printing and saving as a PDF never creates a link.</p>' +
         '</section>');
     P.appearance.insertAdjacentHTML("beforeend",
@@ -10337,7 +10385,7 @@
           '<div class="asItem" id="asMktRow"><label class="lbl" for="asMarketing">Product updates by email<small>Occasional Stick-It news and feature updates. You can unsubscribe anytime.</small></label><input type="checkbox" class="asSw" id="asMarketing" role="switch"></div>' +
           '<button type="button" class="asAction" id="asExport"><span class="lbl">Export my boards<small>One file with your text, layout and pictures. Voice memos and videos are not included yet.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asImport" hidden><span class="lbl">Import boards from this device<small id="asImportSub"></small></span><span class="go" aria-hidden="true">›</span></button>' +
-          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage active shares<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
+          '<button type="button" class="asAction" id="asShares"><span class="lbl">Manage shared links<small>See or turn off links you\u2019ve created.</small></span><span class="go"><span id="asSharesN"></span><span aria-hidden="true">\u203A</span></span></button>' +
           '<button type="button" class="asAction" id="asCorrect"><span class="lbl">Correct my profile details<small>Change your name, username or bio at the top of this page, then Save.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<button type="button" class="asAction" id="asSignAll"><span class="lbl">Sign out of all devices<small>Ends your sessions everywhere, including this one.</small></span><span class="go" aria-hidden="true">\u203A</span></button>' +
           '<p class="asHint" id="asPrivacyHint" style="margin-top:10px;"></p>' +
