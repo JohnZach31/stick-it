@@ -4040,6 +4040,7 @@
     setSelection([n.id]);
     if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
     var host = fieldEl.classList.contains("poTotal") ? fieldEl.querySelector("b") : fieldEl, before = captureState([n.id]), start = n[f] || "", done = false;
+    leaseGuard(host, n, Stick.objects.LABELS[n.type]);
     host.contentEditable = "true"; fieldEl.classList.add("editing"); host.focus();
     var rg = document.createRange(); rg.selectNodeContents(host); rg.collapse(false); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg);
     function value(){ return spec.multi ? Stick.objects.clean.lines(host.innerText, spec.max, 14) : Stick.objects.clean.one(host.textContent, spec.max); }
@@ -4414,13 +4415,32 @@
   function shopFieldValue(n, it, f){ return f === "qty" ? (it.q || "") : f === "note" ? (it.n || "") : f === "tag" ? (it.g || "") : f === "link" ? (it.l || "") : (it.p == null ? "" : String(it.p)); }
   function shopPatch(key, val){ var p = {}; p[key] = val == null ? undefined : val; if(val == null) p[key] = undefined; return p; }
 
+  // The editing lease is enforced at three levels, so nothing gets into a paper someone else is editing:
+  //   1. the door: focus is refused (the callers below), and the caret is cleared so a later insert has nowhere to go
+  //   2. typing, paste, drop and dictation are cancelled before they happen ("beforeinput")
+  //   3. anything the browser reports as input anyway (script- or accessibility-driven insertion does not always fire "beforeinput") is rolled back to the last accepted text
+  function leaseHolder(n){ return window.Stick && Stick.collab && Stick.collab.active && Stick.collab.active() && Stick.collab.blockedBy(n.id); }
+  function dropCaret(){ try{ var sel = window.getSelection(); if(sel) sel.removeAllRanges(); }catch(e){} }
+  function leaseGuard(target, n, what){
+    if(!target || target._leaseGuarded) return; target._leaseGuarded = true;
+    var last = target.innerHTML;
+    function say(h){ var now = Date.now(); if(!leaseGuard._t || now - leaseGuard._t > 1500){ leaseGuard._t = now; toast(h + " is editing this " + (what || "note") + "."); } }
+    target.addEventListener("focus", function(){ last = target.innerHTML; }, true);
+    target.addEventListener("beforeinput", function(e){ var h = leaseHolder(n); if(!h) return; e.preventDefault(); e.stopPropagation(); say(h); }, true);
+    target.addEventListener("input", function(e){
+      var h = leaseHolder(n);
+      if(!h){ last = target.innerHTML; return; }
+      e.stopImmediatePropagation(); target.innerHTML = last; dropCaret(); say(h);
+    }, true);
+  }
   // typing in an item's words: kept as you type (device now, account after a pause); one history step per visit
   function wireShopText(n, it, span){
+    leaseGuard(span, n, "list");
     var before = null, startText = it.t;
     function holder(){ return window.Stick && Stick.collab && Stick.collab.blockedBy(n.id); }
     span.addEventListener("pointerdown", function(e){ e.stopPropagation(); });
     span.addEventListener("focus", function(){
-      var h = holder(); if(h){ toast(h + " is editing this list."); span.blur(); return; }
+      var h = holder(); if(h){ toast(h + " is editing this list."); span.blur(); dropCaret(); return; }
       endEditing(span); before = captureState([n.id]); startText = it.t;
       if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
       if(!selected.has(n.id)) setSelection([n.id]);
@@ -6514,9 +6534,10 @@
         }
         document.execCommand("insertHTML", false, insert);
       });
+      leaseGuard(text, n, "note");
       text.addEventListener("focus", function(){
         var holder = window.Stick && Stick.collab && Stick.collab.blockedBy(n.id);
-        if(holder){ setTimeout(function(){ text.blur(); }, 0); toast(holder + " is editing this note."); return; }          // one person at a time per note
+        if(holder){ text.blur(); dropCaret(); setTimeout(function(){ text.blur(); dropCaret(); }, 0); toast(holder + " is editing this note."); return; }          // one person at a time per note
         if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
         clearTimeout(n._cleanT);
         el.classList.add("editing"); if(n.cosmetic === "soup") soupBalance();
@@ -8265,7 +8286,7 @@
       if(kind === "trash"){
         if(ids.length){ bulkBtn("Restore selected (" + ids.length + ")", "primary", function(){ var n = restoreFromTrash(ids); toast(n + " restored to the board."); after(); });
           bulkBtn("Delete selected forever", "danger", function(){ confirmForever(ids, "Delete " + ids.length + " forever?", "They will be gone for good. This can’t be undone."); }); }
-        if(all.length) bulkBtn("Empty Trash…", "danger", function(){ confirmDialog({title: "Empty the Trash?", body: "All " + all.length + (all.length === 1 ? " thing" : " things") + " in Trash will be deleted forever. This can’t be undone.", confirm: "Empty Trash", danger: true}).then(function(ok){ if(!ok) return; var n = deleteForever(all.map(function(o){ return o.id; })); toast("Trash emptied (" + n + ")."); after(); }); });
+        if(all.length) bulkBtn("Empty Trash…", "danger", function(){ confirmDialog({title: "Empty the Trash?", body: "All " + all.length + (all.length === 1 ? " thing" : " things") + " in Trash will be deleted forever. This can’t be undone.", confirm: "Empty Trash", danger: true}).then(function(ok){ if(!ok) return; var n = deleteForever(all.map(function(o){ return o.id; })); if(n){ try{ SoundFx.cue("trash"); }catch(e){} } /* same low chord as an ordinary Trash: once, only after the emptying really happened */ toast("Trash emptied (" + n + ")."); after(); }); });
       } else if(ids.length){
         bulkBtn("Put back selected (" + ids.length + ")", "primary", function(){ var n = restoreFromDone(ids); toast(n + " put back on the board."); after(); });
         bulkBtn("Move selected to Trash", "", function(){ doneToTrash(ids); after(); });
@@ -9897,7 +9918,22 @@
     var bi = window.Stick && Stick.build; function buildTag(){ return bi && bi.n ? " · build " + bi.n + (bi.at ? " · " + bi.at : "") : ""; }
     if(v && c.APP_VERSION){ v.textContent = "v" + c.APP_VERSION + (c.APP_STATUS === "development" ? " dev" : "") + buildTag(); v.title = "Stick-It " + c.APP_VERSION + (c.APP_CODENAME ? " – " + c.APP_CODENAME : "") + (bi && bi.n ? ", build " + bi.n + ", " + bi.at : ""); }
     var local = window.Stick && Stick.authDiag && Stick.authDiag.isLoopback();
-    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev" + buildTag() + " · localhost"; }
+    if(local){ document.title = "Stick-It — Local Development"; if(v && c.APP_VERSION) v.textContent = "v" + c.APP_VERSION + " dev" + buildTag() + " · localhost"; if(v) v.classList.add("local"); }
+    // A tab that stays open keeps running the code it loaded. Ask the server which build it has now; when it is newer, the tag turns red and says so, so an old bundle is never tested by accident.
+    // (localhost: every 15 s; the live site: every 5 minutes. Nothing reloads by itself.)
+    if(v && bi && bi.n){
+      var staleShown = false;
+      var checkBuild = function(){
+        if(staleShown) return;
+        fetch("js/build-info.js?cb=" + Date.now(), {cache: "no-store"}).then(function(r){ return r.ok ? r.text() : ""; }).then(function(t){
+          var m = /\bn:\s*(\d+)/.exec(t || ""); if(!m || Number(m[1]) <= bi.n) return;
+          staleShown = true; v.classList.remove("local"); v.classList.add("stale");
+          v.textContent = "Build " + m[1] + " is ready \u2014 this tab runs build " + bi.n + ". Click to reload."; v.title = "Reload to get the newest code"; v.setAttribute("role", "button"); v.tabIndex = 0;
+          v.addEventListener("click", function(){ location.reload(); }); v.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); location.reload(); } });
+        }).catch(function(){});
+      };
+      setTimeout(checkBuild, 3000); setInterval(checkBuild, local ? 15000 : 300000); window.addEventListener("focus", checkBuild);
+    }
     try{ var bt = sessionStorage.getItem("stickit.bootToast"); if(bt){ sessionStorage.removeItem("stickit.bootToast"); setTimeout(function(){ toast(bt); }, 800); } }catch(e){}
     try{ var al = sessionStorage.getItem("stickit.afterLeave"); if(al){ sessionStorage.removeItem("stickit.afterLeave"); setTimeout(function(){ try{ if(al === "signin") openAccountModal(); else if(al === "boards") document.getElementById("brandBtn").click(); }catch(e){} }, 1400); } }catch(e){}
     try{ if(sessionStorage.getItem("stickit.staleNote")){ sessionStorage.removeItem("stickit.staleNote"); setTimeout(function(){ toast("Your sign-in had expired, so you’re browsing as a guest. Sign in again any time."); }, 800); } }catch(e){} })();
@@ -10418,7 +10454,7 @@
       inviteSets.forEach(function(set){
         if(!set.rows.length && set.ok) return;
         anyInv = true;
-        var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH board"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
+        var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH boardName"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
         content.appendChild(sec);
         if(!set.ok){ var bad = makeDiv("accNone"); bad.textContent = "Couldn\u2019t load this board\u2019s invitations."; sec.appendChild(bad); return; }
         var pnl = buildAccessPanel(set.b.id, {presence: set.b.id === activeBoardId, people: true, onChange: bump});
@@ -12193,7 +12229,7 @@
   }
   function saveThumbNow(){
     clearTimeout(thumbT);
-    if(readOnly || singleNoteMode || !activeBoardId) return;
+    if(readOnly || singleNoteMode || !activeBoardId || cloudSigningOut || accessLost) return;       // leaving a cloud session (sign-out, access turned off): its boards are not drawn onto this device again
     try{ storeThumb(activeBoardId, notes); }catch(e){}
   }
   document.addEventListener("visibilitychange", function(){ if(document.visibilityState === "hidden") saveThumbNow(); });
@@ -13387,7 +13423,9 @@
   function wipeCloudCache(uid){
     var prefix = "stickyboard.cloud." + uid + ".";
     Object.keys(localStorage).forEach(function(k){ if(k.indexOf(prefix) === 0) localStorage.removeItem(k); });
+    try{ sessionStorage.setItem("stickit.wipeCloud", uid); }catch(e){}          // the page that is closing can still write after this; the next page sweeps again
   }
+  (function(){ try{ var w = sessionStorage.getItem("stickit.wipeCloud"); if(w){ sessionStorage.removeItem("stickit.wipeCloud"); var pre = "stickyboard.cloud." + w + "."; Object.keys(localStorage).forEach(function(k){ if(k.indexOf(pre) === 0) localStorage.removeItem(k); }); } }catch(e){} })();
   async function cloudSignOut(scope){
     scope = scope === "global" ? "global" : "local";
     flushTypingNotify();
@@ -13588,17 +13626,31 @@
   }
 
   // ---- collaboration (presence, comments, review): only for a cloud board, never for guests
-  // "What should we call you?": optional, quick, never an account. Skip keeps the generated name.
-  function openGuestNameDialog(){
-    var gi = guestId(), wrap = makeDiv("joinDlg");
-    wrap.innerHTML = '<p class="acctSub" style="margin:0 0 10px;">This is how other people on the board see you. It is not an account, and only this browser remembers it.</p>' +
-      '<label class="asLbl" for="gnName">Your name</label><input id="gnName" class="asIn" type="text" maxlength="40" autocomplete="off" spellcheck="false">' +
-      '<div class="asHint">Your generated name stays as your guest ID' + (gi.alias ? ": " + gi.alias : "") + '.</div>';
-    var inp = wrap.querySelector("#gnName"); inp.value = gi.name || gi.alias || ""; inp.placeholder = gi.alias || "Your name";
-    var m = openModal({title: "What should we call you?", content: wrap, width: 380, actions: [
-      {label: "Keep " + (gi.alias || "generated name"), value: false, onClick: function(close){ guestSave({asked: true}); return true; }},
-      {label: "Continue", kind: "primary", onClick: function(close){ applyGuestName(inp.value); close(true); return false; }}]});
-    inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); applyGuestName(inp.value); m.close(true); } });
+  // "What should we call you?": a small slip anchored to the guest's own avatar. Optional, never an account. It stays until the person presses Save, Cancel or X (or Esc);
+  // nothing closes it by itself, so it can never be missed. Dismissing keeps the generated name.
+  var namePopEl = null;
+  function closeGuestNamePop(){ if(namePopEl){ var o = namePopEl.opener; namePopEl.remove(); namePopEl = null; window.removeEventListener("resize", placeNamePop); if(o && o.focus && document.contains(o)){ try{ o.focus(); }catch(e){} } } }
+  function placeNamePop(){
+    if(!namePopEl) return;
+    var a = namePopEl.anchorEl && document.contains(namePopEl.anchorEl) ? namePopEl.anchorEl : document.getElementById("presenceBar"), r = a.getBoundingClientRect();
+    var w = namePopEl.offsetWidth || 300; namePopEl.style.top = Math.max(8, r.bottom + 8) + "px"; namePopEl.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + "px";
+  }
+  function openGuestNameDialog(anchor){
+    closeGuestNamePop();
+    var gi = guestId(), opener = document.activeElement;
+    var pop = makeDiv("namePop"); pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Your name on this board"); pop.opener = opener; pop.anchorEl = anchor && anchor.getBoundingClientRect ? anchor : null;
+    pop.innerHTML = '<button type="button" class="npX" aria-label="Close">\u00d7</button>' +
+      '<div class="npTitle">You\u2019re \u201c<span class="npAlias"></span>\u201d here</div>' +
+      '<p class="npHelp">Other people on the board see this name. It isn\u2019t an account, and only this browser remembers it.</p>' +
+      '<label class="npLbl" for="gnName">Your name</label><input id="gnName" class="asIn" type="text" maxlength="40" autocomplete="off" spellcheck="false">' +
+      '<div class="npActs"><button type="button" class="pillBtn npCancel">Cancel</button><button type="button" class="pillBtn primary npSave">Save</button></div>';
+    pop.querySelector(".npAlias").textContent = gi.name || gi.alias || "guest";
+    var inp = pop.querySelector("#gnName"); inp.value = gi.name || gi.alias || ""; inp.placeholder = gi.alias || "Your name";
+    function cancel(){ guestSave({asked: true}); closeGuestNamePop(); }
+    function save(){ applyGuestName(inp.value); closeGuestNamePop(); }
+    pop.querySelector(".npX").addEventListener("click", cancel); pop.querySelector(".npCancel").addEventListener("click", cancel); pop.querySelector(".npSave").addEventListener("click", save);
+    pop.addEventListener("keydown", function(e){ if(e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); cancel(); } else if(e.key === "Enter" && e.target === inp){ e.preventDefault(); e.stopPropagation(); save(); } else if(e.key === "Tab"){ var f = [].slice.call(pop.querySelectorAll("button, input")); var i = f.indexOf(document.activeElement); if(e.shiftKey && i <= 0){ e.preventDefault(); f[f.length - 1].focus(); } else if(!e.shiftKey && i === f.length - 1){ e.preventDefault(); f[0].focus(); } } });
+    document.body.appendChild(pop); namePopEl = pop; placeNamePop(); window.addEventListener("resize", placeNamePop);
     setTimeout(function(){ inp.focus(); inp.select(); }, 30);
   }
   function applyGuestName(raw){
@@ -13622,14 +13674,14 @@
       var role = p.role === "owner" ? "Owner" : p.role === "viewer" ? "Viewer" : p.role === "editor" ? "Editor" : "";
       if(role){ var rl = document.createElement("span"); rl.className = "accRole"; rl.textContent = role; row.appendChild(rl); }
       if(lab.sub){ var sb = document.createElement("div"); sb.className = "accSub"; sb.style.flexBasis = "100%"; sb.textContent = lab.sub; row.appendChild(sb); }
-      if(p.self && p.guest){ var cn = document.createElement("button"); cn.type = "button"; cn.className = "pillBtn"; cn.textContent = "Change my name"; cn.addEventListener("click", function(){ closeFloatingPopovers(); openGuestNameDialog(); }); row.appendChild(cn); }
+      if(p.self && p.guest){ var cn = document.createElement("button"); cn.type = "button"; cn.className = "pillBtn"; cn.textContent = "Change my name"; cn.addEventListener("click", function(){ closeFloatingPopovers(); openGuestNameDialog(anchor); }); row.appendChild(cn); }
       pop.appendChild(row);
     });
   }
   function startCollab(){
     if(!(window.Stick && Stick.collab) || !CLOUD || !activeBoardId || singleNoteMode) return;
     var meta = boards.filter(function(b){ return b.id === activeBoardId; })[0] || {}, role = meta.access || "owner";
-    var user = Stick.auth.user() || {}, dev = window.Stick && Stick.dev && localStorage.getItem("stickit.dev.presence") === "bc";
+    var user = Stick.auth.user() || {}, devP = window.Stick && Stick.dev && localStorage.getItem("stickit.dev.presence"), dev = devP === "bc" || devP === "fake" || devP === "relay";
     // Who I am in presence: an account by its profile name; a guest by the name they chose, else the generated one ("Leaflet #253"), with the generated name kept as the stable identifier.
     var isGuest = !!(Stick.auth.isAnonymous && Stick.auth.isAnonymous()), gi = isGuest ? guestId() : null;
     if(isGuest && !gi.alias && !startCollab._asked){
@@ -13640,10 +13692,10 @@
     if(isGuest && settings.account) settings.account.name = myName;
     if(isGuest && gi.alias && !gi.asked && !gi.name && !startCollab._prompted){
       startCollab._prompted = true; guestSave({asked: true});
-      setTimeout(function(){ toast("You\u2019re \u201c" + gi.alias + "\u201d here. Want a different name?", "Set name", openGuestNameDialog); }, 1500);
+      setTimeout(function(){ var self0 = document.querySelector("#presenceBar .presAv.self"); if(self0) openGuestNameDialog(self0); }, 1800);          // anchored to the guest's own avatar; stays until they act
     }
     Stick.collab.start({
-      boardId: activeBoardId, role: role, canComment: role === "owner" || role === "editor", transport: dev ? "broadcast" : undefined,
+      boardId: activeBoardId, role: role, canComment: role === "owner" || role === "editor", transport: dev ? (devP === "fake" ? "fake" : devP === "relay" ? "relay" : "broadcast") : undefined,
       me: {uid: user.id || "", name: myName, alias: isGuest ? (gi.alias || "") : "", guest: isGuest, hue: isGuest ? gi.hue : undefined},
       host: {
         refresh: function(){ notes.forEach(function(n){ if(n.el) Stick.collab.decorate(n, n.el); }); },
@@ -13654,6 +13706,7 @@
         },
         modal: function(o){ return openModal(o); },
         showPeople: function(anchor){ openPresencePopover(anchor); },
+        elFor: function(id){ var n = findNote(id); return n && n.el ? n.el : null; },
         // your own comments show your own picture; other people show their initial (their pictures are not shared with the board)
         paintAvatar: function(elm, uid){ var me = Stick.auth.user(); if(me && uid === me.id && settings.account){ paintAvatar(elm, accountAvatarSpec()); return true; } return false; }
       }

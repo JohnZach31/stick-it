@@ -1933,7 +1933,9 @@
   #snapStage .po-postcard .poCard{ transform-style:flat; }
   #snapStage .po-postcard .poFace{ backface-visibility:visible; -webkit-backface-visibility:visible; box-shadow:none; border:1px solid rgba(0,0,0,0.12); }
 
-#verTag{ position:fixed; right:10px; bottom:5px; z-index:2; font:500 0.62rem "Sora",sans-serif; letter-spacing:0.04em; color:var(--ink-soft); opacity:.5; pointer-events:none; user-select:none; }
+#verTag{ position:fixed; right:10px; bottom:5px; z-index:var(--z-toast, 10029); font:600 0.72rem "Sora",sans-serif; letter-spacing:0.03em; color:var(--ink); background:color-mix(in srgb, var(--panel) 88%, transparent); padding:3px 9px; border-radius:999px; border:1px solid var(--line); opacity:.92; pointer-events:none; user-select:none; max-width:calc(100vw - 20px); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#verTag.local{ background:#ffe9a8; color:#3a2d00; border-color:#d9a400; opacity:1; }
+#verTag.stale{ background:#d9534f; color:#fff; border-color:#a52a27; pointer-events:auto; cursor:pointer; }
 @media print{ #verTag{ display:none; } }
 
 /* strip picker (inside the shared modal) */
@@ -2735,5 +2737,5 @@ body.dark .embedObj::before{ background:rgba(242,234,219,0.22); border-color:rgb
 /* ===== Central layer scale (v0.8.3.3). Every full-screen surface takes its z-index from here, so a dialog can never again sit under a system space.
    canvas < zones < objects < object chrome < selection < floating board controls < toasts / status pills < system-space chrome (Done, Trash, pile browser, readers)
    < modal backdrop + modal (Settings, share, collaboration, confirmations) < tutorial < critical confirmation */
-:root{ --z-toast:10029; --z-system:10045; --z-reader:10075; --z-modal:10070; --z-tutorial:10080; --z-critical:10090; }
+:root{ --z-menu:10095; --z-peer:9990; --z-toast:10029; --z-system:10045; --z-reader:10075; --z-modal:10070; --z-tutorial:10080; --z-critical:10090; }
 .acctBackdrop.critical{ z-index:var(--z-critical); }

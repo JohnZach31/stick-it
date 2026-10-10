@@ -99,6 +99,22 @@
       leave: function () { dead = true; try { if (ch) { ch.untrack(); if (client) client.removeChannel(ch); } } catch (e) {} }
     };
   }
+  // dev/test only (localStorage "stickit.dev.presence" = "relay", localhost only): presence through the LOCAL TEST BACKEND instead of Supabase Realtime, so two real pages
+  // (even on different origins) see each other. Same state, same merge and lease rules as the real channel; only the wire differs.
+  function relayTransport(boardId, selfKey, onSync) {
+    var base = (Stick.config && Stick.config.SUPABASE_URL || "").replace(/\/$/, "") + "/__presence/" + encodeURIComponent(boardId), mine = null, dead = false, timer = null;
+    function post(method, body) { try { return root.fetch(base, { method: method, body: JSON.stringify(body) }).catch(function () {}); } catch (e) {} }
+    function poll() { if (dead) return; root.fetch(base).then(function (r) { return r.json(); }).then(function (list) { if (!dead) onSync(list.map(function (x) { return { key: x.key, state: x.state }; })); }).catch(function () {}); }
+    timer = setInterval(function () { if (mine) post("POST", { key: selfKey, state: mine }); poll(); }, 700);
+    function wake() { if (mine) post("POST", { key: selfKey, state: mine }); poll(); }
+    if (root.document && root.document.addEventListener) root.document.addEventListener("visibilitychange", function () { if (!root.document.hidden) wake(); });
+    if (root.addEventListener) root.addEventListener("focus", wake);
+    return {
+      status: function () { return "connected"; },
+      track: function (st) { mine = st; post("POST", { key: selfKey, state: st }); setTimeout(poll, 60); },
+      leave: function () { dead = true; clearInterval(timer); post("DELETE", { key: selfKey }); }
+    };
+  }
   // dev/test only: several tabs of one browser stand in for several people (same origin, no server)
   function broadcastTransport(boardId, selfKey, onSync) {
     var bc = new root.BroadcastChannel("stickit-presence:" + boardId), seen = {}, mine = null, timer = null;
@@ -127,11 +143,15 @@
     var selfKey = (opts.me.uid || "dev") + ":" + Math.random().toString(36).slice(2, 8);
     S = { opts: opts, selfKey: selfKey, peers: {}, beat: 0, editing: null, active: null, summary: { comments: {}, reviews: {} }, timers: [], listeners: [] };
     var onSync = function (list) { S.peers = core.merge(S.peers, list, Date.now()); render(); };
-    try { S.tp = (opts.transport === "broadcast" && root.BroadcastChannel) ? broadcastTransport(opts.boardId, selfKey, onSync) : (opts.transport === "none" ? null : supabaseTransport(opts.boardId, selfKey, onSync)); } catch (e) { S.tp = null; }
+    S.onSync = onSync;
+    if (opts.transport === "relay") { S.tp = relayTransport(opts.boardId, selfKey, onSync); }
+    else if (opts.transport === "fake") { S.tp = { track: function (st) { S.lastTracked = st; }, leave: function () {}, status: function () { return "connected"; } }; }
+    else try { S.tp = (opts.transport === "broadcast" && root.BroadcastChannel) ? broadcastTransport(opts.boardId, selfKey, onSync) : (opts.transport === "none" ? null : supabaseTransport(opts.boardId, selfKey, onSync)); } catch (e) { S.tp = null; }
     function send() { if (!S || !S.tp) return; S.beat++; var me = S.opts.me; S.tp.track({ uid: me.uid, name: me.name, alias: me.alias || "", guest: !!me.guest, hue: me.hue != null ? me.hue : core.hue(me.uid), role: S.opts.role || null, editing: S.editing, active: S.active, beat: S.beat }); }
     S.send = send; send();
     S.timers.push(setInterval(function () { send(); render(); }, BEAT_MS));
     S.timers.push(setInterval(function () { render(); }, 5000));                     // so a silent peer's lock really does expire on screen
+    S.timers.push(setInterval(function () { syncPeerLayer(); }, 350));               // the glow follows its paper when it is moved or resized
     if (opts.comments !== false) {
       C.refreshSummary();
       S.timers.push(setInterval(function () { if (root.document.visibilityState !== "hidden") C.refreshSummary(); }, 30000));
@@ -145,7 +165,7 @@
     S.timers.forEach(clearInterval);
     if (S.tp) S.tp.leave();
     clearInterval(S.leaseT);
-    S = null; drawPeople(); listeners.forEach(function (f) { try { f(); } catch (e) {} });
+    S = null; drawPeople(); syncPeerLayer(); listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (host && host.refresh) host.refresh();
   };
   C.active = function () { return !!S; };
@@ -176,6 +196,14 @@
       });
     }, function () {});
     return function () { dead = true; chans.forEach(function (ch) { try { if (client) client.removeChannel(ch); } catch (e) {} }); chans = []; };
+  };
+  // DEV ONLY (localStorage "stickit.dev.presence" = "fake", honoured on localhost): script who is on the board, to check what the real page draws without a second browser.
+  // list = [{uid, name, alias, guest, hue, role, editing}], the same fields presence carries. Calling it again replaces the previous list (an empty list = everyone left).
+  C.devFeed = function (list) {
+    if (!S || !S.onSync) return false;
+    S.devBeat = (S.devBeat || 0) + 1;
+    S.onSync((list || []).map(function (p) { return { key: "dev:" + p.uid, state: Object.assign({ beat: S.devBeat }, p) }; }));
+    return true;
   };
   C.status = function () { return S && S.tp && S.tp.status ? S.tp.status() : (S ? "off" : "stopped"); };
   // who holds the lease on an object right now (name, colour, guest alias), or null
@@ -269,7 +297,7 @@
     return [{ uid: me.uid || "", name: me.name || "You", alias: me.alias || "", guest: !!me.guest, role: S.opts.role || null, self: true, editing: S.editing, hue: me.hue != null ? me.hue : core.hue(me.uid || "me"), initial: core.initial(me.name) }].concat(C.people().map(function (p) { p.self = false; return p; }));
   };
   function render() {
-    drawPeople();
+    drawPeople(); syncPeerLayer();
     listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (!S || !S.opts.host || !S.opts.host.refresh) return;
     var sig = JSON.stringify([C.people().map(function (p) { return [p.uid, p.editing, p.active, p.name, p.hue]; }), S.summary]);
@@ -281,7 +309,7 @@
     var bar = root.document.getElementById("presenceBar");
     if (!bar) return;
     barEl = bar;
-    var others = C.people(), all = S && others.length ? C.online() : [];       // alone on the board: nothing to show
+    var others = C.people(), all = S && (others.length || S.opts.me.guest) ? C.online() : [];       // alone on the board: nothing to show (a guest always sees themself, so they can rename from it)
     bar.innerHTML = ""; bar.hidden = !all.length;
     var MAX = 4;
     all.slice(0, MAX).forEach(function (p) {
@@ -297,6 +325,56 @@
   }
 
   // called for every object element the app draws (or redraws)
+  // ---- the editing overlay: one board-level layer above all papers (not inside any paper, so no neighbour, tape, comment tab or the paper's own styles can hide it).
+  // For each object someone else holds the lease on it draws a glow in that person's colour and a small tab with their initial; hover / focus / tap shows "<name> is editing".
+  function layerFor(node) {
+    var parent = node && node.parentNode; if (!parent) return null;
+    var L = parent.querySelector(":scope > .peerLayer");
+    if (!L) { L = el("div", "peerLayer"); L.setAttribute("aria-hidden", "false"); parent.appendChild(L); }
+    return L;
+  }
+  function syncPeerLayer() {
+    var doc = root.document; if (!doc) return;
+    var want = {};
+    if (S && S.opts.host && S.opts.host.elFor) {
+      var now = Date.now();
+      Object.keys(S.peers).forEach(function (k) {
+        var p = S.peers[k];
+        if (k === S.selfKey || !core.fresh(p, now) || !core.leaseFresh(p, now)) return;
+        if (p.state.uid && p.state.uid === S.opts.me.uid) return;
+        var id = p.state.editing; if (!id || want[id]) return;
+        var node = S.opts.host.elFor(id); if (!node || !node.parentNode) return;
+        want[id] = { node: node, st: p.state, key: k };
+      });
+    }
+    var layers = doc.querySelectorAll(".peerLayer");
+    Array.prototype.forEach.call(layers, function (L) {
+      Array.prototype.forEach.call(L.querySelectorAll(":scope > .peerGlow"), function (g) { if (!want[g.getAttribute("data-for")]) g.remove(); });
+    });
+    Object.keys(want).forEach(function (id) {
+      var w = want[id], node = w.node, L = layerFor(node); if (!L) return;
+      var g = null; Array.prototype.forEach.call(L.querySelectorAll(":scope > .peerGlow"), function (x) { if (x.getAttribute("data-for") === id) g = x; });
+      var hue = w.st.hue != null ? w.st.hue : core.hue(w.st.uid || w.key), lab = core.label(w.st);
+      if (!g) {
+        g = el("div", "peerGlow"); g.setAttribute("data-for", id);
+        var tab = el("button", "peerTab"); tab.type = "button";
+        tab.appendChild(el("span", "peerTabAv", "")); tab.appendChild(el("span", "peerTabText", ""));
+        tab.addEventListener("click", function () { tab.classList.toggle("open"); });          // tap on a phone
+        g.appendChild(tab); L.appendChild(g);
+      }
+      g.style.setProperty("--ph", hue);
+      var tb = g.firstChild; tb.firstChild.textContent = core.initial(w.st.name); tb.lastChild.textContent = lab.name + " is editing";
+      tb.title = lab.name + " is editing" + (lab.sub ? " \u00b7 " + lab.sub : ""); tb.setAttribute("aria-label", tb.title);
+      // the paper's own box (layout coordinates, so board zoom does not matter), and its tilt
+      var cs = root.getComputedStyle(node);
+      g.style.left = (node.offsetLeft - 5) + "px"; g.style.top = (node.offsetTop - 5) + "px"; g.style.width = (node.offsetWidth + 10) + "px"; g.style.height = (node.offsetHeight + 10) + "px";
+      g.style.transform = cs.transform && cs.transform !== "none" ? cs.transform : "";
+      // the tab normally hangs above the paper's top edge; when that would be under the top bar (or off screen) it sits just inside the corner instead
+      var tbar = doc.querySelector(".topbar"), limit = tbar ? tbar.getBoundingClientRect().bottom + 4 : 0, nt = node.getBoundingClientRect().top;
+      tb.classList.toggle("inside", nt - 22 < limit);
+    });
+  }
+  C.syncPeerLayer = syncPeerLayer;
   C.decorate = function (n, node) {
     if (!S || !node || !n || !n.id) return;
     var old = node.querySelectorAll(":scope > .cmtTab, :scope > .peerBadge");
@@ -317,7 +395,7 @@
       var lab = core.label(p.state);
       b.title = lab.name + (hit === "editing" ? " is editing this" : " is moving this") + (lab.sub ? " \u00b7 " + lab.sub : ""); b.setAttribute("aria-label", b.title);
       node.appendChild(b);
-      if (hit === "editing") { var tag = el("span", "peerBadge peerTag", lab.name + " is editing"); tag.style.setProperty("--h", hue); tag.setAttribute("aria-hidden", "true"); node.appendChild(tag); }
+      if (hit === "editing") b.remove();                       // the overlay (syncPeerLayer) draws the editing glow and tab above every paper
     });
     // comments and review
     if (S.opts.comments === false) return;
