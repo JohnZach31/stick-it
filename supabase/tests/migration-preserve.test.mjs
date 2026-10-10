@@ -121,4 +121,17 @@ ok((await run('su', 'select count(*)::int c from public.board_members where boar
   ok(accNames.length === (await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [board.id])).rows[0].c, 'the access list matches the real membership');
 }
 
+
+// ---- and the fourth (a returning guest can have their generated name back)
+{
+  const NEW4 = '20261010100000_guest_alias_return.sql';
+  const sql4 = fs.readFileSync(path.join(migDir, NEW4), 'utf8').replace(/\r\n/g, '\n');
+  ok(!/\bupdate\s+public\.board_members\b/i.test(sql4) && !/\bdelete\s+from\s+public\./i.test(sql4), 'the fourth migration does not touch memberships or delete anything');
+  const pre = await snap();
+  await db.exec(sql4);
+  const post = await snap();
+  ok(JSON.stringify(pre.members) === JSON.stringify(post.members) && JSON.stringify(pre.invites) === JSON.stringify(post.invites), 'AFTER the fourth migration: memberships and invitations are still identical');
+  ok(!(await run(guest, 'select public.accept_invite($1)', [openLink.token])).error && await wrote(guest) && await wrote(editor), 'existing guests and editors still work');
+}
+
 console.log('migration preserves existing access: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

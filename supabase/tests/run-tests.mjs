@@ -1082,6 +1082,14 @@ group('guest identity and history');
   ok((await run('su', 'select count(*)::int c from public.board_members where board_id=$1', [B.id])).rows[0].c === headBefore, 'and no membership changed');
   ok(errIs(await run(g2, 'select public.accept_invite($1)', [inv.token]), /INVITE_REVOKED/), 'a hidden link still cannot be used');
   ok(errIs(await run(bob, 'select public.delete_invite_history($1)', [inv2.id]), /FORBIDDEN/), 'only the owner can hide history');
+  // the same person coming back (new session, same browser) gets their generated name again once their old session is no longer on the board
+  const g5 = { id: uuid(), email: null, anonymous: true }; await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g5.id, null, '{}']); await attest(g5.id);
+  const heldBy = (await run('su', "select user_id from public.board_invite_uses where board_id=$1 and alias='Leaflet #77' limit 1", [B.id])).rows[0];
+  ok(!!heldBy && !(await run('su', 'select 1 from public.board_members where board_id=$1 and user_id=$2', [B.id, heldBy.user_id])).rows.length, 'the guest who first had that name was removed from the board (the name only survives in history)');
+  ok(!(await run(g5, 'select public.accept_invite($1, $2)', [inv2.token, 'Leaflet #77'])).error && (await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g5.id])).rows[0].alias === 'Leaflet #77', 'so the returning guest gets their generated name back');
+  const g6 = { id: uuid(), email: null, anonymous: true }; await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g6.id, null, '{}']); await attest(g6.id);
+  await run(g6, 'select public.accept_invite($1, $2)', [inv2.token, 'Leaflet #77']);
+  ok((await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g6.id])).rows[0].alias !== 'Leaflet #77', 'but a name that someone ON the board right now holds is never given to a second person');
 }
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -118,13 +118,14 @@ async function findOrCreateUser(email, bare) {
 }
 function sessionFor(u) {
   const now = Math.floor(Date.now() / 1000);
-  const access = sign({ iss: 'fake-supabase', sub: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, iat: now, exp: now + 3600,
-                        user_metadata: u.raw_user_meta_data, app_metadata: { provider: 'google' } });
+  const anon = !u.email;                                 // an anonymous (guest) user has no e-mail; the real platform marks the JWT with is_anonymous
+  const access = sign({ iss: 'fake-supabase', sub: u.id, aud: 'authenticated', role: 'authenticated', email: u.email || undefined, iat: now, exp: now + 3600,
+                        user_metadata: u.raw_user_meta_data, app_metadata: { provider: anon ? 'anonymous' : 'google' }, is_anonymous: anon });
   const refresh = crypto.randomUUID();
   sessions.set(refresh, u.id);
   return { access_token: access, token_type: 'bearer', expires_in: 3600, expires_at: now + 3600, refresh_token: refresh,
-           user: { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, app_metadata: { provider: 'google', providers: ['google'] },
-                   user_metadata: u.raw_user_meta_data, identities: [], created_at: new Date().toISOString() } };
+           user: { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, app_metadata: { provider: anon ? 'anonymous' : 'google', providers: anon ? [] : ['google'] },
+                   user_metadata: u.raw_user_meta_data, identities: [], created_at: new Date().toISOString(), is_anonymous: anon } };
 }
 async function handleAuth(req, res, url, body) {
   const p = url.pathname.replace('/auth/v1', '');
@@ -170,7 +171,7 @@ async function handleAuth(req, res, url, body) {
     const c = verify((req.headers.authorization || '').replace(/^Bearer\s+/i, ''));
     if (!c || !c.sub) return send(req, res, 401, { message: 'invalid JWT' });
     const u = (await asSuper(d => d.query('select id, email, raw_user_meta_data from auth.users where id=$1', [c.sub]))).rows[0];
-    return send(req, res, 200, { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.raw_user_meta_data, app_metadata: { provider: 'google', providers: ['google'] }, identities: [{ id: u.id, user_id: u.id, provider: 'google', identity_data: u.raw_user_meta_data }] });
+    return send(req, res, 200, { id: u.id, aud: 'authenticated', role: 'authenticated', email: u.email, user_metadata: u.raw_user_meta_data, is_anonymous: !u.email, app_metadata: { provider: u.email ? 'google' : 'anonymous', providers: u.email ? ['google'] : [] }, identities: [{ id: u.id, user_id: u.id, provider: 'google', identity_data: u.raw_user_meta_data }] });
   }
   if (p === '/otp') {                                   // passwordless e-mail code: always the same reply (no enumeration)
     const j = JSON.parse(body.toString() || '{}');
@@ -192,6 +193,10 @@ async function handleAuth(req, res, url, body) {
     otps.delete(email);
     const s = sessionFor(await findOrCreateUser(email, true)); s.user.app_metadata = { provider: 'email', providers: ['email'] };
     return send(req, res, 200, s);
+  }
+  if (p === '/signup') {                                // anonymous sign-in (a guest with no account), as the real platform does when it is switched on
+    const u = await asSuper(async (d) => (await d.query('insert into auth.users (email, raw_user_meta_data) values (null, $1::jsonb) returning id, email, raw_user_meta_data', ['{}'])).rows[0]);
+    return send(req, res, 200, sessionFor(u));
   }
   if (p === '/logout') return send(req, res, 204);
   if (p === '/settings') return send(req, res, 200, { external: { google: true }, disable_signup: false });
@@ -424,6 +429,15 @@ async function handleFunction(req, res, url, body) {
 // ---------------------------------------------------------------- admin (tests only)
 async function handleAdmin(req, res, url, body) {
   const j = body.length ? JSON.parse(body.toString()) : {};
+  if (url.pathname.startsWith('/__presence/')) {          // TEST DOUBLE ONLY: who is "connected" to a board, as presence would report it (entries expire after 12 s of silence)
+    const board = decodeURIComponent(url.pathname.slice('/__presence/'.length));
+    const m = relay.get(board) || new Map(); relay.set(board, m);
+    const j = body && body.length ? JSON.parse(body.toString() || '{}') : {};
+    if (req.method === 'POST') { m.set(String(j.key), { state: j.state, at: Date.now() }); return send(req, res, 200, {}); }
+    if (req.method === 'DELETE') { m.delete(String(j.key)); return send(req, res, 200, {}); }
+    const now = Date.now(); for (const [k, v] of m) if (now - v.at > 12000) m.delete(k);
+    return send(req, res, 200, [...m].map(([key, v]) => ({ key, state: v.state })));
+  }
   if (url.pathname === '/__admin/config') return send(req, res, 200, { url: ORIGIN, anonKey: ANON_KEY, serviceKey: SERVICE_KEY });
   if (url.pathname === '/__admin/sql') {
     try { const r = await asSuper(d => d.query(j.sql, j.params || [])); return send(req, res, 200, { rows: r.rows }); }
@@ -435,6 +449,7 @@ async function handleAdmin(req, res, url, body) {
 }
 
 // ---------------------------------------------------------------- server
+const relay = new Map();     // board id -> Map(key -> {state, at}) for the presence relay above
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, ORIGIN);
   if (req.method === 'OPTIONS') { res.writeHead(204, cors(req)); return res.end(); }
@@ -444,7 +459,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/rest/v1')) return await handleRest(req, res, url, body);
     if (url.pathname.startsWith('/storage/v1/object')) return await handleStorage(req, res, url, body);
     if (url.pathname.startsWith('/functions/v1')) return await handleFunction(req, res, url, body);
-    if (url.pathname.startsWith('/__admin')) return await handleAdmin(req, res, url, body);
+    if (url.pathname.startsWith('/__admin') || url.pathname.startsWith('/__presence/')) return await handleAdmin(req, res, url, body);
     return send(req, res, 200, { ok: true, service: 'fake-supabase (test double)' });
   } catch (e) { console.error(e); return send(req, res, 500, { message: String(e.message) }); }
 });

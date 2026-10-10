@@ -104,15 +104,15 @@ C.stop(); ok(removed.includes('board:b1'), 'leaving the board removes the presen
   ok(!/\|\| "Member"|"Stick-It member"|'Stick-It member'/.test(app), 'and neither does the page');
   ok(/archived_at timestamptz/.test(mig) && /set archived_at = coalesce\(archived_at, now\(\)\)/.test(mig) && !/delete from public\.board_invites/.test(mig), 'Delete from history hides (archives) the record: it stays as the access log, no membership changes');
 }
-ok(/function openGuestNameDialog\(\)/.test(app) && /What should we call you\?/.test(app) && /Keep " \+ \(gi\.alias/.test(app) && /Continue/.test(app), 'a quick, optional "What should we call you?" (Continue / keep the generated name), not an account');
+ok(/function openGuestNameDialog\(anchor\)/.test(app) && /What should we call you\?|You\\u2019re \\u201c<span class="npAlias">/.test(app) && /class="npSave"|npSave/.test(app) && /npCancel/.test(app) && /npX/.test(app), 'the name step is a small slip with a field, Save, Cancel and X (not a toast, not an account)');
 ok(/Stick\.collab\.setMe\(\{name: shown\}\)/.test(app) && /Stick\.repo\.setGuestName\(custom\)/.test(app), 'renaming updates everyone connected at once and the owner\'s lists');
-ok(/toast\("You\\u2019re \\u201c" \+ gi\.alias/.test(app) && /openGuestNameDialog\)/.test(app), 'a new guest is offered the name step once, from a toast (no extra heavyweight modal)');
+ok(/openGuestNameDialog\(self0\)/.test(app) && /#presenceBar \.presAv\.self/.test(app) && !/toast\("You\\u2019re \\u201c" \+ gi\.alias/.test(app), 'a new guest is offered the name slip once, anchored to their own avatar; it stays until they act');
 ok(/if\(p\.self && p\.guest\)/.test(app) && /Change my name/.test(app), 'a guest can rename from the header avatars at any time');
 ok(/showPeople: function\(anchor\)\{ openPresencePopover\(anchor\); \}/.test(app) && /var h = makeDiv\("menuHint"\); h\.textContent = "On this board now"/.test(app), 'tapping the header avatars lists who is here (name, guest line, role)');
 ok(/function paintBoardPres\(id\)/.test(app) && /" here"/.test(app) && /Stick\.collab\.watch\(ids/.test(app) && /endBoardWatch\(\)/.test(app) && /rowPres\[b\.id\] = presEl/.test(app), 'the board list shows "N here" under a board, from presence, only while it is open');
 ok(/Stick\.collab\.holder\(n\.id\)/.test(app) && /Delete anyway\?/.test(app) && /editing .* right now\. Delete anyway\?/.test(app), 'deleting a note someone is editing asks first: "<name> is editing this note right now. Delete anyway?"');
 ok((app.match(/is editing this (note|list|" \+ Stick\.objects\.LABELS\[n\.type\])/g) || []).length >= 3 && /Stick\.collab\.blockedBy\(n\.id\)/.test(app), 'editing a note someone else is editing says "<name> is editing this note." and does not steal focus');
-ok(/\.peerEditing\{[^}]*hsl\(var\(--ph, 200\)/.test(css) && /peerTag/.test(read('js/collab.js')) && /is editing"/.test(read('js/collab.js')), 'the editing node glows in the editor\'s own colour with a "<name> is editing" tab');
+ok(/\.peerGlow\{[^}]*hsl\(var\(--ph, 200\)/.test(css) && /syncPeerLayer/.test(read('js/collab.js')) && /is editing"/.test(read('js/collab.js')) && /z-index:var\(--z-peer, 9990\)/.test(css), 'the editing node glows in the editor\'s own colour (board-level overlay above every paper) with a "<name> is editing" tab');
 ok(!/setEditing\([^)]*\)[^;]*saveNotes|setEditing[^\n]*syncObjects/.test(app + read('js/collab.js')), 'the lease uses presence only, not the board\'s persistent data');
 // board-name sub-lines and counts
 ok(/kind === "invite"/.test(app) && /function bump\(d, kind\)/.test(app) && /bump\(-1, "public"\)/.test(app) && /\.accCount"\)\.textContent = nInv/.test(app), 'turning links off or hiding history moves the counts without a reload');
