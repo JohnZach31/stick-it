@@ -53,3 +53,8 @@ Migration: `supabase/migrations/20261009110000_collab_management.sql` (also non-
 * **History.** "Delete from history" hides a turned-off link (`archived_at`); the row and the names of the people who used it remain as the access log. No membership changes.
 
 Migration: `supabase/migrations/20261009120000_guest_identity.sql`.
+
+## Why Realtime did not work in production until the CSP fix (v0.8.3.4)
+
+`index.html` allowed `connect-src https://*.supabase.co` but not `wss://*.supabase.co`. A CSP source of `https://…` does **not** cover a `wss://` WebSocket, so the browser blocked Supabase Realtime outright ("Refused to connect … violates connect-src"): no presence, no editing lease, no live push, no access-changed ping. Everything fell back to polling, which looked like "realtime is a bit faster" only because the save/pull delays had been shortened. The page now allows `wss://*.supabase.co` (and `ws://` for the two local test origins). To check on any page: open the console; there must be no `connect-src` violation, and `Stick.collab.status()` must say `connected`. If it says `unavailable`, the console line `[presence] live channel …` says which of the three usual causes it is (blocked WebSocket, missing policies on `realtime.messages`, expired sign-in). The policies are applied once with `supabase/ops/realtime-policies.sql`; verify with
+`select policyname, cmd from pg_policies where schemaname = 'realtime' and tablename = 'messages';` (expect `board_channel_read` and `board_channel_write`).

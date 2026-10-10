@@ -35,7 +35,7 @@ ok(/hit === "editing"\) b\.remove\(\)/.test(collab), 'the old in-paper badge is 
 ok(/node\.offsetLeft - 5/.test(collab) && /cs\.transform/.test(collab), 'the glow follows the paper\'s box and tilt');
 
 // ---- 3. class-name collision: a heading called "board" took the page canvas's rules (position:fixed)
-ok(!/\.accH\.board\{/.test(css) && /\.accH\.boardName\{/.test(css) && /accH boardName/.test(app), 'the board-name heading is no longer named like the page canvas');
+ok(!/\.accH\.board\{/.test(css) && !/\.accH\.boardName\{/.test(css) && /\.accH\.accBoardTitle\{/.test(css) && /accH accBoardTitle/.test(app), 'the board-name heading uses its own class (not "board" = the page canvas, not "boardName" = the top-bar pill)');
 {
   const old = read('css/app.css');
   const mine = [...new Set([...(css.matchAll(/\.((?:acc|inv|id|np|peer|bRow|idls)[A-Za-z]+)\b/g))].map((m) => m[1]))];
@@ -106,5 +106,101 @@ ok(/stickit\.wipeCloud/.test(app) && /sessionStorage\.getItem\("stickit\.wipeClo
 
 // ---- 11. API presence
 ok(/Stick\.perf\.collab = function\(\)/.test(app) && /Stick\.perf = \{marks:/.test(app) && app.indexOf('Stick.perf = {marks:') < app.indexOf('Stick.perf.collab = function'), 'Stick.perf.collab is defined right after Stick.perf, at page start (typeof Stick.perf.collab === "function")');
+
+
+// ---- 12. CSP: WebSockets to Supabase are allowed (an https:// source does NOT cover wss://, so Realtime was silently blocked in the browser)
+{
+  const csp = read('index.html').match(/Content-Security-Policy" content="([^"]+)"/)[1];
+  const connect = (csp.match(/connect-src ([^;]+)/) || [])[1] || '';
+  const toks = connect.split(/\s+/);
+  ok(toks.includes('https://*.supabase.co') && toks.includes('wss://*.supabase.co'), 'connect-src allows https AND wss for Supabase');
+  ok(toks.includes('http://127.0.0.1:54321') && toks.includes('ws://127.0.0.1:54321') && toks.includes('http://localhost:54321') && toks.includes('ws://localhost:54321'), 'and the same pair for the two local test origins');
+  ok(!/wss?:\/\/\*(?!\.supabase)/.test(connect) && !/\bwss?:(\s|$)/.test(connect) && !/\*\s|\s\*(\s|$)/.test(connect), 'without opening WebSockets to anywhere else');
+  ok(/wss:\/\/\*\.supabase\.co/.test(read('docs/legal/csp.md')) || /does NOT cover a wss/.test(read('docs/legal/csp.md')), 'the CSP document explains why');
+}
+// ---- 13. reconnect: after a drop the channel rejoins, re-announces who we are, and the list shows one entry per person
+{
+  const { parseHTML } = await import('linkedom');
+  const { document } = parseHTML('<!doctype html><html><body><div id="presenceBar" hidden></div></body></html>');
+  const tracked = [], warns = [], chans = [];
+  const client = { channel(name, o) { const ch = { name, handlers: {}, state: {}, on(k, f, fn) { ch.handlers[k + ':' + (f.event || '')] = fn; return ch; }, subscribe(cb) { ch.cb = cb; return ch; }, track(p) { tracked.push(p); return Promise.resolve(); }, untrack() {}, presenceState() { return ch.state; } }; chans.push(ch); return ch; }, removeChannel() {} };
+  const ctx = vm.createContext({ console: { warn: (m) => warns.push(String(m)), log() {} }, setTimeout, clearTimeout, setInterval, clearInterval, Date, JSON, Math, Object, Array, Promise, document, addEventListener() {}, CustomEvent: class {}, dispatchEvent() {} });
+  ctx.window = ctx; ctx.Stick = { cloud: { load: () => Promise.resolve(client) }, auth: {} };
+  vm.runInContext(read('js/collab.js'), ctx, { filename: 'collab.js' });
+  const C = ctx.Stick.collab; const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  C.start({ boardId: 'b1', role: 'owner', me: { uid: 'o1', name: 'Owner' }, host: { refresh() {}, elFor: () => null }, comments: false });
+  await sleep(30); const ch = chans[0];
+  ch.cb('SUBSCRIBED'); await sleep(10); const t1 = tracked.length;
+  ok(C.status() === 'connected' && t1 >= 1, 'connected: our state is announced');
+  ch.cb('CLOSED'); ok(C.status() === 'unavailable' && warns.length === 1 && /\[presence\] live channel CLOSED/.test(warns[0]) && !/apikey|jwt|token/i.test(warns[0]), 'a drop is reported once, with the usual causes, and no secret');
+  ch.cb('TIMED_OUT'); ok(warns.length === 1, 'repeated failures do not spam the console');
+  C.setEditing('n1'); ch.cb('SUBSCRIBED'); await sleep(10);
+  ok(C.status() === 'connected' && tracked.length > t1 && tracked[tracked.length - 1].editing === 'n1', 'after the rejoin we announce again, including the note we are editing');
+  // two tabs of one person, plus a guest who reconnects: still one avatar each
+  ch.state = { a1: [{ uid: 'g1', name: 'Pinny', guest: true, beat: 1 }], a2: [{ uid: 'g1', name: 'Pinny', guest: true, beat: 2 }] };
+  ch.handlers['presence:sync'](); const bar = document.getElementById('presenceBar');
+  ok(bar.children.length === 2, 'several connections of one person show as one avatar (plus me)');
+  ch.state = {}; ch.handlers['presence:sync']();
+  ok(bar.hidden === true && bar.children.length === 0, 'when they leave, exactly their entry goes');
+  C.stop();
+}
+
+
+// ---- 14. a start-up race has exactly one winner (the same answer on both sides), and the loser's work is discarded, not saved
+{
+  const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, Date, JSON, Math, Object, Array, Promise, document: { getElementById: () => null, createElement: () => ({}) }, addEventListener() {}, CustomEvent: class {}, dispatchEvent() {} });
+  ctx.window = ctx; ctx.Stick = { cloud: { load: () => new Promise(() => {}) }, auth: {} };
+  vm.runInContext(read('js/collab.js'), ctx, { filename: 'collab.js' });
+  const core = ctx.Stick.collab.core, now = 5e6;
+  const peers = (since, uid, editing = 'n1') => core.merge({}, [{ key: uid + ':k', state: { uid, name: uid, editing, since, beat: 1 } }], now);
+  ok(core.mustYield(peers(1000, 'anna'), 'n1', now, 'me:x', { uid: 'bo', since: 1400 })?.uid === 'anna', 'I started later than them: I yield');
+  ok(core.mustYield(peers(1400, 'anna'), 'n1', now, 'me:x', { uid: 'bo', since: 1000 }) === null, 'I started earlier: I keep it (and they will yield: same two numbers, same rule)');
+  ok(core.mustYield(peers(1000, 'anna'), 'n1', now, 'me:x', { uid: 'bo', since: 1000 })?.uid === 'anna' && core.mustYield(peers(1000, 'bo'), 'n1', now, 'me:x', { uid: 'anna', since: 1000 }) === null, 'a tie goes to the smaller account id, on both sides alike');
+  ok(core.mustYield(peers(1000, 'anna', 'other'), 'n1', now, 'me:x', { uid: 'bo', since: 1400 }) === null, 'someone editing a different object is no rival');
+  ok(core.mustYield(peers(1000, 'bo'), 'n1', now, 'me:x', { uid: 'bo', since: 1400 }) === null, 'my own other tab is no rival');
+  ok(core.mustYield(peers(1000, 'anna'), 'n1', now + 9000, 'me:x', { uid: 'bo', since: 1400 }) === null, 'a rival whose lease has lapsed no longer counts');
+  const a = app.slice(app.indexOf('yieldEdit: function(id, rival)'), app.indexOf('yieldEdit: function(id, rival)') + 900);
+  ok(/t\.blur\(\)/.test(a) && /n\.html = n\._leaseModel; rerenderNote\(n\); saveNotes\(\)/.test(a) && /is editing this note\./.test(a), 'the loser stops, goes back to what the note held when they started (so nothing of theirs is saved and no conflict copy appears), and is told');
+  ok(/n\._leaseModel = n\.html;/.test(app), 'what the note held at the start is remembered when editing begins');
+  ok(/since: S\.editing \? S\.editSince : 0/.test(collab) && /S\.editSince = id \? Date\.now\(\) : 0/.test(collab), 'the start time travels with the lease');
+}
+// ---- 15. selecting something never overwrites "I am editing" in what is announced
+{
+  const { parseHTML } = await import('linkedom');
+  const { document } = parseHTML('<!doctype html><html><body><div id="presenceBar" hidden></div></body></html>');
+  const tracked = []; const chans = [];
+  const client = { channel(name) { const ch = { handlers: {}, state: {}, on(k, f, fn) { ch.handlers[k + ':' + (f.event || '')] = fn; return ch; }, subscribe(cb) { ch.cb = cb; return ch; }, track(p) { tracked.push(p); return Promise.resolve(); }, untrack() {}, presenceState() { return ch.state; } }; chans.push(ch); return ch; }, removeChannel() {} };
+  const ctx = vm.createContext({ console, setTimeout, clearTimeout, setInterval, clearInterval, Date, JSON, Math, Object, Array, Promise, document, addEventListener() {}, CustomEvent: class {}, dispatchEvent() {} });
+  ctx.window = ctx; ctx.Stick = { cloud: { load: () => Promise.resolve(client) }, auth: {} };
+  vm.runInContext(read('js/collab.js'), ctx, { filename: 'collab.js' });
+  const C = ctx.Stick.collab; C.start({ boardId: 'b9', role: 'owner', me: { uid: 'o9', name: 'Owner' }, host: { refresh() {}, elFor: () => null }, comments: false });
+  await new Promise((r) => setTimeout(r, 30)); chans[0].cb('SUBSCRIBED'); await new Promise((r) => setTimeout(r, 10));
+  C.setEditing('note-A'); C.setActive('note-B'); C.setActive(null); C.setActive('note-C');
+  const last = tracked[tracked.length - 1];
+  ok(last.editing === 'note-A' && last.active === 'note-C' && last.since > 0, 'editing and selecting are announced separately; selecting never replaces editing');
+  C.setEditing(null); ok(tracked[tracked.length - 1].editing === null && tracked[tracked.length - 1].since === 0, 'ending the edit clears only the lease');
+  C.stop();
+}
+
+
+// ---- 16. English UI, English dates: nothing here follows the browser's own language for month names (a Hebrew browser showed Hebrew months inside the English interface)
+{
+  const bad = (txt) => (txt.match(/to(Locale|LocaleDate|LocaleTime)String\(undefined|Intl\.DateTimeFormat\(undefined/g) || []).length;
+  ok(bad(app) === 0 && bad(collab) === 0, 'every date shown in the interface names its language ("en")');
+  ok(/toLocaleDateString\("en", \{day: "numeric", month: "short", year: "numeric"\}\)/.test(app) && /toLocaleString\("en"/.test(collab), 'link dates and comment times use English');
+  ok(new Date(Date.UTC(2026, 9, 8, 12)).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) === 'Oct 8, 2026', 'and read as "Oct 8, 2026"');
+}
+// ---- 17. phones: the top bar fits, who-is-here sits under it, nothing scrolls sideways
+{
+  const m = css.match(/@media \(max-width:520px\)\{\s*\.brand\{ min-width:0; gap:4px; \}[\s\S]*?\n\}/);
+  ok(!!m, 'a phone rule set for the left cluster exists');
+  ok(m && /#syncPill\{ font-size:0/.test(m[0]) && /\.brand \.chev\{ display:none; \}/.test(m[0]), 'the save state shrinks to its dot and the chevron goes (so logo + dot fit beside the buttons)');
+  ok(m && /\.presenceBar\{ position:fixed; top:calc\(56px \+ env\(safe-area-inset-top, 0px\) \+ 6px\); left:calc\(10px \+ env\(safe-area-inset-left, 0px\)\)/.test(m[0]) && /z-index:calc\(var\(--z-peer, 9990\) \+ 1\)/.test(m[0]), 'who is here moves to a small pill just under the bar, safe-area aware, on the layer scale');
+  ok(m && /\.presPop\{ max-width:calc\(100vw - 16px\); \}/.test(m[0]), 'its list never exceeds the screen');
+  ok(/\.namePop\{[^}]*width:min\(300px, calc\(100vw - 16px\)\)/.test(css) && /Math\.min\(window\.innerWidth - w - 8, r\.left\)/.test(app), 'the rename slip fits any width and is clamped to the screen');
+  ok(/\.peerTab\.inside\{ top:10px; left:10px; \}/.test(css) && /@media \(pointer:coarse\)\{ \.peerTab\{ height:32px; \}/.test(css), 'the editing tab stays on screen and is finger-sized on touch');
+}
+// ---- 18. leaving a session: nothing but the guest identity (and dev switches) stays namespaced
+ok(/stickit\.wipeCloud/.test(app) && /cloudSigningOut \|\| accessLost\) return/.test(app) && !/removeItem\("stickit\.guest"/.test(app), 'cloud caches (and pictures of boards) are swept; the guest identity is never removed');
 
 console.log('v0.8.3.4 reality fixes: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

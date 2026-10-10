@@ -25,7 +25,7 @@
     var role = st.role === "owner" || st.role === "editor" || st.role === "viewer" ? st.role : null;
     // uid / display name / generated guest name / colour / role hint / which object is being edited / heartbeat. Never an e-mail, a token, a profile or board content.
     return { uid: s(st.uid, 64), name: s(st.name, 40), alias: st.alias ? s(st.alias, 24) : "", guest: st.guest === true, hue: hue, role: role,
-             editing: st.editing ? s(st.editing, 64) : null, active: st.active ? s(st.active, 64) : null, beat: Number(st.beat) || 0 };
+             editing: st.editing ? s(st.editing, 64) : null, since: Number(st.since) > 0 ? Math.floor(Number(st.since)) : 0, active: st.active ? s(st.active, 64) : null, beat: Number(st.beat) || 0 };
   };
   // merge a fresh list of {key, state} into the known peers; "seenAt" moves only when a peer's heartbeat/state really changed,
   // measured on OUR clock (clock differences between devices never matter)
@@ -44,6 +44,20 @@
   var LEASE_MS = 8000, LEASE_BEAT_MS = 3000;
   C.LEASE_MS = LEASE_MS; C.LEASE_BEAT_MS = LEASE_BEAT_MS;
   core.leaseFresh = function (peer, now) { return now - peer.seenAt <= LEASE_MS; };
+  // Two people can start editing the same object within one propagation delay. Both sides then see the other's lease and apply the same rule to the same two numbers:
+  // the EARLIER start keeps it (ties go to the smaller account id); the later one yields. Returns the rival's state when I must yield, else null.
+  core.mustYield = function (peers, objectId, now, selfKey, me) {
+    var rival = null;
+    Object.keys(peers).forEach(function (k) {
+      var p = peers[k];
+      if (k === selfKey || !core.leaseFresh(p, now) || p.state.editing !== objectId) return;
+      if (p.state.uid && p.state.uid === me.uid) return;                       // another tab of mine is not a rival
+      var theirs = p.state.since || 0, mine = me.since || 0;
+      var iLose = theirs < mine || (theirs === mine && String(p.state.uid || k) < String(me.uid || ""));
+      if (iLose && (!rival || theirs < (rival.since || 0))) rival = p.state;
+    });
+    return rival;
+  };
   // how a person is shown: a chosen name over their generated one; guests carry "Guest · <generated name>" as the stable identifier
   core.label = function (st) {
     var name = st.name || "Someone";
@@ -88,8 +102,10 @@
       ch = c.channel("board:" + boardId, { config: { private: true, presence: { key: selfKey } } });
       ch.on("presence", { event: "sync" }, gather);
       ch.on("broadcast", { event: "access_changed" }, function () { try { root.dispatchEvent(new root.CustomEvent("stick:access-changed")); } catch (e) {} });
-      ch.subscribe(function (st) {
+      ch.subscribe(function (st, err) {
+        var was = status;
         status = st === "SUBSCRIBED" ? "connected" : (st === "CHANNEL_ERROR" || st === "TIMED_OUT" || st === "CLOSED") ? "unavailable" : status;
+        if (status === "unavailable" && was !== "unavailable") { try { root.console.warn("[presence] live channel " + st + (err && err.message ? ": " + String(err.message).slice(0, 160) : "") + " (a blocked WebSocket, missing Realtime policies on realtime.messages, or an expired sign-in: see docs/dev/GUEST-JOIN.md)"); } catch (e) {} }
         if (st === "SUBSCRIBED") { ready = true; if (pending) { ch.track(pending); } }
       });
     }, function () { status = "unavailable"; });
@@ -147,7 +163,7 @@
     if (opts.transport === "relay") { S.tp = relayTransport(opts.boardId, selfKey, onSync); }
     else if (opts.transport === "fake") { S.tp = { track: function (st) { S.lastTracked = st; }, leave: function () {}, status: function () { return "connected"; } }; }
     else try { S.tp = (opts.transport === "broadcast" && root.BroadcastChannel) ? broadcastTransport(opts.boardId, selfKey, onSync) : (opts.transport === "none" ? null : supabaseTransport(opts.boardId, selfKey, onSync)); } catch (e) { S.tp = null; }
-    function send() { if (!S || !S.tp) return; S.beat++; var me = S.opts.me; S.tp.track({ uid: me.uid, name: me.name, alias: me.alias || "", guest: !!me.guest, hue: me.hue != null ? me.hue : core.hue(me.uid), role: S.opts.role || null, editing: S.editing, active: S.active, beat: S.beat }); }
+    function send() { if (!S || !S.tp) return; S.beat++; var me = S.opts.me; S.tp.track({ uid: me.uid, name: me.name, alias: me.alias || "", guest: !!me.guest, hue: me.hue != null ? me.hue : core.hue(me.uid), role: S.opts.role || null, editing: S.editing, since: S.editing ? S.editSince : 0, active: S.active, beat: S.beat }); }
     S.send = send; send();
     S.timers.push(setInterval(function () { send(); render(); }, BEAT_MS));
     S.timers.push(setInterval(function () { render(); }, 5000));                     // so a silent peer's lock really does expire on screen
@@ -173,7 +189,7 @@
   // Start or end an editing lease. While it is held a heartbeat goes out every few seconds (presence only: lightweight, nothing is written to the board's data).
   C.setEditing = function (id) {
     if (!S || S.editing === id) return;
-    S.editing = id || null; clearInterval(S.leaseT); S.leaseT = null;
+    S.editing = id || null; S.editSince = id ? Date.now() : 0; clearInterval(S.leaseT); S.leaseT = null;
     if (S.editing) { var sess = S; S.leaseT = setInterval(function () { if (S === sess && S.editing) S.send(); else clearInterval(sess.leaseT); }, LEASE_BEAT_MS); }
     S.send();
   };
@@ -298,6 +314,10 @@
   };
   function render() {
     drawPeople(); syncPeerLayer();
+    if (S && S.editing) {
+      var rival = core.mustYield(S.peers, S.editing, Date.now(), S.selfKey, { uid: S.opts.me.uid, since: S.editSince });
+      if (rival) { var lostId = S.editing; C.setEditing(null); try { if (S.opts.host && S.opts.host.yieldEdit) S.opts.host.yieldEdit(lostId, rival); } catch (e) {} }
+    }
     listeners.forEach(function (f) { try { f(); } catch (e) {} });
     if (!S || !S.opts.host || !S.opts.host.refresh) return;
     var sig = JSON.stringify([C.people().map(function (p) { return [p.uid, p.editing, p.active, p.name, p.hue]; }), S.summary]);
@@ -520,5 +540,5 @@
     paintReview(); paintList();
     setTimeout(function () { try { (canEdit ? input : slip).focus({ preventScroll: true }); } catch (e) {} }, 30);
   };
-  function fmtWhen(iso) { try { return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } }
+  function fmtWhen(iso) { try { return new Date(iso).toLocaleString("en", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch (e) { return ""; } }
 })(typeof window !== "undefined" ? window : globalThis);

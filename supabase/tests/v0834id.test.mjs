@@ -50,7 +50,7 @@ C.start({ boardId: 'b1', role: 'owner', me: { uid: 'owner-1', name: 'Johnathan',
 await sleep(30);
 ok(tracked.length >= 1 && tracked[0].name === 'board:b1' && channels[0].opts.config.private === true, 'presence runs on the board\'s private channel (the existing infrastructure; no second socket)');
 const last = () => tracked[tracked.length - 1].p;
-ok(last().uid === 'owner-1' && !('email' in last()) && Object.keys(last()).every((k) => ['uid', 'name', 'alias', 'guest', 'hue', 'role', 'editing', 'active', 'beat'].includes(k)), 'what is tracked is only the small, safe set');
+ok(last().uid === 'owner-1' && !('email' in last()) && Object.keys(last()).every((k) => ['uid', 'name', 'alias', 'guest', 'hue', 'role', 'editing', 'since', 'active', 'beat'].includes(k)), 'what is tracked is only the small, safe set');
 C.setEditing('note-9'); ok(last().editing === 'note-9', 'starting to edit announces the lease at once');
 const n0 = tracked.length; C.setEditing(null); ok(last().editing === null && tracked.length === n0 + 1, 'ending the edit releases it at once');
 C.setMe({ name: 'Johnathan Z' }); ok(last().name === 'Johnathan Z', 'a rename is announced at once (no reload)');

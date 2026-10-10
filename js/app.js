@@ -2100,7 +2100,7 @@
     if(!pop) return;
     var when;
     try{
-      when = new Intl.DateTimeFormat(undefined, m.allDay
+      when = new Intl.DateTimeFormat("en", m.allDay
         ? {weekday:"short", month:"short", day:"numeric"}
         : {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"}).format(m.date);
     }catch(e){ when = m.date.toString(); }
@@ -3868,7 +3868,7 @@
   var PAPER_TYPE = "'Special Elite','Courier Prime','Courier New',monospace";
   function isPaper(n){ return !!n && !!window.Stick && Stick.objects && Stick.objects.isKind(n.type); }
   function paperHelpers(){ return {safeImage: safeImage, safeHref: safeHref, locale: (typeof navigator !== "undefined" && navigator.language) || undefined, tz: (function(){ try{ return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; }catch(e){ return ""; } })(), fontOk: function(f){ return !!FONT_BY_NAME[f]; }}; }
-  function todayShort(){ try{ return new Date().toLocaleDateString(undefined, {day:"numeric", month:"short", year:"numeric"}); }catch(e){ return isoDate(new Date()); } }
+  function todayShort(){ try{ return new Date().toLocaleDateString("en", {day:"numeric", month:"short", year:"numeric"}); }catch(e){ return isoDate(new Date()); } }
   function paperLabel(n){ return Stick.objects.label(n); }
   function paperSize(n){
     if(n.el && n.el.offsetWidth) return {w:n.el.offsetWidth, h:n.el.offsetHeight};
@@ -6538,6 +6538,7 @@
       text.addEventListener("focus", function(){
         var holder = window.Stick && Stick.collab && Stick.collab.blockedBy(n.id);
         if(holder){ text.blur(); dropCaret(); setTimeout(function(){ text.blur(); dropCaret(); }, 0); toast(holder + " is editing this note."); return; }          // one person at a time per note
+        n._leaseModel = n.html;                                      // what the note held when I started: put back if someone else started first (a lost race)
         if(window.Stick && Stick.collab) Stick.collab.setEditing(n.id);
         clearTimeout(n._cleanT);
         el.classList.add("editing"); if(n.cosmetic === "soup") soupBalance();
@@ -7946,7 +7947,7 @@
     t = String(t || "").replace(/\s+/g, " ").trim();
     return t || "Empty note";
   }
-  function pileWhen(o){ try{ return new Date(o.doneAt).toLocaleDateString(undefined, {day:"numeric", month:"short"}); }catch(e){ return ""; } }
+  function pileWhen(o){ try{ return new Date(o.doneAt).toLocaleDateString("en", {day:"numeric", month:"short"}); }catch(e){ return ""; } }
   var pileBtn = null;
   // The two system spaces people reach for, as one small dock in the corner: a tick and a bin, each with a count, shown only when it holds something. (Other system spaces do not belong here.)
   var spaceDock = null, trashBtn = null;
@@ -8090,7 +8091,7 @@
     if(d) d.textContent = c.done; if(t) t.textContent = c.trash;
     updateDonePile(false);
   }
-  function whenLabel(ts){ try{ return new Date(ts).toLocaleDateString(undefined, {day: "numeric", month: "short"}); }catch(e){ return ""; } }
+  function whenLabel(ts){ try{ return new Date(ts).toLocaleDateString("en", {day: "numeric", month: "short"}); }catch(e){ return ""; } }
 
   // ---- to Trash: an explicit deletion by the user. The object leaves the board and waits in Trash with everything it had.
   function trashNotes(list){
@@ -10266,7 +10267,7 @@
     var mb = b / 1048576;
     return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + " MB";
   }
-  function monthYear(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {month:"long", year:"numeric"}); }catch(e){ return ""; } }
+  function monthYear(iso){ try{ return new Date(iso).toLocaleDateString("en", {month:"long", year:"numeric"}); }catch(e){ return ""; } }
   function downloadText(filename, text, type){
     var blob = new Blob([text], {type: type || "application/json"});
     var url = URL.createObjectURL(blob);
@@ -10435,7 +10436,7 @@
         body.appendChild(head);
         var meta = makeDiv("lkMeta");
         function chip(txt, cls){ var c = document.createElement("span"); c.className = "lkChip" + (cls ? " " + cls : ""); c.textContent = txt; meta.appendChild(c); }
-        chip("Created " + new Date(x.created_at).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}));
+        chip("Created " + new Date(x.created_at).toLocaleDateString("en", {day: "numeric", month: "short", year: "numeric"}));
         if(live) chip("Read only", "perm"); else chip("Frozen copy");
         if(x.by_name) chip("Shown as " + x.by_name);
         if(x.by_avatar_asset_id) chip("With photo"); if(x.by_bio) chip("With bio");
@@ -10454,7 +10455,7 @@
       inviteSets.forEach(function(set){
         if(!set.rows.length && set.ok) return;
         anyInv = true;
-        var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH boardName"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
+        var sec = makeDiv("invSection"), t = document.createElement("h3"); t.className = "accH accBoardTitle"; t.textContent = set.b.name || "Board"; sec.appendChild(t);
         content.appendChild(sec);
         if(!set.ok){ var bad = makeDiv("accNone"); bad.textContent = "Couldn\u2019t load this board\u2019s invitations."; sec.appendChild(bad); return; }
         var pnl = buildAccessPanel(set.b.id, {presence: set.b.id === activeBoardId, people: true, onChange: bump});
@@ -13706,6 +13707,15 @@
         },
         modal: function(o){ return openModal(o); },
         showPeople: function(anchor){ openPresencePopover(anchor); },
+        // two people started on the same object within one propagation delay and the other one started first: stop here, drop what was typed since, and say so.
+        // (Nothing of the loser is ever saved, so no conflict copy is made when the winner's version arrives.)
+        yieldEdit: function(id, rival){
+          var n = findNote(id); if(!n) return;
+          var t = n.textEl; if(t){ try{ t.blur(); }catch(e){} dropCaret(); }
+          if(n._leaseModel != null && !n.type){ n.html = n._leaseModel; rerenderNote(n); saveNotes(); }          // always redraw from what it held at the start: whatever was typed since is discarded
+          n._leaseModel = null;
+          toast((rival && rival.name || "Someone") + " is editing this note.");
+        },
         elFor: function(id){ var n = findNote(id); return n && n.el ? n.el : null; },
         // your own comments show your own picture; other people show their initial (their pictures are not shared with the board)
         paintAvatar: function(elm, uid){ var me = Stick.auth.user(); if(me && uid === me.id && settings.account){ paintAvatar(elm, accountAvatarSpec()); return true; } return false; }
@@ -13901,7 +13911,7 @@
   function inviteTokens(){ try{ var o = JSON.parse(localStorage.getItem(INV_TOK_KEY) || "{}"); return o && typeof o === "object" ? o : {}; }catch(e){ return {}; } }
   function rememberInviteToken(id, t){ if(!id || !t) return; var o = inviteTokens(); o[id] = t; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
   function forgetInviteToken(id){ var o = inviteTokens(); delete o[id]; try{ localStorage.setItem(INV_TOK_KEY, JSON.stringify(o)); }catch(e){} }
-  function fmtDay(iso){ try{ return new Date(iso).toLocaleDateString(undefined, {day: "numeric", month: "short", year: "numeric"}); }catch(e){ return ""; } }
+  function fmtDay(iso){ try{ return new Date(iso).toLocaleDateString("en", {day: "numeric", month: "short", year: "numeric"}); }catch(e){ return ""; } }
   // ---- identity chips: a small avatar (initial on the person's own colour) and the name. Guests carry a plain "Guest" tag; nobody's e-mail is ever shown.
   function idChip(p){
     var core = (window.Stick && Stick.collab && Stick.collab.core) || null;

@@ -781,7 +781,7 @@ body.dark .idlsScroll::-webkit-scrollbar-thumb{ background:color-mix(in srgb, va
 /* section hierarchy */
 .accH{ margin:0; font-family:var(--hand, inherit); font-size:1.12rem; font-weight:700; letter-spacing:.01em; color:var(--ink); }
 .accH.first{ margin-bottom:6px; }
-.accH.boardName{ font-size:1.02rem; margin:14px 0 2px; padding-bottom:4px; border-bottom:1.5px solid var(--line); }
+.accH.accBoardTitle{ font-size:1.02rem; margin:14px 0 2px; padding-bottom:4px; border-bottom:1.5px solid var(--line); }
 .accRule{ border:0; height:0; margin:18px 0 6px; border-top:2px dashed color-mix(in srgb, var(--line) 85%, var(--ink) 15%); }
 .accSec{ margin-top:16px; }
 .accSecHead{ display:flex; flex-direction:column; gap:1px; margin-bottom:8px; }
@@ -885,3 +885,14 @@ html[data-a11y-motion="reduce"] .peerGlow{ animation:none; }
 .collabDlg > *{ flex:none; }
 .collabOut{ display:block; }
 .collabDlg .collabOut:empty{ display:none; }
+
+/* phones: the left cluster (logo, save state, who is here) must fit the room the buttons leave it; anything wider ran underneath the search and account buttons */
+@media (max-width:520px){
+  .brand{ min-width:0; gap:4px; }
+  .brand #syncPill{ font-size:0; padding:2px 5px; gap:0; margin-left:2px; min-width:0; }
+  .brand .chev{ display:none; }
+  /* who is here moves out of the crowded top bar into a small pill just under it (still tappable, never under a button) */
+  .presenceBar{ position:fixed; top:calc(56px + env(safe-area-inset-top, 0px) + 6px); left:calc(10px + env(safe-area-inset-left, 0px)); margin:0; padding:2px 6px 2px 8px; border-radius:999px; background:color-mix(in srgb, var(--panel) 90%, transparent); border:1px solid var(--line); box-shadow:0 1px 5px rgba(0,0,0,0.2); z-index:calc(var(--z-peer, 9990) + 1); }
+  button.presAv{ width:24px; height:24px; margin-left:-7px; }
+  .presPop{ max-width:calc(100vw - 16px); }
+}
