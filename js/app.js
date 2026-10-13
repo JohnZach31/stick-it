@@ -2383,7 +2383,10 @@
     ensureCaret(textEl);
     try{ document.execCommand(cmd, false, value || null); }catch(e){}
     notifyInput(textEl);
+    refreshFormatControls();
   }
+  // every control that shows "is this bold / italic / underlined here" asks the editor itself (queryCommandState) after any change, whichever control (or key) made it
+  function refreshFormatControls(){ setTimeout(function(){ try{ paintSelTip(); }catch(e){} try{ updateFocusBar(); }catch(e){} }, 0); }
   function toggleHeading(textEl, level){
     ensureCaret(textEl);
     var cur = "";
@@ -2391,13 +2394,22 @@
     execIn(textEl, "formatBlock", cur === "h" + level ? "<div>" : "<h" + level + ">");
   }
 
-  // Ctrl/Cmd+U underlines inside a note. This listener runs first (capture phase, on the window) so the browser never gets to open its
-  // view-source page while someone is writing, whichever element has focus and whatever the keyboard layout.
-  window.addEventListener("keydown", function(e){
+  // Ctrl/Cmd+U underlines inside a note (same editor command as the Underline buttons: execIn(...,"underline")). This listener runs first (capture phase, on the window) so the browser
+  // never gets to open its view-source page while someone is writing, whichever element has focus and whatever the keyboard layout.
+  //  * a held key (auto-repeat) is ignored: it used to flip underline on and off while the key was down, so the result depended on how long it was pressed
+  //  * it only acts when an editable Stick-It field has focus (a note's text is formatted; other fields just never open view-source); with nothing being edited the browser keeps Ctrl+U
+  function underlineShortcut(e){
     if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || !(e.code === "KeyU" || (e.key && e.key.toLowerCase() === "u"))) return;
     var ae = document.activeElement, editing = ae && ae.isContentEditable && ae.classList && ae.classList.contains("text");
-    if(editing){ e.preventDefault(); e.stopPropagation(); if(!readOnly) execIn(ae, "underline"); return; }
-    if(!readOnly && !singleNoteMode && (selected.size || isTyping())) e.preventDefault();       // a selected note or a field: never view-source
+    if(editing){ e.preventDefault(); e.stopPropagation(); if(!readOnly && !e.repeat) execIn(ae, "underline"); return; }
+    if(!readOnly && !singleNoteMode && isTyping()) e.preventDefault();       // typing in some other Stick-It field: never view-source
+  }
+  window.addEventListener("keydown", underlineShortcut, true);
+  // bold and italic are applied by the browser itself; once the key is up, repaint the controls from the editor's own state (underline does it in execIn)
+  window.addEventListener("keyup", function(e){
+    if(!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var k = (e.key || "").toLowerCase(); if(k !== "b" && k !== "i" && k !== "u") return;
+    var ae = document.activeElement; if(ae && ae.isContentEditable && ae.classList && ae.classList.contains("text")) refreshFormatControls();
   }, true);
 
   // ---------- selection tip: a small Stick-It toolbar over the words you highlight ----------
@@ -6495,7 +6507,6 @@
         }, 450);
       });
       text.addEventListener("keydown", function(e){
-        if((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key.toLowerCase() === "u" || e.code === "KeyU")){ e.preventDefault(); return; }   // underline is applied by the window handler; never the browser's view-source (also on a Hebrew keyboard, where the key is not "u")
         if(e.key === "Enter" && !e.shiftKey){
           if(handleListEnter(text, e)) return;
           if(focusState && focusState.n === n) return;
