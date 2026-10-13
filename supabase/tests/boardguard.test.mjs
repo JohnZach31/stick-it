@@ -69,7 +69,7 @@ function build() {
     paperCopy: (src) => ({ ...src, id: 'copy' + (++idSeq) }),
     insertNotes: (list, label) => { list.forEach((n) => { sb.notes.push(n); inserted.push(n); }); sb.labels.push(label); },
     labels: [], pasteSeq: 0, lastPasteTs: 0,
-    isPileObj: (n) => !!n && n.type === 'pile', logicalCount: () => sb.notes.filter((n) => n.type !== 'pile').length,
+    isLockedNote: () => false, isPileObj: (n) => !!n && n.type === 'pile', logicalCount: () => sb.notes.filter((n) => n.type !== 'pile').length,
     activeBoardId: 'b1', centerGroup: () => {}, viewCenter: () => ({ x: 0, y: 0 }),
   };
   const ctx = vm.createContext(sb);

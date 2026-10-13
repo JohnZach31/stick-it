@@ -211,6 +211,14 @@
     // a guest's chosen display name (anonymous sessions only); empty string goes back to the generated name
     setGuestName: function (name) {
       return db().then(function (c) { return guard(c.rpc("set_guest_name", { p_name: name == null ? "" : name })); });
+    },
+    // PIN locks (v0.8.4): the server keeps a hash of a proof derived from the PIN and a random secret, and counts wrong guesses. It never sees the PIN or the key.
+    nodeLock: {
+      create: function (board, node, proof) { return db().then(function (c) { return guard(c.rpc("create_node_lock", { p_board: board, p_node: node, p_proof: proof })); }); },
+      unlock: function (board, node, proof) { return db().then(function (c) { return guard(c.rpc("unlock_node", { p_board: board, p_node: node, p_proof: proof })); }); },
+      change: function (board, node, oldProof, newProof) { return db().then(function (c) { return guard(c.rpc("change_node_lock", { p_board: board, p_node: node, p_old_proof: oldProof, p_new_proof: newProof })); }); },
+      remove: function (board, node, proof) { return db().then(function (c) { return guard(c.rpc("remove_node_lock", { p_board: board, p_node: node, p_proof: proof })); }); },
+      state: function (board, node) { return db().then(function (c) { return guard(c.rpc("node_lock_state", { p_board: board, p_node: node })); }); }
     }
   };
 })(typeof window !== "undefined" ? window : globalThis);

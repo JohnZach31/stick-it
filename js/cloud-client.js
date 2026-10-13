@@ -73,6 +73,12 @@
       "ASSET-002": { from: "MIME_NOT_ALLOWED", message: "That file type isn’t supported.", retry: false, severity: "info" },
       "ASSET-003": { from: "STORAGE_QUOTA_EXCEEDED", message: "Your account is out of storage space.", retry: false, severity: "info" },
       "ASSET-004": { from: "UPLOAD_NOT_FOUND", message: "That upload could not be found. Please try again.", retry: true, severity: "warn" },
+      "LOCK-001": { from: "LOCK_PIN_WRONG", message: "That PIN didn\u2019t open the note.", retry: true, severity: "info" },
+      "LOCK-002": { from: "LOCK_COOLDOWN", message: "Too many wrong PINs. Please wait a little before trying again.", retry: true, severity: "warn" },
+      "LOCK-003": { from: "LOCK_NOT_FOUND", message: "This note\u2019s lock record is missing, so it can\u2019t be opened here.", retry: false, severity: "warn" },
+      "LOCK-004": { from: "LOCK_NOT_OWNER", message: "Only the person who locked this note can change or remove its lock.", retry: false, severity: "info" },
+      "LOCK-005": { from: "LOCK_UNSUPPORTED", message: "That can\u2019t be PIN-locked yet.", retry: false, severity: "info" },
+      "LOCK-006": { from: "LOCK_DAMAGED", message: "This locked note is damaged and can\u2019t be opened.", retry: false, severity: "warn" },
       "PRINT-001": { from: "PRINT_FAILED", message: "Printing didn’t start. Try again, or use Save as PDF.", retry: true, severity: "warn" },
       "MEDIA-001": { from: "MEDIA_DENIED", message: "The camera or microphone isn’t allowed. Check the browser’s permission for this site.", retry: false, severity: "warn" }
     },

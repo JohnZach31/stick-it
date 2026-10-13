@@ -1,7 +1,7 @@
 /* v0.8.4 privacy notes: Incognito (scratch-off foil) and PIN-locked (sealed letter). Layer values come from the scale in docs/dev/LAYERS.md. */
 
 /* ---------- Incognito ---------- */
-.note.incogCovered > :not(.tab):not(.del):not(.incogWrap):not(.paperFx):not(.noteEdge):not(.noteHandle):not(.quickDone):not(.incogEye){ visibility:hidden !important; }
+.note.incogCovered > :is(.text, .noteImgWrap, .taskRow, .badge, .taskDock, .listHint, .moreBtn, .fontCycle){ visibility:hidden !important; }
 .incogWrap{
   position:absolute; left:0; right:0; bottom:0; top:22px; z-index:3; border-radius:0 0 3px 3px; overflow:hidden;
   cursor:crosshair; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
@@ -38,4 +38,73 @@ body.dark .incogCanvas{ filter:brightness(.82) contrast(1.05); }
   display:flex; align-items:center; justify-content:center; font-family:'Caveat', cursive; font-size:24px; color:rgba(52,57,66,.78);
   -webkit-print-color-adjust:exact; print-color-adjust:exact;
 }
-.note.incogCovered.staticNote > :not(.tab):not(.paperFx):not(.incogStatic){ visibility:hidden !important; }
+.note.incogCovered.staticNote > :is(.text, .noteImgWrap, .taskRow, .badge){ visibility:hidden !important; }
+
+/* ---------- PIN-locked notes: a sealed letter ---------- */
+.note.lockSealed > :is(.text, .noteImgWrap, .taskRow, .badge, .taskDock, .listHint, .moreBtn, .fontCycle){ visibility:hidden !important; }
+.sealWrap{
+  position:absolute; left:0; right:0; bottom:0; top:22px; z-index:3; border-radius:0 0 3px 3px; overflow:hidden; cursor:pointer; outline:none;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.06), rgba(0,0,0,0) 38%),
+    repeating-linear-gradient(0deg, rgba(0,0,0,.025) 0 1px, rgba(255,255,255,.04) 1px 3px);
+  display:flex; align-items:flex-end; justify-content:center; padding-bottom:10px;
+}
+.sealWrap:focus-visible{ box-shadow:inset 0 0 0 2px var(--sel-ring, #3a6ff7); }
+/* the folded-over flap: a triangle of slightly darker paper with its own fold shadow */
+.sealFlap{
+  position:absolute; left:0; right:0; top:0; height:56%; transform-origin:50% 0;
+  background:linear-gradient(170deg, rgba(0,0,0,.14), rgba(0,0,0,.07)); clip-path:polygon(0 0, 100% 0, 50% 100%);
+  filter:drop-shadow(0 3px 2px rgba(0,0,0,.2));
+}
+.sealFold{ position:absolute; left:0; right:0; top:0; height:56%; clip-path:polygon(0 0, 100% 0, 50% 100%); background:linear-gradient(180deg, rgba(255,255,255,.35), rgba(255,255,255,0) 60%); pointer-events:none; }
+/* the wax seal: a slightly lopsided blob of red wax with the lock pressed into it */
+.sealWax{
+  position:absolute; left:50%; top:42%; width:46px; height:44px; transform:translate(-50%, -50%) rotate(-6deg); color:rgba(60,8,10,.78);
+  background:radial-gradient(circle at 35% 30%, #e0584f 0%, #b3261e 48%, #7d1511 100%);
+  border-radius:52% 48% 55% 45% / 48% 54% 46% 52%;
+  box-shadow:0 2px 3px rgba(0,0,0,.35), inset 0 1px 2px rgba(255,255,255,.35), inset 0 -2px 3px rgba(0,0,0,.35);
+  display:flex; align-items:center; justify-content:center;
+}
+.sealWax::before{ content:""; position:absolute; inset:5px; border-radius:inherit; border:1px dashed rgba(60,8,10,.35); }
+.sealWax svg{ width:22px; height:22px; filter:drop-shadow(0 1px 0 rgba(255,255,255,.28)); }
+.sealLabel{ position:relative; font-family:'Caveat', 'Kalam', cursive; font-size:21px; color:rgba(51,48,31,.8); transform:rotate(-2deg); text-shadow:0 1px 0 rgba(255,255,255,.4); }
+body.dark .sealLabel{ color:rgba(242,234,219,.82); text-shadow:none; }
+.sealWrap:hover .sealWax{ transform:translate(-50%, -50%) rotate(-3deg) scale(1.05); }
+.sealWax{ transition:transform .15s ease; }
+/* opening the letter: the wax cracks away and the flap lifts */
+.note.lockOpening .sealWax{ transition:transform .35s ease, opacity .35s ease; transform:translate(-50%, -90%) rotate(24deg) scale(.7); opacity:0; }
+.note.lockOpening .sealFlap, .note.lockOpening .sealFold{ transition:transform .45s ease .05s, opacity .45s ease; transform:perspective(300px) rotateX(-150deg); opacity:0; }
+.note.lockOpening .sealLabel{ transition:opacity .2s; opacity:0; }
+.note.lockSealing .sealWax{ animation:waxStamp .5s cubic-bezier(.3,1.6,.5,1) both; }
+@keyframes waxStamp{ 0%{ transform:translate(-50%, -50%) scale(1.8) rotate(-6deg); opacity:0; } 100%{ transform:translate(-50%, -50%) scale(1) rotate(-6deg); opacity:1; } }
+.lockBtn{
+  position:absolute; top:-2px; right:26px; width:26px; height:22px; padding:0; border:0; background:transparent; cursor:pointer; color:rgba(51,48,31,.55);
+  opacity:0; transition:opacity .15s; z-index:4; display:flex; align-items:center; justify-content:center;
+}
+.lockBtn svg{ width:18px; height:18px; }
+.note:hover .lockBtn, .note.selected .lockBtn, .lockBtn:focus-visible{ opacity:1; }
+.lockBtn:hover{ color:rgba(51,48,31,.95); }
+@media (pointer:coarse){ .lockBtn{ width:34px; height:30px; opacity:.8; } }
+@media (prefers-reduced-motion: reduce){ .note.lockSealing .sealWax{ animation:none; } .sealWax{ transition:none; } }
+
+/* ---------- the PIN slip ---------- */
+.pinForm{ display:flex; flex-direction:column; gap:10px; }
+.pinRow{ display:flex; flex-direction:column; gap:4px; }
+.pinRow label{ font-size:.82rem; color:inherit; opacity:.8; }
+.pinInput{
+  width:100%; box-sizing:border-box; font:600 1.5rem/1.2 'Caveat', 'Kalam', monospace; letter-spacing:.35em; text-align:center; padding:8px 10px;
+  background:rgba(255,255,255,.55); color:inherit; border:1.5px solid rgba(90,74,28,.35); border-radius:6px; outline:none; -webkit-text-security:disc;
+}
+.pinInput:focus{ border-color:var(--sel-ring, #3a6ff7); box-shadow:0 0 0 2px rgba(58,111,247,.2); }
+body.dark .pinInput{ background:rgba(0,0,0,.25); border-color:rgba(242,234,219,.3); }
+.pinWarn{ margin:0; font-size:.78rem; line-height:1.35; opacity:.82; }
+.pinWeak, .pinMsg{ min-height:1.1em; font-size:.8rem; }
+.pinWeak{ color:#8a5a00; }
+.pinMsg{ color:#a3271f; font-weight:600; }
+body.dark .pinWeak{ color:#f0c36b; } body.dark .pinMsg{ color:#ff958d; }
+.pinCheck{ display:flex; gap:8px; align-items:flex-start; font-size:.82rem; line-height:1.35; cursor:pointer; }
+.pinCheck input{ margin-top:3px; }
+.pinCard.pinShake{ animation:pinShake .38s ease; }
+@keyframes pinShake{ 0%,100%{ transform:translateX(0) rotate(0); } 20%{ transform:translateX(-9px) rotate(-1deg); } 40%{ transform:translateX(8px) rotate(1deg); } 60%{ transform:translateX(-5px); } 80%{ transform:translateX(3px); } }
+.pinCard .busy{ opacity:.7; cursor:progress; }
+@media (prefers-reduced-motion: reduce){ .pinCard.pinShake{ animation:none; } }

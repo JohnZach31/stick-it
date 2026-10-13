@@ -1091,6 +1091,87 @@ group('guest identity and history');
   await run(g6, 'select public.accept_invite($1, $2)', [inv2.token, 'Leaflet #77']);
   ok((await run('su', 'select alias from public.board_invite_uses where user_id=$1', [g6.id])).rows[0].alias !== 'Leaflet #77', 'but a name that someone ON the board right now holds is never given to a second person');
 }
+// ---------------------------------------------------------------- v0.8.4 PIN locks: the server half
+group('PIN locks (node_locks)');
+{
+  const owner = mallory, ed = bob, view = carol, out = dave;
+  const g = { id: uuid(), email: null, anonymous: true }; await run('su', 'insert into auth.users (id, email, raw_user_meta_data) values ($1,$2,$3::jsonb)', [g.id, null, '{}']); await attest(g.id);
+  const B = (await run(owner, 'select id from public.create_board($1,$2,$3)', ['Lock board', null, 'k-' + uuid()])).rows[0];
+  const ie = (await run(owner, 'select public.create_invite($1,null,$2) as r', [B.id, 'editor'])).rows[0].r, iv = (await run(owner, 'select public.create_invite($1,null,$2) as r', [B.id, 'viewer'])).rows[0].r;
+  await run(ed, 'select public.accept_invite($1)', [ie.token]); await run(view, 'select public.accept_invite($1)', [iv.token]);
+  const P1 = 'a'.repeat(64), P2 = 'b'.repeat(64), PX = 'c'.repeat(64), N = 'note-' + uuid().slice(0, 8);
+  const unlock = async (u, p, n = N) => { const r = await run(u, 'select public.unlock_node($1,$2,$3) as r', [B.id, n, p]); return r.error ? r : r.rows[0].r; };
+  const reset = () => run('su', 'update public.node_locks set fails = 0, locked_until = null where board_id=$1 and node_id=$2', [B.id, N]);
+
+  ok(errIs(await run(g, 'select public.create_node_lock($1,$2,$3)', [B.id, N, P1]), /ANONYMOUS_NOT_ALLOWED/), 'a guest (anonymous session) cannot create a lock');
+  ok(errIs(await run(out, 'select public.create_node_lock($1,$2,$3)', [B.id, N, P1]), /FORBIDDEN/), 'someone outside the board cannot create a lock');
+  ok(errIs(await run(view, 'select public.create_node_lock($1,$2,$3)', [B.id, N, P1]), /FORBIDDEN/), 'a viewer cannot create a lock');
+  ok(errIs(await run(owner, 'select public.create_node_lock($1,$2,$3)', [B.id, N, 'not-hex']), /BAD_REQUEST/) && errIs(await run(owner, 'select public.create_node_lock($1,$2,$3)', [B.id, 'bad id!', P1]), /BAD_REQUEST/), 'a malformed proof or node id is refused');
+  const sec = await run(owner, 'select public.create_node_lock($1,$2,$3) as s', [B.id, N, P1]);
+  ok(!sec.error && /^[0-9a-f]{64}$/.test(sec.rows[0].s), 'the owner creates a lock and gets a 256-bit server secret');
+  const row = (await run('su', 'select verifier, secret from public.node_locks where board_id=$1 and node_id=$2', [B.id, N])).rows[0];
+  ok(row.verifier !== P1 && !JSON.stringify(row).includes(P1), 'the proof itself is never stored, only its hash');
+
+  for (const [who, name] of [[owner, 'owner'], [ed, 'editor'], [view, 'viewer'], [out, 'outsider'], ['anon', 'anonymous caller']]) {
+    const rd = await run(who, 'select * from public.node_locks');
+    ok(denied(rd) || rd.rows.length === 0, name + ' cannot read node_locks directly');
+    const up = await run(who, 'update public.node_locks set fails = 0 returning 1');
+    ok(denied(up) || up.rows.length === 0, name + ' cannot reset the attempt counter');
+    const dl = await run(who, 'delete from public.node_locks returning 1');
+    ok(denied(dl) || dl.rows.length === 0, name + ' cannot delete a lock');
+    const ins = await run(who, "insert into public.node_locks (board_id, node_id, owner_id, verifier, secret) values ($1, 'x1', $2, $3, $3)", [B.id, owner.id, P1]);
+    ok(!!ins.error, name + ' cannot insert a lock of their own');
+  }
+  ok(errIs(await run(ed, 'select public.create_node_lock($1,$2,$3)', [B.id, N, P2]), /LOCK_NOT_OWNER/), 'a collaborator cannot replace somebody else\'s lock');
+  ok(errIs(await run(ed, 'select public.change_node_lock($1,$2,$3,$4)', [B.id, N, P1, P2]), /LOCK_NOT_OWNER/), 'a collaborator cannot change the PIN even with the right proof');
+  ok(errIs(await run(ed, 'select public.remove_node_lock($1,$2,$3)', [B.id, N, P1]), /LOCK_NOT_OWNER/), 'a collaborator cannot remove the lock even with the right proof');
+  ok(errIs(await run(owner, 'select public.remove_node_lock($1,$2,$3)', [uuid(), N, P1]), /FORBIDDEN/), 'a lock cannot be reached through a board you are not on');
+
+  ok(errIs(await run(out, 'select public.unlock_node($1,$2,$3)', [B.id, N, P1]), /FORBIDDEN/), 'someone outside the board cannot even try a PIN');
+  ok(errIs(await run(out, 'select public.node_lock_state($1,$2)', [B.id, N]), /FORBIDDEN/), 'nor read its state');
+  const r0 = await unlock(ed, P1);
+  ok(r0.ok === true && r0.secret === row.secret, 'the right proof releases the secret to a collaborator who knows the PIN');
+  ok((await unlock(view, P1)).ok === true, 'a viewer who knows the PIN can read (they still cannot edit)');
+
+  // wrong guesses: counted per note across everybody, with growing cooldowns
+  const wait = (await run('su', 'select array_agg(public.node_lock_wait(g) order by g) w from generate_series(1,10) g')).rows[0].w;
+  ok(JSON.stringify(wait) === JSON.stringify([0, 0, 10, 30, 60, 300, 900, 3600, 86400, 86400]), 'the cooldown schedule is 0,0,10s,30s,1m,5m,15m,1h,24h,24h');
+  let a = await unlock(ed, PX); ok(a.ok === false && a.fails === 1 && a.wait === 0, 'first wrong PIN: counted, no wait yet');
+  a = await unlock(view, PX); ok(a.ok === false && a.fails === 2, 'a second account\'s guess lands on the SAME counter (extra accounts do not buy extra guesses)');
+  a = await unlock(owner, PX); ok(a.ok === false && a.fails === 3 && a.wait === 10, 'third wrong PIN: 10 second cooldown');
+  a = await unlock(ed, P1); ok(a.ok === false && a.wait > 0 && !a.secret, 'during a cooldown even the RIGHT PIN is refused and no secret is released');
+  await run('su', "update public.node_locks set locked_until = now() - interval '1 second' where board_id=$1 and node_id=$2", [B.id, N]);
+  a = await unlock(ed, P1); ok(a.ok === true && !!a.secret, 'after the cooldown the right PIN works');
+  ok((await run('su', 'select fails from public.node_locks where board_id=$1 and node_id=$2', [B.id, N])).rows[0].fails === 0, 'and the counter starts over');
+  for (let i = 0; i < 8; i++) { await run('su', 'update public.node_locks set locked_until = null where board_id=$1 and node_id=$2', [B.id, N]); a = await unlock(ed, PX); }
+  ok(a.fails === 8 && a.wait === 3600, 'persistent guessing climbs to an hour');
+  await reset();
+  const st = (await run(view, 'select public.node_lock_state($1,$2) as s', [B.id, N])).rows[0].s;
+  ok(st.exists === true && st.mine === false && st.wait === 0 && !('secret' in st) && !('verifier' in st), 'the state call reports waiting time and nothing secret');
+
+  // changing the PIN: both work until the new one has been used once, so a crash can never lock the note out
+  ok((await run(owner, 'select public.change_node_lock($1,$2,$3,$4) as r', [B.id, N, PX, P2])).rows[0].r.ok === false, 'changing the PIN with the wrong old PIN is refused (and counted)');
+  await reset();
+  const ch = (await run(owner, 'select public.change_node_lock($1,$2,$3,$4) as r', [B.id, N, P1, P2])).rows[0].r;
+  ok(ch.ok === true && ch.secret === row.secret, 'the owner changes the PIN with the old one; the server secret stays the same');
+  ok((await unlock(owner, P1)).ok === true, 'until the new PIN has been used the old one still opens it (nothing can be lost mid-change)');
+  ok((await unlock(owner, P2)).ok === true, 'the new PIN opens it');
+  ok((await unlock(owner, P1)).ok === false, 'and now only the new PIN works');
+  await reset();
+
+  // removing
+  ok((await run(owner, 'select public.remove_node_lock($1,$2,$3) as r', [B.id, N, PX])).rows[0].r.ok === false && (await run('su', 'select 1 from public.node_locks where node_id=$1', [N])).rows.length === 1, 'removing with the wrong PIN keeps the lock');
+  await reset();
+  const rm = (await run(owner, 'select public.remove_node_lock($1,$2,$3) as r', [B.id, N, P2])).rows[0].r;
+  ok(rm.ok === true && !('secret' in rm) && !(await run('su', 'select 1 from public.node_locks where node_id=$1', [N])).rows.length, 'the owner removes the lock with the PIN; the secret is gone');
+  ok(errIs(await run(ed, 'select public.unlock_node($1,$2,$3)', [B.id, N, P2]), /LOCK_NOT_FOUND/), 'there is nothing left to unlock');
+
+  // locking again makes a fresh secret, and deleting the board deletes its locks
+  const s1 = (await run(owner, 'select public.create_node_lock($1,$2,$3) as s', [B.id, N, P1])).rows[0].s, s2 = (await run(owner, 'select public.create_node_lock($1,$2,$3) as s', [B.id, N, P2])).rows[0].s;
+  ok(s1 !== s2 && (await unlock(owner, P2)).ok === true && (await unlock(owner, P1)).ok === false, 'locking again makes a fresh secret and the new PIN');
+  await run('su', 'delete from public.boards where id=$1', [B.id]);
+  ok(!(await run('su', 'select 1 from public.node_locks where board_id=$1', [B.id])).rows.length, 'deleting the board deletes its locks');
+}
 // ---------------------------------------------------------------- summary
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) { console.log('\nFailures:\n - ' + failures.join('\n - ')); process.exit(1); }

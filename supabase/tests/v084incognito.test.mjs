@@ -43,7 +43,7 @@ ok(/prefers-reduced-motion/.test(mod) && /prefers-reduced-motion/.test(css), 're
 ok(/IntersectionObserver/.test(mod) && /MAX_DPR/.test(mod), 'many notes: off-screen pristine foils give their pixels back, and the canvas is capped');
 
 // ---- the model: saved flag, never the revealed state
-ok(/"imgFit","tf","incog"\];/.test(app), 'the flag is part of what a note saves and syncs');
+ok(/"imgFit","tf","incog","lock","lockH"\];/.test(app), 'the flag is part of what a note saves and syncs');
 ok(!/incogOpen/.test(fn('serializeNote')) && !/incogOpen/.test(fn('persistForm')), 'whether it was scratched is never saved: a reload covers it again');
 ok(/function incogCovered\(n\)\{ return isIncog\(n\) && !incogOpen\[n\.id\]; \}/.test(app), 'covered = flagged and not scratched away this session');
 ok(/c\.incog !== undefined && \(c\.incog !== true \|\| c\.type\)\) delete c\.incog/.test(app), 'what arrives from the server is only ever true, and only on a plain note');
@@ -53,12 +53,12 @@ ok(/decoratePin\(n\); decorateReactions\(n\); decorateIncog\(n\);/.test(app), 'e
 ok(/function itemText\(n\)\{\s*if\(isConcealed\(n\)\) return "";/.test(app), 'text for share messages, search hits and the print title is empty');
 ok(/isConcealed\(n\)\)\{ n\.el\.style\.opacity = "0\.15"/.test(fn('runSearch')), 'search neither matches nor highlights a covered note');
 ok(/if\(isConcealed\(o\)\) return hiddenLabel\(o\)/.test(fn('pileTitle')) && /if\(isConcealed\(top\)\) return hiddenLabel\(top\)/.test(fn('pileSnippet')), 'the Done list and a pile top show "Incognito note", not words');
-ok(/var veiled = isConcealed\(n\);/.test(app) && /var text = veiled \? ""/.test(app) && /if\(n\.image && !veiled\)/.test(app), 'board thumbnails draw a grey card, no words and no picture');
+ok(/var veiled = isConcealed\(n\) \|\| isLockedNote\(n\);/.test(app) && /var text = veiled \? ""/.test(app) && /if\(n\.image && !veiled\)/.test(app), 'board thumbnails draw a grey card, no words and no picture');
 ok(/var veiledAny = list\.some\(isConcealed\)/.test(fn('copyNotesToClipboard')) && /if\(!veiledAny\)\{ try\{ e\.clipboardData\.setData\(CLIP_MIME/.test(fn('copyNotesToClipboard')) && /"\[" \+ hiddenLabel\(n\) \+ "\]"/.test(fn('copyNotesToClipboard')), 'copying puts only a placeholder on the system clipboard, never the private type that carries the words');
 ok(/if\(isConcealed\(n\)\)\{ pn\.html = ""; pn\.image = null; pn\.isTask = false; pn\.due = ""; pn\.concealed = true;/.test(fn('printObjects')), 'print and PDF carry no words for a covered note');
 ok(/t\.innerHTML = item\.concealed \|\| item\.sealed \? "" : sanitizeHtml\(item\.html\)/.test(fn('buildStaticNote')) && /item\.image && !item\.concealed/.test(fn('buildStaticNote')), 'a concealed copy has no words and no picture in its markup');
 ok(/Incognito isn\\u2019t private/.test(fn('openShareModal')) && /Share anyway/.test(fn('openShareModal')), 'sharing says plainly that the foil is not privacy');
-ok(/\.note\.incogCovered > :not\(\.tab\)[^{]*\{ visibility:hidden !important; \}/.test(css), 'the words under the foil are hidden from the page, find-in-page and screen readers, not just painted over');
+ok(/\.note\.incogCovered > :is\(\.text, \.noteImgWrap[^{]*\{ visibility:hidden !important; \}/.test(css), 'the words under the foil are hidden from the page, find-in-page and screen readers, not just painted over');
 ok(!/encrypt|secure|private storage/i.test(mod.replace(/NOT SECURITY[\s\S]*?\*\//, '')) , 'the module never claims security');
 
 // ---- menus

@@ -85,7 +85,7 @@ ok(/!hiddenIds\[id\]/.test(fn('setSelection')), 'a hidden member can not be sele
 ok(/if\(item\.type === "pile"\) return null;/.test(fn('normalizeIncoming')) && /delete item\.pileId/.test(fn('normalizeIncoming')), 'a pile is never imported or pasted, and a stray pile id never survives an import');
 ok(/c\.type === "pile"/.test(fn('cloudSanitize')) && /sp\.pileId/.test(fn('cloudSanitize')), 'piles and members survive sanitising from the server');
 ok(/pileRelease\(o\.id, false\)/.test(app), 'a member finished on another device leaves its pile');
-ok(/\.filter\(function\(n\)\{ return n && !isPileObj\(n\); \}\)/.test(fn('duplicateNow')), 'a pile is not duplicated in phase 1');
+ok(/\.filter\(function\(n\)\{ return n && !isPileObj\(n\)( && !isLockedNote\(n\))?; \}\)/.test(fn('duplicateNow')), 'a pile is not duplicated in phase 1');
 ok(/isPileObj\)\)\{ toast\("Open the pile first/.test(fn('moveNotesToBoard')), 'a pile is not moved to another board in phase 1');
 ok(/"pileId","members","ox","oy","edges"/.test(app.match(/var SERIAL_FIELDS = \[[^\]]*\]/)[0]), 'pile fields are stored and synced');
 ok(/"pileId","members","ox","oy","edges"/.test(app.match(/var TRACK_FIELDS = \[[^\]]*\]/)[0]), 'pile fields are part of undo');

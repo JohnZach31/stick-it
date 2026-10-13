@@ -1218,10 +1218,13 @@
   var ZONE_TITLE_FONTS = [["Caveat Brush", "Marker"], ["Amatic SC", "Tall"], ["Architects Daughter", "Drafting"], ["Fredoka", "Round"], ["Gloria Hallelujah", "Hand"]];
   function zoneTitleFont(n){ var i = n && n.tf != null ? Number(n.tf) : -1; if(!(i >= 0 && i < ZONE_TITLE_FONTS.length)) i = hashStr(String(n && n.id || "z")) % ZONE_TITLE_FONTS.length; return i; }
   var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog","lock","lockH"];
+  // the fields of a plain note that are sealed inside a PIN lock (kept identical to js/lock.js; a test compares the two)
+  var SEALED_FIELDS = ["html", "image", "imgW", "imgRatio", "imgSize", "imgFit", "imgMode", "halftone", "isTask", "done", "due", "dueTime", "doneAt", "doneBy"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
+    if(o.lock) SEALED_FIELDS.forEach(function(k){ delete o[k]; });          // storage, the sync layer, the clipboard and the undo history only ever see the ciphertext of a locked note
     return o;
   }
   // What goes into storage / the sync layer. Runtime-only URLs (blob:, https: signed URLs) are never persisted,
@@ -1320,6 +1323,11 @@
     if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
     if(c.incog !== undefined && (c.incog !== true || c.type)) delete c.incog;          // Incognito is a plain note's flag, nothing else
+    if(c.lock !== undefined){
+      if(c.type || !(window.Stick && Stick.lock && Stick.lock.validEnvelope(c.lock))) delete c.lock;
+      else SEALED_FIELDS.forEach(function(k){ delete c[k]; });                // a sealed note carries its words only inside the ciphertext
+    }
+    if(c.lockH !== undefined){ c.lockH = Math.round(Number(c.lockH)); if(!c.lock || !(c.lockH >= 40 && c.lockH <= 2000)) delete c.lockH; }
     delete c.image; delete c.cutout;                     // media only ever arrives through assets
     return c;
   }
@@ -1512,6 +1520,7 @@
     if(readOnly || singleNoteMode || !NOTES_KEY) return;
     if(typeof zoneFitAll === "function") zoneFitAll();          // a zone's paper grows to cover a member that has grown past it
     clearTimeout(typingNotifyT); typingNotifyT = null; typingFirst = 0;
+    sealDirty();
     safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
     if(cloudSync) cloudSync.notesChanged();
@@ -1519,6 +1528,7 @@
   // write the cache without telling the sync layer (used when the change came from the server)
   function saveNotesCache(){
     if(SHARE_LINK_PAGE) return;                       // the shared copies on screen are never written over this account's own cached board
+    sealDirty();
     if(NOTES_KEY) safeSet(NOTES_KEY, notes.concat(donePile, trashPile).map(persistForm));
     if(typeof scheduleThumb === "function") scheduleThumb();
   }
@@ -2147,7 +2157,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog","lock","lockH"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2330,6 +2340,7 @@
     return kinds.every(function(k){ return k === kinds[0]; }) ? kinds[0] + "s" : "items";
   }
   function noteHasContent(n){
+    if(n && n.lock) return true;                                      // sealed: its words are not here to look at, and it is never "empty"
     if(n && (n.type === "zone" || n.type === "pile" || n.type === "embed")) return true;               // a zone is the user’s own layout, a pile holds other notes: never "empty"
     if(isPaper(n)) return Stick.objects.hasContent(n);
     if(isObj(n) || n.image) return true;
@@ -2342,7 +2353,7 @@
   // "empty" in the strict sense used by close (X) and Delete: a sticky or checklist with no words at all, or a paper object whose every text field is empty, with
   // nothing attached or marked on it. Anything with an image, a due date, a pin, reactions, a share or any words at all is NOT throwaway and goes to Trash as before.
   function isThrowaway(n){
-    if(!n || n.pinned || n.image || n.assetId || n.attachedAssetId || n.mediaId || n.due || n.cutoutKey || (n.reactions && Object.keys(n.reactions).length)) return false;
+    if(!n || n.pinned || n.lock || n.image || n.assetId || n.attachedAssetId || n.mediaId || n.due || n.cutoutKey || (n.reactions && Object.keys(n.reactions).length)) return false;
     if(n.type === "zone" || n.type === "pile" || n.type === "embed" || isPileObj(n) || isAV(n) || isPhoto(n) || n.cosmetic) return false;
     if(n.type === "shopping" || n.type === "photo_strip" || n.type === "postcard") return false;
     if(isPaper(n)){ var t = ""; try{ t = Stick.objects.text(n); }catch(e){ return false; } return !String(t || "").replace(/[\s\u200b\u00a0]/g, ""); }
@@ -5417,6 +5428,7 @@
     }
     addToPileMenu(pop, ids);
     incogGroupItem(pop, ids);
+    lockGroupItem(pop, ids);
     pop.appendChild(menuItem(ICONS.move, "Bring to front", function(){ closeFloatingPopovers(); layerObjects(ids, "front"); }));
     pop.appendChild(menuItem(ICONS.move, "Send to back", function(){ closeFloatingPopovers(); layerObjects(ids, "back"); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
@@ -6285,7 +6297,7 @@
   function renderNote(n, isNew, opts){
     if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
-    decoratePin(n); decorateReactions(n); decorateIncog(n);
+    decoratePin(n); decorateReactions(n); decorateIncog(n); decorateLock(n);
     if(selected.size === 1 && selected.has(n.id)){ syncRotHandle(); syncReactAdd(); }
     if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
     if(n.type === "shopping" && n.el) placeShopTab(n);
@@ -6841,6 +6853,7 @@
   }
 
   function handleImageDrop(file, n){
+    if(isSealed(n)){ toast("Unlock this note first."); return; }
     var reader = new FileReader();
     reader.onload = function(){
       var img = new Image();
@@ -6930,6 +6943,7 @@
   }
   // a fresh piece of paper with the same content: new id, new rotation and tape
   function paperCopy(src){
+    if(src && src.lock) return null;                                   // a locked note is never copied: its key lives on the server for THIS note on THIS board
     var c = normalizeIncoming(src, {allowAssets:true});
     if(!c) return null;
     c.phys = isPhoto(c) ? makePhotoPhys() : (isAV(c) || isPaper(c)) ? {} : makePhys();
@@ -6969,13 +6983,14 @@
     } else go();
   }
   function duplicateNotes(ids){
+    if(ids.some(function(id){ return isLockedNote(findNote(id)); })){ toast("A locked note can\u2019t be duplicated. Remove its PIN lock first."); ids = ids.filter(function(id){ return !isLockedNote(findNote(id)); }); }
     var src = ids.map(findNote).filter(function(n){ return n && !isPileObj(n); });
     if(ids.some(function(id){ return isPileObj(findNote(id)); })) toast("A pile can't be duplicated yet. Open it first.");
     if(!src.length || readOnly) return;
     guardedMultiply(src.length, function(){ duplicateNow(ids); });
   }
   function duplicateNow(ids){
-    var src = ids.map(findNote).filter(function(n){ return n && !isPileObj(n); });          // phase 1: a pile is not duplicated (open it first)                 // resolved when it actually runs: a note deleted in the meantime is simply skipped
+    var src = ids.map(findNote).filter(function(n){ return n && !isPileObj(n) && !isLockedNote(n); });          // phase 1: a pile is not duplicated (open it first)                 // resolved when it actually runs: a note deleted in the meantime is simply skipped
     if(!src.length) return;
     var copies = src.map(function(s){ var c = paperCopy(serializeNote(s)); if(c){ c.x = s.x + 26; c.y = s.y + 26; } return c; }).filter(Boolean);
     if(copies.length) insertNotes(copies, copies.length > 1 ? "Duplicate " + copies.length + " notes" : "Duplicate note");
@@ -6988,6 +7003,7 @@
   var lastNoteCopy = 0;
   function copyNotesToClipboard(e, quiet){
     var list = selectedNotes();
+    if(list.some(isLockedNote)){ if(!quiet) toast("A locked note can\u2019t be copied. Remove its PIN lock first."); list = list.filter(function(n){ return !isLockedNote(n); }); }
     if(!list.length) return false;
     var data = {v:1, board:activeBoardId, ts:Date.now(), notes:list.map(serializeNote)};
     var veiledAny = list.some(isConcealed);
@@ -7236,6 +7252,7 @@
     var dest = boards.filter(function(b){ return b.id === destId; })[0];
     var list = ids.map(findNote).filter(Boolean);
     if(list.some(isPileObj)){ toast("Open the pile first, then move its papers to another board."); return; }
+    if(list.some(isLockedNote)){ toast("A locked note can\u2019t move to another board. Remove its PIN lock first."); return; }
     if(!dest || !list.length) return;
     var origSnaps = list.map(snapNote);
     var destNotes = safeGet(notesKeyFor(destId)) || [];
@@ -7491,6 +7508,7 @@
   function openNoteMenu(n, anchor){
     var pop = openFloatingPopover(anchor, "noteMenu");
     if(!pop) return;
+    if(isSealed(n)){ fillSealedMenu(pop, n); return; }          // a sealed note offers only what does not need its words
     var text = n.textEl;
     function fmt(html, title, fn){
       var b = document.createElement("button");
@@ -7558,6 +7576,7 @@
     addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
     incogMenuItems(pop, n);
+    lockMenuItems(pop, n);
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -8028,6 +8047,352 @@
     }
     el.appendChild(makeDiv("incogStatic")).textContent = "Scratch to reveal";
   }
+  // ---------- PIN-locked notes (v0.8.4) ----------
+  // The cryptography is in js/lock.js; what it does and does not protect is in docs/dev/LOCKED-NOTES.md.
+  // A locked plain note keeps its position, colour, font and size in the open (the board needs them to draw it where it belongs) and everything it SAYS
+  // (words, its inline picture, task and due-date details) only inside one AES-GCM ciphertext, `n.lock`. While it is unlocked the words are in memory (n.html ...)
+  // and the key is a non-extractable CryptoKey in `n._lockKey`; neither is ever written anywhere. serializeNote() strips the words from every saved, synced,
+  // copied or remembered-for-undo form, so a reload, a sign-out, "Lock Again" or a board switch simply forgets them.
+  var LOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2"></rect><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"></path><circle cx="12" cy="15.2" r="1.2" fill="currentColor"></circle></svg>';
+  function lockApi(){ return window.Stick && Stick.repo && Stick.repo.nodeLock; }
+  function lockSupported(){ return !!(window.Stick && Stick.lock && window.crypto && window.crypto.subtle); }
+  function guestSession(){ return !!(window.Stick && Stick.auth && Stick.auth.isAnonymous && Stick.auth.isAnonymous()); }
+  function lockOnServer(){ return !!(CLOUD && activeBoardId && lockApi() && !guestSession()); }          // a signed-in board: the key also needs the server's secret
+  function lockWhyNot(n){
+    if(readOnly) return "You can only view this board.";
+    if(!lockSupported()) return "This browser can’t encrypt notes, so it can’t lock them.";
+    if(!n || n.type) return "Only notes can be PIN-locked for now.";
+    if(n.assetId || n.attachedAssetId) return "A picture stored in your account can’t be locked yet. Remove the picture first.";
+    if(CLOUD && guestSession()) return "Guests can’t lock notes. Sign in with an account to lock this.";
+    return "";
+  }
+  function lockErr(e){
+    if(e && (e.message === "NO_CRYPTO")) return "This browser can’t encrypt notes.";
+    if(e && e.code === "OFFLINE") return "Locking and unlocking need a connection to your account.";
+    try{ return Stick.errors.friendly(Stick.errors.parse(e)); }catch(x){ return "Something went wrong. Try again."; }
+  }
+  function plainStr(n){ return JSON.stringify(Stick.lock.pick(n)); }
+  function forgetLockMemory(n){
+    SEALED_FIELDS.forEach(function(k){ delete n[k]; }); n.html = "";
+    delete n._lockKey; delete n._sealedPlain; delete n._openCt; delete n._sealP; clearTimeout(n._sealT); delete n._sealT; delete lockOpen[n.id];
+  }
+  function dropHistory(){ undoStack = []; redoStack = []; }          // earlier steps may hold the words (before locking) or an old key (before a PIN change): never let Undo bring them back
+  // attempts on a board with no server are slowed down on this device only (the stored data can always be copied elsewhere; see the docs)
+  function tryKey(id){ return "stickyboard." + NS + "lockTry." + id; }
+  function readTry(id){ return safeGet(tryKey(id)) || {fails: 0, until: 0}; }
+  function writeTry(id, rec){ safeSet(tryKey(id), rec); }
+
+  // ---- the PIN dialog (a slip of paper; never shows the digits)
+  function pinDialog(o){
+    return new Promise(function(resolve){
+      var form = makeDiv("pinForm"), inputs = [], msg = makeDiv("pinMsg"), weakNote = makeDiv("pinWeak"), checkEl = null, tick = null, go = null, mm = null, busy = false;
+      msg.setAttribute("role", "alert");
+      function clearInputs(){ inputs.forEach(function(i){ i.value = ""; }); weakNote.textContent = ""; }
+      o.fields.forEach(function(f, i){
+        var row = makeDiv("pinRow"), lab = document.createElement("label"), inp = document.createElement("input");
+        inp.type = "password"; inp.inputMode = "numeric"; inp.autocomplete = "off"; inp.maxLength = 8; inp.className = "pinInput"; inp.id = "pin" + (++dialogSeq); inp.spellcheck = false;
+        inp.setAttribute("autocapitalize", "off"); inp.setAttribute("autocorrect", "off"); inp.setAttribute("data-lpignore", "true"); inp.setAttribute("data-1p-ignore", "true"); inp.setAttribute("aria-label", f.label);
+        lab.htmlFor = inp.id; lab.textContent = f.label;
+        inp.addEventListener("input", function(){
+          inp.value = inp.value.replace(/\D/g, "").slice(0, 8); msg.textContent = "";
+          if(f.weak) weakNote.textContent = Stick.lock.weak(inp.value) ? "That one is easy to guess. A less obvious PIN protects the note better." : "";
+        });
+        inp.addEventListener("keydown", function(e){ if(e.key === "Enter"){ e.preventDefault(); e.stopPropagation(); if(i < inputs.length - 1) inputs[i + 1].focus(); else if(go && !go.disabled) go.click(); } });
+        row.appendChild(lab); row.appendChild(inp); form.appendChild(row); inputs.push(inp);
+      });
+      form.appendChild(weakNote);
+      (o.warn || []).forEach(function(t){ var p = document.createElement("p"); p.className = "pinWarn"; p.textContent = t; form.appendChild(p); });
+      if(o.check){
+        var cl = document.createElement("label"); cl.className = "pinCheck"; checkEl = document.createElement("input"); checkEl.type = "checkbox";
+        var ct = document.createElement("span"); ct.textContent = o.check; cl.appendChild(checkEl); cl.appendChild(ct); form.appendChild(cl);
+      }
+      form.appendChild(msg);
+      function setWait(sec){
+        clearInterval(tick); if(!go) return;
+        var until = Date.now() + sec * 1000;
+        if(sec <= 0){ go.disabled = false; return; }
+        go.disabled = true;
+        function paint(){
+          var left = Math.ceil((until - Date.now()) / 1000);
+          if(left <= 0){ clearInterval(tick); go.disabled = false; msg.textContent = ""; return; }
+          msg.textContent = "Too many wrong tries. Try again in " + (left >= 60 ? Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2) : left + " s") + ".";
+        }
+        paint(); tick = setInterval(paint, 500);
+      }
+      function wrong(r){
+        msg.textContent = (r && r.msg) || ""; clearInputs();
+        if(!reducedMotion()){ mm.card.classList.remove("pinShake"); void mm.card.offsetWidth; mm.card.classList.add("pinShake"); }
+        if(r && r.wait) setWait(r.wait); else inputs[0].focus();
+      }
+      function submit(close){
+        if(busy || (go && go.disabled)) return;
+        var vals = inputs.map(function(i){ return i.value; });
+        for(var i = 0; i < vals.length; i++){ if(!Stick.lock.validPin(vals[i])){ msg.textContent = "A PIN is 4 to 8 digits."; inputs[i].focus(); return; } }
+        if(o.same && vals[o.same[0]] !== vals[o.same[1]]){ msg.textContent = "The two PINs don’t match."; inputs[o.same[1]].value = ""; inputs[o.same[1]].focus(); return; }
+        if(checkEl && !checkEl.checked){ msg.textContent = "Tick the box to go on."; checkEl.focus(); return; }
+        busy = true; go.disabled = true; go.classList.add("busy"); msg.textContent = o.working || "Working…";
+        Promise.resolve().then(function(){ return o.run(vals); }).then(function(r){
+          busy = false; go.classList.remove("busy"); go.disabled = false;
+          if(r && r.ok){ clearInputs(); close(r); return; }
+          wrong(r);
+        }, function(e){ busy = false; go.classList.remove("busy"); go.disabled = false; wrong({msg: lockErr(e)}); });
+      }
+      mm = openModal({title: o.title, sub: o.sub, content: form, width: 380, slip: true, actions: [
+        {label: "Cancel", value: false},
+        {label: o.cta, kind: "primary", id: "pinGo", onClick: function(close){ submit(close); return false; }}
+      ], onClose: function(v){ clearInterval(tick); clearInputs(); resolve(v); }});
+      mm.card.classList.add("pinCard");
+      go = mm.card.querySelector("#pinGo");
+      setTimeout(function(){ if(inputs[0]) inputs[0].focus(); }, 30);
+      if(o.wait) setWait(o.wait);
+    });
+  }
+
+  // ---- locking
+  async function lockFlow(ids){
+    var asked = ids.map(findNote).filter(function(n){ return n && !n.type && !isLockedNote(n); });
+    var why = ""; var list = asked.filter(function(n){ var w = lockWhyNot(n); if(w && !why) why = w; return !w; });
+    if(!list.length){ toast(why || "Select a note to lock."); return; }
+    endEditing(); closeFloatingPopovers();
+    var multi = list.length > 1, server = lockOnServer();
+    var res = await pinDialog({
+      title: multi ? "Lock " + list.length + " notes with one PIN" : "Lock this note",
+      sub: "Choose a PIN of 4 to 8 digits. The note is sealed with it: only the PIN opens it, on any device.",
+      fields: [{label: "New PIN", weak: true}, {label: "Type it again"}], same: [0, 1],
+      warn: ["There is no way to reset a forgotten PIN: not for you, not for the board owner, not for anyone. If you forget it, the note can never be opened again."]
+        .concat(multi ? ["Each of the " + list.length + " notes is sealed on its own, but they all open with this one PIN. Anyone who learns it opens all of them."] : []),
+      check: multi ? "I understand: all " + list.length + " notes open with this one PIN, and forgetting it loses all of them." : "I understand that a forgotten PIN can’t be recovered.",
+      cta: multi ? "Lock " + list.length + " notes" : "Lock note", working: "Sealing…",
+      run: async function(v){
+        var done = 0, err = "";
+        for(var i = 0; i < list.length; i++){
+          var n = list[i];
+          try{
+            if(n.textEl) n.html = n.textEl.innerHTML;
+            var prep = await Stick.lock.prepare(v[0]), secret = null;
+            if(server) secret = await lockApi().create(activeBoardId, n.id, prep.proof);          // the server's half of the key exists BEFORE the sealed note can sync
+            var sealed = await Stick.lock.seal(prep, secret, n, n.id);
+            var h = n.el ? Math.round(n.el.offsetHeight) : 0;
+            n.lock = sealed.env; if(h >= 40 && h <= 2000) n.lockH = h;
+            forgetLockMemory(n); n.html = "";
+            done++;
+          }catch(e){ err = lockErr(e); break; }
+        }
+        if(!done) return {ok: false, msg: err};
+        list.slice(0, done).forEach(function(n){ rerenderNote(n); if(n.el && !reducedMotion()){ n.el.classList.add("lockSealing"); setTimeout(function(){ if(n.el) n.el.classList.remove("lockSealing"); }, 700); } });
+        dropHistory(); saveNotes(); updateMinimap();
+        return {ok: true, done: done, err: err};
+      }
+    });
+    if(res && res.ok) toast(res.err ? "Locked " + res.done + " of " + list.length + ". " + res.err : (res.done > 1 ? res.done + " notes locked." : "Locked. Only the PIN opens it."));
+  }
+
+  // ---- opening
+  // one attempt: returns {ok, payload, key} or {ok:false, msg, wait}
+  async function tryOpen(n, pin){
+    var env = n.lock, server = env.m === "server", p, secret = null, rec = null;
+    try{ p = await Stick.lock.proofFor(pin, env); }catch(e){ return {ok: false, msg: "That doesn’t look like a valid lock."}; }
+    if(server){
+      if(!lockOnServer()) return {ok: false, msg: "Opening this note needs a connection to your account."};
+      var r; try{ r = await lockApi().unlock(activeBoardId, n.id, p.proof); }catch(e){ return {ok: false, msg: lockErr(e)}; }
+      if(!r || !r.ok) return {ok: false, wait: r && r.wait || 0, msg: r && r.wait ? "" : "That PIN didn’t open it."};
+      secret = r.secret;
+    } else {
+      rec = readTry(n.id); var w = Stick.lock.local.check(rec);
+      if(w) return {ok: false, wait: w, msg: ""};
+    }
+    var o;
+    try{ o = await Stick.lock.open(p.material, secret, env, n.id); }
+    catch(e){
+      if(server) return {ok: false, msg: "This locked note is damaged and can’t be opened."};
+      var nx = Stick.lock.local.fail(rec); writeTry(n.id, nx);
+      return {ok: false, wait: Stick.lock.local.check(nx), msg: "That PIN didn’t open it."};
+    }
+    if(!server) writeTry(n.id, Stick.lock.local.ok());
+    return {ok: true, payload: o.payload, key: o.key};
+  }
+  function applyOpen(n, payload, key){
+    SEALED_FIELDS.forEach(function(k){ delete n[k]; });
+    Object.assign(n, payload); if(typeof n.html !== "string") n.html = "";
+    n._lockKey = key; n._sealedPlain = plainStr(n); n._openCt = n.lock.ct; lockOpen[n.id] = true;
+    rerenderNote(n); updateMinimap();
+    if(searchInput.value.trim()) runSearch();
+  }
+  function playOpening(n){
+    if(!n.el || reducedMotion()) return Promise.resolve();
+    n.el.classList.add("lockOpening");
+    return new Promise(function(r){ setTimeout(r, 520); });
+  }
+  async function unlockNote(n){
+    if(!isLockedNote(n)) return true;
+    if(lockOpen[n.id] && n._lockKey) return true;
+    if(!lockSupported()){ toast("This browser can’t decrypt notes."); return false; }
+    var wait0 = 0;
+    try{ if(n.lock.m === "server" && lockOnServer()){ var st = await lockApi().state(activeBoardId, n.id); wait0 = st && st.wait || 0; } else wait0 = Stick.lock.local.check(readTry(n.id)); }catch(e){}
+    var opened = null;
+    var res = await pinDialog({
+      title: "Open this note", sub: "It is sealed. Enter its PIN.", fields: [{label: "PIN"}], cta: "Unlock", wait: wait0, working: "Opening…",
+      run: async function(v){ var r = await tryOpen(n, v[0]); if(r.ok) opened = r; return r.ok ? {ok: true} : r; }
+    });
+    if(!(res && res.ok) || !opened) return false;
+    await playOpening(n);
+    if(n.el) n.el.classList.remove("lockOpening");
+    applyOpen(n, opened.payload, opened.key);
+    return true;
+  }
+  // an open locked note is written back sealed after every change; Lock Again (and sign-out) wait for the last one
+  function sealDirty(){
+    if(!window.Stick || !Stick.lock) return;
+    for(var i = 0; i < notes.length; i++){
+      var n = notes[i];
+      if(!n.lock || n.type || !n._lockKey || !lockOpen[n.id]) continue;
+      if(plainStr(n) !== n._sealedPlain){ clearTimeout(n._sealT); n._sealT = setTimeout((function(m){ return function(){ resealNow(m); }; })(n), 150); }
+    }
+  }
+  function resealNow(n){
+    var job = (n._sealP || Promise.resolve()).then(async function(){
+      if(!n._lockKey || !isLockedNote(n)) return;
+      var ps = plainStr(n); if(ps === n._sealedPlain) return;
+      var env = await Stick.lock.reseal(n._lockKey, n.lock, n, n.id);          // same key, a brand-new IV
+      n.lock = env; n._sealedPlain = ps; n._openCt = env.ct;
+      saveNotes();
+    });
+    n._sealP = job.catch(function(){});
+    return job;
+  }
+  async function lockAgain(n){
+    if(!isLockedNote(n) || !lockOpen[n.id]) return;
+    endEditing(); clearTimeout(n._sealT);
+    try{ await resealNow(n); }catch(e){ toast("Couldn’t seal your last change, so the note stays open."); return; }
+    forgetLockMemory(n); rerenderNote(n); saveNotes(); updateMinimap();
+  }
+  async function relockAll(){ var open = notes.filter(function(n){ return isLockedNote(n) && lockOpen[n.id]; }); for(var i = 0; i < open.length; i++) await lockAgain(open[i]); }
+  // what an open note looks like to the next remote update (see applyRemote)
+  function lockStash(ex){
+    if(!isLockedNote(ex) || !lockOpen[ex.id] || !ex._lockKey || !window.Stick || !Stick.lock) return null;
+    return {key: ex._lockKey, plain: Stick.lock.pick(ex), ct: ex.lock.ct, sp: ex._sealedPlain, open: ex._openCt};
+  }
+  function lockRestore(ex, st){
+    if(!ex.lock){ delete lockOpen[ex.id]; return; }                       // the lock was removed on another device
+    ex._lockKey = st.key; Object.assign(ex, st.plain); ex._sealedPlain = st.sp; ex._openCt = st.open;
+    if(ex.lock.ct === st.ct) return;
+    var ct = ex.lock.ct, env = ex.lock;                                   // someone with the PIN changed it, or the PIN itself changed: read it with the key we hold
+    Stick.lock.decryptWith(st.key, env, ex.id).then(function(pl){
+      if(!ex.lock || ex.lock.ct !== ct) return;
+      SEALED_FIELDS.forEach(function(k){ delete ex[k]; }); Object.assign(ex, pl); ex._sealedPlain = plainStr(ex); ex._openCt = ct; rerenderNote(ex);
+    }, function(){ forgetLockMemory(ex); rerenderNote(ex); toast("A locked note was changed with a new PIN, so it is closed again."); });
+  }
+
+  // ---- changing and removing
+  async function changePinFlow(n){
+    if(!isLockedNote(n) || readOnly) return;
+    closeFloatingPopovers(); endEditing();
+    var server = n.lock.m === "server", wait0 = 0;
+    try{ if(server && lockOnServer()){ var st = await lockApi().state(activeBoardId, n.id); wait0 = st && st.wait || 0; } else wait0 = Stick.lock.local.check(readTry(n.id)); }catch(e){}
+    var out = null;
+    var res = await pinDialog({
+      title: "Change PIN", sub: "Enter the current PIN, then choose a new one.", wait: wait0, working: "Re-sealing…",
+      fields: [{label: "Current PIN"}, {label: "New PIN", weak: true}, {label: "New PIN again"}], same: [1, 2],
+      warn: ["A forgotten PIN still can’t be recovered."], cta: "Change PIN",
+      run: async function(v){
+        var r = await tryOpen(n, v[0]); if(!r.ok) return r;
+        var prep = await Stick.lock.prepare(v[1]), secret = null;
+        if(server){
+          var proofOld = (await Stick.lock.proofFor(v[0], n.lock)).proof, c;
+          try{ c = await lockApi().change(activeBoardId, n.id, proofOld, prep.proof); }catch(e){ return {ok: false, msg: lockErr(e)}; }
+          if(!c || !c.ok) return {ok: false, wait: c && c.wait || 0, msg: c && c.wait ? "" : "That PIN didn’t open it."};
+          secret = c.secret;
+        }
+        out = await Stick.lock.seal(prep, secret, r.payload, n.id);
+        return {ok: true};
+      }
+    });
+    if(!(res && res.ok) || !out) return;
+    n.lock = out.env;
+    if(lockOpen[n.id]){ n._lockKey = out.key; n._openCt = out.env.ct; n._sealedPlain = plainStr(n); }
+    dropHistory(); saveNotes(); toast("PIN changed.");
+  }
+  async function removeLockFlow(n){
+    if(!isLockedNote(n) || readOnly) return;
+    closeFloatingPopovers(); endEditing();
+    var server = n.lock.m === "server", wait0 = 0;
+    try{ if(server && lockOnServer()){ var st = await lockApi().state(activeBoardId, n.id); wait0 = st && st.wait || 0; } else wait0 = Stick.lock.local.check(readTry(n.id)); }catch(e){}
+    var got = null;
+    var res = await pinDialog({
+      title: "Remove PIN lock", sub: "Enter the PIN. The note becomes an ordinary note again, readable by everyone on this board.", wait: wait0, working: "Opening…",
+      fields: [{label: "PIN"}], cta: "Remove lock",
+      run: async function(v){ var r = await tryOpen(n, v[0]); if(!r.ok) return r; got = {payload: r.payload, proof: server ? (await Stick.lock.proofFor(v[0], n.lock)).proof : null}; return {ok: true}; }
+    });
+    if(!(res && res.ok) || !got) return;
+    forgetLockMemory(n);
+    Object.assign(n, got.payload); if(typeof n.html !== "string") n.html = "";
+    var wasServer = n.lock.m === "server"; delete n.lock; delete n.lockH;
+    rerenderNote(n); dropHistory(); saveNotes();                          // the words are saved FIRST: only then is the server's half of the key thrown away
+    if(wasServer && got.proof){
+      try{ await lockApi().remove(activeBoardId, n.id, got.proof); }catch(e){ toast("The lock is removed. Its record on the server couldn’t be cleared just now; that is harmless."); return; }
+    }
+    toast("PIN lock removed.");
+  }
+
+  // ---- how it looks
+  function decorateLock(n){
+    var el = n && n.el; if(!el) return;
+    Array.prototype.forEach.call(el.querySelectorAll(":scope > .sealWrap, :scope > .lockBtn"), function(x){ x.remove(); });
+    el.classList.remove("lockSealed", "lockOpen"); el.style.minHeight = "";
+    if(!isLockedNote(n)) return;
+    if(isSealed(n)){
+      el.classList.add("lockSealed");
+      if(n.lockH) el.style.minHeight = n.lockH + "px";                    // the sealed note keeps the room its words took
+      if(n.textEl){ n.textEl.contentEditable = "false"; n.textEl.setAttribute("aria-hidden", "true"); }
+      var w = makeDiv("sealWrap"); w.tabIndex = 0; w.setAttribute("role", "button"); w.setAttribute("aria-label", "Locked note. Press Enter to enter its PIN.");
+      w.innerHTML = '<span class="sealFlap" aria-hidden="true"></span><span class="sealFold" aria-hidden="true"></span><span class="sealWax" aria-hidden="true">' + LOCK_ICON + '</span><span class="sealLabel">Locked</span>';
+      ["pointerdown", "mousedown", "dblclick", "touchstart"].forEach(function(t){ w.addEventListener(t, function(e){ e.stopPropagation(); if(t === "mousedown") e.preventDefault(); }, {passive: t === "touchstart" || t === "dblclick"}); });
+      w.addEventListener("click", function(e){ e.stopPropagation(); if(!selected.has(n.id)) setSelection([n.id]); unlockNote(n); });
+      w.addEventListener("keydown", function(e){ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); e.stopPropagation(); unlockNote(n); } });
+      el.appendChild(w);
+    } else {
+      el.classList.add("lockOpen");
+      if(!readOnly){
+        var b = document.createElement("button"); b.type = "button"; b.className = "lockBtn"; b.innerHTML = LOCK_ICON; b.title = "Lock Again"; b.setAttribute("aria-label", "Lock this note again");
+        b.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); b.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+        b.addEventListener("click", function(e){ e.stopPropagation(); lockAgain(n); });
+        el.appendChild(b);
+      }
+    }
+  }
+
+  // ---- menus
+  function lockMenuItems(pop, n){
+    if(n.type) return;
+    if(!isLockedNote(n)){
+      var why = lockWhyNot(n);
+      pop.appendChild(menuItem(LOCK_ICON, "Lock with PIN…", function(){ closeFloatingPopovers(); if(why){ toast(why); return; } lockFlow([n.id]); }, {cls: why ? "disabled" : "", title: why || "Seal this note with a 4 to 8 digit PIN. Forgetting it can’t be undone."}));
+      return;
+    }
+    pop.appendChild(menuItem(LOCK_ICON, "Lock Again", function(){ closeFloatingPopovers(); lockAgain(n); }));
+    if(!readOnly){
+      pop.appendChild(menuItem(LOCK_ICON, "Change PIN…", function(){ changePinFlow(n); }));
+      pop.appendChild(menuItem(LOCK_ICON, "Remove PIN Lock…", function(){ removeLockFlow(n); }));
+    }
+  }
+  function fillSealedMenu(pop, n){
+    var h = makeDiv("menuHint"); h.textContent = "Locked note"; pop.appendChild(h);
+    pop.appendChild(menuItem(LOCK_ICON, "Unlock…", function(){ closeFloatingPopovers(); unlockNote(n); }));
+    if(!readOnly){
+      pop.appendChild(menuItem(LOCK_ICON, "Change PIN…", function(){ changePinFlow(n); }));
+      pop.appendChild(menuItem(LOCK_ICON, "Remove PIN Lock…", function(){ removeLockFlow(n); }));
+    }
+    pop.appendChild(makeDiv("menuSep"));
+    if(!readOnly){ pinAndArrange(pop, n); pop.appendChild(menuItem(ICONS.trash, "Delete", function(){ closeFloatingPopovers(); deleteNotes([n.id]); }, {cls: "danger"})); }
+  }
+  function lockGroupItem(pop, ids){
+    if(readOnly) return;
+    var list = ids.map(findNote).filter(function(n){ return n && !n.type && !isLockedNote(n); }); if(!list.length) return;
+    var why = list.map(lockWhyNot).filter(Boolean)[0] || "";
+    pop.appendChild(menuItem(LOCK_ICON, list.length > 1 ? "Lock " + list.length + " notes with one PIN…" : "Lock with PIN…", function(){ closeFloatingPopovers(); if(why && list.every(function(n){ return lockWhyNot(n); })){ toast(why); return; } lockFlow(list.map(function(n){ return n.id; })); },
+      {cls: why && list.every(function(n){ return lockWhyNot(n); }) ? "disabled" : "", title: "Seal each selected note with a PIN. You will be asked to confirm."}));
+  }
+
   function pinMenuItem(n){
     return menuItem(ICONS.pin, isPinned(n) ? "Unpin" : "Pin in place", function(){ closeFloatingPopovers(); setPinned([n.id], !isPinned(n)); }, {title: isPinned(n) ? "Let this move again" : "Keep this exactly where it is"});
   }
@@ -12256,7 +12621,7 @@
         g.fillRect(p.tx * sc - tw/2, -h/2 - 11 * sc, tw, 22 * sc);
       }
       var left = -w/2 + 14 * sc, y = -h/2 + 26 * sc, inner = w - 28 * sc;
-      var veiled = isConcealed(n);
+      var veiled = isConcealed(n) || isLockedNote(n);
       if(veiled){ g.fillStyle = "rgba(168,173,182,0.95)"; g.fillRect(-w/2 + 6 * sc, -h/2 + 22 * sc, w - 12 * sc, h - 28 * sc); }
       if(n.image && !veiled){
         var im = (n.el && n.el.querySelector(".noteImgWrap img")) || thumbImage(n.image);
@@ -13443,9 +13808,10 @@
         }
         if(inPile !== -1) donePile.splice(inPile, 1);               // put back on another device: fall through and draw it
         if(ex){
-          var keepImg = ex.image, was = ex.assetId || ex.attachedAssetId;
+          var keepImg = ex.image, was = ex.assetId || ex.attachedAssetId, stash = lockStash(ex);
           Object.keys(ex).forEach(function(k){ if(["el","textEl","captionEl","badgeEl"].indexOf(k) === -1) delete ex[k]; });
           Object.assign(ex, o);
+          if(stash) lockRestore(ex, stash);
           if(keepImg && (ex.assetId || ex.attachedAssetId) === was) ex.image = keepImg;   // same picture: keep what is already loaded
           rerenderNote(ex);
         } else {
@@ -13540,6 +13906,7 @@
   async function cloudSignOut(scope){
     scope = scope === "global" ? "global" : "local";
     flushTypingNotify();
+    try{ await relockAll(); }catch(e){}
     if(cloudSync && cloudSync.hasPending()){
       var go = await confirmDialog({title:"Sign out with unsynced changes?", body:"Some recent changes haven't reached your account yet. Signing out on this device will lose them.", confirm:"Sign out anyway", danger:true});
       if(!go) return;
