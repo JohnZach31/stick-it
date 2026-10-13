@@ -86,7 +86,7 @@ function fn(name) { const i = app.search(new RegExp('function ' + name + '\\('))
   const ctx = vm.createContext({ hashStr: (s) => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }, ZONE_TITLE_FONTS: [1, 2, 3, 4, 5] }); vm.runInContext(fn('zoneTitleFont'), ctx);
   const f = (n) => ctx.zoneTitleFont(n); ok(f({ id: 'abc' }) === f({ id: 'abc' }) && f({ id: 'a', tf: 3 }) === 3 && f({ id: 'a', tf: 99 }) >= 0 && f({ id: 'a', tf: 99 }) < 5, 'a zone keeps its title face: the same id always gives the same one, and a chosen one wins');
   ok(/for \(let i = 0; i < 40; i\+\+\)/.test('for (let i = 0; i < 40; i++)') || true, 'n/a');
-  ok(/z\.tf = hashStr\(z\.id\)/.test(fn('createZone')) && /"tf"\]/.test(app), 'a new zone is given its face once and stores it');
+  ok(/z\.tf = hashStr\(z\.id\)/.test(fn('createZone')) && /"tf"[,\]]/.test(app), 'a new zone is given its face once and stores it');
   const cnt = fn('paintZoneState'); ok(/createElement\("b"\)/.test(cnt) && /selectZoneMembers/.test(app), 'the count is a bold number, and a button that selects the zone’s objects');
   ok(/\.zoneCount\{[^}]*cursor:pointer/.test(sp) && /\.zone:not\(\.zoneMinimized\):hover\{[^}]*animation:zoneBreath/.test(sp) && /data-a11y-motion="reduce"\] \.zone:hover\{ animation:none/.test(sp) && /prefers-reduced-motion: no-preference/.test(sp), 'a subtle hover life that is off for reduced motion');
   const sel = fn('selectZoneMembers'); ok(/restoreZone\(z\)/.test(sel) && /setSelection\(ids\)/.test(sel), 'the count selects members (a minimized zone is restored first)');

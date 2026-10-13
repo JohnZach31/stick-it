@@ -1,0 +1,41 @@
+/* v0.8.4 privacy notes: Incognito (scratch-off foil) and PIN-locked (sealed letter). Layer values come from the scale in docs/dev/LAYERS.md. */
+
+/* ---------- Incognito ---------- */
+.note.incogCovered > :not(.tab):not(.del):not(.incogWrap):not(.paperFx):not(.noteEdge):not(.noteHandle):not(.quickDone):not(.incogEye){ visibility:hidden !important; }
+.incogWrap{
+  position:absolute; left:0; right:0; bottom:0; top:22px; z-index:3; border-radius:0 0 3px 3px; overflow:hidden;
+  cursor:crosshair; touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  transition:opacity .5s ease, transform .5s ease; outline:none;
+  box-shadow:inset 0 0 0 1px rgba(60,64,72,.18), inset 0 1px 6px rgba(255,255,255,.35);
+}
+.incogWrap:focus-visible{ box-shadow:inset 0 0 0 2px var(--sel-ring, #3a6ff7); }
+.incogWrap.lifting{ opacity:0; transform:scale(1.04) rotate(.6deg); pointer-events:none; }
+.incogCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+body.dark .incogCanvas{ filter:brightness(.82) contrast(1.05); }
+/* the lifted corner: a small curl of foil with its own shadow */
+.incogCurl{
+  position:absolute; right:0; bottom:0; width:26px; height:26px; pointer-events:none;
+  background:linear-gradient(135deg, transparent 50%, #eef0f3 50%, #b8bdc5 78%, #8f959e 100%);
+  border-top-left-radius:100% 100%; box-shadow:-3px -3px 6px rgba(0,0,0,.18); transform-origin:100% 100%;
+}
+.incogEye{
+  position:absolute; top:-2px; right:26px; width:26px; height:22px; padding:0; border:0; background:transparent; cursor:pointer;
+  color:rgba(51,48,31,.55); opacity:0; transition:opacity .15s; z-index:4; display:flex; align-items:center; justify-content:center;
+}
+.incogEye svg{ width:20px; height:20px; }
+.note:hover .incogEye, .note.selected .incogEye, .incogEye:focus-visible{ opacity:1; }
+.incogEye:hover{ color:rgba(51,48,31,.9); }
+.incogFx{ position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:var(--z-peer, 9990); }
+@media (prefers-reduced-motion: reduce){ .incogWrap{ transition:none; } }
+@media (pointer:coarse){ .incogEye{ width:34px; height:30px; opacity:.8; } }
+/* a covered note printed or shown without its words: the same foil, as plain CSS (no canvas) */
+.incogStatic{
+  position:absolute; left:0; right:0; bottom:0; top:22px; border-radius:0 0 3px 3px; overflow:hidden; pointer-events:none;
+  background:
+    linear-gradient(115deg, transparent 38%, rgba(255,255,255,.34) 46%, transparent 54%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.07) 0 1px, rgba(90,95,105,.06) 1px 2px),
+    linear-gradient(135deg, #d4d7dc, #a9aeb6 32%, #cfd2d8 55%, #9ca1aa 80%, #c3c7cd);
+  display:flex; align-items:center; justify-content:center; font-family:'Caveat', cursive; font-size:24px; color:rgba(52,57,66,.78);
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+.note.incogCovered.staticNote > :not(.tab):not(.paperFx):not(.incogStatic){ visibility:hidden !important; }

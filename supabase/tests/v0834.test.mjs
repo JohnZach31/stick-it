@@ -31,7 +31,7 @@ const P = globalThis.Stick.printLayout;
   const env = {
     document, window: Object.assign(window, { print: () => { printCalls++; printedState = { printing: document.body.classList.contains('printing'), dark: document.body.classList.contains('dark'), root: !!document.getElementById('printRoot'), title: document.title, kids: document.querySelectorAll('#printRoot .printObj').length }; window.dispatchEvent(new window.Event('afterprint')); } }),
     Stick: { printLayout: P }, setTimeout, clearTimeout, Promise, Math, Array, Object, String, Number,
-    isPileObj: (n) => n.type === 'pile', isZone: (n) => n.type === 'zone', isAV: (n) => n.type === 'audio' || n.type === 'video', isHiddenMember: (n) => !!n.hidden, noteHasContent: (n) => !n.empty, itemText: (n) => n.text || '',
+    isConcealed: () => false, isIncog: () => false, isPileObj: (n) => n.type === 'pile', isZone: (n) => n.type === 'zone', isAV: (n) => n.type === 'audio' || n.type === 'video', isHiddenMember: (n) => !!n.hidden, noteHasContent: (n) => !n.empty, itemText: (n) => n.text || '',
     PublicShare: { toPublicNote: (n) => ({ id: n.id, text: n.text, x: n.x, y: n.y, w: n.w, h: n.h, rot: n.rot, secret: undefined }) }, buildStaticNote: mk, makeDiv: (c) => { const d = document.createElement('div'); d.className = c; return d; },
     toast: (m) => toasts.push(m), endEditing: () => {}, closeFloatingPopovers: () => {}, printState: null,
   };

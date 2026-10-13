@@ -1218,7 +1218,7 @@
   var ZONE_TITLE_FONTS = [["Caveat Brush", "Marker"], ["Amatic SC", "Tall"], ["Architects Daughter", "Drafting"], ["Fredoka", "Round"], ["Gloria Hallelujah", "Hand"]];
   function zoneTitleFont(n){ var i = n && n.tf != null ? Number(n.tf) : -1; if(!(i >= 0 && i < ZONE_TITLE_FONTS.length)) i = hashStr(String(n && n.id || "z")) % ZONE_TITLE_FONTS.length; return i; }
   var ZONE_MIN_W = 120, ZONE_MAX_W = 20000, ZONE_MIN_H = 80, ZONE_MAX_H = 20000;          // v0.8.3.2: zones can be as large or small as the board needs; the bounds only guard against corrupt values
-  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
+  var SERIAL_FIELDS = ["id","type","x","y","w","html","bg","font","fontManual","rot","z","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","listHintOff","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","createdAt","mediaId","duration","mime","poster","assetId","attachedAssetId","mediaState","legacyId","phys","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog"];
   function serializeNote(n){
     var o = {};
     SERIAL_FIELDS.forEach(function(k){ if(n[k] !== undefined) o[k] = n[k]; });
@@ -1319,6 +1319,7 @@
     if(c.captionFont !== undefined && !FONT_BY_NAME[c.captionFont]) delete c.captionFont;
     if(c.cosmetic !== undefined && c.cosmetic !== "soup") delete c.cosmetic;
     if(c.mediaState !== undefined && ["uploading", "ready", "failed", "missing"].indexOf(c.mediaState) === -1) delete c.mediaState;
+    if(c.incog !== undefined && (c.incog !== true || c.type)) delete c.incog;          // Incognito is a plain note's flag, nothing else
     delete c.image; delete c.cutout;                     // media only ever arrives through assets
     return c;
   }
@@ -1381,10 +1382,11 @@
         type:n.type, x:n.x, y:n.y, w:n.w, imgRatio:n.imgRatio, rot:n.rot, caption:n.caption || "", font:n.font,
         duration:n.duration, poster:n.poster, mediaId:n.mediaId, assetId:n.assetId, phys:{}
       };
+      if(isSealed(n)) return {x:n.x, y:n.y, w:n.w || NOTE_W, html:"", bg:n.bg, font:n.font, rot:n.rot, sealed:true, phys:ensurePhys(n)};          // a locked note leaves with no words at all
       return {
         x:n.x, y:n.y, w:n.w || NOTE_W, html:n.html || "", bg:n.bg, font:n.font, rot:n.rot,
         isTask:!!n.isTask, done:!!n.done, due:n.due || "", dueTime:n.dueTime || "", cosmetic:n.cosmetic === "soup" ? "soup" : undefined,
-        image:n.image || null, imgW:n.imgW || null, imgRatio:n.imgRatio || null, phys:ensurePhys(n)
+        image:n.image || null, imgW:n.imgW || null, imgRatio:n.imgRatio || null, phys:ensurePhys(n), incog:isIncog(n) ? true : undefined
       };
     },
     // Photos travel inside the link, so shrink them (same ratio, fewer pixels) first.
@@ -2145,7 +2147,7 @@
   // the browser's own undo, so `html` is deliberately not tracked here: undoing a
   // move never throws away words typed after the move.
   var undoStack = [], redoStack = [], HISTORY_MAX = 30;
-  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf"];
+  var TRACK_FIELDS = ["x","y","w","bg","font","fontManual","rot","phys","categoryIndex","isTask","done","due","dueTime","image","imgW","imgRatio","photoStyle","caption","captionFont","cutBorder","doneAt","doneBy","h","rip","pinned","carry","fields","cur","createdFromPreset","items","cutoutKey","cutoutAssetId","cutoutRatio","backing","cosmetic","title","date","body","amount","variant","dateTime","place","details","orient","location","message","recipient","frames","pileId","members","ox","oy","edges","url","provider","vid","start","trashedAt","trashedBy","reactions","headline","sub","quote","sourceTitle","sourceUrl","min","hold","imgMode","halftone","imgSize","imgFit","tf","incog"];
   function findNote(id){ for(var i=0; i<notes.length; i++){ if(notes[i].id === id) return notes[i]; } return null; }
   function snapNote(n){ var o = serializeNote(n); if(o.phys) o.phys = Object.assign({}, o.phys); return o; }
   function captureState(ids){
@@ -2304,7 +2306,19 @@
 
   // ---------- note content helpers ----------
   // the words someone can see on an item (a note's writing, a photo's caption)
+  // ---------- concealment (v0.8.4): Incognito foil and PIN seals ----------
+  // isConcealed(n) is the single question every place that could show a note's words asks first: search, the clipboard, previews, print, thumbnails, share text.
+  // Incognito covers until the foil is scratched away (this session only); a sealed note stays sealed until its PIN is entered. Both are separate from "selected" or "editing".
+  var incogOpen = {};                                                // notes whose foil was scratched away this session (never saved: a reload covers them again)
+  var lockOpen = {};                                                 // notes unlocked this session (their words are in memory only while here)
+  function isIncog(n){ return !!n && n.incog === true && !n.type; }
+  function incogCovered(n){ return isIncog(n) && !incogOpen[n.id]; }
+  function isLockedNote(n){ return !!n && !!n.lock && !n.type; }
+  function isSealed(n){ return isLockedNote(n) && !lockOpen[n.id]; }
+  function isConcealed(n){ return incogCovered(n) || isSealed(n); }
+  function hiddenLabel(n){ return isSealed(n) ? "Locked note" : "Incognito note"; }
   function itemText(n){
+    if(isConcealed(n)) return "";
     if(isPaper(n)) return Stick.objects.text(n);
     if(isObj(n)) return n.caption || "";
     return n.textEl ? getPlainText(n.textEl) : htmlToText(n.html || "").trim();
@@ -5402,6 +5416,7 @@
       pop.appendChild(menuItem(ICONS.move, "Collapse into a pile", function(){ closeFloatingPopovers(); makePile(ids); }, {title: "Tucks the notes into one pile. Nothing is deleted; Unpile spreads them back."}));
     }
     addToPileMenu(pop, ids);
+    incogGroupItem(pop, ids);
     pop.appendChild(menuItem(ICONS.move, "Bring to front", function(){ closeFloatingPopovers(); layerObjects(ids, "front"); }));
     pop.appendChild(menuItem(ICONS.move, "Send to back", function(){ closeFloatingPopovers(); layerObjects(ids, "back"); }));
     pop.appendChild(menuItem(ICONS.copy, "Duplicate", function(){ closeFloatingPopovers(); duplicateNotes(ids); }, {kbd: MOD + "+D"}));
@@ -5726,17 +5741,18 @@
     el.appendChild(makeDiv("tab"));
     el.appendChild(makeDiv("paperFx"));
     if(item.isTask) el.appendChild(makeBadge(item));
-    if(item.image) el.appendChild(buildImageWrap(item).wrap);
+    if(item.image && !item.concealed) el.appendChild(buildImageWrap(item).wrap);
     var t = makeDiv("text" + (item.done ? " done" : ""));
     t.dir = "auto";
     t.style.fontFamily = fontStack(item.font);
-    t.innerHTML = sanitizeHtml(item.html);
+    t.innerHTML = item.concealed || item.sealed ? "" : sanitizeHtml(item.html);
     t.addEventListener("click", function(e){
       var a = e.target.closest("a");
       if(a){ e.preventDefault(); openLink(a.getAttribute("href")); }
     });
     el.appendChild(t);
     if(item.cosmetic === "soup") soupDecorate(el, item, t);
+    if(item.incog === true || item.sealed === true) staticVeil(el, item);
     return el;
   }
 
@@ -5784,6 +5800,7 @@
 
   // ---- the pile on the board: top paper + a few edges + a count (about 8 elements however many papers it holds)
   function pileSnippet(top){
+    if(isConcealed(top)) return hiddenLabel(top);
     var t = isPaper(top) ? Stick.objects.text(top) : htmlToText(top.html || "");
     t = String(t || "").replace(/\s+/g, " ").trim();
     return t.slice(0, 140) || (isPaper(top) ? Stick.objects.LABELS[top.type] : "Empty note");
@@ -6268,7 +6285,7 @@
   function renderNote(n, isNew, opts){
     if(hiddenIds[n.id]) return null;                               // inside a collapsed pile: not drawn, still on the board
     var made = renderNoteCore(n, isNew, opts);
-    decoratePin(n); decorateReactions(n);
+    decoratePin(n); decorateReactions(n); decorateIncog(n);
     if(selected.size === 1 && selected.has(n.id)){ syncRotHandle(); syncReactAdd(); }
     if(window.Stick && Stick.collab && Stick.collab.active() && (n.el || made)) Stick.collab.decorate(n, n.el || made);
     if(n.type === "shopping" && n.el) placeShopTab(n);
@@ -6973,12 +6990,13 @@
     var list = selectedNotes();
     if(!list.length) return false;
     var data = {v:1, board:activeBoardId, ts:Date.now(), notes:list.map(serializeNote)};
-    var plain = list.map(itemText).filter(Boolean).join("\n\n");
+    var veiledAny = list.some(isConcealed);
+    var plain = list.map(function(n){ return isConcealed(n) ? "[" + hiddenLabel(n) + "]" : itemText(n); }).filter(Boolean).join("\n\n");
     data.text = plain;
     if(!e) { safeSet(CLIP_KEY, data); lastNoteCopy = Date.now(); }
     if(e && e.clipboardData){
       e.clipboardData.setData("text/plain", plain || " ");
-      try{ e.clipboardData.setData(CLIP_MIME, JSON.stringify(data)); }catch(err){}
+      if(!veiledAny){ try{ e.clipboardData.setData(CLIP_MIME, JSON.stringify(data)); }catch(err){} }          // the private clipboard type (which carries the words) is never offered to other apps for a concealed note
       e.preventDefault();
       if(Date.now() - lastNoteCopy > 800) safeSet(CLIP_KEY, data);
     }
@@ -7539,6 +7557,7 @@
     pop.appendChild(menuItem(ICONS.tick, "Mark done", function(){ closeFloatingPopovers(); markDone(n); }, {title: "Move this note to the Done pile"}));
     addToPileMenu(pop, [n.id]);
     pinAndArrange(pop, n);
+    incogMenuItems(pop, n);
     pop.appendChild(menuItem(ICONS.task, n.isTask ? "Unmark as task" : "Mark as task", function(){
       closeFloatingPopovers();
       var before = captureState([n.id]);
@@ -7939,6 +7958,76 @@
     recordChange(on ? (list.length > 1 ? "Pin " + list.length + " items" : "Pin in place") : (list.length > 1 ? "Unpin " + list.length + " items" : "Unpin"), before);
     toast(on ? (list.length > 1 ? "Pinned " + list.length + " items in place." : "Pinned in place.") : "Unpinned.");
   }
+  // ---------- Incognito: a scratch-off foil over a plain note (v0.8.4) ----------
+  // A VISUAL concealment only: the words are stored, synced and shared like any note. It is never described as security (use a PIN lock for that).
+  // `incog` is saved; whether the foil has been scratched away is not: a reload (or a re-open of the board) covers every Incognito note again.
+  var INCOG_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="2.8"></circle></svg>';
+  var INCOG_EYE_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5c2 0 3.7.7 5.1 1.6M21.5 12S18 18.5 12 18.5c-2 0-3.7-.7-5.1-1.6"></path><path d="M3.5 3.5l17 17"></path></svg>';
+  function incogEligible(n){ return !!n && !n.type && !isLockedNote(n); }
+  function decorateIncog(n){
+    var el = n && n.el; if(!el) return;
+    if(n._incog){ try{ n._incog.destroy(); }catch(e){} n._incog = null; }
+    Array.prototype.forEach.call(el.querySelectorAll(":scope > .incogWrap, :scope > .incogEye"), function(x){ x.remove(); });
+    el.classList.remove("incogCovered");
+    if(!isIncog(n) || isSealed(n) || !window.Stick || !Stick.incognito) return;
+    if(incogCovered(n)){
+      if(n.textEl && document.activeElement === n.textEl){ try{ n.textEl.blur(); }catch(e){} }
+      n._incog = Stick.incognito.mount(el, {
+        seed: n.id,
+        onPress: function(){ if(!selected.has(n.id)){ if(searchInput.value.trim()) setTimeout(clearSearch, 0); setSelection([n.id]); } },
+        onReveal: function(){ incogOpen[n.id] = true; n._incog = null; decorateIncog(n); updateMinimap(); announceIncog(n, "Incognito note revealed."); }
+      });
+    } else if(!readOnly || SHARE_LINK_PAGE){
+      var eye = document.createElement("button"); eye.type = "button"; eye.className = "incogEye"; eye.innerHTML = INCOG_EYE_OFF;
+      eye.title = "Cover again"; eye.setAttribute("aria-label", "Cover this note again");
+      eye.addEventListener("pointerdown", function(e){ e.stopPropagation(); }); eye.addEventListener("mousedown", function(e){ e.preventDefault(); e.stopPropagation(); });
+      eye.addEventListener("click", function(e){ e.stopPropagation(); coverIncog(n); });
+      el.appendChild(eye);
+    }
+  }
+  function announceIncog(n, msg){ try{ var live = document.getElementById("liveRegion") || document.getElementById("srLive"); if(live) live.textContent = msg; }catch(e){} }
+  function coverIncog(n){
+    if(!isIncog(n)) return;
+    endEditing(); delete incogOpen[n.id];
+    var t = n.textEl; if(t && document.activeElement === t){ try{ t.blur(); }catch(e){} }
+    decorateIncog(n); updateMinimap(); announceIncog(n, "Incognito note covered.");
+  }
+  function revealIncog(n){ if(n && n._incog) n._incog.reveal(true); else if(isIncog(n)){ incogOpen[n.id] = true; decorateIncog(n); } }
+  function setIncog(ids, on){
+    if(readOnly) return;
+    var list = ids.map(findNote).filter(function(n){ return incogEligible(n) && isIncog(n) !== on; });
+    if(!list.length) return;
+    endEditing();
+    var before = captureState(list.map(function(n){ return n.id; }));
+    list.forEach(function(n){ if(on) n.incog = true; else delete n.incog; delete incogOpen[n.id]; rerenderNote(n); });
+    saveNotes();
+    recordChange(on ? (list.length > 1 ? "Make " + list.length + " notes incognito" : "Make incognito") : (list.length > 1 ? "Remove Incognito from " + list.length + " notes" : "Remove Incognito"), before);
+    toast(on ? (list.length > 1 ? list.length + " notes covered. Scratch to reveal." : "Covered. Scratch to reveal.") : "Incognito removed.");
+  }
+  function incogMenuItems(pop, n){
+    if(!incogEligible(n)) return;
+    if(!isIncog(n)){ pop.appendChild(menuItem(INCOG_EYE_OFF, "Make Incognito", function(){ closeFloatingPopovers(); setIncog([n.id], true); }, {title: "Cover this note with scratch-off foil. A visual cover only, not security."})); return; }
+    if(incogCovered(n)) pop.appendChild(menuItem(INCOG_EYE, "Reveal", function(){ closeFloatingPopovers(); revealIncog(n); }, {title: "Lift the foil without scratching"}));
+    else pop.appendChild(menuItem(INCOG_EYE_OFF, "Cover Again", function(){ closeFloatingPopovers(); coverIncog(n); }, {title: "Put the foil back"}));
+    if(readOnly) return;
+    pop.appendChild(menuItem(INCOG_EYE, "Remove Incognito", function(){ closeFloatingPopovers(); setIncog([n.id], false); }, {title: "Make this a normal note again"}));
+  }
+  function incogGroupItem(pop, ids){
+    if(readOnly) return;
+    var list = ids.map(findNote).filter(incogEligible); if(!list.length) return;
+    var allOn = list.every(isIncog);
+    pop.appendChild(menuItem(allOn ? INCOG_EYE : INCOG_EYE_OFF, allOn ? "Remove Incognito" : "Make Incognito", function(){ closeFloatingPopovers(); setIncog(list.map(function(n){ return n.id; }), !allOn); }, {title: allOn ? "Make the selected notes normal again" : "Cover the selected notes with scratch-off foil. A visual cover only, not security."}));
+  }
+  // a shared page or a print shows the foil as it is, without scratching (a shared page lets the reader scratch)
+  function staticVeil(el, item){
+    el.classList.add("incogCovered");
+    if(item.sealed === true){ var seal = makeDiv("incogStatic"); seal.textContent = "Locked"; el.appendChild(seal); return; }
+    if(SHARE_LINK_PAGE && window.Stick && Stick.incognito && !item.concealed){
+      var h = Stick.incognito.mount(el, {seed: String(item.x) + ":" + String(item.y), onReveal: function(){ el.classList.remove("incogCovered"); }});
+      return h;
+    }
+    el.appendChild(makeDiv("incogStatic")).textContent = "Scratch to reveal";
+  }
   function pinMenuItem(n){
     return menuItem(ICONS.pin, isPinned(n) ? "Unpin" : "Pin in place", function(){ closeFloatingPopovers(); setPinned([n.id], !isPinned(n)); }, {title: isPinned(n) ? "Let this move again" : "Keep this exactly where it is"});
   }
@@ -7951,6 +8040,7 @@
   function isDoneItem(o){ return !!o && Number(o.doneAt) > 0; }
   function findPile(id){ for(var i = 0; i < donePile.length; i++){ if(donePile[i].id === id) return donePile[i]; } return null; }
   function pileTitle(o){
+    if(isConcealed(o)) return hiddenLabel(o);
     var t = "";
     if(o.type === "photo" || o.type === "audio" || o.type === "video") t = o.caption || "";
     else if(isPaper(o)) t = Stick.objects.text(o);
@@ -8521,6 +8611,12 @@
     var cloudShare = !!(CLOUD && cloudSync && !viewerMode && window.Stick && Stick.share);
     var avLeft = list.filter(isAV).length;
     var shareable = list.filter(function(n){ return !isPileObj(n) && noteHasContent(n) && (cloudShare || !isAV(n)); });
+    var sealedHere = shareable.filter(isLockedNote);
+    if(sealedHere.length){ shareable = shareable.filter(function(n){ return !isLockedNote(n); }); toast(sealedHere.length === 1 ? "A locked note can't be shared. Remove its PIN lock first." : "Locked notes can't be shared. Remove their PIN locks first."); if(!shareable.length) return; }
+    if(shareable.some(isIncog)){
+      var okIncog = await confirmDialog({title: "Incognito isn\u2019t private", body: "The foil only hides the words until someone scratches it. They travel inside the link, so anyone who gets it can read them. Use a PIN lock for anything that must stay private.", confirm: "Share anyway"});
+      if(!okIncog) return;
+    }
     if(!shareable.length && avLeft && !cloudShare){ toast("Voice memos and videos stay on this device for now, so they can't be shared by link yet. Sign in to share them."); return; }
     if(!shareable.length){
       toast(list.length > 1 ? "Those notes are empty. Add something first." : "Add some text or an image before sharing.");
@@ -8649,7 +8745,7 @@
     endEditing(); closeFloatingPopovers();
     var root = null;
     try{
-    var P = Stick.printLayout, data = items.map(function(n){ return PublicShare.toPublicNote(Object.assign({}, n)); });      // clean copies: the originals are never changed
+    var P = Stick.printLayout, data = items.map(function(n){ var pn = PublicShare.toPublicNote(Object.assign({}, n)); if(isConcealed(n)){ pn.html = ""; pn.image = null; pn.isTask = false; pn.due = ""; pn.concealed = true; if(isIncog(n)) pn.incog = true; } return pn; });      // clean copies: the originals are never changed; concealed ones carry no words
     root = document.createElement("div"); root.id = "printRoot"; root.setAttribute("aria-hidden", "true");
     var sheet = makeDiv("printSheet"); root.appendChild(sheet);
     var els = data.map(function(it){ var el = buildStaticNote(it); el.removeAttribute("id"); Array.prototype.forEach.call(el.querySelectorAll("[id]"), function(x){ x.removeAttribute("id"); }); el.classList.add("printObj"); return el; });
@@ -9063,6 +9159,7 @@
       if(isPileObj(n)){ if(n.el){ var hit = !q || !!pileHits[n.id]; n.el.style.opacity = hit ? "" : "0.15"; n.el.style.pointerEvents = hit ? "" : "none"; n.el.classList.toggle("pileHit", !!q && !!pileHits[n.id]); n.el.title = q && pileHits[n.id] ? pileHits[n.id] + " match" + (pileHits[n.id] > 1 ? "es" : "") + " inside this pile. Click to select it, or open it." : ""; } return; }
       if(!n.el) return;
       if(!q || isZone(n)){ n.el.style.opacity = ""; n.el.style.pointerEvents = ""; return; }
+      if(isConcealed(n)){ n.el.style.opacity = "0.15"; n.el.style.pointerEvents = "none"; return; }          // concealed: not searched, not highlighted
       if(isPaper(n) && !n.textEl){ var pHit = Stick.objects.text(n).toLowerCase().indexOf(q) !== -1; n.el.style.opacity = pHit ? "1" : "0.15"; n.el.style.pointerEvents = pHit ? "" : "none"; return; }
       var searchable = n.textEl || n.captionEl;
       if(!searchable){ n.el.style.opacity = "0.15"; n.el.style.pointerEvents = "none"; return; }
@@ -12159,7 +12256,9 @@
         g.fillRect(p.tx * sc - tw/2, -h/2 - 11 * sc, tw, 22 * sc);
       }
       var left = -w/2 + 14 * sc, y = -h/2 + 26 * sc, inner = w - 28 * sc;
-      if(n.image){
+      var veiled = isConcealed(n);
+      if(veiled){ g.fillStyle = "rgba(168,173,182,0.95)"; g.fillRect(-w/2 + 6 * sc, -h/2 + 22 * sc, w - 12 * sc, h - 28 * sc); }
+      if(n.image && !veiled){
         var im = (n.el && n.el.querySelector(".noteImgWrap img")) || thumbImage(n.image);
         var ratio = n.imgRatio || (im.naturalWidth ? im.naturalHeight / im.naturalWidth : 0.75);
         var iw = Math.min(inner, (n.imgW || defaultImgW(n) || (it.w - 28)) * sc), ih = iw * ratio;
@@ -12167,7 +12266,7 @@
         else { pending = true; g.fillStyle = "rgba(0,0,0,0.12)"; g.fillRect(left, y, iw, ih); }
         y += ih + 8 * sc;
       }
-      var text = (n.textEl ? n.textEl.textContent : htmlToText(n.html || "")).replace(/\s+/g, " ").trim();
+      var text = veiled ? "" : (n.textEl ? n.textEl.textContent : htmlToText(n.html || "")).replace(/\s+/g, " ").trim();
       if(text){
         var fs = Math.max(2.4, 17 * sc);
         g.font = fs + "px " + fontStack(n.font);
