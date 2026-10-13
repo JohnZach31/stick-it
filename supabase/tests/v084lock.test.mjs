@@ -122,4 +122,10 @@ ok(/\.note\.lockSealed > :is\(\.text, \.noteImgWrap/.test(css) && /\.sealWax/.te
 ok(/Only the PIN opens it\./.test(app) && /can.t be recovered/.test(app) && /There is no way to reset a forgotten PIN/.test(app), 'the setup says plainly that a forgotten PIN cannot be recovered');
 ok(!/master|backdoor|recovery code|reset PIN/i.test(fn('lockFlow') + fn('unlockNote') + fn('tryOpen')), 'there is no master PIN or recovery path in the code');
 
+// ---- exports say what they contain, and sizes are guarded
+ok(/Incognito notes are included WITH their words: the foil is not encryption/.test(app) && /PIN-locked notes stay sealed in the file/.test(app) && /PIN-locked notes still sealed/.test(app), 'both exports say that Incognito notes carry their words and locked notes stay sealed');
+ok(/n\.image && lockOnServer\(\)\) return "A picture can.t be PIN-locked on a signed-in board/.test(fn('lockWhyNot')) && /isLockedNote\(n\) && lockOnServer\(\)\)\{ toast\("A picture can.t be added/.test(fn('handleImageDrop')), 'on a signed-in board a locked note takes no picture and a note with a picture is not locked (a board row holds 256 KB)');
+ok(/server && sealed\.env\.ct\.length > 200000/.test(fn('lockFlow')) && /TOO_BIG/.test(fn('lockErr')), 'a sealed note that would not fit in a board row is refused with a plain message');
+ok(L.pad('x'.repeat(10)).length === 256 && new TextEncoder().encode(L.pad('é'.repeat(200))).length % 256 === 0, 'padding counts bytes, not characters (Hebrew and emoji notes pad correctly)');
+
 console.log('v0.8.4 PIN locks: ' + pass + ' passed, ' + fail + ' failed'); process.exit(fail ? 1 : 0);

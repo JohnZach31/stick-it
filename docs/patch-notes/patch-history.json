@@ -11,6 +11,133 @@
   ],
   "versions": [
     {
+      "version": "0.8.4",
+      "slug": "v0-8-4",
+      "codename": "Scratch & Seal",
+      "title": "Stick-It v0.8.4 — Scratch & Seal",
+      "status": "development",
+      "date": null,
+      "summary": "Scratch-off Incognito notes, PIN-sealed notes that are really encrypted, and a more reliable Ctrl+U.",
+      "tags": [
+        "Privacy",
+        "Nodes",
+        "Canvas"
+      ],
+      "highlights": [
+        "Incognito: cover a note with scratch-off foil and scratch it away with the mouse or a finger. A visual cover only, not security.",
+        "PIN lock: seal a note with a 4 to 8 digit PIN. Its words are encrypted on your device and nothing can bring them back without the PIN.",
+        "No recovery: a forgotten PIN can never be reset, and Stick-It tells you before you lock.",
+        "Covered and locked notes show no words in search, copy, print, previews or board thumbnails.",
+        "Ctrl+U underlines reliably: holding the keys no longer flips it on and off."
+      ],
+      "notes": [
+        {
+          "heading": "Incognito notes",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Right-click a note and choose Make Incognito: it gets a silver scratch-off foil. Scratch it with the mouse or a finger; about 60% of the way through, the rest lifts off by itself",
+                "The note's tab stays clear, so you can still drag it like any note. Scratching never moves the note, pans the board or starts a selection",
+                "Works at any zoom and any tilt",
+                "Cover Again puts the foil back; Remove Incognito makes it an ordinary note",
+                "Keyboard and screen reader: the foil is a button; Enter or Space (or Reveal in the menu) lifts it",
+                "It stays Incognito after a refresh and covers itself again every time the board is opened",
+                "Search, previews, the clipboard, print, PDF and board thumbnails show no words for a covered note",
+                "Select several notes and make them all Incognito at once"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "PIN-locked notes",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Right-click a note and choose Lock with PIN: choose a PIN of 4 to 8 digits and type it twice. The note becomes a sealed letter with a wax seal and a handwritten \"Locked\"",
+                "Its colour and size stay; its words and picture are encrypted on your device before anything is saved or synced",
+                "Click the sealed note to enter the PIN. Wrong guesses are slowed down: after three in a row you wait ten seconds, then longer",
+                "Lock Again closes it at any time. Refreshing the page, switching boards or signing out closes every lock",
+                "Change PIN and Remove PIN Lock ask for the current PIN",
+                "Locking several notes at once needs a deliberate confirmation, because they all open with the same PIN",
+                "There is no master PIN and no recovery. If you forget a PIN the note can never be opened again, and Stick-It says so before you lock",
+                "On a signed-in board, the key also depends on a secret that the server only gives out for a correct PIN, and counts wrong guesses for the note, whoever makes them",
+                "Undo and Redo can never bring a locked note's words back"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "What the lock does and does not protect",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "It protects the words from other people on the board, board owners and administrators, shared links, exports and anyone who copies the stored data",
+                "It does not hide that a locked note exists, where it is, its colour or its size",
+                "A 4 to 8 digit PIN has few possible values. On a signed-in board the server limits guessing; on a board that only lives on this device, only the encryption slows guessing down",
+                "Someone who can read the whole database and the stored note can still try PINs offline. Use a long PIN for anything that matters",
+                "Incognito is a visual cover only. It is not encryption and is never described as security"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Writing",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Ctrl+U (Cmd+U on a Mac) underlines reliably: holding the keys down no longer flips the underline on and off, and the buttons show the same state as the shortcut"
+              ]
+            }
+          ]
+        },
+        {
+          "heading": "Known limits",
+          "blocks": [
+            {
+              "t": "ul",
+              "items": [
+                "Only plain notes (including checklists) can be Incognito or PIN-locked. Photos, papers, recordings, zones and piles cannot yet",
+                "On a signed-in board, a note with a picture cannot be PIN-locked yet (and a locked note cannot take a picture); remove the picture first. Very large notes are refused too",
+                "Guests who joined with a link cannot create PIN locks; a guest board that only lives on this device can",
+                "A locked note cannot be copied, duplicated, shared or moved to another board",
+                "Real touch scratching has not been tried on a physical phone or tablet yet",
+                "Opening a server-protected lock needs a connection"
+              ]
+            }
+          ]
+        }
+      ],
+      "tour": {
+        "mode": "full",
+        "cards": [
+          {
+            "title": "Scratch & Seal",
+            "body": "Two new ways to keep a note to yourself. This takes about thirty seconds."
+          },
+          {
+            "title": "Incognito",
+            "body": "Right-click a note and choose Make Incognito. Scratch the foil away to read it. It covers itself again every time the board opens. It is a cover, not a lock."
+          },
+          {
+            "title": "PIN lock",
+            "body": "Right-click a note and choose Lock with PIN. The words are encrypted before they are saved. A forgotten PIN can never be recovered."
+          },
+          {
+            "title": "Nothing leaks",
+            "body": "A covered or locked note shows no words in search, copy, print, previews or thumbnails."
+          }
+        ]
+      },
+      "media": [],
+      "notesFile": "0.8.4.md",
+      "newer": null,
+      "older": "0.8.3.4"
+    },
+    {
       "version": "0.8.3.4",
       "slug": "v0-8-3-4",
       "codename": "Lock It Down",
@@ -132,7 +259,7 @@
       },
       "media": [],
       "notesFile": "0.8.3.4.md",
-      "newer": null,
+      "newer": "0.8.4",
       "older": "0.8.3.3"
     },
     {

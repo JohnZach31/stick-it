@@ -57,3 +57,9 @@ Owner saw "Couldn't reach the server" opening a shared board in a private window
 **v0.8.3 — Stick Around.** Not started. Do not start it until the owner says so.
 
 - Piles / vertical stacks phase 1 built (docs/dev/PILES.md). Needs owner/two-device verification; Fan view deliberately not started.
+
+## v0.8.4 Scratch & Seal (in development, on `feature/v0.8.4-incognito-pin-locks`)
+- New: Incognito notes ([INCOGNITO.md](INCOGNITO.md)), PIN-locked notes ([LOCKED-NOTES.md](LOCKED-NOTES.md)), the Ctrl+U fix. Not merged and not pushed to master.
+- Migration to apply by the owner before PIN locks work on a **signed-in** board: `supabase/migrations/20261011100000_node_locks.sql` (one table, no policy; six functions). Device-only boards do not need it.
+- Not validated yet: a physical phone or tablet (touch scratching), the real Supabase project (locks were exercised against the local stand-in running the real migration), the off-screen memory release of foils (the automated browser never delivers IntersectionObserver callbacks), Hebrew/RTL notes under a foil or seal by eye, a screen reader.
+- Known gaps by design: only plain notes; no recovery for a forgotten PIN; the database operator can still guess PINs offline; a locked note cannot be copied, shared or moved.

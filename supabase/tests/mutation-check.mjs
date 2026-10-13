@@ -50,6 +50,16 @@ const mutations = [
   ['deleted comments can come back',        '20261002100000_comment_delete.sql', "if old.deleted_at is not null and new.deleted_at is distinct from old.deleted_at then", "if false then"],
   ['former members keep their reach (both layers)', '20261002100000_comment_delete.sql', ["if not public.can_read_board(old.board_id) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;", "or not public.can_read_board(c.board_id) then return; end if;"], ["null;", "then return; end if;"]],
   ['review table writable by browsers',     '20261001140000_collab.sql', "grant select on public.object_reviews to authenticated;", "grant all on public.object_reviews to authenticated;"],
+  // ---- v0.8.4 PIN locks
+  ['lock table open to browsers',           '20261011100000_node_locks.sql', 'alter table public.node_locks enable row level security;\nrevoke all on public.node_locks from public, anon, authenticated;', 'grant select, insert, update, delete on public.node_locks to anon, authenticated;'],
+  ['lock cooldown ignored',                 '20261011100000_node_locks.sql', 'if l.locked_until is not null and l.locked_until > now() then      -- cooling down', 'if false then      -- cooling down'],
+  ['wrong PINs are not counted',            '20261011100000_node_locks.sql', 'update public.node_locks set fails = l.fails + 1, locked_until', 'update public.node_locks set fails = l.fails, locked_until'],
+  ['anyone can change or remove a lock',    '20261011100000_node_locks.sql', "if p_require_owner and l.owner_id <> uid then raise exception 'LOCK_NOT_OWNER' using errcode = '42501'; end if;", 'null;'],
+  ['someone else\'s lock can be replaced',   '20261011100000_node_locks.sql', "if found and cur.owner_id <> uid then raise exception 'LOCK_NOT_OWNER' using errcode = '42501'; end if;", 'null;'],
+  ['viewers can create locks',              '20261011100000_node_locks.sql', "if not public.can_edit_board(p_board) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;\n  if p_node is null", 'if p_node is null'],
+  ['guests can create locks',               '20261011100000_node_locks.sql', "if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then raise exception 'ANONYMOUS_NOT_ALLOWED' using errcode = '42501'; end if;\n  if not public.can_edit_board", 'if not public.can_edit_board'],
+  ['outsiders can guess PINs',              '20261011100000_node_locks.sql', "elsif not public.can_read_board(p_board) then raise exception 'FORBIDDEN' using errcode = '42501'; end if;", 'end if;'],
+  ['removing a lock hands out the secret',  '20261011100000_node_locks.sql', "return r - 'secret';", 'return r;']
 ];
 
 let missed = 0;

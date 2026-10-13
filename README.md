@@ -37,11 +37,17 @@ Share a board with a link that just *works*.
 | 📚 **Piles and stacks** | Stack notes in a column, or collapse them into a pile you can browse one paper at a time. Nothing in a pile is ever deleted by collapsing it. |
 | ▶️ **Links that become videos** | Paste a YouTube or Vimeo link (or click one already in a note) and choose to keep it as a link or play it right on the board. Nothing loads until you press Play. |
 | ✅ **Done pile & Clean up** | Finished notes tuck into a Done pile; a tidy-up button arranges what's on screen, leaving pinned notes and zones alone. |
+| 🪙 **Incognito notes** | Cover a note with scratch-off foil and scratch it away with the mouse or a finger. A visual cover only, never described as security; it covers itself again every time the board opens. See [docs/dev/INCOGNITO.md](docs/dev/INCOGNITO.md). |
+| 🔐 **PIN-locked notes** | Seal a plain note with a 4–8 digit PIN: its words are encrypted on your device (AES-GCM, PBKDF2) before they are saved or synced, and on a signed-in board the key also needs a secret the server only releases for a correct PIN, a few guesses at a time. No master PIN, no recovery. What it does and does not protect: [docs/dev/LOCKED-NOTES.md](docs/dev/LOCKED-NOTES.md). |
 | 📜 **Legal, in the app** | Privacy, Terms, Storage, Accessibility, Young people and Copyright open inside Stick-It (English and Hebrew), generated from the same source as the public pages. |
 
 ---
 
 ## 🆕 What's new
+
+**v0.8.4 — Scratch & Seal** (in development): Incognito scratch-off notes, PIN-locked notes that are really encrypted (with honest limits: see [docs/dev/LOCKED-NOTES.md](docs/dev/LOCKED-NOTES.md)), covered and locked notes kept out of search, copy, print, previews and thumbnails, and a more reliable Ctrl+U. Needs one new database migration for locks on signed-in boards (`20261011100000_node_locks.sql`).
+
+**v0.8.3.4 — Lock It Down** (a hotfix, not yet merged): turning off an invite link really removes the access it gave, live boards update almost instantly, who-is-here and note-editing indicators, a Sharing & access window, and a round of fixes. Notes: [docs/patch-notes/0.8.3.4.md](docs/patch-notes/0.8.3.4.md).
 
 **v0.8.3.3 — Sand the Edges** (in development): a hotfix pass. Tutorial keys and Skip work again (a second tutorial could stack on the first), a central layer scale puts dialogs above Done / Trash, piles show the real top paper with one set of reserved controls and can be edited in place, zones get a short menu (Material / Colour submenus), a readable title rail with its own fonts and a clickable object count, reactions are paper tabs with a searchable emoji slip, Done has a warmer stamp-and-chime sound, empty notes skip Trash, paper trims itself (with Undo), newspapers have eight clearly different looks, standalone legal pages match the in-app reader, Add video asks how first, Clean Up can tidy inside zones, Done / Trash are one small dock, and What’s New shows every update with a release map. See [docs/dev/LAYERS.md](docs/dev/LAYERS.md).
 

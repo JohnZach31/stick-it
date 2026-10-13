@@ -278,7 +278,7 @@ const fresh = () => { const c = vm.createContext({ console, Math, Date, Object, 
 const pn = JSON.parse(read('docs/patch-notes/patch-notes.json'));
 const pn3 = pn.find((x) => x.version === '0.8.3');
 ok(pn3 && pn3.codename === 'Stick Around' && pn3.status === 'development' && pn3.date === null && pn3.title === 'Stick-It v0.8.3 — Stick Around', 'v0.8.3 "Stick Around" is recorded and not released');
-ok(/APP_STATUS: "(development|released)"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.3(?:\.\d)?"/.test(read('js/config.js')), 'the app is still in development');
+ok(/APP_STATUS: "(development|released)"/.test(read('js/config.js')) && /APP_VERSION: "0\.8\.(?:3(?:\.\d)?|4)"/.test(read('js/config.js')), 'the app is still in development');
 ok(JSON.parse(read('docs/patch-notes/index.json')).find((x) => x.version === '0.8.3').file === '0.8.3.md' && fs.existsSync(path.join(root, 'docs/patch-notes/0.8.3.md')), 'patch notes and the index are in step');
 ok(pn3.tour.length === 5 && ['Done has somewhere to go', 'Trash without panic', 'Scraps got richer', 'Your board remembers more'].every((t) => pn3.tour.some((s) => s.title === t)), 'the Spotlight has the four cards');
 const pd = read('js/patch-data.js'); ok(/"version": "0\.8\.\d(?:\.\d)?"/.test(pd) && !/Touch the Paper/.test(pd), 'the shipped Spotlight data has no stale content');

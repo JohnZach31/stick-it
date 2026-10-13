@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.8.4",
+    "codename": "Scratch & Seal",
+    "title": "Stick-It v0.8.4 — Scratch & Seal",
+    "date": null,
+    "status": "development",
+    "tldr": "Scratch-off Incognito notes, PIN-sealed notes that are really encrypted, and a more reliable Ctrl+U.",
+    "file": "0.8.4.md"
+  },
+  {
     "version": "0.8.3.4",
     "codename": "Lock It Down",
     "title": "Stick-It v0.8.3.4 — Lock It Down",

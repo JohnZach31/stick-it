@@ -19,4 +19,6 @@ Order, lowest to highest:
 
 Board overlays: `--z-peer: 9990` is the editing glow/tab layer (above every paper, below the zone title rail at 9999 and everything in the list above).
 
+The Incognito flake layer (`.incogFx`, a fixed canvas that only ever draws a few specks) uses `--z-peer`, and the foil and the wax seal (`.incogWrap`, `.sealWrap`) sit inside their own note at `z-index: 3`, so they move, tilt and stack with it. The PIN slip is an ordinary modal (`--z-modal`, `critical` when opened over a reader).
+
 New surfaces must use a variable, not a number. Escape handling is separate: `OV.layer(...)` keeps a stack so Esc closes the top-most surface only.

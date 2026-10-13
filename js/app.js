@@ -6854,6 +6854,7 @@
 
   function handleImageDrop(file, n){
     if(isSealed(n)){ toast("Unlock this note first."); return; }
+    if(isLockedNote(n) && lockOnServer()){ toast("A picture can’t be added to a PIN-locked note on a signed-in board yet. Remove the lock first."); return; }
     var reader = new FileReader();
     reader.onload = function(){
       var img = new Image();
@@ -8063,11 +8064,13 @@
     if(!lockSupported()) return "This browser can’t encrypt notes, so it can’t lock them.";
     if(!n || n.type) return "Only notes can be PIN-locked for now.";
     if(n.assetId || n.attachedAssetId) return "A picture stored in your account can’t be locked yet. Remove the picture first.";
+    if(n.image && lockOnServer()) return "A picture can’t be PIN-locked on a signed-in board yet. Remove the picture first.";
     if(CLOUD && guestSession()) return "Guests can’t lock notes. Sign in with an account to lock this.";
     return "";
   }
   function lockErr(e){
     if(e && (e.message === "NO_CRYPTO")) return "This browser can’t encrypt notes.";
+    if(e && (e.message === "TOO_BIG")) return "That note is too big to lock. Shorten it first.";
     if(e && e.code === "OFFLINE") return "Locking and unlocking need a connection to your account.";
     try{ return Stick.errors.friendly(Stick.errors.parse(e)); }catch(x){ return "Something went wrong. Try again."; }
   }
@@ -8172,6 +8175,7 @@
             var prep = await Stick.lock.prepare(v[0]), secret = null;
             if(server) secret = await lockApi().create(activeBoardId, n.id, prep.proof);          // the server's half of the key exists BEFORE the sealed note can sync
             var sealed = await Stick.lock.seal(prep, secret, n, n.id);
+            if(server && sealed.env.ct.length > 200000) throw new Error("TOO_BIG");          // a board row holds 256 KB: a note that big could not be saved
             var h = n.el ? Math.round(n.el.offsetHeight) : 0;
             n.lock = sealed.env; if(h >= 40 && h <= 2000) n.lockH = h;
             forgetLockMemory(n); n.html = "";
@@ -8819,6 +8823,13 @@
       add(ICONS.move, "Pile", function(){ makePile(ids); }).title = "Collapse these notes into one pile (nothing is deleted)";
     }
     add(ICONS.copy, "Duplicate", function(){ duplicateNotes(ids); });
+    var incogIds = ids.filter(function(id){ return incogEligible(findNote(id)); });
+    if(incogIds.length){
+      var allIncog = incogIds.every(function(id){ return isIncog(findNote(id)); });
+      add(allIncog ? INCOG_EYE : INCOG_EYE_OFF, allIncog ? "Incognito off" : "Incognito", function(){ setIncog(incogIds, !allIncog); }).title = allIncog ? "Make the selected notes normal again" : "Cover the selected notes with scratch-off foil. A visual cover only, not security.";
+    }
+    var lockIds = ids.filter(function(id){ var q = findNote(id); return q && !q.type && !isLockedNote(q); });
+    if(lockIds.length) add(LOCK_ICON, "Lock", function(){ lockFlow(lockIds); }).title = "Seal the selected notes with one PIN. You will be asked to confirm.";
     add(ICONS.move, "Move " + ids.length + " to…", function(b){
       var pop = openFloatingPopover(b, "noteMenu");
       if(!pop) return;
@@ -10846,7 +10857,7 @@
       };
       downloadText("stick-it-account-" + new Date().toISOString().slice(0, 10) + ".json",
         JSON.stringify({app: "stick-it", version: 2, kind: "account-export", exportedAt: new Date().toISOString(),
-          includes: ["account and profile", "preferences", "boards you can open and everything on them (text, layout, formatting)", "pictures (embedded)", "your share links (without their secret addresses)", "which boards you belong to and your role"],
+          includes: ["account and profile", "preferences", "boards you can open and everything on them (text, layout, formatting; Incognito notes with their words, PIN-locked notes still sealed)", "pictures (embedded)", "your share links (without their secret addresses)", "which boards you belong to and your role"],
           notIncluded: ["voice memo and video files (the items are listed, the recordings are not)", "the secret address of each share link", "comments (the app has no comments yet)"],
           account: account, boards: out}, null, 2));
       toast("Downloaded " + out.length + (out.length === 1 ? " board" : " boards") + " (" + total + " items)." +
@@ -11772,7 +11783,9 @@
     var box = makeDiv("noteBox");
     box.textContent = "“" + currentBoardName() + "” · " + notes.length + (notes.length === 1 ? " note" : " notes") +
       (withImg ? " (" + withImg + " with images)" : "") + ". The file keeps text, formatting, colours, fonts, images and positions." +
-      (avCount ? " Voice memos and videos aren\u2019t included in the file (" + avCount + " on this board)." : "");
+      (avCount ? " Voice memos and videos aren\u2019t included in the file (" + avCount + " on this board)." : "") +
+      (notes.some(isIncog) ? " Incognito notes are included WITH their words: the foil is not encryption." : "") +
+      (notes.some(isLockedNote) ? " PIN-locked notes stay sealed in the file; they need their PIN, and one locked on a signed-in board can only be opened on that board." : "");
     content.appendChild(box);
     var m = openModal({
       title:"Export board",
